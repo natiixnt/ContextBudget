@@ -1,0 +1,4 @@
+[compression]
+full_file_threshold_tokens = 1
+snippet_score_threshold = 0
+snippet_total_line_limit = 50

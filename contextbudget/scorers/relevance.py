@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+"""Relevance scoring stage for repository files."""
+
+from contextbudget.config import ScoreSettings
 from contextbudget.core.text import task_keywords
 from contextbudget.schemas.models import FileRecord, RankedFile
+from contextbudget.scorers.import_graph import build_import_graph
 
 _SIGNAL_FILES = {
     "readme.md": 0.5,
@@ -13,9 +17,26 @@ _SIGNAL_FILES = {
 }
 
 
-def score_files(task: str, files: list[FileRecord]) -> list[RankedFile]:
+def _add_reason(reasons: list[str], reason: str) -> None:
+    if reason not in reasons:
+        reasons.append(reason)
+
+
+def _format_graph_reason(prefix: str, related: set[str]) -> str:
+    sorted_related = sorted(related)
+    if len(sorted_related) == 1:
+        return f"{prefix}: {sorted_related[0]}"
+    return f"{prefix}: {sorted_related[0]} (+{len(sorted_related) - 1} more)"
+
+
+def score_files(task: str, files: list[FileRecord], settings: ScoreSettings | None = None) -> list[RankedFile]:
+    """Score files for a task using deterministic keyword and import-graph heuristics."""
+
+    cfg = settings if settings is not None else ScoreSettings()
     keywords = task_keywords(task)
-    ranked: list[RankedFile] = []
+
+    base_scores: dict[str, float] = {}
+    reasons_by_path: dict[str, list[str]] = {}
 
     for record in files:
         path_lower = record.path.lower()
@@ -23,34 +44,89 @@ def score_files(task: str, files: list[FileRecord]) -> list[RankedFile]:
         score = 0.0
         reasons: list[str] = []
 
+        for critical_keyword in cfg.critical_path_keywords:
+            if critical_keyword and critical_keyword in path_lower:
+                score += cfg.critical_path_bonus
+                _add_reason(reasons, f"critical path keyword '{critical_keyword}'")
+
         for keyword in keywords:
             path_hits = path_lower.count(keyword)
             preview_hits = preview_lower.count(keyword)
             if path_hits:
-                score += 2.0 * path_hits
-                reasons.append(f"path contains '{keyword}'")
+                score += cfg.path_keyword_weight * path_hits
+                _add_reason(reasons, f"path contains '{keyword}'")
             if preview_hits:
-                score += min(4.0, 0.25 * preview_hits)
-                reasons.append(f"content mentions '{keyword}'")
+                score += min(cfg.content_keyword_cap, cfg.content_keyword_weight * preview_hits)
+                _add_reason(reasons, f"content mentions '{keyword}'")
 
-        name = record.path.rsplit("/", 1)[-1]
-        if name in _SIGNAL_FILES:
-            score += _SIGNAL_FILES[name]
-            reasons.append(f"signal file {name}")
+        name = record.path.rsplit("/", 1)[-1].lower()
+        signals = cfg.signal_files if cfg.signal_files else _SIGNAL_FILES
+        if name in signals:
+            score += signals[name]
+            _add_reason(reasons, f"signal file {name}")
 
-        if record.extension in {".py", ".ts", ".tsx", ".js", ".go", ".rs", ".java"}:
-            score += 0.35
+        if record.extension in cfg.code_extensions:
+            score += cfg.code_extension_bonus
 
         if "test" in path_lower:
-            score += 0.25
-            reasons.append("test proximity")
+            score += cfg.test_path_bonus
+            _add_reason(reasons, "test proximity")
 
-        if record.line_count > 500:
-            score -= 0.2
+        if record.line_count > cfg.large_file_line_threshold:
+            score -= cfg.large_file_penalty
 
-        if score > 0:
-            deduped_reasons = list(dict.fromkeys(reasons))
-            ranked.append(RankedFile(file=record, score=round(score, 3), reasons=deduped_reasons[:4]))
+        base_scores[record.path] = score
+        reasons_by_path[record.path] = reasons
+
+    if cfg.enable_import_graph_signals and files:
+        graph = build_import_graph(files, entrypoint_filenames=cfg.entrypoint_filenames)
+
+        # Graph propagation model:
+        # 1) Find seed files from high base scores.
+        # 2) Award deterministic bonuses to one-hop neighbors.
+        # 3) Keep explanations tied to specific graph relationships.
+        seed_paths = {path for path, score in base_scores.items() if score >= cfg.graph_seed_score_threshold}
+        if not seed_paths:
+            # Fallback seed for sparse tasks: top positive base score only.
+            positive = sorted(
+                [(path, score) for path, score in base_scores.items() if score > 0],
+                key=lambda item: (-item[1], item[0]),
+            )
+            if positive:
+                seed_paths = {positive[0][0]}
+
+        for record in files:
+            path = record.path
+            score = base_scores[path]
+            reasons = reasons_by_path[path]
+
+            inbound_from_seed = graph.incoming.get(path, set()) & seed_paths
+            if inbound_from_seed:
+                bonus = min(cfg.graph_bonus_cap, cfg.graph_imported_by_relevant_bonus * len(inbound_from_seed))
+                score += bonus
+                _add_reason(reasons, _format_graph_reason("imported by relevant file", inbound_from_seed))
+
+            outbound_to_seed = graph.outgoing.get(path, set()) & seed_paths
+            if outbound_to_seed:
+                bonus = min(cfg.graph_bonus_cap, cfg.graph_depends_on_relevant_bonus * len(outbound_to_seed))
+                score += bonus
+                _add_reason(reasons, _format_graph_reason("depends on relevant module", outbound_to_seed))
+
+            adjacent_entrypoints = (graph.incoming.get(path, set()) | graph.outgoing.get(path, set())) & graph.entrypoints
+            if adjacent_entrypoints:
+                score += cfg.graph_entrypoint_adjacency_bonus
+                _add_reason(reasons, _format_graph_reason("adjacent to entrypoint", adjacent_entrypoints))
+
+            base_scores[path] = score
+            reasons_by_path[path] = reasons
+
+    ranked: list[RankedFile] = []
+    for record in files:
+        score = base_scores[record.path]
+        if score <= 0:
+            continue
+        reasons = reasons_by_path[record.path]
+        ranked.append(RankedFile(file=record, score=round(score, 3), reasons=reasons[:6]))
 
     ranked.sort(key=lambda item: (-item.score, item.file.path))
     return ranked

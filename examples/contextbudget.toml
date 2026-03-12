@@ -1,0 +1,26 @@
+# Example ContextBudget configuration
+
+[scan]
+include_globs = ["**/*.py", "**/*.md", "pyproject.toml"]
+ignore_globs = ["**/migrations/**", "**/*.generated.*", "**/vendor/**"]
+max_file_size_bytes = 1500000
+
+[budget]
+max_tokens = 30000
+top_files = 25
+
+[score]
+critical_path_keywords = ["auth", "permission", "billing", "security"]
+
+[compression]
+summary_preview_lines = 10
+
+[cache]
+summary_cache_enabled = true
+duplicate_hash_cache_enabled = true
+cache_file = ".contextbudget_cache.json"
+
+[telemetry]
+enabled = false
+sink = "file"
+file_path = ".contextbudget/telemetry.jsonl"

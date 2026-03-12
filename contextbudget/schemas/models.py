@@ -1,11 +1,15 @@
 from __future__ import annotations
 
+"""Shared schema dataclasses and legacy constants."""
+
 from dataclasses import dataclass, field
 from pathlib import Path
 
 
 @dataclass(slots=True)
 class FileRecord:
+    """Metadata for a scanned repository file."""
+
     path: str
     absolute_path: str
     extension: str
@@ -17,6 +21,8 @@ class FileRecord:
 
 @dataclass(slots=True)
 class RankedFile:
+    """File metadata paired with a relevance score and reasons."""
+
     file: FileRecord
     score: float
     reasons: list[str] = field(default_factory=list)
@@ -24,15 +30,22 @@ class RankedFile:
 
 @dataclass(slots=True)
 class CompressedFile:
+    """Packed output entry for a file included in context payload."""
+
     path: str
     strategy: str
     original_tokens: int
     compressed_tokens: int
     text: str
+    chunk_strategy: str = "none"
+    chunk_reason: str = ""
+    selected_ranges: list[dict[str, int | str]] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class BudgetReport:
+    """Budget metrics included in run reports."""
+
     max_tokens: int
     estimated_input_tokens: int
     estimated_saved_tokens: int
@@ -42,6 +55,8 @@ class BudgetReport:
 
 @dataclass(slots=True)
 class RunReport:
+    """Top-level run report persisted to ``run.json``."""
+
     command: str
     task: str
     repo: str
@@ -94,4 +109,6 @@ DEFAULT_IGNORE_DIRS = {
 
 
 def normalize_repo(repo: str | Path) -> Path:
+    """Normalize repository path to absolute path."""
+
     return Path(repo).resolve()

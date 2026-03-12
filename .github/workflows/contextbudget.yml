@@ -1,0 +1,163 @@
+name: ContextBudget CI
+
+on:
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      task:
+        description: "Optional task override for ContextBudget"
+        required: false
+        type: string
+      changed_files:
+        description: "Optional comma/newline list of changed files"
+        required: false
+        type: string
+      strict_mode:
+        description: "Enable strict policy enforcement"
+        required: false
+        default: "true"
+        type: boolean
+      policy_path:
+        description: "Path to policy TOML"
+        required: false
+        default: ".github/contextbudget-policy.toml"
+        type: string
+
+jobs:
+  contextbudget:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    env:
+      TASK_INPUT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.task || '' }}
+      CHANGED_FILES_INPUT: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.changed_files || '' }}
+      STRICT_MODE: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.strict_mode || 'false' }}
+      POLICY_PATH: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.policy_path || '.github/contextbudget-policy.toml' }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ContextBudget
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install -e .
+
+      - name: Resolve task
+        id: resolve
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          changed_files="${CHANGED_FILES_INPUT}"
+          if [[ -z "$changed_files" ]]; then
+            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
+              git fetch origin "${{ github.base_ref }}" --depth=1
+              changed_files="$(git diff --name-only "origin/${{ github.base_ref }}...${{ github.sha }}" | paste -sd, -)"
+            elif [[ "${{ github.event_name }}" == "push" ]]; then
+              changed_files="$(git diff --name-only "${{ github.event.before }}...${{ github.sha }}" | paste -sd, -)"
+            fi
+          fi
+
+          task="${TASK_INPUT}"
+          if [[ -z "$task" ]]; then
+            if [[ -n "$changed_files" ]]; then
+              task="review changed files: $changed_files"
+            else
+              task="evaluate repository context budget"
+            fi
+          fi
+
+          {
+            echo "task<<EOF"
+            echo "$task"
+            echo "EOF"
+            echo "changed_files<<EOF"
+            echo "$changed_files"
+            echo "EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Run ContextBudget pack
+        id: pack
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          args=(pack "${{ steps.resolve.outputs.task }}" --repo . --out-prefix contextbudget-ci)
+          if [[ "$STRICT_MODE" == "true" ]]; then
+            args+=(--strict)
+            if [[ -f "$POLICY_PATH" ]]; then
+              args+=(--policy "$POLICY_PATH")
+            fi
+          fi
+
+          python -m contextbudget.cli "${args[@]}"
+
+      - name: Generate summary report
+        id: report
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          args=(report contextbudget-ci.json --out contextbudget-ci.report.md)
+          if [[ -f "$POLICY_PATH" ]]; then
+            args+=(--policy "$POLICY_PATH")
+          fi
+
+          python -m contextbudget.cli "${args[@]}"
+
+      - name: Add CI summary
+        if: always()
+        shell: bash
+        run: |
+          if [[ -f contextbudget-ci.report.md ]]; then
+            cat contextbudget-ci.report.md >> "$GITHUB_STEP_SUMMARY"
+          elif [[ -f contextbudget-ci.md ]]; then
+            cat contextbudget-ci.md >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "ContextBudget report was not generated." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          echo "### ContextBudget Run Meta" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Task: \\`${{ steps.resolve.outputs.task }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "${{ steps.resolve.outputs.changed_files }}" ]]; then
+            echo "- Changed files input: \\`${{ steps.resolve.outputs.changed_files }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload ContextBudget artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextbudget-artifacts
+          path: |
+            contextbudget-ci.json
+            contextbudget-ci.md
+            contextbudget-ci.report.md
+          if-no-files-found: warn
+
+      - name: Enforce workflow result
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if [[ "${{ steps.pack.outcome }}" != "success" ]]; then
+            echo "ContextBudget pack step failed."
+            exit 1
+          fi
+
+          if [[ "$STRICT_MODE" == "true" && "${{ steps.report.outcome }}" != "success" ]]; then
+            echo "Strict mode is enabled and policy checks failed."
+            exit 1
+          fi

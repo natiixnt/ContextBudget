@@ -183,7 +183,7 @@ def build_parser() -> argparse.ArgumentParser:
         prog="contextbudget",
         description=(
             "Reduce token usage by planning and packing repository context. "
-            "Supports contextbudget.toml sections: [scan], [budget], [score], [compression], [cache]."
+            "Supports contextbudget.toml sections: [scan], [budget], [score], [compression], [cache], [telemetry]."
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)

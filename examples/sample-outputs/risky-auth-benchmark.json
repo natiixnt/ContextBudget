@@ -1,0 +1,81 @@
+{
+  "baseline_full_context_tokens": 73,
+  "command": "benchmark",
+  "generated_at": "2026-03-12T20:08:02.046199+00:00",
+  "max_tokens": 30000,
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+  "scan_runtime_ms": 2,
+  "strategies": [
+    {
+      "cache_hits": 0,
+      "description": "Send full readable repository context without selection or compression.",
+      "duplicate_reads_prevented": 0,
+      "estimated_input_tokens": 73,
+      "estimated_saved_tokens": 0,
+      "files_included": [
+        ".contextbudget_cache.json",
+        "src/auth.py",
+        "src/middleware.py",
+        "src/permissions.py"
+      ],
+      "files_skipped": [],
+      "quality_risk_estimate": "low",
+      "runtime_ms": 0,
+      "strategy": "naive_full_context"
+    },
+    {
+      "cache_hits": 0,
+      "description": "Select top-ranked files and include full content without compression.",
+      "duplicate_reads_prevented": 0,
+      "estimated_input_tokens": 67,
+      "estimated_saved_tokens": 6,
+      "files_included": [
+        "src/auth.py",
+        "src/middleware.py",
+        "src/permissions.py"
+      ],
+      "files_skipped": [
+        ".contextbudget_cache.json"
+      ],
+      "notes": "top_files=25",
+      "quality_risk_estimate": "low",
+      "runtime_ms": 0,
+      "strategy": "top_k_selection"
+    },
+    {
+      "cache_hits": 0,
+      "description": "Use ContextBudget scoring + compression under configured token budget.",
+      "duplicate_reads_prevented": 0,
+      "estimated_input_tokens": 85,
+      "estimated_saved_tokens": 0,
+      "files_included": [
+        "src/auth.py",
+        "src/middleware.py",
+        "src/permissions.py"
+      ],
+      "files_skipped": [],
+      "quality_risk_estimate": "medium",
+      "runtime_ms": 1,
+      "strategy": "compressed_pack"
+    },
+    {
+      "cache_hits": 0,
+      "description": "Repeat compressed pack on warm cache to measure cache-assisted behavior.",
+      "duplicate_reads_prevented": 0,
+      "estimated_input_tokens": 85,
+      "estimated_saved_tokens": 0,
+      "files_included": [
+        "src/auth.py",
+        "src/middleware.py",
+        "src/permissions.py"
+      ],
+      "files_skipped": [],
+      "notes": "second run with warmed summary cache",
+      "quality_risk_estimate": "medium",
+      "runtime_ms": 1,
+      "strategy": "cache_assisted_pack"
+    }
+  ],
+  "task": "add rate limiting to auth API",
+  "top_files": 25
+}

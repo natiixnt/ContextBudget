@@ -23,3 +23,8 @@ Max tokens: 1000
 - `tests/test_service.py` (score: 3.35)
 - `src/service.py` (score: 2.6)
 - `src/models.py` (score: 0.35)
+
+## Chunk Selection
+- `tests/test_service.py`: full-file - file fits within full-file threshold (ranges: 1-5)
+- `src/service.py`: full-file - file fits within full-file threshold (ranges: 1-3)
+- `src/models.py`: full-file - file fits within full-file threshold (ranges: 1-3)

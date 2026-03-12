@@ -23,3 +23,8 @@ Max tokens: 1500
 - `src/middleware.py` (score: 4.1)
 - `src/auth.py` (score: 3.1)
 - `src/permissions.py` (score: 0.35)
+
+## Chunk Selection
+- `src/middleware.py`: full-file - file fits within full-file threshold (ranges: 1-4)
+- `src/auth.py`: full-file - file fits within full-file threshold (ranges: 1-2)
+- `src/permissions.py`: full-file - file fits within full-file threshold (ranges: 1-2)

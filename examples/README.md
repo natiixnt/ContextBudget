@@ -20,3 +20,30 @@ contextbudget pack "tighten auth middleware token validation" --repo examples/ri
 contextbudget plan "large service layer refactor" --repo examples/large-refactor/repo
 contextbudget pack "large service layer refactor" --repo examples/large-refactor/repo --max-tokens 1000 --out-prefix examples/sample-outputs/large-refactor-run
 ```
+
+## Language-aware chunking
+
+```bash
+contextbudget plan "refactor auth exports" --repo examples/language-aware/repo --out-prefix examples/sample-outputs/language-aware-plan
+contextbudget pack "refactor auth exports" --repo examples/language-aware/repo --out-prefix examples/sample-outputs/language-aware-run
+```
+
+## Run-to-run diff
+
+```bash
+contextbudget diff examples/sample-outputs/small-feature-run.json examples/sample-outputs/risky-auth-run.json --out-prefix examples/sample-outputs/small-feature-vs-risky-auth.diff
+```
+
+## Benchmark mode
+
+```bash
+contextbudget benchmark "add rate limiting to auth API" --repo examples/benchmark/repo --out-prefix examples/sample-outputs/benchmark-auth
+```
+
+## Strict policy check
+
+```bash
+contextbudget pack "tighten auth middleware token validation" --repo examples/risky-auth-change/repo --strict --policy examples/policy.toml --out-prefix examples/sample-outputs/risky-auth-strict
+```
+
+In CI, this command exits non-zero when policy violations are detected.

@@ -1,0 +1,82 @@
+{
+  "budget_delta": {
+    "cache_hits": {
+      "delta": 0,
+      "new": 0,
+      "old": 0
+    },
+    "estimated_input_tokens": {
+      "delta": 16,
+      "new": 85,
+      "old": 69
+    },
+    "estimated_saved_tokens": {
+      "delta": 0,
+      "new": 0,
+      "old": 0
+    },
+    "quality_risk": {
+      "delta_level": 0,
+      "new": "medium",
+      "old": "medium"
+    }
+  },
+  "command": "diff",
+  "context_diff": {
+    "added_count": 3,
+    "files_added": [
+      "src/auth.py",
+      "src/middleware.py",
+      "src/permissions.py"
+    ],
+    "files_removed": [
+      "src/cache.py",
+      "src/search_api.py"
+    ],
+    "removed_count": 2
+  },
+  "new_run": "examples/sample-outputs/risky-auth-run.json",
+  "old_run": "examples/sample-outputs/small-feature-run.json",
+  "ranked_score_changes": [
+    {
+      "change_type": "added",
+      "delta": 4.1,
+      "new_score": 4.1,
+      "old_score": null,
+      "path": "src/middleware.py"
+    },
+    {
+      "change_type": "added",
+      "delta": 3.1,
+      "new_score": 3.1,
+      "old_score": null,
+      "path": "src/auth.py"
+    },
+    {
+      "change_type": "removed",
+      "delta": -2.6,
+      "new_score": null,
+      "old_score": 2.6,
+      "path": "src/search_api.py"
+    },
+    {
+      "change_type": "removed",
+      "delta": -0.35,
+      "new_score": null,
+      "old_score": 0.35,
+      "path": "src/cache.py"
+    },
+    {
+      "change_type": "added",
+      "delta": 0.35,
+      "new_score": 0.35,
+      "old_score": null,
+      "path": "src/permissions.py"
+    }
+  ],
+  "task_diff": {
+    "changed": true,
+    "new_task": "tighten auth middleware token validation",
+    "old_task": "add caching to search API"
+  }
+}

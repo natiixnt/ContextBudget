@@ -1,0 +1,126 @@
+{
+  "budget": {
+    "duplicate_reads_prevented": 0,
+    "estimated_input_tokens": 85,
+    "estimated_saved_tokens": 0,
+    "quality_risk_estimate": "medium"
+  },
+  "cache_hits": 0,
+  "command": "pack",
+  "compressed_context": [
+    {
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 33,
+      "original_tokens": 26,
+      "path": "src/middleware.py",
+      "selected_ranges": [
+        {
+          "end_line": 4,
+          "kind": "full",
+          "start_line": 1
+        }
+      ],
+      "strategy": "full",
+      "text": "# Full: src/middleware.py\nfrom .auth import verify_token\n\ndef auth_middleware(token: str) -> bool:\n    return verify_token(token)\n"
+    },
+    {
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 24,
+      "original_tokens": 19,
+      "path": "src/auth.py",
+      "selected_ranges": [
+        {
+          "end_line": 2,
+          "kind": "full",
+          "start_line": 1
+        }
+      ],
+      "strategy": "full",
+      "text": "# Full: src/auth.py\ndef verify_token(token: str) -> bool:\n    return token.startswith(\"prod_\")\n"
+    },
+    {
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 28,
+      "original_tokens": 22,
+      "path": "src/permissions.py",
+      "selected_ranges": [
+        {
+          "end_line": 2,
+          "kind": "full",
+          "start_line": 1
+        }
+      ],
+      "strategy": "full",
+      "text": "# Full: src/permissions.py\ndef can_access(user_role: str, action: str) -> bool:\n    return user_role == \"admin\"\n"
+    }
+  ],
+  "files_included": [
+    "src/middleware.py",
+    "src/auth.py",
+    "src/permissions.py"
+  ],
+  "files_skipped": [],
+  "generated_at": "2026-03-12T19:59:47.457540+00:00",
+  "max_tokens": 30000,
+  "policy": {
+    "checks": {
+      "max_estimated_input_tokens": {
+        "actual": 85,
+        "limit": 30000,
+        "passed": true
+      },
+      "max_files_included": {
+        "actual": 3,
+        "limit": 12,
+        "passed": true
+      },
+      "max_quality_risk_level": {
+        "actual": "medium",
+        "limit": "medium",
+        "passed": true
+      },
+      "min_estimated_savings_percentage": {
+        "actual": 0.0,
+        "limit": 0.0,
+        "passed": true
+      }
+    },
+    "passed": true,
+    "violations": []
+  },
+  "ranked_files": [
+    {
+      "line_count": 4,
+      "path": "src/middleware.py",
+      "reasons": [
+        "content mentions 'auth'",
+        "path contains 'middleware'",
+        "content mentions 'middleware'",
+        "content mentions 'token'",
+        "depends on relevant module: src/auth.py"
+      ],
+      "score": 4.8
+    },
+    {
+      "line_count": 2,
+      "path": "src/auth.py",
+      "reasons": [
+        "path contains 'auth'",
+        "content mentions 'token'",
+        "imported by relevant file: src/middleware.py"
+      ],
+      "score": 4.0
+    },
+    {
+      "line_count": 2,
+      "path": "src/permissions.py",
+      "reasons": [],
+      "score": 0.35
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+  "task": "tighten auth middleware token validation"
+}

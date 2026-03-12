@@ -2,3 +2,5 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 .contextbudget_cache.json
+.venv/
+*.egg-info/

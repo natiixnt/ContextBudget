@@ -1,16 +1,22 @@
 from __future__ import annotations
 
+"""Pack/compression stage for budgeted context generation."""
+
 from dataclasses import dataclass
 from pathlib import Path
 
 from contextbudget.cache.summary_cache import SummaryCache
+from contextbudget.config import CompressionSettings
+from contextbudget.compressors.language_chunks import select_language_aware_chunks
 from contextbudget.core.text import task_keywords
 from contextbudget.core.tokens import estimate_tokens
-from contextbudget.schemas.models import CompressedFile, FileRecord, RankedFile
+from contextbudget.schemas.models import CompressedFile, RankedFile
 
 
 @dataclass(slots=True)
 class CompressionResult:
+    """Result bundle produced by the compression stage."""
+
     compressed_files: list[CompressedFile]
     files_included: list[str]
     files_skipped: list[str]
@@ -21,16 +27,16 @@ class CompressionResult:
     quality_risk_estimate: str
 
 
-def _summary_from_text(path: str, text: str) -> str:
+def _summary_from_text(path: str, text: str, line_limit: int) -> str:
     lines = [line.strip() for line in text.splitlines() if line.strip()]
-    first_lines = lines[:8]
+    first_lines = lines[:line_limit]
     summary = "\n".join(first_lines)
-    if len(lines) > 8:
+    if len(lines) > line_limit:
         summary += "\n..."
     return f"# Summary: {path}\n{summary}" if summary else f"# Summary: {path}\n<empty file>"
 
 
-def _snippet_from_text(path: str, text: str, keywords: list[str]) -> str:
+def _snippet_from_text(path: str, text: str, keywords: list[str], settings: CompressionSettings) -> str:
     raw_lines = text.splitlines()
     hit_indexes: list[int] = []
     for idx, line in enumerate(raw_lines):
@@ -38,20 +44,20 @@ def _snippet_from_text(path: str, text: str, keywords: list[str]) -> str:
         if any(keyword in lower for keyword in keywords):
             hit_indexes.append(idx)
     if not hit_indexes:
-        snippet = "\n".join(raw_lines[:60])
+        snippet = "\n".join(raw_lines[: settings.snippet_fallback_lines])
         return f"# Snippet: {path}\n{snippet}"
 
     selected: list[str] = []
     seen: set[int] = set()
-    for idx in hit_indexes[:8]:
-        start = max(0, idx - 2)
-        end = min(len(raw_lines), idx + 3)
+    for idx in hit_indexes[: settings.snippet_hit_limit]:
+        start = max(0, idx - settings.snippet_context_lines)
+        end = min(len(raw_lines), idx + settings.snippet_context_lines + 1)
         for line_no in range(start, end):
             if line_no in seen:
                 continue
             seen.add(line_no)
             selected.append(raw_lines[line_no])
-    return f"# Snippet: {path}\n" + "\n".join(selected[:120])
+    return f"# Snippet: {path}\n" + "\n".join(selected[: settings.snippet_total_line_limit])
 
 
 def compress_ranked_files(
@@ -60,7 +66,12 @@ def compress_ranked_files(
     ranked_files: list[RankedFile],
     max_tokens: int,
     cache: SummaryCache,
+    settings: CompressionSettings | None = None,
+    duplicate_hash_cache_enabled: bool = True,
 ) -> CompressionResult:
+    """Compress ranked files under a token budget."""
+
+    cfg = settings if settings is not None else CompressionSettings()
     keywords = task_keywords(task)
     compressed_files: list[CompressedFile] = []
     files_included: list[str] = []
@@ -73,11 +84,12 @@ def compress_ranked_files(
 
     for ranked in ranked_files:
         file_record = ranked.file
-        if file_record.content_hash in seen_hashes:
+        if duplicate_hash_cache_enabled and file_record.content_hash in seen_hashes:
             duplicate_reads_prevented += 1
             files_skipped.append(file_record.path)
             continue
-        seen_hashes.add(file_record.content_hash)
+        if duplicate_hash_cache_enabled:
+            seen_hashes.add(file_record.content_hash)
 
         path = repo / file_record.path
         try:
@@ -90,20 +102,64 @@ def compress_ranked_files(
         total_raw += raw_tokens
         cache_key = f"{file_record.path}:{file_record.size_bytes}:{file_record.content_hash}"
 
-        if raw_tokens <= 600:
+        if raw_tokens <= cfg.full_file_threshold_tokens:
             strategy = "full"
             compressed = f"# Full: {file_record.path}\n{full_text}"
-        elif ranked.score >= 2.5:
+            chunk_strategy = "full-file"
+            chunk_reason = "file fits within full-file threshold"
+            line_count = len(full_text.splitlines())
+            selected_ranges = (
+                [
+                    {
+                        "start_line": 1,
+                        "end_line": line_count,
+                        "kind": "full",
+                    }
+                ]
+                if line_count > 0
+                else []
+            )
+        elif ranked.score >= cfg.snippet_score_threshold:
             strategy = "snippet"
-            compressed = _snippet_from_text(file_record.path, full_text, keywords)
+            chunk = select_language_aware_chunks(
+                file_path=file_record.path,
+                text=full_text,
+                keywords=keywords,
+                line_budget=cfg.snippet_total_line_limit,
+            )
+            if chunk is not None:
+                compressed = f"# Snippet: {file_record.path}\n{chunk.text}"
+                chunk_strategy = chunk.chunk_strategy
+                chunk_reason = chunk.chunk_reason
+                selected_ranges = chunk.selected_ranges
+            else:
+                compressed = _snippet_from_text(file_record.path, full_text, keywords, cfg)
+                chunk_strategy = "keyword-window"
+                chunk_reason = "fallback keyword-window snippet selection"
+                selected_ranges = []
         else:
             strategy = "summary"
             cached = cache.get_summary(cache_key)
             if cached is not None:
                 compressed = cached
+                chunk_reason = "cached summary preview"
             else:
-                compressed = _summary_from_text(file_record.path, full_text)
+                compressed = _summary_from_text(file_record.path, full_text, cfg.summary_preview_lines)
                 cache.put_summary(cache_key, compressed)
+                chunk_reason = "summary preview of leading content"
+            chunk_strategy = "summary-preview"
+            preview_end = min(cfg.summary_preview_lines, len(full_text.splitlines()))
+            selected_ranges = (
+                [
+                    {
+                        "start_line": 1,
+                        "end_line": preview_end,
+                        "kind": "summary",
+                    }
+                ]
+                if preview_end > 0
+                else []
+            )
 
         compressed_tokens = estimate_tokens(compressed)
         if total_compressed + compressed_tokens > max_tokens:
@@ -118,6 +174,9 @@ def compress_ranked_files(
                 original_tokens=raw_tokens,
                 compressed_tokens=compressed_tokens,
                 text=compressed,
+                chunk_strategy=chunk_strategy,
+                chunk_reason=chunk_reason,
+                selected_ranges=selected_ranges,
             )
         )
         files_included.append(file_record.path)
@@ -126,7 +185,12 @@ def compress_ranked_files(
     skipped_ratio = len(files_skipped) / max(1, len(ranked_files))
     compression_ratio = total_compressed / max(1, total_raw)
     bounded_ratio = min(1.0, max(0.0, compression_ratio))
-    risk_score = 0.55 * skipped_ratio + 0.45 * bounded_ratio
+    total_weight = cfg.risk_skip_weight + cfg.risk_compression_weight
+    if total_weight <= 0:
+        total_weight = 1.0
+    skip_weight = cfg.risk_skip_weight / total_weight
+    compression_weight = cfg.risk_compression_weight / total_weight
+    risk_score = skip_weight * skipped_ratio + compression_weight * bounded_ratio
     if risk_score < 0.25:
         risk = "low"
     elif risk_score < 0.5:

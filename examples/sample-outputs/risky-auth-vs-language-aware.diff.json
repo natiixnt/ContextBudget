@@ -1,0 +1,82 @@
+{
+  "budget_delta": {
+    "cache_hits": {
+      "delta": 0,
+      "new": 0,
+      "old": 0
+    },
+    "estimated_input_tokens": {
+      "delta": 81,
+      "new": 166,
+      "old": 85
+    },
+    "estimated_saved_tokens": {
+      "delta": 0,
+      "new": 0,
+      "old": 0
+    },
+    "quality_risk": {
+      "delta_level": 0,
+      "new": "medium",
+      "old": "medium"
+    }
+  },
+  "command": "diff",
+  "context_diff": {
+    "added_count": 2,
+    "files_added": [
+      "src/auth.ts",
+      "src/auth_service.py"
+    ],
+    "files_removed": [
+      "src/auth.py",
+      "src/middleware.py",
+      "src/permissions.py"
+    ],
+    "removed_count": 3
+  },
+  "new_run": "examples/sample-outputs/language-aware-run.json",
+  "old_run": "examples/sample-outputs/risky-auth-run.json",
+  "ranked_score_changes": [
+    {
+      "change_type": "removed",
+      "delta": -4.1,
+      "new_score": null,
+      "old_score": 4.1,
+      "path": "src/middleware.py"
+    },
+    {
+      "change_type": "removed",
+      "delta": -3.1,
+      "new_score": null,
+      "old_score": 3.1,
+      "path": "src/auth.py"
+    },
+    {
+      "change_type": "added",
+      "delta": 3.1,
+      "new_score": 3.1,
+      "old_score": null,
+      "path": "src/auth_service.py"
+    },
+    {
+      "change_type": "added",
+      "delta": 2.85,
+      "new_score": 2.85,
+      "old_score": null,
+      "path": "src/auth.ts"
+    },
+    {
+      "change_type": "removed",
+      "delta": -0.35,
+      "new_score": null,
+      "old_score": 0.35,
+      "path": "src/permissions.py"
+    }
+  ],
+  "task_diff": {
+    "changed": true,
+    "new_task": "refactor auth exports",
+    "old_task": "tighten auth middleware token validation"
+  }
+}

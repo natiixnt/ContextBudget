@@ -23,6 +23,7 @@ from contextbudget.core.policy import (
 )
 from contextbudget.core.render import read_json
 from contextbudget.schemas.models import normalize_repo
+from contextbudget.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
 
 
 RunArtifactInput = dict[str, Any] | str | Path
@@ -45,8 +46,13 @@ class BudgetPolicyViolationError(RuntimeError):
 class ContextBudgetEngine:
     """Stable programmatic interface for ContextBudget commands."""
 
-    def __init__(self, config_path: str | Path | None = None) -> None:
+    def __init__(
+        self,
+        config_path: str | Path | None = None,
+        telemetry_sink: TelemetrySink | None = None,
+    ) -> None:
         self._default_config_path = self._resolve_path(config_path)
+        self._telemetry_sink = telemetry_sink
 
     @staticmethod
     def _resolve_path(path: str | Path | None) -> Path | None:
@@ -65,6 +71,35 @@ class ContextBudgetEngine:
         if isinstance(run_artifact, (str, Path)):
             return read_json(Path(run_artifact))
         raise TypeError("run_artifact must be a dict, path string, or Path")
+
+    def _resolve_repo_from_run_data(self, run_data: dict[str, Any]) -> Path:
+        raw_repo = run_data.get("repo")
+        if isinstance(raw_repo, str) and raw_repo.strip():
+            return normalize_repo(raw_repo)
+        return Path.cwd()
+
+    def _build_policy_telemetry_session(
+        self,
+        run_data: dict[str, Any],
+        *,
+        config_path: str | Path | None = None,
+    ) -> TelemetrySession:
+        repo = self._resolve_repo_from_run_data(run_data)
+        cfg = self._load_config(repo, config_path=config_path)
+        sink = self._telemetry_sink or build_telemetry_sink(
+            repo=repo,
+            enabled=cfg.telemetry.enabled,
+            sink=cfg.telemetry.sink,
+            file_path=cfg.telemetry.file_path,
+        )
+        return TelemetrySession(
+            sink=sink,
+            base_payload={
+                "command": str(run_data.get("command", "policy")),
+                "task": str(run_data.get("task", "")),
+                "repo": str(repo),
+            },
+        )
 
     @staticmethod
     def make_policy(
@@ -96,7 +131,13 @@ class ContextBudgetEngine:
         repo_path = normalize_repo(repo)
         cfg = self._load_config(repo_path, config_path=config_path)
         effective_top_files = top_files if top_files is not None else cfg.budget.top_files
-        return run_plan(task, repo=repo_path, top_n=effective_top_files, config=cfg)
+        return run_plan(
+            task,
+            repo=repo_path,
+            top_n=effective_top_files,
+            config=cfg,
+            telemetry_sink=self._telemetry_sink,
+        )
 
     def pack(
         self,
@@ -117,6 +158,7 @@ class ContextBudgetEngine:
             max_tokens=max_tokens,
             top_files=top_files,
             config=cfg,
+            telemetry_sink=self._telemetry_sink,
         )
         return as_json_dict(report)
 
@@ -132,6 +174,7 @@ class ContextBudgetEngine:
         *,
         policy: PolicySpec | None = None,
         policy_path: str | Path | None = None,
+        config_path: str | Path | None = None,
     ) -> dict[str, Any]:
         """Evaluate a run artifact against a policy and return serializable result."""
 
@@ -146,7 +189,15 @@ class ContextBudgetEngine:
         else:
             spec = PolicySpec()
 
-        return policy_result_to_dict(evaluate_policy_artifact(run_data, spec))
+        policy_result = policy_result_to_dict(evaluate_policy_artifact(run_data, spec))
+        if not bool(policy_result.get("passed", False)):
+            telemetry = self._build_policy_telemetry_session(run_data, config_path=config_path)
+            telemetry.emit(
+                "policy_failed",
+                violations=list(policy_result.get("violations", [])),
+                checks=policy_result.get("checks", {}),
+            )
+        return policy_result
 
     def diff(
         self,

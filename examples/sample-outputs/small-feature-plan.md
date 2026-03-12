@@ -2,7 +2,7 @@
 
 Task: add caching to search API
 Repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/small-feature/repo
-Scanned files: 2
+Scanned files: 3
 
 ## Ranked Relevant Files
 - `src/search_api.py` (score: 2.6) - path contains 'search', content mentions 'search'

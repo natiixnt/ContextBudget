@@ -21,3 +21,7 @@ Max tokens: 1200
 ## Ranked Relevant Files
 - `src/search_api.py` (score: 2.6)
 - `src/cache.py` (score: 0.35)
+
+## Chunk Selection
+- `src/search_api.py`: full-file - file fits within full-file threshold (ranges: 1-2)
+- `src/cache.py`: full-file - file fits within full-file threshold (ranges: 1-7)

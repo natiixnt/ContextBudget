@@ -1,0 +1,98 @@
+{
+  "budget": {
+    "duplicate_reads_prevented": 0,
+    "estimated_input_tokens": 166,
+    "estimated_saved_tokens": 0,
+    "quality_risk_estimate": "medium"
+  },
+  "cache_hits": 0,
+  "command": "pack",
+  "compressed_context": [
+    {
+      "chunk_reason": "language-aware python chunking (matched task keywords)",
+      "chunk_strategy": "language-aware-python",
+      "compressed_tokens": 82,
+      "original_tokens": 54,
+      "path": "src/auth_service.py",
+      "selected_ranges": [
+        {
+          "end_line": 1,
+          "kind": "import",
+          "start_line": 1
+        },
+        {
+          "end_line": 2,
+          "kind": "import",
+          "start_line": 2
+        },
+        {
+          "end_line": 9,
+          "kind": "class",
+          "start_line": 4
+        },
+        {
+          "end_line": 13,
+          "kind": "function",
+          "start_line": 11
+        }
+      ],
+      "strategy": "snippet",
+      "text": "# Snippet: src/auth_service.py\n## import lines 1-1\nimport os\n\n## import lines 2-2\nimport hashlib\n\n## class lines 4-9\n# Handles auth checks.\nclass AuthService:\n    \"\"\"Auth service docs.\"\"\"\n\n    def login(self, token: str) -> bool:\n        return token.startswith(\"prod_\")\n\n## function lines 11-13\n\ndef helper() -> None:\n    pass"
+    },
+    {
+      "chunk_reason": "language-aware typescript chunking (matched task keywords)",
+      "chunk_strategy": "language-aware-typescript",
+      "compressed_tokens": 84,
+      "original_tokens": 63,
+      "path": "src/auth.ts",
+      "selected_ranges": [
+        {
+          "end_line": 1,
+          "kind": "import",
+          "start_line": 1
+        },
+        {
+          "end_line": 8,
+          "kind": "export",
+          "start_line": 3
+        },
+        {
+          "end_line": 12,
+          "kind": "export",
+          "start_line": 9
+        }
+      ],
+      "strategy": "snippet",
+      "text": "# Snippet: src/auth.ts\n## import lines 1-1\nimport { createHash } from \"node:crypto\";\n\n## export lines 3-8\n// Exported auth class.\nexport class AuthClient {\n  login(token: string): boolean {\n    return token.startsWith(\"prod_\");\n  }\n}\n\n## export lines 9-12\n\nexport function validate(token: string): boolean {\n  return token.length > 3;\n}"
+    }
+  ],
+  "files_included": [
+    "src/auth_service.py",
+    "src/auth.ts"
+  ],
+  "files_skipped": [],
+  "generated_at": "2026-03-12T19:47:21.954995+00:00",
+  "max_tokens": 30000,
+  "ranked_files": [
+    {
+      "line_count": 13,
+      "path": "src/auth_service.py",
+      "reasons": [
+        "path contains 'auth'",
+        "content mentions 'auth'"
+      ],
+      "score": 3.1
+    },
+    {
+      "line_count": 12,
+      "path": "src/auth.ts",
+      "reasons": [
+        "path contains 'auth'",
+        "content mentions 'auth'"
+      ],
+      "score": 2.85
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/language-aware/repo",
+  "task": "refactor auth exports"
+}
