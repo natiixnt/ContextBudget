@@ -1,0 +1,52 @@
+{
+  "budget": {
+    "duplicate_reads_prevented": 0,
+    "estimated_input_tokens": 69,
+    "estimated_saved_tokens": 0,
+    "quality_risk_estimate": "medium"
+  },
+  "cache_hits": 0,
+  "command": "pack",
+  "compressed_context": [
+    {
+      "compressed_tokens": 21,
+      "original_tokens": 14,
+      "path": "src/search_api.py",
+      "strategy": "full",
+      "text": "# Full: src/search_api.py\ndef search(query: str) -> list[str]:\n    return [query]\n"
+    },
+    {
+      "compressed_tokens": 48,
+      "original_tokens": 43,
+      "path": "src/cache.py",
+      "strategy": "full",
+      "text": "# Full: src/cache.py\n_CACHE: dict[str, list[str]] = {}\n\ndef get(key: str) -> list[str] | None:\n    return _CACHE.get(key)\n\ndef put(key: str, value: list[str]) -> None:\n    _CACHE[key] = value\n"
+    }
+  ],
+  "files_included": [
+    "src/search_api.py",
+    "src/cache.py"
+  ],
+  "files_skipped": [],
+  "generated_at": "2026-03-12T15:28:39.148031+00:00",
+  "max_tokens": 1200,
+  "ranked_files": [
+    {
+      "line_count": 2,
+      "path": "src/search_api.py",
+      "reasons": [
+        "path contains 'search'",
+        "content mentions 'search'"
+      ],
+      "score": 2.6
+    },
+    {
+      "line_count": 7,
+      "path": "src/cache.py",
+      "reasons": [],
+      "score": 0.35
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/small-feature/repo",
+  "task": "add caching to search API"
+}

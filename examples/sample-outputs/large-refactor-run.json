@@ -1,0 +1,70 @@
+{
+  "budget": {
+    "duplicate_reads_prevented": 0,
+    "estimated_input_tokens": 80,
+    "estimated_saved_tokens": 0,
+    "quality_risk_estimate": "medium"
+  },
+  "cache_hits": 0,
+  "command": "pack",
+  "compressed_context": [
+    {
+      "compressed_tokens": 31,
+      "original_tokens": 24,
+      "path": "tests/test_service.py",
+      "strategy": "full",
+      "text": "# Full: tests/test_service.py\nfrom src.service import Service\n\n\ndef test_run() -> None:\n    assert Service().run() == \"ok\"\n"
+    },
+    {
+      "compressed_tokens": 21,
+      "original_tokens": 16,
+      "path": "src/service.py",
+      "strategy": "full",
+      "text": "# Full: src/service.py\nclass Service:\n    def run(self) -> str:\n        return \"ok\"\n"
+    },
+    {
+      "compressed_tokens": 28,
+      "original_tokens": 23,
+      "path": "src/models.py",
+      "strategy": "full",
+      "text": "# Full: src/models.py\nclass User:\n    def __init__(self, user_id: str) -> None:\n        self.user_id = user_id\n"
+    }
+  ],
+  "files_included": [
+    "tests/test_service.py",
+    "src/service.py",
+    "src/models.py"
+  ],
+  "files_skipped": [],
+  "generated_at": "2026-03-12T15:28:39.273675+00:00",
+  "max_tokens": 1000,
+  "ranked_files": [
+    {
+      "line_count": 5,
+      "path": "tests/test_service.py",
+      "reasons": [
+        "path contains 'service'",
+        "content mentions 'service'",
+        "test proximity"
+      ],
+      "score": 3.35
+    },
+    {
+      "line_count": 3,
+      "path": "src/service.py",
+      "reasons": [
+        "path contains 'service'",
+        "content mentions 'service'"
+      ],
+      "score": 2.6
+    },
+    {
+      "line_count": 3,
+      "path": "src/models.py",
+      "reasons": [],
+      "score": 0.35
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/large-refactor/repo",
+  "task": "large service layer refactor"
+}

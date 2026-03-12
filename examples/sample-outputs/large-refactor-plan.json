@@ -1,0 +1,32 @@
+{
+  "ranked_files": [
+    {
+      "line_count": 5,
+      "path": "tests/test_service.py",
+      "reasons": [
+        "path contains 'service'",
+        "content mentions 'service'",
+        "test proximity"
+      ],
+      "score": 3.35
+    },
+    {
+      "line_count": 3,
+      "path": "src/service.py",
+      "reasons": [
+        "path contains 'service'",
+        "content mentions 'service'"
+      ],
+      "score": 2.6
+    },
+    {
+      "line_count": 3,
+      "path": "src/models.py",
+      "reasons": [],
+      "score": 0.35
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/large-refactor/repo",
+  "scanned_files": 3,
+  "task": "large service layer refactor"
+}

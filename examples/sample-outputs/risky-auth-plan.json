@@ -1,0 +1,33 @@
+{
+  "ranked_files": [
+    {
+      "line_count": 4,
+      "path": "src/middleware.py",
+      "reasons": [
+        "content mentions 'auth'",
+        "path contains 'middleware'",
+        "content mentions 'middleware'",
+        "content mentions 'token'"
+      ],
+      "score": 4.1
+    },
+    {
+      "line_count": 2,
+      "path": "src/auth.py",
+      "reasons": [
+        "path contains 'auth'",
+        "content mentions 'token'"
+      ],
+      "score": 3.1
+    },
+    {
+      "line_count": 2,
+      "path": "src/permissions.py",
+      "reasons": [],
+      "score": 0.35
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+  "scanned_files": 3,
+  "task": "tighten auth middleware token validation"
+}

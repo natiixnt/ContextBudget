@@ -1,0 +1,71 @@
+{
+  "budget": {
+    "duplicate_reads_prevented": 0,
+    "estimated_input_tokens": 85,
+    "estimated_saved_tokens": 0,
+    "quality_risk_estimate": "medium"
+  },
+  "cache_hits": 0,
+  "command": "pack",
+  "compressed_context": [
+    {
+      "compressed_tokens": 33,
+      "original_tokens": 26,
+      "path": "src/middleware.py",
+      "strategy": "full",
+      "text": "# Full: src/middleware.py\nfrom .auth import verify_token\n\ndef auth_middleware(token: str) -> bool:\n    return verify_token(token)\n"
+    },
+    {
+      "compressed_tokens": 24,
+      "original_tokens": 19,
+      "path": "src/auth.py",
+      "strategy": "full",
+      "text": "# Full: src/auth.py\ndef verify_token(token: str) -> bool:\n    return token.startswith(\"prod_\")\n"
+    },
+    {
+      "compressed_tokens": 28,
+      "original_tokens": 22,
+      "path": "src/permissions.py",
+      "strategy": "full",
+      "text": "# Full: src/permissions.py\ndef can_access(user_role: str, action: str) -> bool:\n    return user_role == \"admin\"\n"
+    }
+  ],
+  "files_included": [
+    "src/middleware.py",
+    "src/auth.py",
+    "src/permissions.py"
+  ],
+  "files_skipped": [],
+  "generated_at": "2026-03-12T15:28:39.210776+00:00",
+  "max_tokens": 1500,
+  "ranked_files": [
+    {
+      "line_count": 4,
+      "path": "src/middleware.py",
+      "reasons": [
+        "content mentions 'auth'",
+        "path contains 'middleware'",
+        "content mentions 'middleware'",
+        "content mentions 'token'"
+      ],
+      "score": 4.1
+    },
+    {
+      "line_count": 2,
+      "path": "src/auth.py",
+      "reasons": [
+        "path contains 'auth'",
+        "content mentions 'token'"
+      ],
+      "score": 3.1
+    },
+    {
+      "line_count": 2,
+      "path": "src/permissions.py",
+      "reasons": [],
+      "score": 0.35
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+  "task": "tighten auth middleware token validation"
+}
