@@ -8,11 +8,13 @@ from pathlib import Path
 import time
 from typing import Any
 
-from contextbudget.config import ContextBudgetConfig, load_config
-from contextbudget.core.tokens import estimate_tokens
+from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_config
 from contextbudget.core.pipeline import run_pack
+from contextbudget.core.tokens import compare_builtin_token_estimators
+from contextbudget.plugins import ResolvedPlugins, resolve_plugins
 from contextbudget.schemas.models import DEFAULT_TOP_FILES
-from contextbudget.stages.workflow import run_scan_stage, run_score_stage
+from contextbudget.stages.workflow import run_scan_stage, run_scan_workspace_stage, run_score_stage
+from contextbudget.telemetry import NoOpTelemetrySink, TelemetrySession, TelemetrySink, build_telemetry_sink
 
 
 def _risk_from_coverage(input_tokens: int, baseline_tokens: int) -> str:
@@ -26,16 +28,23 @@ def _risk_from_coverage(input_tokens: int, baseline_tokens: int) -> str:
     return "high"
 
 
-def _read_file_tokens(absolute_path: str) -> int | None:
+def _read_file_tokens(absolute_path: str, plugins: ResolvedPlugins) -> int | None:
     try:
         text = Path(absolute_path).read_text(encoding="utf-8", errors="ignore")
     except OSError:
         return None
-    return estimate_tokens(text)
+    return plugins.estimate_tokens(text)
 
 
 def _round_runtime_ms(start: float, end: float) -> int:
     return int(round((end - start) * 1000))
+
+
+def _read_sample_text(path: str) -> str:
+    try:
+        return Path(path).read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return ""
 
 
 def run_benchmark(
@@ -45,17 +54,53 @@ def run_benchmark(
     top_files: int | None = None,
     config: ContextBudgetConfig | None = None,
     config_path: Path | None = None,
+    telemetry_sink: TelemetrySink | None = None,
+    workspace: WorkspaceDefinition | None = None,
 ) -> dict[str, Any]:
     """Run benchmark strategies and return JSON-serializable report."""
 
-    cfg = config if config is not None else load_config(repo, config_path=config_path)
+    cfg = config if config is not None else (workspace.config if workspace is not None else load_config(repo, config_path=config_path))
+    resolved_plugins = resolve_plugins(cfg)
     effective_max_tokens = max_tokens if max_tokens is not None else cfg.budget.max_tokens
     effective_top_files = top_files if top_files is not None else cfg.budget.top_files
+    target_repo = workspace.root if workspace is not None else repo
+    telemetry = TelemetrySession(
+        sink=telemetry_sink
+        or build_telemetry_sink(
+            repo=target_repo,
+            enabled=cfg.telemetry.enabled,
+            sink=cfg.telemetry.sink,
+            file_path=cfg.telemetry.file_path,
+        ),
+        base_payload={
+            "command": "benchmark",
+            "repo": target_repo,
+        },
+    )
+    telemetry_top_files = effective_top_files if effective_top_files is not None else DEFAULT_TOP_FILES
+    telemetry.emit(
+        "run_started",
+        max_tokens=effective_max_tokens,
+        top_files=telemetry_top_files,
+        workspace=str(workspace.path) if workspace is not None else "",
+        repo_count=len(workspace.repos) if workspace is not None else 1,
+    )
 
     scan_start = time.perf_counter()
-    files = run_scan_stage(repo, cfg)
-    ranked = run_score_stage(task, files, cfg)
+    if workspace is not None:
+        files, scanned_repos = run_scan_workspace_stage(workspace, cfg)
+    else:
+        files = run_scan_stage(repo, cfg)
+        scanned_repos = []
+    telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
+    ranked = run_score_stage(task, files, cfg, plugins=resolved_plugins)
     scan_end = time.perf_counter()
+    telemetry.emit(
+        "scoring_completed",
+        scanned_files=len(files),
+        ranked_files=len(ranked),
+        top_files=telemetry_top_files,
+    )
 
     if effective_top_files is not None:
         ranked_top = ranked[:effective_top_files]
@@ -66,7 +111,7 @@ def run_benchmark(
     readable_tokens: dict[str, int] = {}
     unreadable_paths: list[str] = []
     for record in files:
-        token_count = _read_file_tokens(record.absolute_path)
+        token_count = _read_file_tokens(record.absolute_path, resolved_plugins)
         if token_count is None:
             unreadable_paths.append(record.path)
             continue
@@ -119,10 +164,13 @@ def run_benchmark(
     packed_run = asdict(
         run_pack(
             task,
-            repo,
+            target_repo,
             max_tokens=effective_max_tokens,
             top_files=effective_top_files,
             config=cfg,
+            telemetry_sink=NoOpTelemetrySink(),
+            workspace=workspace,
+            plugins=resolved_plugins,
         )
     )
     pack_end = time.perf_counter()
@@ -148,10 +196,13 @@ def run_benchmark(
     cache_run = asdict(
         run_pack(
             task,
-            repo,
+            target_repo,
             max_tokens=effective_max_tokens,
             top_files=effective_top_files,
             config=cfg,
+            telemetry_sink=NoOpTelemetrySink(),
+            workspace=workspace,
+            plugins=resolved_plugins,
         )
     )
     cache_end = time.perf_counter()
@@ -174,14 +225,61 @@ def run_benchmark(
         }
     )
 
-    return {
+    estimator_samples: list[dict[str, Any]] = compare_builtin_token_estimators(
+        [
+            {"name": "task", "text": task},
+            (
+                {
+                    "name": "top_ranked_file",
+                    "path": ranked_top[0].file.path,
+                    "text": _read_sample_text(ranked_top[0].file.absolute_path),
+                }
+                if ranked_top
+                else {}
+            ),
+            {
+                "name": "packed_context",
+                "text": "\n\n".join(
+                    str(item.get("text", ""))
+                    for item in packed_run.get("compressed_context", [])
+                    if str(item.get("text", ""))
+                ),
+            },
+        ],
+        model=cfg.tokens.model,
+        encoding=cfg.tokens.encoding,
+        fallback_backend=cfg.tokens.fallback_backend,
+    )
+
+    result = {
         "command": "benchmark",
         "task": task,
-        "repo": str(repo),
+        "repo": str(target_repo),
         "max_tokens": effective_max_tokens,
         "top_files": effective_top_files,
         "baseline_full_context_tokens": baseline_total_tokens,
         "scan_runtime_ms": _round_runtime_ms(scan_start, scan_end),
         "strategies": strategies,
+        "token_estimator": resolved_plugins.token_estimator_report,
+        "estimator_samples": estimator_samples,
         "generated_at": datetime.now(timezone.utc).isoformat(),
+        "implementations": resolved_plugins.pack_implementations(),
     }
+    if workspace is not None:
+        result["workspace"] = str(workspace.path)
+        result["scanned_repos"] = [
+            {"label": item.label, "path": item.path, "scanned_files": item.scanned_files}
+            for item in scanned_repos
+        ]
+    telemetry.emit(
+        "benchmark_completed",
+        max_tokens=effective_max_tokens,
+        baseline_full_context_tokens=baseline_total_tokens,
+        scanned_files=len(files),
+        scanned_repos=len(scanned_repos),
+        ranked_files=len(ranked),
+        top_files=effective_top_files,
+        scan_runtime_ms=_round_runtime_ms(scan_start, scan_end),
+        strategies=strategies,
+    )
+    return result

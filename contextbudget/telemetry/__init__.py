@@ -9,6 +9,14 @@ from pathlib import Path
 from typing import Any, Protocol
 from uuid import uuid4
 
+from contextbudget.telemetry.schemas import (
+    ANALYTICS_EVENT_NAMES,
+    EVENT_SCHEMA_VERSIONS,
+    build_analytics_payload,
+    build_repository_identifiers,
+    schema_version_for_event,
+)
+
 
 def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -19,6 +27,7 @@ class TelemetryEvent:
     """Structured telemetry event payload."""
 
     name: str
+    schema_version: str
     timestamp: str
     run_id: str
     payload: dict[str, Any] = field(default_factory=dict)
@@ -28,6 +37,7 @@ class TelemetryEvent:
 
         return {
             "name": self.name,
+            "schema_version": self.schema_version,
             "timestamp": self.timestamp,
             "run_id": self.run_id,
             "payload": self.payload,
@@ -76,14 +86,20 @@ class TelemetrySession:
     def emit(self, name: str, **payload: Any) -> None:
         """Emit a structured event for this run session."""
 
-        data = dict(self.base_payload)
-        data.update(payload)
+        command = str(self.base_payload.get("command", ""))
+        repo = self.base_payload.get("repo")
         self.sink.emit(
             TelemetryEvent(
                 name=name,
+                schema_version=schema_version_for_event(name),
                 timestamp=_utc_now(),
                 run_id=self.run_id,
-                payload=data,
+                payload=build_analytics_payload(
+                    name,
+                    command=command,
+                    repo=repo if isinstance(repo, (str, Path)) else None,
+                    data=payload,
+                ),
             )
         )
 
@@ -116,10 +132,13 @@ def build_telemetry_sink(
 
 
 __all__ = [
+    "ANALYTICS_EVENT_NAMES",
+    "EVENT_SCHEMA_VERSIONS",
     "TelemetryEvent",
     "TelemetrySink",
     "NoOpTelemetrySink",
     "JsonlFileTelemetrySink",
     "TelemetrySession",
+    "build_repository_identifiers",
     "build_telemetry_sink",
 ]

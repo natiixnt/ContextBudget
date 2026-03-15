@@ -24,10 +24,14 @@ def test_engine_plan_pack_report_flow(tmp_path: Path) -> None:
     pack_data = engine.pack(task="add caching to search api", repo=tmp_path, max_tokens=500)
     assert pack_data["command"] == "pack"
     assert pack_data["max_tokens"] == 500
+    assert pack_data["cache"]["backend"] == "local_file"
+    assert pack_data["summarizer"]["selected_backend"] == "deterministic"
 
     summary = engine.report(pack_data)
     assert summary["task"] == pack_data["task"]
     assert summary["estimated_input_tokens"] == pack_data["budget"]["estimated_input_tokens"]
+    assert summary["cache"]["backend"] == "local_file"
+    assert summary["summarizer"]["selected_backend"] == "deterministic"
 
 
 def test_engine_policy_evaluation_with_make_policy(tmp_path: Path) -> None:
@@ -68,3 +72,30 @@ max_files_included = 0
     assert exc.value.policy_result["passed"] is False
     assert exc.value.policy_result["violations"]
     assert "policy" in exc.value.run_artifact
+
+
+def test_engine_pack_supports_workspace(tmp_path: Path) -> None:
+    _write(tmp_path / "app" / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+    _write(tmp_path / "shared" / "src" / "auth.py", "def validate() -> bool:\n    return True\n")
+    _write(
+        tmp_path / "workspace.toml",
+        """
+[scan]
+include_globs = ["**/*.py"]
+
+[[repos]]
+label = "app"
+path = "app"
+
+[[repos]]
+label = "shared"
+path = "shared"
+""".strip(),
+    )
+
+    engine = ContextBudgetEngine()
+    pack_data = engine.pack(task="update auth flow", workspace=tmp_path / "workspace.toml", max_tokens=500)
+
+    assert pack_data["workspace"].endswith("workspace.toml")
+    assert set(pack_data["selected_repos"]) == {"app", "shared"}
+    assert any(item["repo"] == "app" for item in pack_data["ranked_files"])

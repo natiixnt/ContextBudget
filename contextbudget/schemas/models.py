@@ -17,6 +17,13 @@ class FileRecord:
     line_count: int
     content_hash: str
     content_preview: str
+    relative_path: str = ""
+    repo_label: str = ""
+    repo_root: str = ""
+
+    def __post_init__(self) -> None:
+        if not self.relative_path:
+            self.relative_path = self.path
 
 
 @dataclass(slots=True)
@@ -40,6 +47,8 @@ class CompressedFile:
     chunk_strategy: str = "none"
     chunk_reason: str = ""
     selected_ranges: list[dict[str, int | str]] = field(default_factory=list)
+    relative_path: str = ""
+    repo_label: str = ""
 
 
 @dataclass(slots=True)
@@ -51,6 +60,47 @@ class BudgetReport:
     estimated_saved_tokens: int
     duplicate_reads_prevented: int
     quality_risk_estimate: str
+
+
+@dataclass(slots=True)
+class CacheReport:
+    """Cache backend metadata included in run reports."""
+
+    backend: str
+    enabled: bool
+    hits: int
+    misses: int
+    writes: int
+
+
+@dataclass(slots=True)
+class SummarizerReport:
+    """Summarizer metadata included in run reports."""
+
+    selected_backend: str
+    external_adapter: str = ""
+    effective_backend: str = "unused"
+    external_configured: bool = False
+    external_resolved: bool = False
+    fallback_used: bool = False
+    fallback_count: int = 0
+    summary_count: int = 0
+    logs: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class TokenEstimatorReport:
+    """Token-estimator metadata included in plan, run, and benchmark artifacts."""
+
+    selected_backend: str
+    effective_backend: str
+    uncertainty: str = "approximate"
+    model: str = ""
+    encoding: str = ""
+    available: bool = True
+    fallback_used: bool = False
+    fallback_reason: str = ""
+    notes: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -66,11 +116,19 @@ class RunReport:
     files_included: list[str]
     files_skipped: list[str]
     budget: dict
+    cache: CacheReport
+    summarizer: SummarizerReport
+    token_estimator: TokenEstimatorReport
     cache_hits: int
     generated_at: str
+    workspace: str = ""
+    scanned_repos: list[dict] = field(default_factory=list)
+    selected_repos: list[str] = field(default_factory=list)
+    implementations: dict[str, str] = field(default_factory=dict)
 
 
 CACHE_FILE = ".contextbudget_cache.json"
+SCAN_INDEX_FILE = ".contextbudget/scan-index.json"
 DEFAULT_MAX_TOKENS = 30_000
 DEFAULT_TOP_FILES = 25
 BINARY_EXTENSIONS = {

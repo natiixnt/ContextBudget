@@ -249,3 +249,96 @@ max_quality_risk_level = "medium"
     )
     assert main() == 2
     assert (tmp_path / "policy-report.md").exists()
+
+
+def test_cli_pack_workspace_records_repo_provenance(tmp_path: Path, monkeypatch) -> None:
+    _write(tmp_path / "services" / "auth" / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+    _write(tmp_path / "services" / "billing" / "src" / "auth.py", "def verify() -> bool:\n    return True\n")
+    _write(
+        tmp_path / "workspace.toml",
+        """
+[scan]
+include_globs = ["**/*.py"]
+
+[[repos]]
+label = "auth-service"
+path = "services/auth"
+
+[[repos]]
+label = "billing-service"
+path = "services/billing"
+""".strip(),
+    )
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "contextbudget",
+            "pack",
+            "update auth flow across services",
+            "--workspace",
+            "workspace.toml",
+            "--out-prefix",
+            "workspace-run",
+        ],
+    )
+    assert main() == 0
+    data = json.loads((tmp_path / "workspace-run.json").read_text(encoding="utf-8"))
+
+    assert data["workspace"].endswith("workspace.toml")
+    assert {item["label"] for item in data["scanned_repos"]} == {"auth-service", "billing-service"}
+    assert set(data["selected_repos"]) == {"auth-service", "billing-service"}
+    assert any(path.startswith("auth-service:") for path in data["files_included"])
+    assert any(path.startswith("billing-service:") for path in data["files_included"])
+
+
+def test_cli_watch_once_writes_scan_index(tmp_path: Path, monkeypatch, capsys) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(repo / "src" / "search.py", "def search():\n    return []\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "watch", "--repo", str(repo), "--once"],
+    )
+    assert main() == 0
+
+    output = capsys.readouterr().out
+    assert "Initial scan:" in output
+    assert "Scan index:" in output
+    assert (repo / ".contextbudget" / "scan-index.json").exists()
+
+
+def test_cli_pack_reports_token_estimator_fallback(tmp_path: Path, monkeypatch, capsys) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(
+        repo / "contextbudget.toml",
+        """
+[tokens]
+backend = "exact"
+model = "gpt-4o-mini"
+fallback_backend = "model_aligned"
+""".strip(),
+    )
+    _write(repo / "src" / "auth.py", "def login() -> bool:\n    return True\n" * 20)
+
+    from contextbudget.core import tokens as token_module
+
+    monkeypatch.setattr("contextbudget.core.tokens._load_tiktoken", lambda: None)
+    token_module._resolve_builtin_token_estimator.cache_clear()
+    try:
+        monkeypatch.chdir(tmp_path)
+        monkeypatch.setattr(
+            "sys.argv",
+            ["contextbudget", "pack", "update auth flow", "--repo", str(repo), "--out-prefix", "token-run"],
+        )
+        assert main() == 0
+    finally:
+        token_module._resolve_builtin_token_estimator.cache_clear()
+
+    output = capsys.readouterr().out
+    assert "Token estimator: selected=exact_tiktoken effective=model_aligned fallback=True" in output
+    assert "Token estimator note:" in output

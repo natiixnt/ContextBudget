@@ -5,6 +5,10 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from contextbudget.cache import normalize_cache_report
+from contextbudget.compressors.summarizers import normalize_summarizer_report
+from contextbudget.core.tokens import normalize_token_estimator_report
+
 
 def write_json(path: Path, data: dict) -> None:
     """Write JSON file with stable formatting."""
@@ -18,6 +22,89 @@ def read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _append_workspace_lines(lines: list[str], data: dict) -> None:
+    workspace = data.get("workspace")
+    if isinstance(workspace, str) and workspace:
+        lines.append(f"Workspace: {workspace}")
+
+    scanned_repos = data.get("scanned_repos", [])
+    if isinstance(scanned_repos, list) and scanned_repos:
+        lines.append("Scanned repos:")
+        for item in scanned_repos:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                "- "
+                f"{item.get('label', '')}: {item.get('path', '')} "
+                f"(files: {item.get('scanned_files', 0)})"
+            )
+
+    selected_repos = data.get("selected_repos", [])
+    if isinstance(selected_repos, list) and selected_repos:
+        lines.append(f"Selected repos: {', '.join(str(item) for item in selected_repos)}")
+
+
+def _append_summarizer_lines(lines: list[str], data: dict) -> None:
+    summarizer = normalize_summarizer_report(data)
+    lines.extend(
+        [
+            f"- Summarizer selected: {summarizer.get('selected_backend', 'deterministic')}",
+            f"- Summarizer effective: {summarizer.get('effective_backend', 'deterministic')}",
+            f"- External summarizer configured: {summarizer.get('external_configured', False)}",
+            f"- External summarizer resolved: {summarizer.get('external_resolved', False)}",
+            f"- Summarizer fallback used: {summarizer.get('fallback_used', False)}",
+            f"- Summarizer fallback count: {summarizer.get('fallback_count', 0)}",
+            f"- Summary files processed: {summarizer.get('summary_count', 0)}",
+        ]
+    )
+    adapter = str(summarizer.get("external_adapter", "") or "")
+    if adapter:
+        lines.append(f"- External summarizer adapter: {adapter}")
+    logs = summarizer.get("logs", [])
+    if isinstance(logs, list) and logs:
+        lines.append("- Summarizer logs:")
+        for item in logs:
+            lines.append(f"  - {item}")
+
+
+def _append_token_estimator_lines(lines: list[str], data: dict) -> None:
+    estimator = normalize_token_estimator_report(data)
+    lines.extend(
+        [
+            f"- Token estimator selected: {estimator.get('selected_backend', 'heuristic')}",
+            f"- Token estimator effective: {estimator.get('effective_backend', 'heuristic')}",
+            f"- Token estimator uncertainty: {estimator.get('uncertainty', 'approximate')}",
+            f"- Token estimator available: {estimator.get('available', True)}",
+            f"- Token estimator fallback used: {estimator.get('fallback_used', False)}",
+        ]
+    )
+    model = str(estimator.get("model", "") or "")
+    if model:
+        lines.append(f"- Token estimator model: {model}")
+    encoding = str(estimator.get("encoding", "") or "")
+    if encoding:
+        lines.append(f"- Token estimator encoding: {encoding}")
+    fallback_reason = str(estimator.get("fallback_reason", "") or "")
+    if fallback_reason:
+        lines.append(f"- Token estimator fallback reason: {fallback_reason}")
+    notes = estimator.get("notes", [])
+    if isinstance(notes, list) and notes:
+        lines.append("- Token estimator notes:")
+        for item in notes:
+            lines.append(f"  - {item}")
+
+
+def _append_implementation_lines(lines: list[str], data: dict) -> None:
+    implementations = data.get("implementations", {})
+    if not isinstance(implementations, dict) or not implementations:
+        return
+    lines.append("Implementations:")
+    for key in ("scorer", "compressor", "token_estimator"):
+        value = implementations.get(key)
+        if value:
+            lines.append(f"- {key}: {value}")
+
+
 def render_plan_markdown(data: dict) -> str:
     """Render plan-stage payload to Markdown."""
 
@@ -27,9 +114,12 @@ def render_plan_markdown(data: dict) -> str:
         f"Task: {data['task']}",
         f"Repository: {data['repo']}",
         f"Scanned files: {data['scanned_files']}",
-        "",
-        "## Ranked Relevant Files",
     ]
+    _append_workspace_lines(lines, data)
+    _append_implementation_lines(lines, data)
+    lines.extend(["", "## Token Estimator"])
+    _append_token_estimator_lines(lines, data)
+    lines.extend(["", "## Ranked Relevant Files"])
     for item in data["ranked_files"]:
         reasons = ", ".join(item["reasons"]) if item["reasons"] else "no specific reason"
         lines.append(f"- `{item['path']}` (score: {item['score']}) - {reasons}")
@@ -43,22 +133,35 @@ def render_pack_markdown(data: dict) -> str:
     """Render pack run payload to Markdown."""
 
     budget = data.get("budget", {})
+    cache = normalize_cache_report(data)
     lines = [
         "# ContextBudget Pack Report",
         "",
         f"Task: {data.get('task', '')}",
         f"Repository: {data.get('repo', '')}",
         f"Max tokens: {data.get('max_tokens', 0)}",
+    ]
+    _append_workspace_lines(lines, data)
+    _append_implementation_lines(lines, data)
+    lines.extend([
+        "",
+        "## Token Estimator",
+    ])
+    _append_token_estimator_lines(lines, data)
+    lines.extend([
         "",
         "## Budget",
         f"- Estimated input tokens: {budget.get('estimated_input_tokens', 0)}",
         f"- Estimated saved tokens: {budget.get('estimated_saved_tokens', 0)}",
         f"- Duplicate reads prevented: {budget.get('duplicate_reads_prevented', 0)}",
         f"- Quality risk estimate: {budget.get('quality_risk_estimate', 'unknown')}",
-        f"- Cache hits: {data.get('cache_hits', 0)}",
-        "",
-        "## Files Included",
-    ]
+        f"- Cache backend: {cache.get('backend', 'unknown')}",
+        f"- Cache hits: {cache.get('hits', 0)}",
+        f"- Cache misses: {cache.get('misses', 0)}",
+        f"- Cache writes: {cache.get('writes', 0)}",
+    ])
+    _append_summarizer_lines(lines, data)
+    lines.extend(["", "## Files Included"])
     included = data.get("files_included", [])
     if included:
         for path in included:
@@ -100,20 +203,34 @@ def render_pack_markdown(data: dict) -> str:
 def render_report_markdown(data: dict) -> str:
     """Render summary report payload to Markdown."""
 
+    cache = normalize_cache_report(data)
     lines = [
         "# ContextBudget Summary Report",
         "",
         f"Task: {data.get('task', '')}",
         f"Repository: {data.get('repo', '')}",
         f"Generated at: {data.get('generated_at', '')}",
+    ]
+    _append_workspace_lines(lines, data)
+    _append_implementation_lines(lines, data)
+    lines.extend([
+        "",
+        "## Token Estimator",
+    ])
+    _append_token_estimator_lines(lines, data)
+    lines.extend([
         "",
         f"- Estimated input tokens: {data.get('estimated_input_tokens', 0)}",
         f"- Estimated saved tokens: {data.get('estimated_saved_tokens', 0)}",
         f"- Duplicate reads prevented: {data.get('duplicate_reads_prevented', 0)}",
         f"- Quality risk estimate: {data.get('quality_risk_estimate', 'unknown')}",
-        "",
-        "## Files Included",
-    ]
+        f"- Cache backend: {cache.get('backend', 'unknown')}",
+        f"- Cache hits: {cache.get('hits', 0)}",
+        f"- Cache misses: {cache.get('misses', 0)}",
+        f"- Cache writes: {cache.get('writes', 0)}",
+    ])
+    _append_summarizer_lines(lines, data)
+    lines.extend(["", "## Files Included"])
 
     included = data.get("files_included", [])
     if included:
@@ -247,12 +364,18 @@ def render_benchmark_markdown(data: dict) -> str:
         f"Baseline full-context tokens: {data.get('baseline_full_context_tokens', 0)}",
         f"Token budget: {data.get('max_tokens', 0)}",
         f"Top files: {data.get('top_files', 0)}",
+    ]
+    _append_workspace_lines(lines, data)
+    _append_implementation_lines(lines, data)
+    lines.extend(["", "## Token Estimator"])
+    _append_token_estimator_lines(lines, data)
+    lines.extend([
         "",
         "## Strategy Comparison",
         "",
         "| Strategy | Input Tokens | Saved Tokens | Files Included | Duplicate Reads Prevented | Quality Risk | Cache Hits | Runtime (ms) |",
         "| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
-    ]
+    ])
 
     for strategy in strategies:
         lines.append(
@@ -276,6 +399,35 @@ def render_benchmark_markdown(data: dict) -> str:
         files_skipped = strategy.get("files_skipped", [])
         lines.append(f"- Files included ({len(files_included)}): {', '.join(files_included) if files_included else 'none'}")
         lines.append(f"- Files skipped ({len(files_skipped)}): {', '.join(files_skipped) if files_skipped else 'none'}")
+
+    estimator_samples = data.get("estimator_samples", [])
+    if isinstance(estimator_samples, list) and estimator_samples:
+        lines.extend(["", "## Estimator Samples"])
+        for sample in estimator_samples:
+            if not isinstance(sample, dict):
+                continue
+            label = str(sample.get("name", "sample"))
+            path = str(sample.get("path", "") or "")
+            path_suffix = f" ({path})" if path else ""
+            lines.append(f"- `{label}`{path_suffix}: chars={sample.get('chars', 0)}")
+            estimators = sample.get("estimators", [])
+            if not isinstance(estimators, list):
+                continue
+            for estimator in estimators:
+                if not isinstance(estimator, dict):
+                    continue
+                detail = (
+                    f"  - {estimator.get('backend', '')}: "
+                    f"tokens={estimator.get('estimated_tokens', 0)} "
+                    f"effective={estimator.get('effective_backend', '')} "
+                    f"uncertainty={estimator.get('uncertainty', '')}"
+                )
+                if estimator.get("fallback_used"):
+                    detail = f"{detail} fallback=true"
+                reason = str(estimator.get("fallback_reason", "") or "")
+                if reason:
+                    detail = f"{detail} reason={reason}"
+                lines.append(detail)
 
     lines.append("")
     return "\n".join(lines)

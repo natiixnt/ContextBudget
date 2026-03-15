@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
-from contextbudget.cache.summary_cache import SummaryCache
-from contextbudget.config import CompressionSettings
+from contextbudget.cache.summary_cache import SummaryCacheBackend
+from contextbudget.config import CompressionSettings, SummarizationSettings
 from contextbudget.compressors.language_chunks import select_language_aware_chunks
+from contextbudget.compressors.summarizers import SummaryRequest, SummarizationService
 from contextbudget.core.text import task_keywords
 from contextbudget.core.tokens import estimate_tokens
-from contextbudget.schemas.models import CompressedFile, RankedFile
+from contextbudget.schemas.models import CacheReport, CompressedFile, RankedFile, SummarizerReport
 
 
 @dataclass(slots=True)
@@ -23,17 +25,10 @@ class CompressionResult:
     estimated_input_tokens: int
     estimated_saved_tokens: int
     duplicate_reads_prevented: int
+    cache: CacheReport
     cache_hits: int
     quality_risk_estimate: str
-
-
-def _summary_from_text(path: str, text: str, line_limit: int) -> str:
-    lines = [line.strip() for line in text.splitlines() if line.strip()]
-    first_lines = lines[:line_limit]
-    summary = "\n".join(first_lines)
-    if len(lines) > line_limit:
-        summary += "\n..."
-    return f"# Summary: {path}\n{summary}" if summary else f"# Summary: {path}\n<empty file>"
+    summarizer: SummarizerReport
 
 
 def _snippet_from_text(path: str, text: str, keywords: list[str], settings: CompressionSettings) -> str:
@@ -65,9 +60,11 @@ def compress_ranked_files(
     repo: Path,
     ranked_files: list[RankedFile],
     max_tokens: int,
-    cache: SummaryCache,
+    cache: SummaryCacheBackend,
     settings: CompressionSettings | None = None,
+    summarization_settings: SummarizationSettings | None = None,
     duplicate_hash_cache_enabled: bool = True,
+    token_estimator: Callable[[str], int] = estimate_tokens,
 ) -> CompressionResult:
     """Compress ranked files under a token budget."""
 
@@ -81,6 +78,10 @@ def compress_ranked_files(
     total_compressed = 0
     duplicate_reads_prevented = 0
     seen_hashes: set[str] = set()
+    summarizer = SummarizationService(
+        backend=(summarization_settings.backend if summarization_settings is not None else "deterministic"),
+        adapter_name=(summarization_settings.adapter if summarization_settings is not None else ""),
+    )
 
     for ranked in ranked_files:
         file_record = ranked.file
@@ -91,14 +92,13 @@ def compress_ranked_files(
         if duplicate_hash_cache_enabled:
             seen_hashes.add(file_record.content_hash)
 
-        path = repo / file_record.path
         try:
-            full_text = path.read_text(encoding="utf-8", errors="ignore")
+            full_text = Path(file_record.absolute_path).read_text(encoding="utf-8", errors="ignore")
         except OSError:
             files_skipped.append(file_record.path)
             continue
 
-        raw_tokens = estimate_tokens(full_text)
+        raw_tokens = token_estimator(full_text)
         total_raw += raw_tokens
         cache_key = f"{file_record.path}:{file_record.size_bytes}:{file_record.content_hash}"
 
@@ -139,29 +139,49 @@ def compress_ranked_files(
                 selected_ranges = []
         else:
             strategy = "summary"
-            cached = cache.get_summary(cache_key)
-            if cached is not None:
-                compressed = cached
-                chunk_reason = "cached summary preview"
-            else:
-                compressed = _summary_from_text(file_record.path, full_text, cfg.summary_preview_lines)
-                cache.put_summary(cache_key, compressed)
-                chunk_reason = "summary preview of leading content"
-            chunk_strategy = "summary-preview"
-            preview_end = min(cfg.summary_preview_lines, len(full_text.splitlines()))
-            selected_ranges = (
-                [
-                    {
-                        "start_line": 1,
-                        "end_line": preview_end,
-                        "kind": "summary",
-                    }
-                ]
-                if preview_end > 0
-                else []
+            summary = summarizer.summarize(
+                cache=cache,
+                cache_key_prefix=cache_key,
+                request=SummaryRequest(
+                    task=task,
+                    path=file_record.path,
+                    text=full_text,
+                    line_limit=cfg.summary_preview_lines,
+                    score=ranked.score,
+                    keywords=keywords,
+                ),
             )
+            compressed = summary.text
+            chunk_reason = summary.chunk_reason
+            chunk_strategy = summary.chunk_strategy
+            line_count = len(full_text.splitlines())
+            if chunk_strategy == "summary-external":
+                selected_ranges = (
+                    [
+                        {
+                            "start_line": 1,
+                            "end_line": line_count,
+                            "kind": "summary",
+                        }
+                    ]
+                    if line_count > 0
+                    else []
+                )
+            else:
+                preview_end = min(cfg.summary_preview_lines, line_count)
+                selected_ranges = (
+                    [
+                        {
+                            "start_line": 1,
+                            "end_line": preview_end,
+                            "kind": "summary",
+                        }
+                    ]
+                    if preview_end > 0
+                    else []
+                )
 
-        compressed_tokens = estimate_tokens(compressed)
+        compressed_tokens = token_estimator(compressed)
         if total_compressed + compressed_tokens > max_tokens:
             files_skipped.append(file_record.path)
             continue
@@ -177,6 +197,8 @@ def compress_ranked_files(
                 chunk_strategy=chunk_strategy,
                 chunk_reason=chunk_reason,
                 selected_ranges=selected_ranges,
+                relative_path=file_record.relative_path,
+                repo_label=file_record.repo_label,
             )
         )
         files_included.append(file_record.path)
@@ -198,6 +220,7 @@ def compress_ranked_files(
     else:
         risk = "high"
 
+    cache_snapshot = cache.snapshot()
     return CompressionResult(
         compressed_files=compressed_files,
         files_included=files_included,
@@ -205,6 +228,8 @@ def compress_ranked_files(
         estimated_input_tokens=total_compressed,
         estimated_saved_tokens=saved,
         duplicate_reads_prevented=duplicate_reads_prevented,
-        cache_hits=cache.stats.hits,
+        cache=cache_snapshot,
+        cache_hits=cache_snapshot.hits,
         quality_risk_estimate=risk,
+        summarizer=summarizer.snapshot(),
     )

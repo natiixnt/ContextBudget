@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from contextbudget.config import ContextBudgetConfig, load_config
+from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_config, load_workspace
 from contextbudget.core.benchmark import run_benchmark
 from contextbudget.core.pipeline import (
     as_json_dict,
@@ -64,6 +64,14 @@ class ContextBudgetEngine:
         resolved_config_path = self._resolve_path(config_path) or self._default_config_path
         return load_config(repo, config_path=resolved_config_path)
 
+    def _load_workspace(
+        self,
+        workspace_path: str | Path,
+        config_path: str | Path | None = None,
+    ) -> WorkspaceDefinition:
+        resolved_config_path = self._resolve_path(config_path) or self._default_config_path
+        return load_workspace(Path(workspace_path).resolve(), config_path=resolved_config_path)
+
     @staticmethod
     def _load_run_artifact(run_artifact: RunArtifactInput) -> dict[str, Any]:
         if isinstance(run_artifact, dict):
@@ -78,6 +86,12 @@ class ContextBudgetEngine:
             return normalize_repo(raw_repo)
         return Path.cwd()
 
+    def _resolve_workspace_from_run_data(self, run_data: dict[str, Any]) -> Path | None:
+        raw_workspace = run_data.get("workspace")
+        if isinstance(raw_workspace, str) and raw_workspace.strip():
+            return Path(raw_workspace).resolve()
+        return None
+
     def _build_policy_telemetry_session(
         self,
         run_data: dict[str, Any],
@@ -85,7 +99,11 @@ class ContextBudgetEngine:
         config_path: str | Path | None = None,
     ) -> TelemetrySession:
         repo = self._resolve_repo_from_run_data(run_data)
-        cfg = self._load_config(repo, config_path=config_path)
+        workspace_path = self._resolve_workspace_from_run_data(run_data)
+        if workspace_path is not None:
+            cfg = self._load_workspace(workspace_path, config_path=config_path).config
+        else:
+            cfg = self._load_config(repo, config_path=config_path)
         sink = self._telemetry_sink or build_telemetry_sink(
             repo=repo,
             enabled=cfg.telemetry.enabled,
@@ -96,8 +114,7 @@ class ContextBudgetEngine:
             sink=sink,
             base_payload={
                 "command": str(run_data.get("command", "policy")),
-                "task": str(run_data.get("task", "")),
-                "repo": str(repo),
+                "repo": repo,
             },
         )
 
@@ -123,12 +140,25 @@ class ContextBudgetEngine:
         *,
         task: str,
         repo: str | Path = ".",
+        workspace: str | Path | None = None,
         top_files: int | None = None,
         config_path: str | Path | None = None,
     ) -> dict[str, Any]:
-        """Rank repository files relevant to a task."""
+        """Rank repository or workspace files relevant to a task."""
 
         repo_path = normalize_repo(repo)
+        if workspace is not None:
+            workspace_definition = self._load_workspace(workspace, config_path=config_path)
+            effective_top_files = top_files if top_files is not None else workspace_definition.config.budget.top_files
+            return run_plan(
+                task,
+                repo=workspace_definition.root,
+                top_n=effective_top_files,
+                config=workspace_definition.config,
+                telemetry_sink=self._telemetry_sink,
+                workspace=workspace_definition,
+            )
+
         cfg = self._load_config(repo_path, config_path=config_path)
         effective_top_files = top_files if top_files is not None else cfg.budget.top_files
         return run_plan(
@@ -144,6 +174,7 @@ class ContextBudgetEngine:
         *,
         task: str,
         repo: str | Path = ".",
+        workspace: str | Path | None = None,
         max_tokens: int | None = None,
         top_files: int | None = None,
         config_path: str | Path | None = None,
@@ -151,6 +182,19 @@ class ContextBudgetEngine:
         """Build compressed context under token and file budgets."""
 
         repo_path = normalize_repo(repo)
+        if workspace is not None:
+            workspace_definition = self._load_workspace(workspace, config_path=config_path)
+            report = run_pack(
+                task,
+                repo=workspace_definition.root,
+                max_tokens=max_tokens,
+                top_files=top_files,
+                config=workspace_definition.config,
+                telemetry_sink=self._telemetry_sink,
+                workspace=workspace_definition,
+            )
+            return as_json_dict(report)
+
         cfg = self._load_config(repo_path, config_path=config_path)
         report = run_pack(
             task,
@@ -192,10 +236,23 @@ class ContextBudgetEngine:
         policy_result = policy_result_to_dict(evaluate_policy_artifact(run_data, spec))
         if not bool(policy_result.get("passed", False)):
             telemetry = self._build_policy_telemetry_session(run_data, config_path=config_path)
+            budget = run_data.get("budget", {})
+            files_included = run_data.get("files_included", [])
+            files_skipped = run_data.get("files_skipped", [])
             telemetry.emit(
                 "policy_failed",
                 violations=list(policy_result.get("violations", [])),
                 checks=policy_result.get("checks", {}),
+                max_tokens=run_data.get("max_tokens"),
+                estimated_input_tokens=budget.get("estimated_input_tokens") if isinstance(budget, dict) else None,
+                estimated_saved_tokens=budget.get("estimated_saved_tokens") if isinstance(budget, dict) else None,
+                files_included=len(files_included) if isinstance(files_included, list) else None,
+                files_skipped=len(files_skipped) if isinstance(files_skipped, list) else None,
+                cache_hits=run_data.get("cache_hits"),
+                duplicate_reads_prevented=(
+                    budget.get("duplicate_reads_prevented", 0) if isinstance(budget, dict) else None
+                ),
+                quality_risk_estimate=budget.get("quality_risk_estimate") if isinstance(budget, dict) else None,
             )
         return policy_result
 
@@ -218,13 +275,26 @@ class ContextBudgetEngine:
         *,
         task: str,
         repo: str | Path = ".",
+        workspace: str | Path | None = None,
         max_tokens: int | None = None,
         top_files: int | None = None,
         config_path: str | Path | None = None,
     ) -> dict[str, Any]:
-        """Run deterministic strategy benchmark for a task and repository."""
+        """Run deterministic strategy benchmark for a task and repository or workspace."""
 
         repo_path = normalize_repo(repo)
+        if workspace is not None:
+            workspace_definition = self._load_workspace(workspace, config_path=config_path)
+            return run_benchmark(
+                task=task,
+                repo=workspace_definition.root,
+                max_tokens=max_tokens,
+                top_files=top_files,
+                config=workspace_definition.config,
+                telemetry_sink=self._telemetry_sink,
+                workspace=workspace_definition,
+            )
+
         cfg = self._load_config(repo_path, config_path=config_path)
         return run_benchmark(
             task=task,
@@ -232,6 +302,7 @@ class ContextBudgetEngine:
             max_tokens=max_tokens,
             top_files=top_files,
             config=cfg,
+            telemetry_sink=self._telemetry_sink,
         )
 
 
@@ -291,6 +362,7 @@ class BudgetGuard:
         *,
         task: str,
         repo: str | Path = ".",
+        workspace: str | Path | None = None,
         max_tokens: int | None = None,
         top_files: int | None = None,
         strict: bool | None = None,
@@ -309,6 +381,7 @@ class BudgetGuard:
         run_data = self.engine.pack(
             task=task,
             repo=repo,
+            workspace=workspace,
             max_tokens=effective_max_tokens,
             top_files=effective_top_files,
             config_path=config_path,

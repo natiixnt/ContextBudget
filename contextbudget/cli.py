@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import argparse
 from pathlib import Path
+import time
 
+from contextbudget.config import ContextBudgetConfig, load_config
 from contextbudget.core.policy import (
     default_strict_policy,
     load_policy,
@@ -19,6 +21,9 @@ from contextbudget.core.render import (
     render_report_markdown,
     write_json,
 )
+from contextbudget.schemas.models import normalize_repo
+from contextbudget.scanners.incremental import ScanRefreshResult, ScanRefreshSummary
+from contextbudget.stages.workflow import run_scan_refresh_stage
 
 
 def _base_name(task: str) -> str:
@@ -26,11 +31,47 @@ def _base_name(task: str) -> str:
     return sanitized[:40] if sanitized else "run"
 
 
+def _resolve_config_path(path: str | None) -> Path | None:
+    if not path:
+        return None
+    return Path(path).resolve()
+
+
+def _render_scan_summary(prefix: str, tracked_repo: Path, summary: ScanRefreshSummary) -> str:
+    return (
+        f"{prefix}: repo={tracked_repo} "
+        f"tracked={summary.tracked_files} included={summary.included_files} "
+        f"reused={summary.reused_count} added={summary.added_count} "
+        f"updated={summary.updated_count} removed={summary.removed_count}"
+    )
+
+
+def _render_scan_change_paths(summary: ScanRefreshSummary, limit: int = 5) -> str:
+    changes: list[str] = []
+    if summary.added_paths:
+        joined = ", ".join(summary.added_paths[:limit])
+        if len(summary.added_paths) > limit:
+            joined = f"{joined}, +{len(summary.added_paths) - limit} more"
+        changes.append(f"added[{joined}]")
+    if summary.updated_paths:
+        joined = ", ".join(summary.updated_paths[:limit])
+        if len(summary.updated_paths) > limit:
+            joined = f"{joined}, +{len(summary.updated_paths) - limit} more"
+        changes.append(f"updated[{joined}]")
+    if summary.removed_paths:
+        joined = ", ".join(summary.removed_paths[:limit])
+        if len(summary.removed_paths) > limit:
+            joined = f"{joined}, +{len(summary.removed_paths) - limit} more"
+        changes.append(f"removed[{joined}]")
+    return " ".join(changes)
+
+
 def cmd_plan(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
     data = engine.plan(
         task=args.task,
         repo=args.repo,
+        workspace=args.workspace,
         top_files=args.top_files,
     )
 
@@ -53,6 +94,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
     data = engine.pack(
         task=args.task,
         repo=args.repo,
+        workspace=args.workspace,
         max_tokens=args.max_tokens,
         top_files=args.top_files,
     )
@@ -85,6 +127,32 @@ def cmd_pack(args: argparse.Namespace) -> int:
         f"saved={budget['estimated_saved_tokens']} tokens, "
         f"risk={budget['quality_risk_estimate']}"
     )
+    estimator = data.get("token_estimator", {})
+    if isinstance(estimator, dict):
+        print(
+            "Token estimator: "
+            f"selected={estimator.get('selected_backend', 'heuristic')} "
+            f"effective={estimator.get('effective_backend', 'heuristic')} "
+            f"fallback={estimator.get('fallback_used', False)}"
+        )
+        reason = str(estimator.get("fallback_reason", "") or "")
+        if reason:
+            print(f"Token estimator note: {reason}")
+    summarizer = data.get("summarizer", {})
+    if isinstance(summarizer, dict):
+        print(
+            "Summarizer: "
+            f"selected={summarizer.get('selected_backend', 'deterministic')} "
+            f"effective={summarizer.get('effective_backend', 'deterministic')} "
+            f"fallback={summarizer.get('fallback_used', False)}"
+        )
+        adapter = str(summarizer.get("external_adapter", "") or "")
+        if adapter:
+            print(f"Summarizer adapter: {adapter}")
+        logs = summarizer.get("logs", [])
+        if isinstance(logs, list):
+            for item in logs:
+                print(f"Summarizer log: {item}")
     if policy_result is not None:
         if bool(policy_result.get("passed", False)):
             print("Policy check: PASS")
@@ -152,6 +220,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     benchmark_data = engine.benchmark(
         task=args.task,
         repo=args.repo,
+        workspace=args.workspace,
         max_tokens=args.max_tokens,
         top_files=args.top_files,
     )
@@ -164,6 +233,17 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     md_path.write_text(markdown, encoding="utf-8")
 
     print("Benchmark summary:")
+    estimator = benchmark_data.get("token_estimator", {})
+    if isinstance(estimator, dict):
+        print(
+            "Estimator backend: "
+            f"selected={estimator.get('selected_backend', 'heuristic')} "
+            f"effective={estimator.get('effective_backend', 'heuristic')} "
+            f"fallback={estimator.get('fallback_used', False)}"
+        )
+        reason = str(estimator.get("fallback_reason", "") or "")
+        if reason:
+            print(f"Estimator note: {reason}")
     for strategy in benchmark_data.get("strategies", []):
         print(
             f"- {strategy.get('strategy')}: "
@@ -178,12 +258,53 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_watch(args: argparse.Namespace) -> int:
+    repo_path = normalize_repo(args.repo)
+    config_path = _resolve_config_path(args.config)
+    poll_interval = float(args.poll_interval)
+    if poll_interval <= 0:
+        print("--poll-interval must be greater than 0")
+        return 2
+
+    print(f"Watching repository: {repo_path}")
+    print(f"Polling interval: {poll_interval:.2f}s")
+
+    def refresh_once() -> tuple[ContextBudgetConfig, ScanRefreshResult]:
+        cfg = load_config(repo_path, config_path=config_path)
+        result = run_scan_refresh_stage(repo_path, cfg)
+        return cfg, result
+
+    _, initial = refresh_once()
+    print(f"Scan index: {initial.index_path}")
+    print(_render_scan_summary("Initial scan", repo_path, initial.summary))
+    initial_changes = _render_scan_change_paths(initial.summary)
+    if initial_changes:
+        print(initial_changes)
+    if args.once:
+        return 0
+
+    try:
+        while True:
+            time.sleep(poll_interval)
+            _, result = refresh_once()
+            summary = result.summary
+            if summary.added_count or summary.updated_count or summary.removed_count:
+                print(_render_scan_summary("Scan change", repo_path, summary))
+                change_paths = _render_scan_change_paths(summary)
+                if change_paths:
+                    print(change_paths)
+    except KeyboardInterrupt:
+        print("Stopped watching.")
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="contextbudget",
         description=(
             "Reduce token usage by planning and packing repository context. "
-            "Supports contextbudget.toml sections: [scan], [budget], [score], [compression], [cache], [telemetry]."
+            "Supports contextbudget.toml sections: [scan], [budget], [score], [compression], "
+            "[summarization], [plugins], [cache], [telemetry]."
         ),
     )
     sub = parser.add_subparsers(dest="command", required=True)
@@ -191,6 +312,7 @@ def build_parser() -> argparse.ArgumentParser:
     plan = sub.add_parser("plan", help="Rank relevant files for a natural language task")
     plan.add_argument("task", help="Task description")
     plan.add_argument("--repo", default=".", help="Repository path")
+    plan.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
     plan.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown")
     plan.add_argument(
         "--top-files",
@@ -207,6 +329,7 @@ def build_parser() -> argparse.ArgumentParser:
     pack = sub.add_parser("pack", help="Build compressed context under token budget")
     pack.add_argument("task", help="Task description")
     pack.add_argument("--repo", default=".", help="Repository path")
+    pack.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
     pack.add_argument(
         "--max-tokens",
         type=int,
@@ -250,11 +373,31 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark = sub.add_parser("benchmark", help="Compare context packing strategies")
     benchmark.add_argument("task", help="Task description")
     benchmark.add_argument("--repo", default=".", help="Repository path")
+    benchmark.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
     benchmark.add_argument("--max-tokens", type=int, default=None, help="Token budget override for packed strategies.")
     benchmark.add_argument("--top-files", type=int, default=None, help="Top files override for ranking-based strategies.")
     benchmark.add_argument("--config", help="Optional path to config TOML (default: <repo>/contextbudget.toml).")
     benchmark.add_argument("--out-prefix", help="Output file prefix for benchmark JSON/Markdown")
     benchmark.set_defaults(func=cmd_benchmark)
+
+    watch = sub.add_parser("watch", help="Watch a repository and update scan state incrementally")
+    watch.add_argument("--repo", default=".", help="Repository path")
+    watch.add_argument(
+        "--poll-interval",
+        type=float,
+        default=1.0,
+        help="Polling interval in seconds for detecting local file changes.",
+    )
+    watch.add_argument(
+        "--config",
+        help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
+    )
+    watch.add_argument(
+        "--once",
+        action="store_true",
+        help="Run a single incremental refresh and exit.",
+    )
+    watch.set_defaults(func=cmd_watch)
 
     return parser
 

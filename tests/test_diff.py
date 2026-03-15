@@ -99,3 +99,32 @@ def test_diff_run_artifacts_handles_stable_runs() -> None:
     assert diff["budget_delta"]["estimated_saved_tokens"]["delta"] == 0
     assert diff["budget_delta"]["quality_risk"]["delta_level"] == 0
     assert diff["budget_delta"]["cache_hits"]["delta"] == 0
+
+
+def test_diff_run_artifacts_reads_cache_hits_from_cache_metadata() -> None:
+    old = _sample_run(
+        task="same",
+        files_included=["a.py"],
+        ranked_files=[{"path": "a.py", "score": 1.0}],
+        input_tokens=10,
+        saved_tokens=2,
+        quality_risk="low",
+        cache_hits=1,
+    )
+    new = _sample_run(
+        task="same",
+        files_included=["a.py"],
+        ranked_files=[{"path": "a.py", "score": 1.0}],
+        input_tokens=10,
+        saved_tokens=2,
+        quality_risk="low",
+        cache_hits=4,
+    )
+    old.pop("cache_hits")
+    new.pop("cache_hits")
+    old["cache"] = {"backend": "local_file", "enabled": True, "hits": 1, "misses": 2, "writes": 1}
+    new["cache"] = {"backend": "shared_stub", "enabled": True, "hits": 4, "misses": 6, "writes": 0}
+
+    diff = diff_run_artifacts(old, new)
+
+    assert diff["budget_delta"]["cache_hits"]["delta"] == 3

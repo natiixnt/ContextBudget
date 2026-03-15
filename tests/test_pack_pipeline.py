@@ -63,8 +63,34 @@ def test_summary_cache_hits_on_second_run(tmp_path: Path) -> None:
     first = as_json_dict(run_pack("touch unrelated", repo=tmp_path, max_tokens=500))
     second = as_json_dict(run_pack("touch unrelated", repo=tmp_path, max_tokens=500))
 
+    assert first["cache"]["backend"] == "local_file"
+    assert first["cache"]["hits"] == first["cache_hits"]
     assert first["cache_hits"] == 0
+    assert first["cache"]["misses"] >= 1
     assert second["cache_hits"] >= 1
+    assert second["cache"]["hits"] == second["cache_hits"]
+
+
+def test_shared_stub_cache_backend_records_misses_without_persistence(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "contextbudget.toml",
+        """
+[cache]
+backend = "shared_stub"
+""".strip(),
+    )
+    _write(tmp_path / "src" / "large.py", "\n".join([f"line {i}" for i in range(2000)]) + "\n")
+
+    first = as_json_dict(run_pack("touch unrelated", repo=tmp_path, max_tokens=500))
+    second = as_json_dict(run_pack("touch unrelated", repo=tmp_path, max_tokens=500))
+
+    assert first["cache"]["backend"] == "shared_stub"
+    assert first["cache"]["hits"] == 0
+    assert first["cache"]["misses"] >= 1
+    assert first["cache"]["writes"] == 0
+    assert second["cache"]["backend"] == "shared_stub"
+    assert second["cache"]["hits"] == 0
+    assert second["cache"]["misses"] >= 1
 
 
 def test_python_language_aware_chunk_selection(tmp_path: Path) -> None:

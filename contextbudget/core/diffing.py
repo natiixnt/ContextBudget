@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from contextbudget.cache import normalize_cache_report
+
 
 _RISK_ORDER = {
     "low": 1,
@@ -113,8 +115,8 @@ def diff_run_artifacts(
     old_risk_value = _risk_value(old_risk)
     new_risk_value = _risk_value(new_risk)
 
-    old_cache_hits = _to_int(old_run.get("cache_hits"))
-    new_cache_hits = _to_int(new_run.get("cache_hits"))
+    old_cache_hits = _to_int(normalize_cache_report(old_run).get("hits"))
+    new_cache_hits = _to_int(normalize_cache_report(new_run).get("hits"))
 
     return {
         "command": "diff",

@@ -34,6 +34,8 @@ def test_run_benchmark_includes_required_strategies(tmp_path: Path) -> None:
     assert compressed["estimated_input_tokens"] <= naive["estimated_input_tokens"]
     assert isinstance(compressed["quality_risk_estimate"], str)
     assert cache_assisted["cache_hits"] >= compressed["cache_hits"]
+    assert data["token_estimator"]["selected_backend"] == "heuristic"
+    assert data["estimator_samples"]
 
 
 def test_cli_benchmark_writes_artifacts(tmp_path: Path, monkeypatch) -> None:
@@ -64,3 +66,32 @@ def test_cli_benchmark_writes_artifacts(tmp_path: Path, monkeypatch) -> None:
     data = json.loads(json_path.read_text(encoding="utf-8"))
     assert data["command"] == "benchmark"
     assert data["strategies"]
+    assert data["token_estimator"]["selected_backend"] == "heuristic"
+
+
+def test_run_benchmark_supports_workspace(tmp_path: Path) -> None:
+    _write(tmp_path / "app" / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+    _write(tmp_path / "shared" / "src" / "auth.py", "def validate() -> bool:\n    return True\n")
+    _write(
+        tmp_path / "workspace.toml",
+        """
+[scan]
+include_globs = ["**/*.py"]
+
+[[repos]]
+label = "app"
+path = "app"
+
+[[repos]]
+label = "shared"
+path = "shared"
+""".strip(),
+    )
+
+    from contextbudget.config import load_workspace
+
+    workspace = load_workspace(tmp_path / "workspace.toml")
+    data = run_benchmark("update auth flow", repo=workspace.root, config=workspace.config, workspace=workspace)
+
+    assert data["workspace"].endswith("workspace.toml")
+    assert {item["label"] for item in data["scanned_repos"]} == {"app", "shared"}

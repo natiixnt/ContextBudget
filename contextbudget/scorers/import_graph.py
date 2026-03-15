@@ -41,7 +41,7 @@ def _build_python_module_map(files: list[FileRecord]) -> dict[str, str]:
         if record.extension != ".py":
             continue
 
-        pure = PurePosixPath(record.path)
+        pure = PurePosixPath(record.relative_path or record.path)
         stem_parts = list(pure.with_suffix("").parts)
         if not stem_parts:
             continue
@@ -102,50 +102,58 @@ def _resolve_python_module_spec(spec: str, current_path: str, module_map: dict[s
 
 
 def _extract_python_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
-    module_map = _build_python_module_map(files)
     edges: dict[str, set[str]] = defaultdict(set)
+    repo_groups: dict[str, list[FileRecord]] = defaultdict(list)
 
     for record in files:
-        if record.extension != ".py":
-            continue
-        try:
-            source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
+        repo_groups[record.repo_label].append(record)
 
-        for raw_line in source.splitlines():
-            line = raw_line.strip()
-            if not line or line.startswith("#"):
+    for repo_files in repo_groups.values():
+        module_map = _build_python_module_map(repo_files)
+
+        for record in repo_files:
+            if record.extension != ".py":
+                continue
+            try:
+                source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
                 continue
 
-            import_match = PY_IMPORT_RE.match(raw_line)
-            if import_match:
-                modules = [token.strip().split(" as ")[0].strip() for token in import_match.group(1).split(",")]
-                for module in modules:
-                    target = _resolve_python_module_spec(module, record.path, module_map)
+            current_path = record.relative_path or record.path
+
+            for raw_line in source.splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("#"):
+                    continue
+
+                import_match = PY_IMPORT_RE.match(raw_line)
+                if import_match:
+                    modules = [token.strip().split(" as ")[0].strip() for token in import_match.group(1).split(",")]
+                    for module in modules:
+                        target = _resolve_python_module_spec(module, current_path, module_map)
+                        if target and target != record.path:
+                            edges[record.path].add(target)
+                    continue
+
+                from_match = PY_FROM_RE.match(raw_line)
+                if not from_match:
+                    continue
+
+                module_spec = from_match.group(1).strip()
+                imported_items = [token.strip().split(" as ")[0].strip() for token in from_match.group(2).split(",")]
+                specs = [module_spec]
+                for imported in imported_items:
+                    if imported in {"", "*"}:
+                        continue
+                    if module_spec.startswith("."):
+                        specs.append(f"{module_spec}{imported}")
+                    else:
+                        specs.append(f"{module_spec}.{imported}")
+
+                for spec in specs:
+                    target = _resolve_python_module_spec(spec, current_path, module_map)
                     if target and target != record.path:
                         edges[record.path].add(target)
-                continue
-
-            from_match = PY_FROM_RE.match(raw_line)
-            if not from_match:
-                continue
-
-            module_spec = from_match.group(1).strip()
-            imported_items = [token.strip().split(" as ")[0].strip() for token in from_match.group(2).split(",")]
-            specs = [module_spec]
-            for imported in imported_items:
-                if imported in {"", "*"}:
-                    continue
-                if module_spec.startswith("."):
-                    specs.append(f"{module_spec}{imported}")
-                else:
-                    specs.append(f"{module_spec}.{imported}")
-
-            for spec in specs:
-                target = _resolve_python_module_spec(spec, record.path, module_map)
-                if target and target != record.path:
-                    edges[record.path].add(target)
 
     return edges
 
@@ -188,25 +196,39 @@ def _resolve_js_ts_spec(current_path: str, spec: str, existing: set[str]) -> str
 
 
 def _extract_js_ts_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
-    existing_paths = {record.path for record in files if record.extension in JS_TS_EXTENSIONS}
     edges: dict[str, set[str]] = defaultdict(set)
+    repo_groups: dict[str, list[FileRecord]] = defaultdict(list)
 
     for record in files:
-        if record.extension not in JS_TS_EXTENSIONS:
-            continue
-        try:
-            source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
-        except OSError:
-            continue
+        repo_groups[record.repo_label].append(record)
 
-        specs: set[str] = set(JS_IMPORT_FROM_RE.findall(source))
-        specs.update(JS_SIDE_EFFECT_IMPORT_RE.findall(source))
-        specs.update(JS_REQUIRE_RE.findall(source))
+    for repo_files in repo_groups.values():
+        existing_paths = {
+            record.relative_path or record.path: record.path
+            for record in repo_files
+            if record.extension in JS_TS_EXTENSIONS
+        }
 
-        for spec in specs:
-            target = _resolve_js_ts_spec(record.path, spec, existing_paths)
-            if target and target != record.path:
-                edges[record.path].add(target)
+        for record in repo_files:
+            if record.extension not in JS_TS_EXTENSIONS:
+                continue
+            try:
+                source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+
+            specs: set[str] = set(JS_IMPORT_FROM_RE.findall(source))
+            specs.update(JS_SIDE_EFFECT_IMPORT_RE.findall(source))
+            specs.update(JS_REQUIRE_RE.findall(source))
+
+            current_path = record.relative_path or record.path
+            for spec in specs:
+                target_relative_path = _resolve_js_ts_spec(current_path, spec, set(existing_paths))
+                if target_relative_path is None:
+                    continue
+                target = existing_paths[target_relative_path]
+                if target != record.path:
+                    edges[record.path].add(target)
 
     return edges
 
@@ -232,7 +254,7 @@ def build_import_graph(files: list[FileRecord], entrypoint_filenames: set[str] |
     entrypoints: set[str] = set()
     if entry_names:
         for record in files:
-            basename = record.path.rsplit("/", 1)[-1].lower()
+            basename = (record.relative_path or record.path).rsplit("/", 1)[-1].lower()
             if basename in entry_names:
                 entrypoints.add(record.path)
 

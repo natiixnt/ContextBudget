@@ -106,12 +106,31 @@ class CompressionSettings:
 
 
 @dataclass(slots=True)
+class SummarizationSettings:
+    """Settings for deterministic or adapter-backed summarization."""
+
+    backend: str = "deterministic"
+    adapter: str = ""
+
+
+@dataclass(slots=True)
 class CacheSettings:
     """Settings for cache and duplicate detection behavior."""
 
+    backend: str = "local_file"
     summary_cache_enabled: bool = True
     cache_file: str = CACHE_FILE
     duplicate_hash_cache_enabled: bool = True
+
+
+@dataclass(slots=True)
+class TokenEstimationSettings:
+    """Settings for selecting and configuring token-estimation backends."""
+
+    backend: str = "heuristic"
+    model: str = "gpt-4o-mini"
+    encoding: str = ""
+    fallback_backend: str = "heuristic"
 
 
 @dataclass(slots=True)
@@ -124,6 +143,45 @@ class TelemetrySettings:
 
 
 @dataclass(slots=True)
+class PluginRegistrationSettings:
+    """Explicit plugin registration entry loaded from configuration."""
+
+    target: str
+    options: dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class PluginSettings:
+    """Configured scorer, compressor, and token-estimator plugin selections."""
+
+    scorer: str = "builtin.relevance"
+    compressor: str = "builtin.default"
+    token_estimator: str = "builtin.char4"
+    registrations: list[PluginRegistrationSettings] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class WorkspaceRepoSettings:
+    """Workspace repository entry with optional scan overrides."""
+
+    label: str
+    path: Path
+    include_globs: list[str] = field(default_factory=list)
+    ignore_globs: list[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class WorkspaceDefinition:
+    """Local-only workspace configuration for multi-repo analysis."""
+
+    path: Path
+    root: Path
+    repos: list[WorkspaceRepoSettings]
+    config: "ContextBudgetConfig"
+    name: str = ""
+
+
+@dataclass(slots=True)
 class ContextBudgetConfig:
     """Top-level settings object used by all pipeline stages."""
 
@@ -131,8 +189,11 @@ class ContextBudgetConfig:
     budget: BudgetSettings = field(default_factory=BudgetSettings)
     score: ScoreSettings = field(default_factory=ScoreSettings)
     compression: CompressionSettings = field(default_factory=CompressionSettings)
+    summarization: SummarizationSettings = field(default_factory=SummarizationSettings)
     cache: CacheSettings = field(default_factory=CacheSettings)
+    tokens: TokenEstimationSettings = field(default_factory=TokenEstimationSettings)
     telemetry: TelemetrySettings = field(default_factory=TelemetrySettings)
+    plugins: PluginSettings = field(default_factory=PluginSettings)
 
 
 def default_config() -> ContextBudgetConfig:
@@ -163,6 +224,12 @@ def _to_float_map(value: Any) -> dict[str, float]:
         except (TypeError, ValueError):
             continue
     return output
+
+
+def _to_dict(value: Any) -> dict[str, Any]:
+    if not isinstance(value, Mapping):
+        return {}
+    return {str(key): raw for key, raw in value.items()}
 
 
 def _apply_scan_overrides(settings: ScanSettings, data: Mapping[str, Any]) -> None:
@@ -264,6 +331,8 @@ def _apply_compression_overrides(settings: CompressionSettings, data: Mapping[st
 
 
 def _apply_cache_overrides(settings: CacheSettings, data: Mapping[str, Any]) -> None:
+    if "backend" in data:
+        settings.backend = str(data["backend"]).strip().lower()
     if "summary_cache_enabled" in data:
         settings.summary_cache_enabled = bool(data["summary_cache_enabled"])
     if "cache_file" in data:
@@ -275,6 +344,26 @@ def _apply_cache_overrides(settings: CacheSettings, data: Mapping[str, Any]) -> 
         settings.summary_cache_enabled = bool(data["enabled"])
 
 
+def _apply_summarization_overrides(settings: SummarizationSettings, data: Mapping[str, Any]) -> None:
+    if "backend" in data:
+        settings.backend = str(data["backend"]).strip().lower()
+    if "adapter" in data:
+        settings.adapter = str(data["adapter"]).strip()
+    if "provider" in data:
+        settings.backend = str(data["provider"]).strip().lower()
+
+
+def _apply_token_estimation_overrides(settings: TokenEstimationSettings, data: Mapping[str, Any]) -> None:
+    if "backend" in data:
+        settings.backend = str(data["backend"]).strip().lower() or settings.backend
+    if "model" in data:
+        settings.model = str(data["model"]).strip() or settings.model
+    if "encoding" in data:
+        settings.encoding = str(data["encoding"]).strip()
+    if "fallback_backend" in data:
+        settings.fallback_backend = str(data["fallback_backend"]).strip().lower() or settings.fallback_backend
+
+
 def _apply_telemetry_overrides(settings: TelemetrySettings, data: Mapping[str, Any]) -> None:
     if "enabled" in data:
         settings.enabled = bool(data["enabled"])
@@ -282,6 +371,31 @@ def _apply_telemetry_overrides(settings: TelemetrySettings, data: Mapping[str, A
         settings.sink = str(data["sink"])
     if "file_path" in data:
         settings.file_path = str(data["file_path"])
+
+
+def _apply_plugin_overrides(settings: PluginSettings, data: Mapping[str, Any]) -> None:
+    if "scorer" in data:
+        settings.scorer = str(data["scorer"]).strip() or settings.scorer
+    if "compressor" in data:
+        settings.compressor = str(data["compressor"]).strip() or settings.compressor
+    if "token_estimator" in data:
+        settings.token_estimator = str(data["token_estimator"]).strip() or settings.token_estimator
+    raw_registrations = data.get("registrations")
+    if isinstance(raw_registrations, list):
+        registrations: list[PluginRegistrationSettings] = []
+        for raw_item in raw_registrations:
+            if not isinstance(raw_item, Mapping):
+                continue
+            target = str(raw_item.get("target", "")).strip()
+            if not target:
+                continue
+            registrations.append(
+                PluginRegistrationSettings(
+                    target=target,
+                    options=_to_dict(raw_item.get("options")),
+                )
+            )
+        settings.registrations = registrations
 
 
 def _apply_overrides(config: ContextBudgetConfig, data: Mapping[str, Any]) -> ContextBudgetConfig:
@@ -297,9 +411,21 @@ def _apply_overrides(config: ContextBudgetConfig, data: Mapping[str, Any]) -> Co
     if isinstance(cache_data, Mapping):
         _apply_cache_overrides(config.cache, cache_data)
 
+    summarization_data = data.get("summarization")
+    if isinstance(summarization_data, Mapping):
+        _apply_summarization_overrides(config.summarization, summarization_data)
+
+    token_data = data.get("tokens")
+    if isinstance(token_data, Mapping):
+        _apply_token_estimation_overrides(config.tokens, token_data)
+
     telemetry_data = data.get("telemetry")
     if isinstance(telemetry_data, Mapping):
         _apply_telemetry_overrides(config.telemetry, telemetry_data)
+
+    plugin_data = data.get("plugins")
+    if isinstance(plugin_data, Mapping):
+        _apply_plugin_overrides(config.plugins, plugin_data)
 
     # Apply legacy sections first for compatibility, then new sections.
     legacy_pack_data = data.get("pack")
@@ -319,6 +445,17 @@ def _apply_overrides(config: ContextBudgetConfig, data: Mapping[str, Any]) -> Co
     if isinstance(compression_data, Mapping):
         _apply_compression_overrides(config.compression, compression_data)
 
+    if isinstance(token_data, Mapping) and not (
+        isinstance(plugin_data, Mapping) and "token_estimator" in plugin_data
+    ):
+        backend = config.tokens.backend
+        if backend in {"heuristic", "simple"}:
+            config.plugins.token_estimator = "builtin.char4"
+        elif backend in {"model_aligned", "model-aligned"}:
+            config.plugins.token_estimator = "builtin.model_aligned"
+        elif backend in {"exact", "exact_tiktoken", "exact-tiktoken", "tiktoken"}:
+            config.plugins.token_estimator = "builtin.exact_tiktoken"
+
     return config
 
 
@@ -328,19 +465,89 @@ def _discover_config_path(repo: Path, config_path: Path | None = None) -> Path:
     return repo / "contextbudget.toml"
 
 
+def load_config_from_mapping(data: Mapping[str, Any]) -> ContextBudgetConfig:
+    """Load config overrides from an in-memory mapping."""
+
+    config = default_config()
+    return _apply_overrides(config, data)
+
+
 def load_config(repo: Path, config_path: Path | None = None) -> ContextBudgetConfig:
     """Load configuration from ``contextbudget.toml`` with defaults fallback."""
 
-    config = default_config()
     path = _discover_config_path(repo, config_path)
 
     if not path.exists():
-        return config
+        return default_config()
 
     if tomllib is None:
         raise RuntimeError("TOML parser unavailable. Install 'tomli' for Python < 3.11.")
 
     data = tomllib.loads(path.read_text(encoding="utf-8"))
     if not isinstance(data, Mapping):
-        return config
-    return _apply_overrides(config, data)
+        return default_config()
+    return load_config_from_mapping(data)
+
+
+def load_workspace(workspace_path: Path, config_path: Path | None = None) -> WorkspaceDefinition:
+    """Load a local workspace TOML describing multiple repositories or packages."""
+
+    resolved_workspace_path = workspace_path.resolve()
+    if not resolved_workspace_path.exists():
+        raise FileNotFoundError(f"Workspace config not found: {resolved_workspace_path}")
+
+    if tomllib is None:
+        raise RuntimeError("TOML parser unavailable. Install 'tomli' for Python < 3.11.")
+
+    data = tomllib.loads(resolved_workspace_path.read_text(encoding="utf-8"))
+    if not isinstance(data, Mapping):
+        raise ValueError(f"Workspace config must be a TOML table: {resolved_workspace_path}")
+
+    raw_repos = data.get("repos")
+    if not isinstance(raw_repos, list) or not raw_repos:
+        raise ValueError("Workspace config must define at least one [[repos]] entry.")
+
+    root = resolved_workspace_path.parent
+    repos: list[WorkspaceRepoSettings] = []
+    seen_labels: set[str] = set()
+
+    for index, raw_repo in enumerate(raw_repos, start=1):
+        if not isinstance(raw_repo, Mapping):
+            raise ValueError(f"Workspace repo entry #{index} must be a TOML table.")
+
+        raw_path = raw_repo.get("path")
+        if raw_path is None:
+            raise ValueError(f"Workspace repo entry #{index} is missing 'path'.")
+
+        repo_path = (root / str(raw_path)).resolve()
+        if not repo_path.exists() or not repo_path.is_dir():
+            raise ValueError(f"Workspace repo path does not exist: {repo_path}")
+
+        label = str(raw_repo.get("label") or repo_path.name).strip()
+        if not label:
+            raise ValueError(f"Workspace repo entry #{index} has an empty label.")
+        if label in seen_labels:
+            raise ValueError(f"Workspace repo label must be unique: {label}")
+        seen_labels.add(label)
+
+        repos.append(
+            WorkspaceRepoSettings(
+                label=label,
+                path=repo_path,
+                include_globs=_to_list(raw_repo.get("include_globs")),
+                ignore_globs=_to_list(raw_repo.get("ignore_globs")),
+            )
+        )
+
+    if config_path is not None:
+        config = load_config(root, config_path=config_path)
+    else:
+        config = load_config_from_mapping(data)
+
+    return WorkspaceDefinition(
+        path=resolved_workspace_path,
+        root=root,
+        repos=repos,
+        config=config,
+        name=str(data.get("name", "")).strip(),
+    )

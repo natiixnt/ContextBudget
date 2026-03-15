@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget.config import load_config
+from contextbudget.config import load_config, load_workspace
 from contextbudget.core.pipeline import as_json_dict, run_pack
 
 
@@ -16,7 +16,15 @@ def test_load_config_defaults_when_file_missing(tmp_path: Path) -> None:
     assert cfg.budget.max_tokens == 30_000
     assert cfg.budget.top_files is None
     assert cfg.scan.max_file_size_bytes == 2_000_000
+    assert cfg.summarization.backend == "deterministic"
+    assert cfg.cache.backend == "local_file"
+    assert cfg.tokens.backend == "heuristic"
+    assert cfg.tokens.model == "gpt-4o-mini"
+    assert cfg.tokens.fallback_backend == "heuristic"
     assert cfg.telemetry.enabled is False
+    assert cfg.plugins.scorer == "builtin.relevance"
+    assert cfg.plugins.compressor == "builtin.default"
+    assert cfg.plugins.token_estimator == "builtin.char4"
 
 
 def test_load_config_overrides_from_toml(tmp_path: Path) -> None:
@@ -30,13 +38,29 @@ top_files = 10
 [compression]
 summary_preview_lines = 5
 
+[summarization]
+backend = "external"
+adapter = "demo"
+
 [cache]
+backend = "shared_stub"
 duplicate_hash_cache_enabled = false
+
+[tokens]
+backend = "model_aligned"
+model = "gpt-4.1-mini"
 
 [telemetry]
 enabled = true
 sink = "file"
 file_path = ".local/events.jsonl"
+
+[plugins]
+scorer = "example.path_glob_bonus"
+
+[[plugins.registrations]]
+target = "contextbudget.plugins.examples:path_glob_bonus_scorer"
+options = { path_patterns = ["docs/**"], bonus = 5.0 }
 """.strip(),
     )
 
@@ -44,10 +68,19 @@ file_path = ".local/events.jsonl"
     assert cfg.budget.max_tokens == 1234
     assert cfg.budget.top_files == 10
     assert cfg.compression.summary_preview_lines == 5
+    assert cfg.summarization.backend == "external"
+    assert cfg.summarization.adapter == "demo"
+    assert cfg.cache.backend == "shared_stub"
     assert cfg.cache.duplicate_hash_cache_enabled is False
+    assert cfg.tokens.backend == "model_aligned"
+    assert cfg.tokens.model == "gpt-4.1-mini"
     assert cfg.telemetry.enabled is True
     assert cfg.telemetry.sink == "file"
     assert cfg.telemetry.file_path == ".local/events.jsonl"
+    assert cfg.plugins.scorer == "example.path_glob_bonus"
+    assert cfg.plugins.token_estimator == "builtin.model_aligned"
+    assert cfg.plugins.registrations[0].target == "contextbudget.plugins.examples:path_glob_bonus_scorer"
+    assert cfg.plugins.registrations[0].options["bonus"] == 5.0
 
 
 def test_run_pack_uses_config_default_budget(tmp_path: Path) -> None:
@@ -64,6 +97,23 @@ max_tokens = 80
     assert report["max_tokens"] == 80
 
 
+def test_explicit_plugin_token_estimator_overrides_tokens_backend(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "contextbudget.toml",
+        """
+[tokens]
+backend = "model_aligned"
+
+[plugins]
+token_estimator = "builtin.exact_tiktoken"
+""".strip(),
+    )
+
+    cfg = load_config(tmp_path)
+    assert cfg.tokens.backend == "model_aligned"
+    assert cfg.plugins.token_estimator == "builtin.exact_tiktoken"
+
+
 def test_run_pack_max_tokens_argument_overrides_config(tmp_path: Path) -> None:
     _write(
         tmp_path / "contextbudget.toml",
@@ -76,3 +126,36 @@ max_tokens = 200
 
     report = as_json_dict(run_pack("touch a", repo=tmp_path, max_tokens=55))
     assert report["max_tokens"] == 55
+
+
+def test_load_workspace_uses_shared_config_and_repo_rules(tmp_path: Path) -> None:
+    _write(tmp_path / "service-a" / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+    _write(tmp_path / "service-a" / "tests" / "test_auth.py", "def test_login() -> None:\n    assert True\n")
+    _write(tmp_path / "service-b" / "src" / "billing.py", "def charge() -> bool:\n    return True\n")
+    _write(
+        tmp_path / "workspace.toml",
+        """
+[budget]
+max_tokens = 111
+
+[scan]
+include_globs = ["**/*.py"]
+
+[[repos]]
+label = "service-a"
+path = "service-a"
+ignore_globs = ["tests/**"]
+
+[[repos]]
+label = "service-b"
+path = "service-b"
+include_globs = ["src/**/*.py"]
+""".strip(),
+    )
+
+    workspace = load_workspace(tmp_path / "workspace.toml")
+
+    assert workspace.config.budget.max_tokens == 111
+    assert [repo.label for repo in workspace.repos] == ["service-a", "service-b"]
+    assert workspace.repos[0].ignore_globs == ["tests/**"]
+    assert workspace.repos[1].include_globs == ["src/**/*.py"]
