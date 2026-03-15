@@ -55,7 +55,7 @@ class _GatewayRequestHandler(http.server.BaseHTTPRequestHandler):
             resp = self._handlers.handle_prepare_context(req)
             return resp.as_dict(), 200
 
-        if path == "/run-agent-step":
+        if path in ("/run-agent-step", "/run-step"):
             req = RunAgentStepRequest.from_dict(body)
             resp = self._handlers.handle_run_agent_step(req)
             return resp.as_dict(), 200
