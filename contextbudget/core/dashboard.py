@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import threading
+import urllib.parse
 import webbrowser
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
@@ -269,6 +270,120 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
         "heatmap": heatmap,
         "simulations": simulations,
         "benchmarks": benchmarks,
+        "_artifacts": artifacts,  # internal, used by endpoint builders
+    }
+
+
+# ---------------------------------------------------------------------------
+# Dashboard API endpoint builders
+# ---------------------------------------------------------------------------
+
+def build_overview_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate data for GET /dashboard/overview."""
+    summary = data["summary"]
+    artifacts = data.get("_artifacts", [])
+
+    total_hits = 0
+    total_misses = 0
+    for a in artifacts:
+        if a.get("command") != "pack":
+            continue
+        cache = a.get("cache", {}) or {}
+        total_hits += int(cache.get("hits", 0) or 0)
+        total_misses += int(cache.get("misses", 0) or 0)
+
+    denom = total_hits + total_misses
+    cache_hit_rate = round(total_hits / denom, 4) if denom > 0 else None
+
+    return {
+        "total_tokens_used": summary["total_input_tokens"],
+        "total_tokens_saved": summary["total_saved_tokens"],
+        "savings_rate": summary["savings_rate"],
+        "cache_hit_rate": cache_hit_rate,
+        "total_runs": summary["total_runs"],
+        "pack_runs": summary["pack_runs"],
+        "simulation_runs": summary["sim_runs"],
+        "benchmark_runs": summary["benchmark_runs"],
+    }
+
+
+def build_repositories_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate data for GET /dashboard/repositories."""
+    artifacts = data.get("_artifacts", [])
+    repo_map: dict[str, dict[str, Any]] = {}
+
+    for a in artifacts:
+        repo = str(a.get("repo", "") or "").strip() or "(unknown)"
+        cmd = a.get("command", "")
+        budget = a.get("budget", {}) or {}
+
+        if cmd == "pack":
+            input_tok = int(budget.get("estimated_input_tokens", 0) or 0)
+            saved_tok = int(budget.get("estimated_saved_tokens", 0) or 0)
+        elif cmd == "simulate-agent":
+            input_tok = int(a.get("total_tokens", 0) or 0)
+            saved_tok = 0
+        elif cmd == "benchmark":
+            strategies = a.get("strategies", [])
+            best = next(
+                (s for s in strategies if s.get("strategy") == "compressed_pack"),
+                strategies[0] if strategies else {},
+            )
+            input_tok = int(
+                best.get("estimated_input_tokens", a.get("baseline_full_context_tokens", 0)) or 0
+            )
+            saved_tok = int(best.get("estimated_saved_tokens", 0) or 0)
+        else:
+            input_tok = 0
+            saved_tok = 0
+
+        if repo not in repo_map:
+            repo_map[repo] = {
+                "repo": repo,
+                "total_tokens_used": 0,
+                "total_tokens_saved": 0,
+                "run_count": 0,
+            }
+        repo_map[repo]["total_tokens_used"] += input_tok
+        repo_map[repo]["total_tokens_saved"] += saved_tok
+        repo_map[repo]["run_count"] += 1
+
+    repositories = sorted(repo_map.values(), key=lambda r: r["total_tokens_used"], reverse=True)
+    for r in repositories:
+        d = r["total_tokens_used"] + r["total_tokens_saved"]
+        r["savings_rate"] = round(r["total_tokens_saved"] / d, 4) if d > 0 else 0.0
+
+    return {"repositories": repositories}
+
+
+def build_savings_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate data for GET /dashboard/savings."""
+    summary = data["summary"]
+    return {
+        "total_tokens_used": summary["total_input_tokens"],
+        "total_tokens_saved": summary["total_saved_tokens"],
+        "savings_rate": summary["savings_rate"],
+        "by_command": [
+            {
+                "command": b["label"],
+                "tokens_used": b["used"],
+                "tokens_saved": b["saved"],
+            }
+            for b in data["savings_breakdown"]
+        ],
+        "trend": data["run_trend"],
+    }
+
+
+def build_heatmap_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Aggregate data for GET /dashboard/heatmap."""
+    heatmap = data.get("heatmap", {})
+    files = heatmap.get("top_token_heavy_files", heatmap.get("files", []))
+    summary = {k: v for k, v in heatmap.items() if k not in ("top_token_heavy_files", "files")}
+    return {
+        "files": files,
+        "total_files": len(files),
+        "summary": summary,
     }
 
 
@@ -754,25 +869,56 @@ def _build_html(data: dict[str, Any]) -> str:
 class _Handler(BaseHTTPRequestHandler):
     dashboard_html: str = ""
     dashboard_data: dict[str, Any] = {}
+    api_overview: dict[str, Any] = {}
+    api_repositories: dict[str, Any] = {}
+    api_savings: dict[str, Any] = {}
+    api_heatmap: dict[str, Any] = {}
+    cost_data: dict[str, Any] = {}
+    _scan_paths: list[Path] = []
 
     def log_message(self, fmt: str, *args: object) -> None:  # silence access log
         pass
 
+    def _send_json(self, payload: dict[str, Any]) -> None:
+        body = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self) -> None:
-        if self.path in ("/", "/index.html"):
+        path = urllib.parse.urlparse(self.path).path
+        if path in ("/", "/index.html"):
             body = self.dashboard_html.encode("utf-8")
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(body)))
             self.end_headers()
             self.wfile.write(body)
-        elif self.path == "/api/data":
-            body = json.dumps(self.dashboard_data, ensure_ascii=False).encode("utf-8")
-            self.send_response(200)
-            self.send_header("Content-Type", "application/json")
-            self.send_header("Content-Length", str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+        elif path == "/api/data":
+            self._send_json(self.dashboard_data)
+        elif path == "/dashboard/overview":
+            self._send_json(self.api_overview)
+        elif path == "/dashboard/repositories":
+            self._send_json(self.api_repositories)
+        elif path == "/dashboard/savings":
+            self._send_json(self.api_savings)
+        elif path == "/dashboard/heatmap":
+            self._send_json(self.api_heatmap)
+        elif path == "/analytics/cost":
+            params = urllib.parse.parse_qs(urllib.parse.urlparse(self.path).query)
+            model = (params.get("model") or [None])[0]
+            if model and model != self.cost_data.get("model"):
+                from contextbudget.core.cost_analytics import build_cost_report
+                try:
+                    refreshed = build_cost_report(self._scan_paths or [Path(".")], model=model)
+                    self._send_json(refreshed)
+                except Exception as exc:
+                    self._send_json({"error": str(exc)})
+            else:
+                self._send_json(self.cost_data)
         else:
             self.send_response(204)
             self.end_headers()
@@ -782,16 +928,29 @@ def serve_dashboard(
     data: dict[str, Any],
     port: int = 7842,
     no_open: bool = False,
+    scan_paths: list[Path] | None = None,
 ) -> None:
     """Start a local HTTP server and serve the dashboard.
 
     Blocks until the user presses Ctrl-C.
     """
+    from contextbudget.core.cost_analytics import build_cost_report
+
     html = _build_html(data)
+    resolved_paths = scan_paths or [Path(".")]
 
     # Inject data into the handler class (simple approach for single-threaded server)
     _Handler.dashboard_html = html
     _Handler.dashboard_data = data
+    _Handler.api_overview = build_overview_data(data)
+    _Handler.api_repositories = build_repositories_data(data)
+    _Handler.api_savings = build_savings_data(data)
+    _Handler.api_heatmap = build_heatmap_data(data)
+    _Handler._scan_paths = resolved_paths
+    try:
+        _Handler.cost_data = build_cost_report(resolved_paths)
+    except Exception:
+        _Handler.cost_data = {}
 
     server = HTTPServer(("127.0.0.1", port), _Handler)
     url = f"http://127.0.0.1:{port}/"
