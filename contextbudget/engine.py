@@ -869,8 +869,41 @@ class ContextBudgetEngine:
 
         resolved = [Path(p) for p in paths] if paths else [Path(".")]
         data = build_dashboard_data(resolved)
-        serve_dashboard(data, port=port, no_open=no_open)
+        serve_dashboard(data, port=port, no_open=no_open, scan_paths=resolved)
         return data
+
+    def cost_analytics(
+        self,
+        paths: list[str | Path] | None = None,
+        *,
+        model: str = "claude-sonnet-4-6",
+    ) -> dict[str, Any]:
+        """Compute token cost analytics and return a cost savings report.
+
+        Scans *paths* for pack run artifacts, observe-history, and history.json
+        entries, then computes baseline vs optimised costs using the pricing
+        table for *model*.
+
+        Args:
+            paths: Directories or JSON artifact files to scan (default: ``["."]``).
+            model: Model identifier for per-token pricing (e.g.
+                   ``"claude-sonnet-4-6"``, ``"gpt-4o"``).  Must be a key in
+                   :data:`~contextbudget.telemetry.pricing.MODEL_PRICING`.
+
+        Returns:
+            JSON-serialisable dict with keys:
+
+            * ``summary`` — total baseline/optimised costs, savings, savings%
+            * ``by_repository`` — cost breakdown per repo path
+            * ``by_run`` — per-run cost entries (newest first)
+            * ``by_stage`` — savings split by cache vs compression stage
+            * ``pricing`` — model and rate used for the calculation
+            * ``available_models`` — list of all supported model pricing entries
+        """
+        from contextbudget.core.cost_analytics import build_cost_report
+
+        resolved = [Path(p) for p in paths] if paths else [Path(".")]
+        return build_cost_report(resolved, model=model)
 
 
 class BudgetGuard:
