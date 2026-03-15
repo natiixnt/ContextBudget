@@ -1333,6 +1333,298 @@ def cmd_prepare_context(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_roi(args: argparse.Namespace) -> int:
+    """Compute ROI from local run history (SQLite) or a list of run artifact JSON files."""
+    from contextbudget.core.cost_analysis import compute_cost_analysis, list_known_models
+
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
+
+    # Collect run artifacts
+    run_files: list[Path] = []
+    if args.runs:
+        for p in args.runs:
+            path = Path(p)
+            if path.is_dir():
+                run_files.extend(sorted(path.glob("*.json")))
+            elif path.exists():
+                run_files.append(path)
+            else:
+                print(f"Warning: not found: {path}")
+    else:
+        # Default: scan current directory for pack run artifacts
+        cwd = Path(".")
+        run_files = sorted(cwd.glob("contextbudget-*.json"))
+        if not run_files:
+            print("No run artifacts found. Pass paths via positional arguments or run 'cb pack' first.")
+            return 2
+
+    if not run_files:
+        print("No run artifacts to analyze.")
+        return 2
+
+    total_baseline = 0
+    total_optimized = 0
+    total_saved = 0
+    total_dollars_saved = 0.0
+    cache_hits_total = 0
+    runs_with_cache = 0
+    repos: dict[str, dict] = {}
+    processed = 0
+
+    for path in run_files:
+        try:
+            data = _json_mod.loads(path.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        meta = data.get("metadata") or data.get("budget") or {}
+        baseline = int(meta.get("baseline_full_context_tokens") or 0)
+        optimized = int(meta.get("estimated_input_tokens") or 0)
+        saved = int(meta.get("estimated_saved_tokens") or 0)
+        cache = int(meta.get("cache", {}).get("hits") if isinstance(meta.get("cache"), dict) else 0)
+        if baseline == 0:
+            baseline = optimized + saved
+
+        result = compute_cost_analysis(data, model=args.model, price_per_1m_input=args.price_input)
+        dollars = float(result.get("saved_cost_usd") or 0.0)
+
+        total_baseline += baseline
+        total_optimized += optimized
+        total_saved += saved
+        total_dollars_saved += dollars
+        cache_hits_total += cache
+        if cache > 0:
+            runs_with_cache += 1
+        processed += 1
+
+        repo = str(data.get("repo") or "unknown")
+        if repo not in repos:
+            repos[repo] = {"baseline": 0, "optimized": 0, "saved": 0, "dollars": 0.0, "runs": 0}
+        repos[repo]["baseline"] += baseline
+        repos[repo]["optimized"] += optimized
+        repos[repo]["saved"] += saved
+        repos[repo]["dollars"] += dollars
+        repos[repo]["runs"] += 1
+
+    if processed == 0:
+        print("No valid run artifacts found.")
+        return 2
+
+    grand = total_optimized + total_saved
+    savings_pct = round(total_saved / grand * 100, 1) if grand > 0 else 0.0
+    cache_pct = round(runs_with_cache / processed * 100, 1) if processed > 0 else 0.0
+
+    roi_data = {
+        "runs_analyzed": processed,
+        "total_baseline_tokens": total_baseline,
+        "total_optimized_tokens": total_optimized,
+        "total_tokens_saved": total_saved,
+        "savings_pct": savings_pct,
+        "estimated_dollars_saved": round(total_dollars_saved, 4),
+        "model": args.model,
+        "cache_hit_rate_pct": cache_pct,
+        "by_repository": [
+            {
+                "repo": repo,
+                "baseline_tokens": v["baseline"],
+                "optimized_tokens": v["optimized"],
+                "tokens_saved": v["saved"],
+                "dollars_saved": round(v["dollars"], 4),
+                "runs": v["runs"],
+                "savings_pct": round(v["saved"] / (v["optimized"] + v["saved"]) * 100, 1)
+                    if (v["optimized"] + v["saved"]) > 0 else 0.0,
+            }
+            for repo, v in sorted(repos.items(), key=lambda x: -x[1]["saved"])
+        ],
+    }
+
+    if fmt == "json":
+        print(_json_mod.dumps(roi_data, indent=2, default=str))
+        return 0
+
+    print(f"ContextBudget ROI — {processed} run(s) analyzed")
+    print(f"  Model:           {args.model}")
+    print(f"  Baseline tokens: {total_baseline:>12,}")
+    print(f"  Optimized:       {total_optimized:>12,}")
+    print(f"  Saved:           {total_saved:>12,}  ({savings_pct:.1f}%)")
+    print(f"  Est. $ saved:    ${total_dollars_saved:>11.4f}")
+    print(f"  Cache hit rate:  {cache_pct:.1f}%  ({runs_with_cache}/{processed} runs)")
+    if roi_data["by_repository"]:
+        print()
+        print(f"  {'Repository':<36} {'Saved':>10} {'Savings%':>10} {'$ Saved':>10}")
+        print("  " + "-" * 68)
+        for r in roi_data["by_repository"][:10]:
+            label = r["repo"]
+            if len(label) > 35:
+                label = "..." + label[-32:]
+            print(f"  {label:<36} {r['tokens_saved']:>10,} {r['savings_pct']:>9.1f}% ${r['dollars_saved']:>9.4f}")
+    return 0
+
+
+def cmd_benchmark_report(args: argparse.Namespace) -> int:
+    """Generate a customer-facing benchmark report comparing baseline vs optimized context."""
+    from contextbudget.core.cost_analysis import compute_cost_analysis
+
+    run_files: list[Path] = []
+    for p in args.runs:
+        path = Path(p)
+        if path.is_dir():
+            run_files.extend(sorted(path.glob("contextbudget-*.json")))
+        elif path.exists():
+            run_files.append(path)
+        else:
+            print(f"Warning: file not found: {path}")
+
+    if not run_files:
+        print("No run artifacts found. Pass JSON artifact paths or a directory.")
+        return 2
+
+    model = args.model
+    title = args.title or "ContextBudget Benchmark Report"
+    base = args.out_prefix or "contextbudget-benchmark-report"
+    md_path = Path(f"{base}.md")
+    json_path = Path(f"{base}.json")
+
+    entries = []
+    totals = {"baseline": 0, "optimized": 0, "saved": 0, "dollars": 0.0, "runs": 0}
+
+    for path in run_files:
+        try:
+            data = _json_mod.loads(path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            print(f"Warning: could not read {path}: {exc}")
+            continue
+
+        meta = data.get("metadata") or {}
+        baseline = int(meta.get("baseline_full_context_tokens") or 0)
+        optimized = int(meta.get("estimated_input_tokens") or 0)
+        saved = int(meta.get("estimated_saved_tokens") or 0)
+        if baseline == 0:
+            baseline = optimized + saved
+
+        cost_result = compute_cost_analysis(data, model=model)
+        dollars_saved = float(cost_result.get("saved_cost_usd") or 0.0)
+        savings_pct = float(cost_result.get("savings_pct") or 0.0)
+
+        # Top files by savings
+        top_files = sorted(
+            (cost_result.get("per_file") or []),
+            key=lambda x: x.get("saved_tokens", 0),
+            reverse=True,
+        )[:5]
+
+        entry = {
+            "artifact": path.name,
+            "task": str(data.get("task") or ""),
+            "repo": str(data.get("repo") or ""),
+            "baseline_tokens": baseline,
+            "optimized_tokens": optimized,
+            "tokens_saved": saved,
+            "savings_pct": round(savings_pct, 1),
+            "dollars_saved": round(dollars_saved, 4),
+            "top_files": [
+                {"path": f["path"], "saved_tokens": f["saved_tokens"]}
+                for f in top_files
+            ],
+        }
+        entries.append(entry)
+        totals["baseline"] += baseline
+        totals["optimized"] += optimized
+        totals["saved"] += saved
+        totals["dollars"] += dollars_saved
+        totals["runs"] += 1
+
+    if not entries:
+        print("No valid artifacts to report on.")
+        return 2
+
+    grand = totals["optimized"] + totals["saved"]
+    overall_pct = round(totals["saved"] / grand * 100, 1) if grand > 0 else 0.0
+    report_data = {
+        "title": title,
+        "model": model,
+        "runs_analyzed": totals["runs"],
+        "totals": {
+            "baseline_tokens":    totals["baseline"],
+            "optimized_tokens":   totals["optimized"],
+            "tokens_saved":       totals["saved"],
+            "overall_savings_pct": overall_pct,
+            "dollars_saved":      round(totals["dollars"], 4),
+        },
+        "entries": entries,
+    }
+
+    write_json(json_path, report_data)
+
+    # Build markdown
+    lines: list[str] = [
+        f"# {title}",
+        "",
+        f"> Model pricing: **{model}**",
+        "",
+        "## Summary",
+        "",
+        f"| Metric | Value |",
+        f"|--------|-------|",
+        f"| Runs analyzed | {totals['runs']} |",
+        f"| Baseline tokens | {totals['baseline']:,} |",
+        f"| Optimized tokens | {totals['optimized']:,} |",
+        f"| **Tokens saved** | **{totals['saved']:,}** |",
+        f"| **Token reduction** | **{overall_pct:.1f}%** |",
+        f"| **Estimated $ saved** | **${totals['dollars']:.4f}** |",
+        "",
+        "## Per-run Breakdown",
+        "",
+        f"| Artifact | Task | Baseline | Optimized | Saved | Reduction | $ Saved |",
+        f"|----------|------|----------|-----------|-------|-----------|---------|",
+    ]
+    for e in entries:
+        task_label = (e["task"][:40] + "…") if len(e["task"]) > 40 else e["task"]
+        lines.append(
+            f"| `{e['artifact']}` | {task_label} "
+            f"| {e['baseline_tokens']:,} | {e['optimized_tokens']:,} "
+            f"| {e['tokens_saved']:,} | {e['savings_pct']:.1f}% | ${e['dollars_saved']:.4f} |"
+        )
+
+    lines += [
+        "",
+        "## Top Files by Token Savings",
+        "",
+    ]
+    all_files: dict[str, int] = {}
+    for e in entries:
+        for f in e["top_files"]:
+            all_files[f["path"]] = all_files.get(f["path"], 0) + f["saved_tokens"]
+
+    if all_files:
+        lines += [
+            f"| File | Tokens Saved |",
+            f"|------|--------------|",
+        ]
+        for fpath, fsaved in sorted(all_files.items(), key=lambda x: -x[1])[:10]:
+            lines.append(f"| `{fpath}` | {fsaved:,} |")
+    else:
+        lines.append("_No per-file data available._")
+
+    lines += [
+        "",
+        "---",
+        "_Generated by [ContextBudget](https://github.com/natiixnt/ContextBudget)_",
+    ]
+
+    md_path.write_text("\n".join(lines), encoding="utf-8")
+
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
+    if fmt == "json":
+        print(_json_mod.dumps(report_data, indent=2, default=str))
+    else:
+        print(f"Wrote benchmark report JSON: {json_path}")
+        print(f"Wrote benchmark report Markdown: {md_path}")
+        print(f"Runs analyzed:   {totals['runs']}")
+        print(f"Tokens saved:    {totals['saved']:,}  ({overall_pct:.1f}%)")
+        print(f"Est. $ saved:    ${totals['dollars']:.4f}  (model: {model})")
+    return 0
+
+
 def cmd_cost_analysis(args: argparse.Namespace) -> int:
     from contextbudget.core.cost_analysis import compute_cost_analysis, list_known_models, load_run_data
 
@@ -2231,6 +2523,84 @@ def build_parser() -> argparse.ArgumentParser:
         help="Overwrite existing configuration files.",
     )
     init_cmd.set_defaults(func=cmd_init)
+
+    roi_cmd = sub.add_parser(
+        "roi",
+        help="Compute ROI summary (tokens saved, dollars saved, cache hit rate) from run artifacts",
+    )
+    roi_cmd.add_argument(
+        "runs",
+        nargs="*",
+        default=[],
+        help=(
+            "Pack run artifact JSON files or directories to analyze. "
+            "Defaults to contextbudget-*.json in the current directory."
+        ),
+    )
+    roi_cmd.add_argument(
+        "--model",
+        default="gpt-4o",
+        help="Model for USD cost calculation (default: gpt-4o). See 'cost-analysis --list-models'.",
+    )
+    roi_cmd.add_argument(
+        "--price-input",
+        dest="price_input",
+        type=float,
+        default=None,
+        help="Custom input price in USD per 1M tokens (overrides --model pricing).",
+    )
+    roi_cmd.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format (default: human).",
+    )
+    roi_cmd.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
+    )
+    roi_cmd.set_defaults(func=cmd_roi)
+
+    benchmark_report_cmd = sub.add_parser(
+        "benchmark-report",
+        help="Generate a customer-facing benchmark report comparing baseline vs optimized context",
+    )
+    benchmark_report_cmd.add_argument(
+        "runs",
+        nargs="+",
+        help="Pack run artifact JSON files or directories to include in the report.",
+    )
+    benchmark_report_cmd.add_argument(
+        "--title",
+        default="",
+        help="Report title (default: 'ContextBudget Benchmark Report').",
+    )
+    benchmark_report_cmd.add_argument(
+        "--model",
+        default="gpt-4o",
+        help="Model for USD cost calculation (default: gpt-4o).",
+    )
+    benchmark_report_cmd.add_argument(
+        "--out-prefix",
+        dest="out_prefix",
+        default="",
+        help="Output file prefix (default: contextbudget-benchmark-report).",
+    )
+    benchmark_report_cmd.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format (default: human).",
+    )
+    benchmark_report_cmd.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
+    )
+    benchmark_report_cmd.set_defaults(func=cmd_benchmark_report)
 
     return parser
 
