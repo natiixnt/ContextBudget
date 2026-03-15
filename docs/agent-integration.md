@@ -1,6 +1,87 @@
 # Agent Integration
 
-ContextBudget includes a local-first middleware layer for sitting between a coding agent and repository context selection. The middleware wraps the existing engine; it does not reimplement scanning, scoring, compression, or policy logic.
+ContextBudget exposes a stable SDK for coding-agent frameworks via `BudgetGuard`.
+The three primary integration methods are:
+
+| Method | Purpose |
+|--------|---------|
+| `BudgetGuard.pack_context()` | Pack repository context under a token budget |
+| `BudgetGuard.simulate_agent()` | Estimate token use and API cost before packing |
+| `BudgetGuard.profile_run()` | Pack and return compression metrics in one call |
+
+## Quickstart
+
+```python
+from contextbudget import BudgetGuard
+
+guard = BudgetGuard(max_tokens=30000)
+
+# Pack context for a task
+context = guard.pack_context(task="add caching", repo=".")
+print(context["budget"]["estimated_input_tokens"], "tokens")
+
+# Build a prompt from the compressed context
+prompt = "\n".join(f["text"] for f in context["compressed_context"])
+```
+
+## Simulate cost before packing
+
+```python
+plan = guard.simulate_agent(task="add caching", repo=".", model="claude-sonnet-4-6")
+print(f"Estimated cost: ${plan['cost_estimate']['total_cost_usd']:.4f}")
+
+for step in plan["steps"]:
+    print(f"  {step['id']:12} {step['step_total_tokens']:6} tokens")
+```
+
+## Profile a run
+
+```python
+result = guard.profile_run(task="add caching", repo=".")
+p = result["profile"]
+print(f"packed in {p['elapsed_ms']} ms, ratio {p['compression_ratio']:.1%}")
+print(f"files: {p['files_included_count']} included, {p['files_skipped_count']} skipped")
+```
+
+## Multi-turn agent loop with delta context
+
+Re-pack only changed files on subsequent turns:
+
+```python
+guard = BudgetGuard(max_tokens=30000)
+previous = None
+
+for iteration in range(3):
+    result = guard.pack_context(task="implement auth caching", repo=".", delta_from=previous)
+    prompt = "\n".join(f["text"] for f in result["compressed_context"])
+    # ... send prompt to LLM ...
+    previous = result
+```
+
+## Strict policy enforcement
+
+```python
+from contextbudget import BudgetGuard, BudgetPolicyViolationError
+
+guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=10)
+
+try:
+    result = guard.pack_context(task="large refactor", repo=".")
+except BudgetPolicyViolationError as err:
+    for v in err.policy_result["violations"]:
+        print(f"policy violation: {v}")
+    # err.run_artifact holds the pack result that triggered the error
+```
+
+See [python-api.md](python-api.md) for the full `BudgetGuard` reference.
+
+---
+
+## Lower-level middleware
+
+ContextBudget also includes a lower-level middleware layer for deeper integration.
+The middleware wraps the same engine; it does not reimplement scanning, scoring,
+compression, or policy logic.
 
 Model-aware packing can be enabled directly in `contextbudget.toml`:
 
