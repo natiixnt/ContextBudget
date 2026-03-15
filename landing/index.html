@@ -150,7 +150,13 @@
     .btn-primary:hover { opacity: .88; transform: translateY(-2px); }
 
     /* ── SECTIONS BASE ────────────────────── */
-    section { padding: 110px 64px; }
+    section {
+      padding: 110px 64px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
 
     .label {
       font-size: 11px; font-weight: 700;
@@ -481,7 +487,7 @@
     /* ── RESPONSIVE ───────────────────────── */
     @media (max-width: 860px) {
       nav      { padding: 20px 24px; }
-      section, #hero, #cta { padding: 80px 24px; }
+      section, #hero, #cta { padding: 80px 24px; min-height: 100svh; }
       footer   { padding: 24px; flex-direction: column; gap: 14px; align-items: flex-start; }
       .cards, .solution-grid, .calc-wrap, .calc-result-row { grid-template-columns: 1fr; gap: 20px; }
       .nav-links { display: none; }
