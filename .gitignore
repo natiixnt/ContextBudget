@@ -5,3 +5,4 @@ __pycache__/
 .contextbudget_cache.json
 .venv/
 *.egg-info/
+node_modules/
