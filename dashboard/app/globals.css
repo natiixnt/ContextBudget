@@ -1,0 +1,30 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --sidebar-width: 224px;
+}
+
+body {
+  @apply bg-slate-50 text-slate-900 antialiased;
+}
+
+.heat-row {
+  position: relative;
+  overflow: hidden;
+}
+
+.heat-bar {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.heat-row td {
+  position: relative;
+  z-index: 1;
+}
