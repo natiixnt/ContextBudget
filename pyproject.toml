@@ -13,11 +13,13 @@ authors = [{ name = "ContextBudget Contributors" }]
 dependencies = []
 
 [project.optional-dependencies]
-dev = ["pytest>=8.0"]
+dev = ["pytest>=8.0", "fakeredis>=2.0"]
 tokenizers = ["tiktoken>=0.7"]
+redis = ["redis>=5.0"]
 
 [project.scripts]
 contextbudget = "contextbudget.cli:main"
+contextbudget-gateway = "contextbudget.gateway.server:run_gateway"
 
 [tool.setuptools]
 include-package-data = true
