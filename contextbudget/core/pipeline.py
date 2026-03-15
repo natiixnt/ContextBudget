@@ -226,6 +226,9 @@ def run_simulate_agent(
     prompt_overhead_per_step: int = 800,
     output_tokens_per_step: int = 600,
     context_mode: str = "isolated",
+    model: str = "gpt-4o",
+    price_per_1m_input: float | None = None,
+    price_per_1m_output: float | None = None,
 ) -> dict:
     """Simulate agent workflow token costs step by step and return a serializable artifact."""
 
@@ -274,6 +277,9 @@ def run_simulate_agent(
         output_tokens_per_step=output_tokens_per_step,
         context_mode=context_mode,
         workspace_mode=workspace is not None,
+        model=model,
+        price_per_1m_input=price_per_1m_input,
+        price_per_1m_output=price_per_1m_output,
     )
 
     telemetry.emit(

@@ -118,7 +118,7 @@
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
       "cache_hits": 15,
-      "runtime_ms": 17,
+      "runtime_ms": 16,
       "notes": "second run with warmed summary cache"
     }
   ],
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-15T09:55:08.956712+00:00",
+  "generated_at": "2026-03-15T10:04:25.421766+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",

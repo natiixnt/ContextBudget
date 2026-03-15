@@ -30,6 +30,60 @@ changes relative to the previous run. The delta package records:
 ### `contextbudget pack <task> --workspace <workspace.toml> [--max-tokens N] [--top-files N]`
 Build compressed context across a local workspace while recording scanned and selected repos.
 
+### `contextbudget profile <run.json> [--out-prefix <prefix>]`
+
+Explain where token savings came from in a pack run.  Reads a `run.json` artifact
+produced by `pack` and emits a `<prefix>.json` + `<prefix>.md` breakdown.
+
+The profile shows:
+
+- **tokens before optimization** — raw token count across all packed files
+- **tokens after optimization** — token count actually sent to the model
+- **savings per stage** — how much each optimization stage contributed
+- **total savings** — absolute tokens removed and percentage reduction
+
+**Stages tracked:**
+
+| Stage | What it captures |
+|-------|-----------------|
+| `cache_reuse` | Files whose summaries were reused from the summary cache |
+| `symbol_extraction` | Files reduced to named symbols (classes, functions, types) |
+| `slicing` | Files reduced via language-aware import/dependency slicing |
+| `compression` | Files replaced by deterministic or external summaries |
+| `snippet` | Files reduced to keyword-window snippets |
+| `delta` | Savings from an incremental delta pack (skipped context carried over) |
+| `full` | Files included without reduction |
+
+**Example:**
+
+```bash
+contextbudget pack "add caching" --repo . --max-tokens 20000
+contextbudget profile run.json
+```
+
+**Sample output (`run-profile.md`):**
+
+```markdown
+# ContextBudget Token Savings Profile
+
+## Summary
+
+| Metric | Tokens |
+|--------|--------|
+| Tokens before optimization | 14200 |
+| Tokens after optimization  |  8900 |
+| Total tokens saved         |  5300 |
+| Savings                    |  37.3% |
+
+## Savings by Stage
+
+| Stage            | Files | Tokens Saved | % of Total Savings |
+|------------------|-------|-------------|---------------------|
+| Symbol Extraction|     4 |        3100 |              58.5% |
+| Compression      |     2 |        1800 |              34.0% |
+| Cache Reuse      |     1 |         400 |               7.5% |
+```
+
 ### `contextbudget report <run.json> [--out <path>] [--policy <policy.toml>]`
 Render summary report from run artifact.
 

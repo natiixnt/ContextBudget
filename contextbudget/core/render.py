@@ -206,11 +206,21 @@ def _append_delta_lines(lines: list[str], data: dict) -> None:
         )
 
 
+def _fmt_usd(value: float) -> str:
+    """Format a USD float for Markdown: use 4 decimals, or 2 for large values."""
+    if value >= 1.0:
+        return f"${value:.4f}"
+    return f"${value:.6f}"
+
+
 def render_agent_simulation_markdown(data: dict) -> str:
     """Render agent workflow simulation artifact to Markdown."""
 
     steps = data.get("steps", [])
     context_mode = data.get("context_mode", "isolated")
+    cost = data.get("cost_estimate") or {}
+    model_name = data.get("model", cost.get("model", ""))
+
     lines = [
         "# ContextBudget Agent Simulation",
         "",
@@ -222,6 +232,10 @@ def render_agent_simulation_markdown(data: dict) -> str:
         f"Output tokens per step: {data.get('output_tokens_per_step', 0)} tokens",
         f"Workflow steps: {len(steps) if isinstance(steps, list) else 0}",
     ]
+    if model_name:
+        provider = cost.get("provider", "")
+        provider_str = f" ({provider})" if provider else ""
+        lines.append(f"Model: {model_name}{provider_str}")
     _append_workspace_lines(lines, data)
     _append_implementation_lines(lines, data)
     if _has_model_profile(data):
@@ -230,6 +244,38 @@ def render_agent_simulation_markdown(data: dict) -> str:
     lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
 
+    # ------------------------------------------------------------------
+    # Cost estimate section
+    # ------------------------------------------------------------------
+    if isinstance(cost, dict) and cost:
+        lines.extend([
+            "",
+            "## Estimated API Cost",
+            "",
+            f"| | Value |",
+            f"|---|---|",
+            f"| Model | {cost.get('model', '')} |",
+            f"| Provider | {cost.get('provider', '—')} |",
+            f"| Input price | ${cost.get('input_per_1m_usd', 0):.2f} / MTok |",
+            f"| Output price | ${cost.get('output_per_1m_usd', 0):.2f} / MTok |",
+            f"| Total input tokens | {cost.get('total_input_tokens', 0):,} |",
+            f"| Total output tokens | {cost.get('total_output_tokens', 0):,} |",
+            f"| **Total cost** | **{_fmt_usd(cost.get('total_cost_usd', 0.0))} USD** |",
+            f"| Input cost | {_fmt_usd(cost.get('total_input_cost_usd', 0.0))} USD |",
+            f"| Output cost | {_fmt_usd(cost.get('total_output_cost_usd', 0.0))} USD |",
+            f"| Min step cost | {_fmt_usd(cost.get('min_step_cost_usd', 0.0))} USD |",
+            f"| Max step cost | {_fmt_usd(cost.get('max_step_cost_usd', 0.0))} USD |",
+            f"| Avg step cost | {_fmt_usd(cost.get('avg_step_cost_usd', 0.0))} USD |",
+        ])
+        notes = cost.get("notes", [])
+        if isinstance(notes, list) and notes:
+            lines.append("")
+            for note in notes:
+                lines.append(f"> **Note:** {note}")
+
+    # ------------------------------------------------------------------
+    # Token summary
+    # ------------------------------------------------------------------
     lines.extend([
         "",
         "## Token Summary",
@@ -245,33 +291,62 @@ def render_agent_simulation_markdown(data: dict) -> str:
         f"- Min step tokens: {data.get('min_step_tokens', 0)}",
         f"- Max step tokens: {data.get('max_step_tokens', 0)}",
         f"- Avg step tokens: {data.get('avg_step_tokens', 0.0)}",
-        "",
-        "## Step Breakdown",
-        "",
-        "| # | Step | Context | Prompt | Output | Step Total | Cumulative Context |",
-        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
     ])
+
+    # ------------------------------------------------------------------
+    # Step breakdown table (now includes cost column)
+    # ------------------------------------------------------------------
+    steps_cost: list[dict] = cost.get("steps_cost", []) if isinstance(cost, dict) else []
+    has_cost = bool(steps_cost)
+    if has_cost:
+        lines.extend([
+            "",
+            "## Step Breakdown",
+            "",
+            "| # | Step | Context | Prompt | Output | Step Total | Cumul. Context | Est. Cost |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+        ])
+    else:
+        lines.extend([
+            "",
+            "## Step Breakdown",
+            "",
+            "| # | Step | Context | Prompt | Output | Step Total | Cumulative Context |",
+            "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+        ])
+
     if isinstance(steps, list) and steps:
         for idx, step in enumerate(steps, start=1):
             if not isinstance(step, dict):
                 continue
+            cost_cell = ""
+            if has_cost and idx - 1 < len(steps_cost):
+                sc = steps_cost[idx - 1]
+                cost_cell = f" | {_fmt_usd(sc.get('step_cost_usd', 0.0))}"
             lines.append(
                 f"| {idx} | {step.get('title', '')} "
                 f"| {step.get('context_tokens', 0)} "
                 f"| {step.get('prompt_tokens', 0)} "
                 f"| {step.get('output_tokens', 0)} "
                 f"| {step.get('step_total_tokens', 0)} "
-                f"| {step.get('cumulative_context_tokens', 0)} |"
+                f"| {step.get('cumulative_context_tokens', 0)}"
+                f"{cost_cell} |"
             )
     else:
-        lines.append("| - | No steps | 0 | 0 | 0 | 0 | 0 |")
+        if has_cost:
+            lines.append("| - | No steps | 0 | 0 | 0 | 0 | 0 | — |")
+        else:
+            lines.append("| - | No steps | 0 | 0 | 0 | 0 | 0 |")
 
+    # ------------------------------------------------------------------
+    # Per-step detail blocks
+    # ------------------------------------------------------------------
     lines.extend(["", "## Step Details"])
     if isinstance(steps, list) and steps:
         for idx, step in enumerate(steps, start=1):
             if not isinstance(step, dict):
                 continue
-            lines.extend([
+            step_lines = [
                 f"### {idx}. {step.get('title', '')}",
                 f"- Step id: {step.get('id', '')}",
                 f"- Objective: {step.get('objective', '')}",
@@ -282,8 +357,16 @@ def render_agent_simulation_markdown(data: dict) -> str:
                 f"- Step total tokens: {step.get('step_total_tokens', 0)}",
                 f"- Cumulative context tokens: {step.get('cumulative_context_tokens', 0)}",
                 f"- Cumulative total tokens: {step.get('cumulative_total_tokens', 0)}",
-                "- Files read:",
-            ])
+            ]
+            if has_cost and idx - 1 < len(steps_cost):
+                sc = steps_cost[idx - 1]
+                step_lines += [
+                    f"- Estimated cost: {_fmt_usd(sc.get('step_cost_usd', 0.0))} USD "
+                    f"(input {_fmt_usd(sc.get('input_cost_usd', 0.0))} + "
+                    f"output {_fmt_usd(sc.get('output_cost_usd', 0.0))})",
+                ]
+            step_lines.append("- Files read:")
+            lines.extend(step_lines)
             files_read = step.get("files_read", [])
             if isinstance(files_read, list) and files_read:
                 for f in files_read:

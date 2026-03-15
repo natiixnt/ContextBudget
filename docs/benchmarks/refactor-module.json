@@ -90,7 +90,7 @@
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
       "cache_hits": 12,
-      "runtime_ms": 15
+      "runtime_ms": 16
     },
     {
       "strategy": "cache_assisted_pack",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-15T09:55:08.990661+00:00",
+  "generated_at": "2026-03-15T10:04:25.457640+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",

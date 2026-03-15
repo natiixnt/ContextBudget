@@ -5,7 +5,7 @@
   "max_tokens": 8000,
   "top_files": 20,
   "baseline_full_context_tokens": 12230,
-  "scan_runtime_ms": 4,
+  "scan_runtime_ms": 5,
   "strategies": [
     {
       "strategy": "naive_full_context",
@@ -91,7 +91,7 @@
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "medium",
       "cache_hits": 0,
-      "runtime_ms": 18
+      "runtime_ms": 17
     },
     {
       "strategy": "cache_assisted_pack",
@@ -230,7 +230,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-15T09:55:08.919756+00:00",
+  "generated_at": "2026-03-15T10:04:25.384294+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",

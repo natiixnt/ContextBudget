@@ -11,8 +11,8 @@ Evaluates how well ContextBudget selects the task service, route handlers, and r
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 4 ms |
-| Generated | 2026-03-15T09:55:08.919756+00:00 |
+| Scan runtime | 5 ms |
+| Generated | 2026-03-15T10:04:25.384294+00:00 |
 
 ## Baseline
 
@@ -24,7 +24,7 @@ Full repository context (no selection, no compression): **12,230 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,230 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,230 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 7,937 | 4,293 (35.1%) | medium | 18 ms |
+| compressed_pack | 7,937 | 4,293 (35.1%) | medium | 17 ms |
 | cache_assisted_pack | 1,906 | 10,324 (84.4%) | low | 16 ms |
 
 ## Compressed pack details

@@ -104,6 +104,16 @@ def test_profiler_attributes_cache_reuse_regardless_of_strategy() -> None:
     assert profile.per_file[0].tokens_saved == 160
 
 
+def test_profiler_attributes_snippet_strategy_to_snippet_stage() -> None:
+    from contextbudget.core.profiler import STAGE_SNIPPET
+    data = _make_run_data(
+        [_make_compressed_entry("f.py", strategy="snippet", chunk_strategy="snippet-keyword", original_tokens=250, compressed_tokens=90)]
+    )
+    profile = build_savings_profile(data)
+    assert profile.per_file[0].stage == STAGE_SNIPPET
+    assert profile.per_file[0].tokens_saved == 160
+
+
 # ---------------------------------------------------------------------------
 # Aggregation tests
 # ---------------------------------------------------------------------------
@@ -140,6 +150,25 @@ def test_profiler_by_stage_sums_correctly() -> None:
     comp = profile.by_stage[STAGE_COMPRESSION]
     assert comp.tokens_saved == 550
     assert comp.file_count == 1
+
+
+def test_profiler_savings_pct_is_zero_when_no_files() -> None:
+    data = {"command": "pack", "compressed_context": [], "budget": {}}
+    profile = build_savings_profile(data)
+    assert profile.tokens_before == 0
+    assert profile.tokens_after == 0
+    assert profile.tokens_saved == 0
+    assert profile.savings_pct == 0.0
+
+
+def test_profiler_negative_savings_clamped_to_zero() -> None:
+    # Compressed > original is a valid edge case when overhead is added
+    data = _make_run_data(
+        [_make_compressed_entry("a.py", strategy="full", chunk_strategy="full-file", original_tokens=10, compressed_tokens=15)]
+    )
+    profile = build_savings_profile(data)
+    assert profile.per_file[0].tokens_saved == 0
+    assert profile.tokens_saved == 0
 
 
 def test_profiler_delta_savings_tracked_from_delta_budget() -> None:

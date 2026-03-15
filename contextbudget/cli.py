@@ -153,6 +153,18 @@ def cmd_plan_agent(args: argparse.Namespace) -> int:
 
 
 def cmd_simulate_agent(args: argparse.Namespace) -> int:
+    if getattr(args, "list_models", False):
+        from contextbudget.core.agent_cost import list_known_models
+        rows = list_known_models()
+        print(f"{'Model':<32} {'Provider':<12} {'Input $/MTok':>14} {'Output $/MTok':>14}")
+        print("-" * 76)
+        for row in rows:
+            print(
+                f"{row['model']:<32} {row['provider']:<12} "
+                f"{row['input_per_1m_usd']:>14.4f} {row['output_per_1m_usd']:>14.4f}"
+            )
+        return 0
+
     engine = ContextBudgetEngine(config_path=args.config)
     data = engine.simulate_agent(
         task=args.task,
@@ -162,6 +174,9 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
         prompt_overhead_per_step=args.prompt_overhead,
         output_tokens_per_step=args.output_tokens,
         context_mode=args.context_mode,
+        model=args.model,
+        price_per_1m_input=args.price_input,
+        price_per_1m_output=args.price_output,
     )
 
     base = args.out_prefix or f"contextbudget-simulate-{_base_name(args.task)}"
@@ -175,16 +190,43 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
     print(f"Wrote simulation Markdown: {md_path}")
     print(f"Context mode: {data.get('context_mode', 'isolated')}")
 
+    # Cost summary
+    cost = data.get("cost_estimate", {})
+    if isinstance(cost, dict) and cost:
+        model_name = cost.get("model", data.get("model", ""))
+        provider = cost.get("provider", "")
+        provider_str = f" ({provider})" if provider else ""
+        print(
+            f"Model: {model_name}{provider_str} "
+            f"| input ${cost.get('input_per_1m_usd', 0):.2f}/MTok "
+            f"| output ${cost.get('output_per_1m_usd', 0):.2f}/MTok"
+        )
+        print(
+            f"Estimated cost: ${cost.get('total_cost_usd', 0.0):.4f} USD "
+            f"(input ${cost.get('total_input_cost_usd', 0.0):.4f} + "
+            f"output ${cost.get('total_output_cost_usd', 0.0):.4f})"
+        )
+        notes = cost.get("notes", [])
+        for note in notes:
+            print(f"Cost note: {note}")
+
     steps = data.get("steps", [])
     if isinstance(steps, list):
         for idx, step in enumerate(steps, start=1):
             if not isinstance(step, dict):
                 continue
+            step_cost_str = ""
+            if isinstance(cost, dict) and cost.get("steps_cost"):
+                step_costs = cost["steps_cost"]
+                if idx - 1 < len(step_costs):
+                    sc = step_costs[idx - 1]
+                    step_cost_str = f", cost=${sc.get('step_cost_usd', 0.0):.5f}"
             print(
                 f"{idx}. {step.get('title', '')} "
                 f"(context={step.get('context_tokens', 0)}, "
                 f"total={step.get('step_total_tokens', 0)}, "
-                f"cumulative_ctx={step.get('cumulative_context_tokens', 0)})"
+                f"cumulative_ctx={step.get('cumulative_context_tokens', 0)}"
+                f"{step_cost_str})"
             )
 
     print(
@@ -784,6 +826,35 @@ def build_parser() -> argparse.ArgumentParser:
             "rolling=two-step sliding window, "
             "full=context grows across all steps (default: isolated)."
         ),
+    )
+    simulate_agent.add_argument(
+        "--model",
+        default="gpt-4o",
+        help=(
+            "Model name used for cost estimation (default: gpt-4o). "
+            "Supports Claude, GPT-4o, Gemini, Mistral, and others. "
+            "Run `contextbudget simulate-agent --list-models` to see all known models."
+        ),
+    )
+    simulate_agent.add_argument(
+        "--price-input",
+        dest="price_input",
+        type=float,
+        default=None,
+        help="Custom input token price in USD per 1 000 000 tokens (overrides built-in model pricing).",
+    )
+    simulate_agent.add_argument(
+        "--price-output",
+        dest="price_output",
+        type=float,
+        default=None,
+        help="Custom output token price in USD per 1 000 000 tokens (overrides built-in model pricing).",
+    )
+    simulate_agent.add_argument(
+        "--list-models",
+        action="store_true",
+        default=False,
+        help="Print all models in the built-in pricing table and exit.",
     )
     simulate_agent.add_argument(
         "--config",

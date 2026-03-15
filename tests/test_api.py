@@ -316,13 +316,13 @@ def test_budget_guard_simulate_agent_returns_workflow_steps(tmp_path: Path) -> N
     guard = BudgetGuard(max_tokens=30000)
     plan = guard.simulate_agent(task="update auth flow", repo=tmp_path)
 
-    assert plan["command"] == "plan_agent"
+    assert plan["command"] == "simulate-agent"
     assert plan["task"] == "update auth flow"
     assert isinstance(plan["steps"], list)
     assert len(plan["steps"]) > 0
     assert {step["id"] for step in plan["steps"]} >= {"inspect", "implement"}
-    assert "total_estimated_tokens" in plan
-    assert "shared_context" in plan
+    assert "total_tokens" in plan
+    assert "unique_context_tokens" in plan
 
 
 def test_budget_guard_simulate_agent_inherits_top_files(tmp_path: Path) -> None:
@@ -332,8 +332,9 @@ def test_budget_guard_simulate_agent_inherits_top_files(tmp_path: Path) -> None:
     guard = BudgetGuard(max_tokens=30000, top_files=2)
     plan = guard.simulate_agent(task="add caching", repo=tmp_path)
 
-    all_context_paths = {item["path"] for step in plan["steps"] for item in step["context"]}
-    assert len(all_context_paths) <= 2
+    for step in plan["steps"]:
+        step_specific = [f for f in step["files_read"] if f.get("read_type") == "step"]
+        assert len(step_specific) <= 2
 
 
 def test_budget_guard_profile_run_adds_profile_block(tmp_path: Path) -> None:

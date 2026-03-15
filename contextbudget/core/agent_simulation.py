@@ -4,14 +4,16 @@ from __future__ import annotations
 
 import math
 import statistics
-from typing import Callable
+from typing import Callable, Optional
 
+from contextbudget.core.agent_cost import compute_workflow_cost
 from contextbudget.core.agent_planning import build_agent_workflow_plan
 from contextbudget.schemas.models import FileRecord, RankedFile
 
 
 _DEFAULT_PROMPT_OVERHEAD = 800
 _DEFAULT_OUTPUT_TOKENS = 600
+_DEFAULT_MODEL = "gpt-4o"
 
 CONTEXT_MODES = ("isolated", "rolling", "full")
 
@@ -59,14 +61,18 @@ def simulate_agent_workflow(
     output_tokens_per_step: int = _DEFAULT_OUTPUT_TOKENS,
     context_mode: str = "isolated",
     workspace_mode: bool = False,
+    model: str = _DEFAULT_MODEL,
+    price_per_1m_input: Optional[float] = None,
+    price_per_1m_output: Optional[float] = None,
 ) -> dict:
-    """Simulate agent workflow execution and estimate token costs per step.
+    """Simulate agent workflow execution and estimate token and USD costs per step.
 
     Returns a dict with:
-      - steps: list of per-step token breakdowns
+      - steps: list of per-step token + cost breakdowns
       - total_tokens, token_variance, token_std_dev, min/max/avg_step_tokens
       - total_context_tokens, unique_context_tokens
       - total_prompt_tokens, total_output_tokens
+      - cost_estimate: full USD cost breakdown keyed by model + pricing
       - simulation parameters used
     """
     if context_mode not in CONTEXT_MODES:
@@ -161,6 +167,15 @@ def simulate_agent_workflow(
     max_step_tokens = max(step_totals) if step_totals else 0
     avg_step_tokens = total_tokens / len(step_totals) if step_totals else 0.0
 
+    cost_estimate = compute_workflow_cost(
+        model=model,
+        steps=steps_out,
+        total_tokens=total_tokens,
+        total_output_tokens=total_output_tokens_sum,
+        price_per_1m_input=price_per_1m_input,
+        price_per_1m_output=price_per_1m_output,
+    )
+
     return {
         "steps": steps_out,
         "total_tokens": total_tokens,
@@ -176,4 +191,6 @@ def simulate_agent_workflow(
         "prompt_overhead_per_step": prompt_overhead_per_step,
         "output_tokens_per_step": output_tokens_per_step,
         "context_mode": context_mode,
+        "model": model,
+        "cost_estimate": cost_estimate,
     }

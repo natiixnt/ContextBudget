@@ -229,9 +229,12 @@ class ContextBudgetEngine:
         prompt_overhead_per_step: int = 800,
         output_tokens_per_step: int = 600,
         context_mode: str = "isolated",
+        model: str = "gpt-4o",
+        price_per_1m_input: float | None = None,
+        price_per_1m_output: float | None = None,
         config_path: str | Path | None = None,
     ) -> dict[str, Any]:
-        """Simulate agent workflow token costs step by step before execution."""
+        """Simulate agent workflow token and cost estimates step by step before execution."""
 
         repo_path = normalize_repo(repo)
         if workspace is not None:
@@ -247,6 +250,9 @@ class ContextBudgetEngine:
                 prompt_overhead_per_step=prompt_overhead_per_step,
                 output_tokens_per_step=output_tokens_per_step,
                 context_mode=context_mode,
+                model=model,
+                price_per_1m_input=price_per_1m_input,
+                price_per_1m_output=price_per_1m_output,
             )
 
         cfg = self._load_config(repo_path, config_path=config_path)
@@ -260,6 +266,9 @@ class ContextBudgetEngine:
             prompt_overhead_per_step=prompt_overhead_per_step,
             output_tokens_per_step=output_tokens_per_step,
             context_mode=context_mode,
+            model=model,
+            price_per_1m_input=price_per_1m_input,
+            price_per_1m_output=price_per_1m_output,
         )
 
     def pack(
@@ -772,41 +781,44 @@ class BudgetGuard:
         repo: str | Path = ".",
         workspace: str | Path | None = None,
         top_files: int | None = None,
+        model: str = "gpt-4o",
+        price_per_1m_input: float | None = None,
+        price_per_1m_output: float | None = None,
         config_path: str | Path | None = None,
     ) -> dict[str, Any]:
-        """Simulate a multi-step agent workflow for a task.
+        """Simulate a multi-step agent workflow with token and cost estimates.
 
-        Returns a step-by-step workflow plan describing how context would be
-        distributed across lifecycle steps such as *inspect*, *implement*,
-        *test*, *validate*, and *document*.  Each step includes assigned context
-        files with token estimates so the caller can plan prompt budgets before
-        packing individual prompts.
+        Returns a step-by-step simulation describing token usage and estimated
+        API cost across lifecycle steps such as *inspect*, *implement*, *test*,
+        *validate*, and *document*.
 
         Artifact keys:
 
-        - ``steps`` – ordered workflow steps, each with ``id``, ``context``, and
-          ``estimated_tokens``
-        - ``shared_context`` – files reused across multiple steps
-        - ``total_estimated_tokens`` – sum across all steps (including reuse)
-        - ``unique_context_tokens`` – tokens counted once per unique file
-        - ``reused_context_tokens`` – tokens attributed to shared context reuse
+        - ``steps`` – ordered workflow steps, each with token and USD cost fields
+        - ``total_tokens`` – sum across all steps
+        - ``cost_estimate`` – full USD breakdown keyed by model and pricing
+        - ``model`` – model used for pricing
 
         Example::
 
             from contextbudget import BudgetGuard
 
             guard = BudgetGuard(max_tokens=30000)
-            plan = guard.simulate_agent(task="refactor auth flow", repo=".")
-            for step in plan["steps"]:
-                print(step["id"], step["estimated_tokens"])
+            sim = guard.simulate_agent(task="refactor auth flow", repo=".", model="claude-sonnet-4-6")
+            print(f"Estimated cost: ${sim['cost_estimate']['total_cost_usd']:.4f}")
+            for step in sim["steps"]:
+                print(step["title"], step["step_total_tokens"])
         """
 
         effective_top_files = top_files if top_files is not None else self.top_files
-        return self.engine.plan_agent(
+        return self.engine.simulate_agent(
             task=task,
             repo=repo,
             workspace=workspace,
             top_files=effective_top_files,
+            model=model,
+            price_per_1m_input=price_per_1m_input,
+            price_per_1m_output=price_per_1m_output,
             config_path=config_path,
         )
 

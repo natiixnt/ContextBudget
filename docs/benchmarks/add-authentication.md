@@ -12,7 +12,7 @@ Evaluates context selection for an auth-focused change spanning route handlers, 
 | Top files | 20 |
 | Token estimator | heuristic |
 | Scan runtime | 3 ms |
-| Generated | 2026-03-15T09:55:08.956712+00:00 |
+| Generated | 2026-03-15T10:04:25.421766+00:00 |
 
 ## Baseline
 
@@ -25,7 +25,7 @@ Full repository context (no selection, no compression): **12,230 tokens**
 | naive_full_context | 12,230 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,230 | 0 (0.0%) | low | 0 ms |
 | compressed_pack | 3,259 | 8,971 (73.4%) | low | 16 ms |
-| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 17 ms |
+| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 16 ms |
 
 ## Compressed pack details
 
@@ -54,7 +54,7 @@ Full repository context (no selection, no compression): **12,230 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 17 ms
+Second run (warm cache): **150 tokens**, 15 cache hits, 16 ms
 
 ## Token estimator comparison
 
