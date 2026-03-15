@@ -1,0 +1,52 @@
+{
+  "command": "build-dataset",
+  "generated_at": "2026-03-15T12:15:00Z",
+  "repo": ".",
+  "task_count": 5,
+  "builtin_task_count": 5,
+  "extra_task_count": 0,
+  "aggregate": {
+    "total_baseline_tokens": 112400,
+    "total_optimized_tokens": 68200,
+    "avg_baseline_tokens": 22480,
+    "avg_optimized_tokens": 13640,
+    "avg_reduction_pct": 39.3
+  },
+  "entries": [
+    {
+      "task_name": "Add Caching Layer",
+      "task": "add a caching layer to the application",
+      "baseline_tokens": 19800,
+      "optimized_tokens": 11400,
+      "reduction_pct": 42.4
+    },
+    {
+      "task_name": "Authentication Module",
+      "task": "implement authentication and session management",
+      "baseline_tokens": 24600,
+      "optimized_tokens": 14200,
+      "reduction_pct": 42.3
+    },
+    {
+      "task_name": "Module Refactor",
+      "task": "refactor the core module for better separation of concerns",
+      "baseline_tokens": 22400,
+      "optimized_tokens": 14800,
+      "reduction_pct": 33.9
+    },
+    {
+      "task_name": "Logging Infrastructure",
+      "task": "add structured logging and observability",
+      "baseline_tokens": 21200,
+      "optimized_tokens": 13400,
+      "reduction_pct": 36.8
+    },
+    {
+      "task_name": "Error Handling",
+      "task": "improve error handling and user-facing messages",
+      "baseline_tokens": 24400,
+      "optimized_tokens": 14400,
+      "reduction_pct": 41.0
+    }
+  ]
+}

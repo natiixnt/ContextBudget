@@ -1,0 +1,62 @@
+{
+  "command": "simulate-agent",
+  "task": "implement OAuth2 login flow",
+  "repo": ".",
+  "generated_at": "2026-03-15T10:30:00Z",
+  "context_mode": "rolling",
+  "model": "claude-3-5-sonnet-20241022",
+  "total_tokens": 48200,
+  "total_context_tokens": 36400,
+  "unique_context_tokens": 28100,
+  "token_variance": 3240000.0,
+  "token_std_dev": 1800.0,
+  "min_step_tokens": 9800,
+  "avg_step_tokens": 12050.0,
+  "max_step_tokens": 14600,
+  "steps": [
+    {
+      "title": "Scan and plan auth module",
+      "context_tokens": 8200,
+      "step_total_tokens": 9800,
+      "cumulative_context_tokens": 8200,
+      "context_files": ["src/auth/__init__.py", "src/auth/models.py", "src/config.py"]
+    },
+    {
+      "title": "Implement token exchange endpoint",
+      "context_tokens": 11400,
+      "step_total_tokens": 13000,
+      "cumulative_context_tokens": 19600,
+      "context_files": ["src/auth/routes.py", "src/auth/models.py", "src/middleware.py", "tests/test_auth.py"]
+    },
+    {
+      "title": "Add refresh token logic",
+      "context_tokens": 10800,
+      "step_total_tokens": 12400,
+      "cumulative_context_tokens": 30400,
+      "context_files": ["src/auth/routes.py", "src/auth/tokens.py", "src/db/session.py"]
+    },
+    {
+      "title": "Write integration tests",
+      "context_tokens": 6000,
+      "step_total_tokens": 13000,
+      "cumulative_context_tokens": 36400,
+      "context_files": ["tests/test_auth.py", "tests/conftest.py", "src/auth/routes.py"]
+    }
+  ],
+  "cost_estimate": {
+    "model": "claude-3-5-sonnet-20241022",
+    "provider": "anthropic",
+    "input_per_1m_usd": 3.0,
+    "output_per_1m_usd": 15.0,
+    "total_input_cost_usd": 0.1092,
+    "total_output_cost_usd": 0.036,
+    "total_cost_usd": 0.1452,
+    "notes": [],
+    "steps_cost": [
+      {"step": 1, "step_cost_usd": 0.032},
+      {"step": 2, "step_cost_usd": 0.041},
+      {"step": 3, "step_cost_usd": 0.039},
+      {"step": 4, "step_cost_usd": 0.033}
+    ]
+  }
+}

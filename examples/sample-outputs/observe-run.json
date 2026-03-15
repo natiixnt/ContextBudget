@@ -1,0 +1,14 @@
+{
+  "command": "observe",
+  "run_json": "run.json",
+  "generated_at": "2026-03-15T10:22:00Z",
+  "total_tokens": 14820,
+  "tokens_saved": 6340,
+  "baseline_tokens": 21160,
+  "files_read": 9,
+  "unique_files_read": 8,
+  "duplicate_reads": 1,
+  "cache_hits": 2,
+  "context_size_files": 9,
+  "run_duration_ms": 412
+}

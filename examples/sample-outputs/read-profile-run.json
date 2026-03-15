@@ -1,0 +1,69 @@
+{
+  "command": "read-profiler",
+  "run_json": "run.json",
+  "generated_at": "2026-03-15T12:00:00Z",
+  "total_files_read": 9,
+  "unique_files_read": 8,
+  "duplicate_reads": 1,
+  "unnecessary_reads": 2,
+  "high_cost_reads": 3,
+  "tokens_wasted_duplicates": 340,
+  "tokens_wasted_unnecessary": 680,
+  "tokens_wasted_total": 1020,
+  "files": [
+    {
+      "path": "src/router.py",
+      "read_count": 2,
+      "estimated_tokens": 340,
+      "relevance_score": 2.4,
+      "is_duplicate": true,
+      "is_unnecessary": false,
+      "is_high_cost": false
+    },
+    {
+      "path": "src/utils/deprecated.py",
+      "read_count": 1,
+      "estimated_tokens": 420,
+      "relevance_score": 0.8,
+      "is_duplicate": false,
+      "is_unnecessary": true,
+      "is_high_cost": false
+    },
+    {
+      "path": "src/auth/middleware.py",
+      "read_count": 1,
+      "estimated_tokens": 1240,
+      "relevance_score": 3.8,
+      "is_duplicate": false,
+      "is_unnecessary": false,
+      "is_high_cost": true
+    }
+  ],
+  "duplicate_files": [
+    {
+      "path": "src/router.py",
+      "read_count": 2,
+      "estimated_tokens": 340,
+      "tokens_wasted": 340
+    }
+  ],
+  "unnecessary_files": [
+    {
+      "path": "src/utils/deprecated.py",
+      "read_count": 1,
+      "estimated_tokens": 420,
+      "relevance_score": 0.8
+    },
+    {
+      "path": "tests/fixtures/stub.py",
+      "read_count": 1,
+      "estimated_tokens": 260,
+      "relevance_score": 0.5
+    }
+  ],
+  "high_cost_files": [
+    {"path": "src/auth/middleware.py", "estimated_tokens": 1240},
+    {"path": "src/api/routes.py", "estimated_tokens": 980},
+    {"path": "src/config.py", "estimated_tokens": 820}
+  ]
+}

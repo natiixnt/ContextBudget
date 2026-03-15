@@ -1,0 +1,38 @@
+{
+  "command": "drift",
+  "generated_at": "2026-03-15T11:00:00Z",
+  "repo": ".",
+  "task_filter": "",
+  "window": 20,
+  "threshold_pct": 10.0,
+  "entries_analyzed": 18,
+  "baseline": {
+    "avg_tokens": 13400,
+    "avg_files": 8.2,
+    "avg_dep_depth": 2.1
+  },
+  "current": {
+    "avg_tokens": 16200,
+    "avg_files": 9.8,
+    "avg_dep_depth": 2.6
+  },
+  "drift": {
+    "token_drift_pct": 20.9,
+    "file_drift_pct": 19.5,
+    "dep_depth_drift_pct": 23.8,
+    "verdict": "high",
+    "alert": true
+  },
+  "top_contributors": [
+    {"file": "src/auth/middleware.py", "status": "grown", "token_delta": 840},
+    {"file": "src/api/routes.py", "status": "grown", "token_delta": 620},
+    {"file": "src/models/user.py", "status": "added", "token_delta": 480},
+    {"file": "src/utils/validators.py", "status": "grown", "token_delta": 320}
+  ],
+  "trend": [
+    {"window_start": "2026-02-01", "avg_tokens": 12800, "avg_files": 7.9},
+    {"window_start": "2026-02-15", "avg_tokens": 13400, "avg_files": 8.2},
+    {"window_start": "2026-03-01", "avg_tokens": 14900, "avg_files": 9.1},
+    {"window_start": "2026-03-15", "avg_tokens": 16200, "avg_files": 9.8}
+  ]
+}

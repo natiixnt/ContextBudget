@@ -235,6 +235,349 @@ Scan change: repo=/repo tracked=12 included=10 reused=11 added=0 updated=1 remov
 updated[src/auth.py]
 ```
 
+---
+
+## Observability and Analytics Commands
+
+These commands turn raw run artifacts into actionable developer intelligence.
+
+### `contextbudget observe <run.json> [--format human|json]`
+
+Extract and store observability metrics from a `pack` run artifact.
+
+Reads a `run.json` produced by `pack` and computes:
+
+- **total_tokens** / **tokens_saved** / **baseline_tokens**
+- **files_read** / **unique_files_read** / **duplicate_reads**
+- **cache_hits** / **run_duration_ms**
+
+Metrics are persisted to `.contextbudget/observe-history.json` for trend tracking.
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--no-store` | Skip persisting to history |
+| `--export-history` | Also dump the full history store to `<prefix>-history.json` |
+| `--base-dir` | Root used to locate the `.contextbudget/` directory |
+| `--out-prefix` | Output file prefix (default: `<run>-observe`) |
+| `--format human\|json` | `human` prints the markdown report; `json` prints raw JSON to stdout |
+
+**Example:**
+
+```bash
+# After a pack run
+contextbudget pack "add caching" --repo . --max-tokens 20000
+contextbudget observe run.json
+
+# Machine-readable for scripting
+contextbudget observe run.json --format json | jq '.total_tokens'
+
+# Export full history
+contextbudget observe run.json --export-history
+```
+
+**Outputs:** `<prefix>.json`, `<prefix>.md`, optionally `<prefix>-history.json`
+
+---
+
+### `contextbudget simulate-agent <task> --repo <path> [--format human|json]`
+
+Estimate token costs and USD spend for a multi-step agent workflow **before** running it.
+
+Models three context accumulation modes and prices tokens against known model rates.
+
+**Context modes:**
+
+| Mode | Description |
+|------|-------------|
+| `isolated` | Each workflow step has independent context (default) |
+| `rolling` | Two-step sliding window — context from the previous step carries forward |
+| `full` | Context grows across all steps (cumulative) |
+
+**Key flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--context-mode` | `isolated` | Context accumulation strategy |
+| `--model` | `gpt-4o` | Model for cost estimation |
+| `--prompt-overhead` | `800` | Estimated system + user prompt tokens per step |
+| `--output-tokens` | `600` | Estimated model output tokens per step |
+| `--price-input` | — | Custom input price (USD / 1M tokens), overrides built-in model table |
+| `--price-output` | — | Custom output price (USD / 1M tokens) |
+| `--list-models` | — | Print all supported models and exit |
+| `--format human\|json` | `human` | `json` prints raw JSON to stdout |
+
+**Example:**
+
+```bash
+# Estimate costs with rolling context for Claude Sonnet
+contextbudget simulate-agent "implement OAuth2" \
+  --repo . \
+  --model claude-3-5-sonnet-20241022 \
+  --context-mode rolling
+
+# List all supported models
+contextbudget simulate-agent --list-models
+
+# JSON output for CI integration
+contextbudget simulate-agent "add caching" --repo . --format json \
+  | jq '.cost_estimate.total_cost_usd'
+```
+
+**Outputs:** `<prefix>.json`, `<prefix>.md`
+
+---
+
+### `contextbudget drift [--repo <path>] [--format human|json]`
+
+Detect token usage growth trends across historical `pack` runs and alert when context is expanding.
+
+Reads `.contextbudget/history.json`, splits entries into a baseline window and a recent window, then computes drift across three dimensions:
+
+| Metric | Description |
+|--------|-------------|
+| `token_drift_pct` | % change in estimated input tokens |
+| `file_drift_pct` | % change in files included per run |
+| `dep_depth_drift_pct` | % change in average dependency depth |
+
+Returns **exit code 2** when drift exceeds the threshold (useful in CI).
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--window` | `20` | Number of recent history entries to analyze |
+| `--threshold` | `10.0` | Drift % that triggers an alert |
+| `--task` | — | Filter history by task substring |
+| `--out-prefix` | `contextbudget-drift` | Output file prefix |
+| `--format human\|json` | `human` | `json` prints raw JSON to stdout |
+
+**Example:**
+
+```bash
+# Detect drift (exits 2 if alert, 0 if clean)
+contextbudget drift --repo . --threshold 15
+
+# Filter to a specific task area
+contextbudget drift --repo . --task "auth"
+
+# CI gate
+contextbudget drift --repo . && echo "Context stable" || echo "DRIFT DETECTED"
+
+# JSON for dashboards
+contextbudget drift --repo . --format json | jq '.drift.token_drift_pct'
+```
+
+**Outputs:** `contextbudget-drift.json`, `contextbudget-drift.md`
+
+---
+
+### `contextbudget advise [--repo <path>] [--format human|json]`
+
+Analyze a repository's import graph and suggest architecture improvements to reduce context bloat.
+
+Detects three categories of problem:
+
+| Category | Signal | Default threshold |
+|----------|--------|------------------|
+| `split_file` | File is too large | ≥ 500 tokens |
+| `extract_module` | File has very high fan-in (many importers) | ≥ 5 importers |
+| `reduce_dependencies` | File has very high fan-out (imports many files) | ≥ 10 imports |
+
+Each suggestion includes an `estimated_token_impact` showing how many tokens could be saved.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--history` | — | Pack JSON files to compute inclusion-frequency signals |
+| `--large-file-tokens` | `500` | Token threshold for "large file" |
+| `--high-fanin` | `5` | Min importer count for fan-in flag |
+| `--high-fanout` | `10` | Min outgoing imports for fan-out flag |
+| `--high-frequency-rate` | `0.5` | Min pack inclusion rate (0–1) for frequency flag |
+| `--top` | `25` | Max suggestions to emit |
+| `--format human\|json` | `human` | `json` prints raw JSON to stdout |
+
+**Example:**
+
+```bash
+# Basic analysis
+contextbudget advise --repo .
+
+# With pack history for frequency signals
+contextbudget advise --repo . --history run*.json
+
+# JSON for tooling integration
+contextbudget advise --repo . --format json \
+  | jq '[.suggestions[] | select(.suggestion == "split_file")]'
+```
+
+**Outputs:** `contextbudget-advise.json`, `contextbudget-advise.md`
+
+---
+
+### `contextbudget visualize [--repo <path>] [--html] [--format human|json]`
+
+Build and export a repository dependency graph annotated with token counts and historical inclusion frequency.
+
+Each graph node carries:
+- `estimated_tokens` — token cost of the file
+- `inclusion_count` / `inclusion_rate` — how often this file appears in pack runs
+- `in_degree` / `out_degree` — import graph connectivity
+- `is_entrypoint` — whether the file is a module root
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--history` | Pack JSON files or directories to compute inclusion-frequency annotations |
+| `--html` | Also write a self-contained interactive HTML visualization |
+| `--out-prefix` | Output file prefix (default: `contextbudget-graph`) |
+| `--format human\|json` | `human` prints a summary; `json` prints raw JSON to stdout |
+
+**Example:**
+
+```bash
+# Build the graph
+contextbudget visualize --repo .
+
+# With history + interactive HTML
+contextbudget visualize --repo . --history run*.json --html
+
+# JSON for external graph tools
+contextbudget visualize --repo . --format json > graph.json
+```
+
+**Outputs:** `contextbudget-graph.json`, `contextbudget-graph.md`, optionally `contextbudget-graph.html`
+
+---
+
+### `contextbudget dashboard [<paths>...] [--port N] [--export] [--format human|json]`
+
+Start a local web UI to browse and compare all run artifacts interactively, or export the aggregated data.
+
+Scans directories and JSON artifact files for pack, benchmark, simulate-agent, plan, heatmap, and profile runs. Aggregates them into a single data view displayed at `http://localhost:<port>`.
+
+**Flags:**
+
+| Flag | Default | Description |
+|------|---------|-------------|
+| `--port` | `7842` | Port for the local server |
+| `--no-open` | false | Don't auto-open the browser |
+| `--export` | false | Export aggregated data as JSON and exit (no server) |
+| `--out-prefix` | `contextbudget-dashboard` | File prefix for `--export` mode |
+| `--format human\|json` | `human` | `json` prints dashboard data to stdout and exits |
+
+**Example:**
+
+```bash
+# Start the dashboard
+contextbudget dashboard
+
+# Scan specific directories
+contextbudget dashboard ./runs/ ../other-project/
+
+# Export data without starting the server
+contextbudget dashboard --export --out-prefix ./reports/dashboard
+
+# Pipe to jq
+contextbudget dashboard --format json | jq '.summary'
+```
+
+---
+
+### `contextbudget read-profiler <run.json> [--format human|json]`
+
+Detect duplicate and unnecessary file reads in a pack run and quantify the tokens wasted.
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--out-prefix` | Output file prefix (default: `<run>-read-profile`) |
+| `--format human\|json` | `human` prints full report; `json` prints raw JSON to stdout |
+
+**Example:**
+
+```bash
+contextbudget pack "add caching" --repo . --max-tokens 20000
+contextbudget read-profiler run.json
+
+# JSON for CI checks
+contextbudget read-profiler run.json --format json \
+  | jq '.tokens_wasted_total'
+```
+
+**Outputs:** `<prefix>.json`, `<prefix>.md`
+
+---
+
+### `contextbudget dataset <tasks.toml> --repo <path> [--format human|json]`
+
+Build a reproducible benchmark dataset from a TOML task list and export per-task token reduction metrics.
+
+The TOML file must contain a `[[tasks]]` array:
+
+```toml
+[[tasks]]
+name = "Add caching"
+task = "add Redis caching to the search API"
+
+[[tasks]]
+name = "Add authentication"
+task = "add JWT authentication to user routes"
+```
+
+Use `contextbudget build-dataset` to run the same pipeline with built-in tasks (no TOML required).
+
+**Flags:**
+
+| Flag | Description |
+|------|-------------|
+| `--max-tokens` | Token budget for each benchmark run |
+| `--top-files` | Top-files limit for each run |
+| `--out-prefix` | Output file prefix (default: `contextbudget-dataset`) |
+| `--format human\|json` | `human` prints per-task summary; `json` prints raw JSON to stdout |
+
+**Example:**
+
+```bash
+# Run the benchmark suite
+contextbudget dataset tasks.toml --repo .
+
+# JSON output
+contextbudget dataset tasks.toml --repo . --format json \
+  | jq '.aggregate.avg_reduction_pct'
+
+# Built-in task suite (no TOML required)
+contextbudget build-dataset --repo .
+```
+
+**Outputs:** `contextbudget-dataset.json`, `contextbudget-dataset.md`
+
+---
+
+## JSON Output Mode
+
+All analytics commands support `--format json` to print the raw data structure to stdout instead of the human-readable summary. Files are still written to disk in both modes.
+
+This is useful for:
+- Piping into `jq` for field extraction
+- Feeding into CI gates and dashboards
+- Integrating with external tooling
+
+```bash
+# Extract a single field
+contextbudget observe run.json --format json | jq '.total_tokens'
+
+# Chain with other tools
+contextbudget drift --repo . --format json \
+  | jq '{alert: .drift.alert, token_drift: .drift.token_drift_pct}'
+```
+
+---
+
 ## Strict Policy Mode
 
 ```bash

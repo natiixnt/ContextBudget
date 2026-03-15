@@ -1,0 +1,86 @@
+{
+  "command": "visualize",
+  "generated_at": "2026-03-15T11:30:00Z",
+  "repo": ".",
+  "stats": {
+    "total_nodes": 24,
+    "total_edges": 41,
+    "total_estimated_tokens": 48600,
+    "avg_tokens_per_node": 2025,
+    "entrypoint_count": 3,
+    "top_token_files": [
+      "src/auth/middleware.py",
+      "src/api/routes.py",
+      "src/config.py"
+    ],
+    "most_imported_files": [
+      "src/utils/helpers.py",
+      "src/models/base.py",
+      "src/config.py"
+    ]
+  },
+  "nodes": [
+    {
+      "id": "src/auth/middleware.py",
+      "label": "src/auth/middleware.py",
+      "estimated_tokens": 1240,
+      "inclusion_count": 12,
+      "inclusion_rate": 0.86,
+      "extension": ".py",
+      "is_entrypoint": false,
+      "in_degree": 3,
+      "out_degree": 4
+    },
+    {
+      "id": "src/api/routes.py",
+      "label": "src/api/routes.py",
+      "estimated_tokens": 980,
+      "inclusion_count": 10,
+      "inclusion_rate": 0.71,
+      "extension": ".py",
+      "is_entrypoint": true,
+      "in_degree": 0,
+      "out_degree": 6
+    },
+    {
+      "id": "src/config.py",
+      "label": "src/config.py",
+      "estimated_tokens": 820,
+      "inclusion_count": 11,
+      "inclusion_rate": 0.79,
+      "extension": ".py",
+      "is_entrypoint": false,
+      "in_degree": 9,
+      "out_degree": 1
+    },
+    {
+      "id": "src/utils/helpers.py",
+      "label": "src/utils/helpers.py",
+      "estimated_tokens": 640,
+      "inclusion_count": 8,
+      "inclusion_rate": 0.57,
+      "extension": ".py",
+      "is_entrypoint": false,
+      "in_degree": 9,
+      "out_degree": 2
+    },
+    {
+      "id": "src/models/base.py",
+      "label": "src/models/base.py",
+      "estimated_tokens": 580,
+      "inclusion_count": 7,
+      "inclusion_rate": 0.50,
+      "extension": ".py",
+      "is_entrypoint": false,
+      "in_degree": 7,
+      "out_degree": 1
+    }
+  ],
+  "edges": [
+    {"source": "src/api/routes.py", "target": "src/auth/middleware.py"},
+    {"source": "src/api/routes.py", "target": "src/config.py"},
+    {"source": "src/api/routes.py", "target": "src/utils/helpers.py"},
+    {"source": "src/auth/middleware.py", "target": "src/config.py"},
+    {"source": "src/auth/middleware.py", "target": "src/models/base.py"}
+  ]
+}

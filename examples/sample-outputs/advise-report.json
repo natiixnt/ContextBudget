@@ -1,0 +1,55 @@
+{
+  "command": "advise",
+  "generated_at": "2026-03-15T11:15:00Z",
+  "repo": ".",
+  "summary": {
+    "total_suggestions": 6,
+    "split_file": 3,
+    "extract_module": 2,
+    "reduce_dependencies": 1
+  },
+  "suggestions": [
+    {
+      "path": "src/auth/middleware.py",
+      "suggestion": "split_file",
+      "reason": "File has 1,240 estimated tokens — exceeds the large-file threshold of 500 tokens",
+      "estimated_token_impact": 620,
+      "signals": ["large_file", "high_frequency"]
+    },
+    {
+      "path": "src/utils/helpers.py",
+      "suggestion": "extract_module",
+      "reason": "Imported by 9 files — high fan-in creates a context bottleneck",
+      "estimated_token_impact": 480,
+      "signals": ["high_fanin"]
+    },
+    {
+      "path": "src/api/routes.py",
+      "suggestion": "split_file",
+      "reason": "File has 980 estimated tokens — exceeds the large-file threshold of 500 tokens",
+      "estimated_token_impact": 390,
+      "signals": ["large_file"]
+    },
+    {
+      "path": "src/models/base.py",
+      "suggestion": "extract_module",
+      "reason": "Imported by 7 files — high fan-in increases token cost across many runs",
+      "estimated_token_impact": 310,
+      "signals": ["high_fanin", "high_frequency"]
+    },
+    {
+      "path": "src/config.py",
+      "suggestion": "split_file",
+      "reason": "File has 820 estimated tokens and is included in 80% of pack runs",
+      "estimated_token_impact": 280,
+      "signals": ["large_file", "high_frequency"]
+    },
+    {
+      "path": "src/api/v2/handlers.py",
+      "suggestion": "reduce_dependencies",
+      "reason": "Imports 14 modules — high fan-out causes excessive context drag",
+      "estimated_token_impact": 240,
+      "signals": ["high_fanout"]
+    }
+  ]
+}

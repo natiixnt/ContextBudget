@@ -1768,3 +1768,73 @@ def render_context_dataset_markdown(data: dict) -> str:
 
     lines.append("")
     return "\n".join(lines)
+
+
+def render_visualize_markdown(data: dict) -> str:
+    """Render a dependency graph visualize report to Markdown."""
+
+    stats = data.get("stats", {})
+    nodes = data.get("nodes", [])
+    edges = data.get("edges", [])
+
+    lines = [
+        "# ContextBudget Dependency Graph",
+        "",
+        f"Repository: {data.get('repo', '')}",
+        f"Generated at: {data.get('generated_at', '')}",
+        "",
+        "## Graph Statistics",
+        "",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| Total nodes | {stats.get('total_nodes', 0)} |",
+        f"| Total edges | {stats.get('total_edges', 0)} |",
+        f"| Total estimated tokens | {stats.get('total_estimated_tokens', 0):,} |",
+        f"| Avg tokens per node | {stats.get('avg_tokens_per_node', 0):.0f} |",
+        f"| Entrypoints | {stats.get('entrypoint_count', 0)} |",
+    ]
+
+    top_token = stats.get("top_token_files", [])
+    if top_token:
+        lines.extend(["", "## Top Token-Heavy Files", ""])
+        for path in top_token:
+            node_data = next((n for n in nodes if n.get("id") == path or n.get("label") == path), {})
+            tokens = node_data.get("estimated_tokens", 0)
+            tok_str = f" — {tokens:,} tokens" if tokens else ""
+            lines.append(f"- `{path}`{tok_str}")
+
+    most_imported = stats.get("most_imported_files", [])
+    if most_imported:
+        lines.extend(["", "## Most Imported Files", ""])
+        for path in most_imported:
+            node_data = next((n for n in nodes if n.get("id") == path or n.get("label") == path), {})
+            in_deg = node_data.get("in_degree", 0)
+            deg_str = f" — imported by {in_deg} files" if in_deg else ""
+            lines.append(f"- `{path}`{deg_str}")
+
+    if nodes:
+        lines.extend([
+            "",
+            "## Node Details",
+            "",
+            "| File | Tokens | Included | Rate | In-Degree | Out-Degree |",
+            "|------|-------:|--------:|-----:|----------:|-----------:|",
+        ])
+        sorted_nodes = sorted(nodes, key=lambda n: n.get("estimated_tokens", 0), reverse=True)
+        for node in sorted_nodes[:30]:
+            if not isinstance(node, dict):
+                continue
+            rate = float(node.get("inclusion_rate", 0.0) or 0.0)
+            lines.append(
+                f"| `{node.get('label', node.get('id', ''))}` "
+                f"| {node.get('estimated_tokens', 0):,} "
+                f"| {node.get('inclusion_count', 0)} "
+                f"| {rate:.0%} "
+                f"| {node.get('in_degree', 0)} "
+                f"| {node.get('out_degree', 0)} |"
+            )
+        if len(nodes) > 30:
+            lines.append(f"\n_...and {len(nodes) - 30} more nodes. See the JSON artifact for full details._")
+
+    lines.extend(["", f"Total edges in graph: {len(edges)}", ""])
+    return "\n".join(lines)

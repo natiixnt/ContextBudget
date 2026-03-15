@@ -163,16 +163,20 @@ def cmd_plan_agent(args: argparse.Namespace) -> int:
 
 
 def cmd_simulate_agent(args: argparse.Namespace) -> int:
+    fmt = getattr(args, "format", "human")
     if getattr(args, "list_models", False):
         from contextbudget.core.agent_cost import list_known_models
         rows = list_known_models()
-        print(f"{'Model':<32} {'Provider':<12} {'Input $/MTok':>14} {'Output $/MTok':>14}")
-        print("-" * 76)
-        for row in rows:
-            print(
-                f"{row['model']:<32} {row['provider']:<12} "
-                f"{row['input_per_1m_usd']:>14.4f} {row['output_per_1m_usd']:>14.4f}"
-            )
+        if fmt == "json":
+            print(_json_mod.dumps(rows, indent=2, default=str))
+        else:
+            print(f"{'Model':<32} {'Provider':<12} {'Input $/MTok':>14} {'Output $/MTok':>14}")
+            print("-" * 76)
+            for row in rows:
+                print(
+                    f"{row['model']:<32} {row['provider']:<12} "
+                    f"{row['input_per_1m_usd']:>14.4f} {row['output_per_1m_usd']:>14.4f}"
+                )
         return 0
 
     engine = ContextBudgetEngine(config_path=args.config)
@@ -195,6 +199,10 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
 
     write_json(json_path, data)
     md_path.write_text(render_agent_simulation_markdown(data), encoding="utf-8")
+
+    if fmt == "json":
+        print(_json_mod.dumps(data, indent=2, default=str))
+        return 0
 
     print(f"Wrote simulation JSON: {json_path}")
     print(f"Wrote simulation Markdown: {md_path}")
@@ -689,6 +697,7 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
 
 def cmd_dataset(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
+    fmt = getattr(args, "format", "human")
     data = engine.dataset(
         tasks_toml=args.tasks_toml,
         repo=args.repo,
@@ -702,23 +711,26 @@ def cmd_dataset(args: argparse.Namespace) -> int:
     write_json(json_path, data)
     md_path.write_text(render_dataset_markdown(data), encoding="utf-8")
 
-    agg = data.get("aggregate", {})
-    print(f"Tasks: {data.get('task_count', 0)}")
-    print(
-        f"Avg baseline tokens: {agg.get('avg_baseline_tokens', 0)}  "
-        f"Avg optimized tokens: {agg.get('avg_optimized_tokens', 0)}  "
-        f"Avg reduction: {agg.get('avg_reduction_pct', 0):.1f}%"
-    )
-    for idx, entry in enumerate(data.get("entries", []), start=1):
-        label = entry.get("task_name") or entry.get("task", "")
+    if fmt == "json":
+        print(_json_mod.dumps(data, indent=2, default=str))
+    else:
+        agg = data.get("aggregate", {})
+        print(f"Tasks: {data.get('task_count', 0)}")
         print(
-            f"  {idx}. {label}  "
-            f"baseline={entry.get('baseline_tokens', 0)}  "
-            f"optimized={entry.get('optimized_tokens', 0)}  "
-            f"reduction={entry.get('reduction_pct', 0):.1f}%"
+            f"Avg baseline tokens: {agg.get('avg_baseline_tokens', 0)}  "
+            f"Avg optimized tokens: {agg.get('avg_optimized_tokens', 0)}  "
+            f"Avg reduction: {agg.get('avg_reduction_pct', 0):.1f}%"
         )
-    print(f"Wrote dataset JSON: {json_path}")
-    print(f"Wrote dataset Markdown: {md_path}")
+        for idx, entry in enumerate(data.get("entries", []), start=1):
+            label = entry.get("task_name") or entry.get("task", "")
+            print(
+                f"  {idx}. {label}  "
+                f"baseline={entry.get('baseline_tokens', 0)}  "
+                f"optimized={entry.get('optimized_tokens', 0)}  "
+                f"reduction={entry.get('reduction_pct', 0):.1f}%"
+            )
+        print(f"Wrote dataset JSON: {json_path}")
+        print(f"Wrote dataset Markdown: {md_path}")
     return 0
 
 
@@ -957,6 +969,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 def cmd_advise(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
+    fmt = getattr(args, "format", "human")
     data = engine.advise(
         repo=args.repo,
         history=args.history or None,
@@ -973,29 +986,33 @@ def cmd_advise(args: argparse.Namespace) -> int:
     write_json(json_path, data)
     md_path.write_text(render_advise_markdown(data), encoding="utf-8")
 
-    summary = data.get("summary", {})
-    suggestions = data.get("suggestions", [])
-    print(f"Wrote advise JSON: {json_path}")
-    print(f"Wrote advise Markdown: {md_path}")
-    print(
-        f"Suggestions: {summary.get('total_suggestions', 0)} total, "
-        f"{summary.get('split_file', 0)} split_file, "
-        f"{summary.get('extract_module', 0)} extract_module, "
-        f"{summary.get('reduce_dependencies', 0)} reduce_dependencies"
-    )
-    for idx, item in enumerate(suggestions[:10], start=1):
+    if fmt == "json":
+        print(_json_mod.dumps(data, indent=2, default=str))
+    else:
+        summary = data.get("summary", {})
+        suggestions = data.get("suggestions", [])
+        print(f"Wrote advise JSON: {json_path}")
+        print(f"Wrote advise Markdown: {md_path}")
         print(
-            f"{idx}. [{item.get('suggestion', '')}] {item.get('path', '')} "
-            f"(impact={item.get('estimated_token_impact', 0)})"
+            f"Suggestions: {summary.get('total_suggestions', 0)} total, "
+            f"{summary.get('split_file', 0)} split_file, "
+            f"{summary.get('extract_module', 0)} extract_module, "
+            f"{summary.get('reduce_dependencies', 0)} reduce_dependencies"
         )
-    if len(suggestions) > 10:
-        print(f"... and {len(suggestions) - 10} more. See {md_path} for full report.")
+        for idx, item in enumerate(suggestions[:10], start=1):
+            print(
+                f"{idx}. [{item.get('suggestion', '')}] {item.get('path', '')} "
+                f"(impact={item.get('estimated_token_impact', 0)})"
+            )
+        if len(suggestions) > 10:
+            print(f"... and {len(suggestions) - 10} more. See {md_path} for full report.")
     return 0
 
 
 def cmd_visualize(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
     history = args.history or []
+    fmt = getattr(args, "format", "human")
 
     graph_data = engine.visualize(
         repo=args.repo,
@@ -1004,25 +1021,31 @@ def cmd_visualize(args: argparse.Namespace) -> int:
 
     base = args.out_prefix or "contextbudget-graph"
     json_path = Path(f"{base}.json")
+    md_path = Path(f"{base}.md")
     write_json(json_path, graph_data)
-    print(f"Wrote graph JSON: {json_path}")
+    md_path.write_text(render_visualize_markdown(graph_data), encoding="utf-8")
 
-    stats = graph_data.get("stats", {})
-    print(
-        f"Nodes: {stats.get('total_nodes', 0)}  "
-        f"Edges: {stats.get('total_edges', 0)}  "
-        f"Total tokens: {stats.get('total_estimated_tokens', 0):,}"
-    )
-    top_token = stats.get("top_token_files", [])
-    if top_token:
-        print("Top token-heavy files:")
-        for path in top_token:
-            print(f"  {path}")
-    most_imported = stats.get("most_imported_files", [])
-    if most_imported:
-        print("Most imported files:")
-        for path in most_imported:
-            print(f"  {path}")
+    if fmt == "json":
+        print(_json_mod.dumps(graph_data, indent=2, default=str))
+    else:
+        print(f"Wrote graph JSON:     {json_path}")
+        print(f"Wrote graph Markdown: {md_path}")
+        stats = graph_data.get("stats", {})
+        print(
+            f"Nodes: {stats.get('total_nodes', 0)}  "
+            f"Edges: {stats.get('total_edges', 0)}  "
+            f"Total tokens: {stats.get('total_estimated_tokens', 0):,}"
+        )
+        top_token = stats.get("top_token_files", [])
+        if top_token:
+            print("Top token-heavy files:")
+            for path in top_token:
+                print(f"  {path}")
+        most_imported = stats.get("most_imported_files", [])
+        if most_imported:
+            print("Most imported files:")
+            for path in most_imported:
+                print(f"  {path}")
 
     if args.html:
         html_str = engine.visualize_html(
@@ -1031,7 +1054,8 @@ def cmd_visualize(args: argparse.Namespace) -> int:
         )
         html_path = Path(f"{base}.html")
         html_path.write_text(html_str, encoding="utf-8")
-        print(f"Wrote graph HTML: {html_path}")
+        if fmt != "json":
+            print(f"Wrote graph HTML: {html_path}")
 
     return 0
 
@@ -1040,7 +1064,19 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
     from contextbudget.core.dashboard import build_dashboard_data, serve_dashboard
 
     scan_paths = [Path(p) for p in args.paths] if args.paths else [Path(".")]
+    fmt = getattr(args, "format", "human")
+    export = getattr(args, "export", False)
     data = build_dashboard_data(scan_paths)
+
+    if fmt == "json" or export:
+        if export:
+            export_path = Path(args.out_prefix or "contextbudget-dashboard") .with_suffix(".json")
+            write_json(export_path, data)
+            if fmt != "json":
+                print(f"Wrote dashboard JSON: {export_path}")
+        if fmt == "json":
+            print(_json_mod.dumps(data, indent=2, default=str))
+        return 0
 
     s = data["summary"]
     print(
@@ -1179,7 +1215,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     simulate_agent = sub.add_parser(
         "simulate-agent",
-        help="Simulate agent workflow token costs step by step before execution",
+        help="Estimate token costs and USD spend for a multi-step agent workflow before execution",
     )
     simulate_agent.add_argument("task", help="Task description")
     simulate_agent.add_argument("--repo", default=".", help="Repository path")
@@ -1247,6 +1283,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
     )
+    simulate_agent.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable summary, json to print raw JSON to stdout.",
+    )
     simulate_agent.set_defaults(func=cmd_simulate_agent)
 
     pack = sub.add_parser("pack", help="Build compressed context under token budget")
@@ -1300,11 +1342,17 @@ def build_parser() -> argparse.ArgumentParser:
 
     read_profiler = sub.add_parser(
         "read-profiler",
-        help="Analyze how a coding agent read repository files in a pack run",
+        help="Detect duplicate and unnecessary file reads in a pack run and quantify wasted tokens",
     )
-    read_profiler.add_argument("run_json", help="Path to run JSON produced by pack")
+    read_profiler.add_argument("run_json", help="Path to run JSON artifact produced by pack")
     read_profiler.add_argument(
         "--out-prefix", help="Output file prefix for read-profile JSON/Markdown"
+    )
+    read_profiler.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable report, json to print raw JSON to stdout.",
     )
     read_profiler.set_defaults(func=cmd_read_profiler)
 
@@ -1352,7 +1400,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     dataset = sub.add_parser(
         "dataset",
-        help="Build a benchmark dataset from a TOML task list and export token reduction metrics",
+        help="Build a reproducible benchmark dataset from a TOML task list and export token reduction metrics",
     )
     dataset.add_argument("tasks_toml", help="Path to TOML file containing [[tasks]] entries")
     dataset.add_argument("--repo", default=".", help="Repository path to benchmark against")
@@ -1360,6 +1408,12 @@ def build_parser() -> argparse.ArgumentParser:
     dataset.add_argument("--top-files", type=int, default=None, help="Top-files limit forwarded to each benchmark run")
     dataset.add_argument("--config", help="Optional path to config TOML (default: <repo>/contextbudget.toml)")
     dataset.add_argument("--out-prefix", default="contextbudget-dataset", help="Output file prefix for dataset JSON/Markdown")
+    dataset.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable summary, json to print raw JSON to stdout.",
+    )
     dataset.set_defaults(func=cmd_dataset)
 
     build_dataset = sub.add_parser(
@@ -1438,7 +1492,10 @@ def build_parser() -> argparse.ArgumentParser:
 
     advise = sub.add_parser(
         "advise",
-        help="Analyse a repository and suggest architecture changes to reduce context size",
+        help=(
+            "Scan a repository's import graph and suggest architecture improvements "
+            "to reduce context bloat (split large files, extract modules, reduce dependencies)"
+        ),
     )
     advise.add_argument("--repo", default=".", help="Repository path")
     advise.add_argument(
@@ -1489,11 +1546,20 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
     )
+    advise.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable suggestions, json to print raw JSON to stdout.",
+    )
     advise.set_defaults(func=cmd_advise)
 
     visualize = sub.add_parser(
         "visualize",
-        help="Build and export a repository dependency graph annotated with token usage",
+        help=(
+            "Build and export a repository dependency graph annotated with token counts "
+            "and historical inclusion frequency"
+        ),
     )
     visualize.add_argument("--repo", default=".", help="Repository path")
     visualize.add_argument(
@@ -1513,17 +1579,23 @@ def build_parser() -> argparse.ArgumentParser:
     visualize.add_argument(
         "--out-prefix",
         default="contextbudget-graph",
-        help="Output file prefix for graph JSON (and optional HTML).",
+        help="Output file prefix for graph JSON, Markdown, and optional HTML.",
     )
     visualize.add_argument(
         "--config",
         help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
     )
+    visualize.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable summary, json to print raw JSON to stdout.",
+    )
     visualize.set_defaults(func=cmd_visualize)
 
     dashboard = sub.add_parser(
         "dashboard",
-        help="Start a local web dashboard for visual context analytics",
+        help="Start a local web UI to browse and compare all run artifacts interactively",
     )
     dashboard.add_argument(
         "paths",
@@ -1544,6 +1616,22 @@ def build_parser() -> argparse.ArgumentParser:
         "--no-open",
         action="store_true",
         help="Do not automatically open the browser.",
+    )
+    dashboard.add_argument(
+        "--export",
+        action="store_true",
+        help="Export dashboard data as JSON and exit without starting the server.",
+    )
+    dashboard.add_argument(
+        "--out-prefix",
+        default="contextbudget-dashboard",
+        help="Output file prefix for --export mode (default: contextbudget-dashboard).",
+    )
+    dashboard.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) starts the server, json prints dashboard data to stdout.",
     )
     dashboard.set_defaults(func=cmd_dashboard)
 
@@ -1601,7 +1689,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     drift = sub.add_parser(
         "drift",
-        help="Detect context size drift over historical pack runs",
+        help="Detect and alert on token usage growth trends across historical pack runs",
     )
     drift.add_argument(
         "--repo",
@@ -1630,11 +1718,17 @@ def build_parser() -> argparse.ArgumentParser:
         default="contextbudget-drift",
         help="Output file prefix for drift JSON/Markdown.",
     )
+    drift.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable alert summary, json to print raw JSON to stdout.",
+    )
     drift.set_defaults(func=cmd_drift)
 
     observe = sub.add_parser(
         "observe",
-        help="Analyze an agent run artifact and record observability metrics",
+        help="Extract and store observability metrics from a pack run artifact",
     )
     observe.add_argument(
         "run_json",
@@ -1662,6 +1756,12 @@ def build_parser() -> argparse.ArgumentParser:
         "--export-history",
         action="store_true",
         help="Export the full metrics store history to a JSON file.",
+    )
+    observe.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable metrics report, json to print raw JSON to stdout.",
     )
     observe.set_defaults(func=cmd_observe)
 
