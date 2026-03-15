@@ -344,12 +344,128 @@
 
     .footer-right { font-size: 13px; color: var(--w30); }
 
+    /* ── CALCULATOR ───────────────────────── */
+    #calculator {
+      background: linear-gradient(160deg, #0f0020 0%, #080010 100%);
+      border-top: 1px solid var(--w10);
+    }
+
+    .calc-wrap {
+      display: grid; grid-template-columns: 1fr 1fr;
+      gap: 60px; margin-top: 56px; max-width: 960px;
+      align-items: start;
+    }
+
+    .calc-field { margin-bottom: 32px; }
+    .calc-field:last-child { margin-bottom: 0; }
+
+    .calc-field-header {
+      display: flex; justify-content: space-between; align-items: baseline;
+      margin-bottom: 12px;
+    }
+
+    .calc-field label {
+      font-size: 13px; font-weight: 700;
+      letter-spacing: .06em; text-transform: uppercase;
+      color: var(--w30);
+      display: block; margin-bottom: 12px;
+    }
+
+    .calc-field-header label { margin-bottom: 0; }
+
+    .calc-val {
+      font-size: 15px; font-weight: 800;
+      color: var(--white); letter-spacing: -.02em;
+    }
+
+    input[type=range] {
+      -webkit-appearance: none; appearance: none;
+      width: 100%; height: 2px;
+      background: rgba(255,255,255,.15);
+      border-radius: 2px; outline: none; cursor: pointer;
+    }
+    input[type=range]::-webkit-slider-thumb {
+      -webkit-appearance: none; appearance: none;
+      width: 18px; height: 18px; border-radius: 50%;
+      background: var(--white); cursor: pointer;
+      box-shadow: 0 0 0 3px rgba(255,255,255,.1);
+      transition: box-shadow .15s;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      box-shadow: 0 0 0 5px rgba(255,255,255,.15);
+    }
+
+    .calc-range-labels {
+      display: flex; justify-content: space-between;
+      font-size: 11px; color: var(--w30); margin-top: 8px;
+    }
+
+    select#select-model {
+      font-family: inherit; font-size: 14px; font-weight: 400;
+      color: var(--white);
+      background: rgba(255,255,255,.06);
+      border: 1px solid rgba(255,255,255,.12);
+      padding: 12px 16px; border-radius: 8px;
+      width: 100%; outline: none; cursor: pointer;
+      appearance: none; -webkit-appearance: none;
+      background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='rgba(255,255,255,0.4)' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
+      background-repeat: no-repeat;
+      background-position: right 14px center;
+    }
+    select#select-model option { background: #1a0028; color: var(--white); }
+
+    .calc-results { display: flex; flex-direction: column; gap: 16px; }
+
+    .calc-result-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+    .calc-result-card {
+      padding: 28px 24px; border-radius: 14px;
+      border: 1px solid var(--w10);
+    }
+    .calc-result-card.dimmed  { background: rgba(255,255,255,.03); }
+    .calc-result-card.highlight { background: rgba(255,255,255,.05); border-color: rgba(255,255,255,.15); }
+
+    .calc-result-label {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: var(--w30); margin-bottom: 12px;
+    }
+
+    .calc-result-num {
+      font-size: 36px; font-weight: 800;
+      letter-spacing: -.04em; line-height: 1;
+      margin-bottom: 6px;
+    }
+    .calc-result-num.red { color: #ff2f42; }
+
+    .calc-result-sub { font-size: 12px; color: var(--w30); }
+
+    .calc-savings-box {
+      padding: 28px 24px; border-radius: 14px;
+      background: rgba(212,0,18,.12);
+      border: 1px solid rgba(212,0,18,.3);
+    }
+
+    .calc-savings-label {
+      font-size: 11px; font-weight: 700;
+      letter-spacing: .12em; text-transform: uppercase;
+      color: rgba(255,80,80,.7); margin-bottom: 10px;
+    }
+
+    .calc-savings-num {
+      font-size: 42px; font-weight: 800;
+      letter-spacing: -.04em; line-height: 1;
+      color: var(--white); margin-bottom: 6px;
+    }
+
+    .calc-savings-year { font-size: 14px; color: rgba(255,255,255,.5); }
+
     /* ── RESPONSIVE ───────────────────────── */
     @media (max-width: 860px) {
       nav      { padding: 20px 24px; }
       section, #hero, #cta { padding: 80px 24px; }
       footer   { padding: 24px; flex-direction: column; gap: 14px; align-items: flex-start; }
-      .cards, .solution-grid { grid-template-columns: 1fr; gap: 20px; }
+      .cards, .solution-grid, .calc-wrap, .calc-result-row { grid-template-columns: 1fr; gap: 20px; }
       .nav-links { display: none; }
     }
   </style>
@@ -549,6 +665,68 @@
 </section>
 
 
+<!-- ── CALCULATOR ── -->
+<section id="calculator">
+  <p class="label">Savings calculator</p>
+  <h2 class="h2">How much will<br>you save?</h2>
+
+  <div class="calc-wrap">
+    <div class="calc-inputs">
+
+      <div class="calc-field">
+        <div class="calc-field-header">
+          <label>Agent calls per day</label>
+          <span class="calc-val" id="val-calls">500</span>
+        </div>
+        <input type="range" min="10" max="5000" step="10" value="500" id="slider-calls">
+        <div class="calc-range-labels"><span>10</span><span>5,000</span></div>
+      </div>
+
+      <div class="calc-field">
+        <div class="calc-field-header">
+          <label>Average context size</label>
+          <span class="calc-val" id="val-ctx">50k tokens</span>
+        </div>
+        <input type="range" min="10000" max="128000" step="1000" value="50000" id="slider-ctx">
+        <div class="calc-range-labels"><span>10k</span><span>128k</span></div>
+      </div>
+
+      <div class="calc-field">
+        <label>Model</label>
+        <select id="select-model">
+          <option value="3.00">Claude Sonnet 4.6 — $3.00 / 1M tokens</option>
+          <option value="15.00">Claude Opus 4.6 — $15.00 / 1M tokens</option>
+          <option value="0.25">Claude Haiku 4.5 — $0.25 / 1M tokens</option>
+          <option value="2.50">GPT-4o — $2.50 / 1M tokens</option>
+          <option value="0.15">GPT-4o mini — $0.15 / 1M tokens</option>
+        </select>
+      </div>
+
+    </div>
+
+    <div class="calc-results">
+      <div class="calc-result-row">
+        <div class="calc-result-card dimmed">
+          <div class="calc-result-label">Without Redcon</div>
+          <div class="calc-result-num" id="cost-before">$4,500</div>
+          <div class="calc-result-sub">per month</div>
+        </div>
+        <div class="calc-result-card highlight">
+          <div class="calc-result-label">With Redcon</div>
+          <div class="calc-result-num red" id="cost-after">$1,395</div>
+          <div class="calc-result-sub">per month</div>
+        </div>
+      </div>
+      <div class="calc-savings-box">
+        <div class="calc-savings-label">You save</div>
+        <div class="calc-savings-num" id="cost-saved">$3,105 / month</div>
+        <div class="calc-savings-year" id="cost-year">$37,260 per year</div>
+      </div>
+    </div>
+  </div>
+</section>
+
+
 <!-- ── CTA ── -->
 <section id="cta">
   <p class="label">Early access</p>
@@ -594,6 +772,38 @@
 
 
 <script>
+// ── SAVINGS CALCULATOR ──────────────────────────────────────────────────────
+const REDUCTION = 0.69; // average from benchmarks
+
+function fmt(n) {
+  if (n >= 1000) return '$' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';
+  return '$' + Math.round(n);
+}
+
+function calcUpdate() {
+  const calls   = +document.getElementById('slider-calls').value;
+  const ctx     = +document.getElementById('slider-ctx').value;
+  const price   = +document.getElementById('select-model').value;
+
+  document.getElementById('val-calls').textContent = calls.toLocaleString();
+  document.getElementById('val-ctx').textContent   = (ctx / 1000).toFixed(0) + 'k tokens';
+
+  const monthlyTokens  = calls * 30 * ctx;           // total input tokens/month
+  const costBefore     = (monthlyTokens / 1e6) * price;
+  const costAfter      = costBefore * (1 - REDUCTION);
+  const saved          = costBefore - costAfter;
+
+  document.getElementById('cost-before').textContent = fmt(costBefore);
+  document.getElementById('cost-after').textContent  = fmt(costAfter);
+  document.getElementById('cost-saved').textContent  = fmt(saved) + ' / month';
+  document.getElementById('cost-year').textContent   = fmt(saved * 12) + ' per year';
+}
+
+document.getElementById('slider-calls').addEventListener('input', calcUpdate);
+document.getElementById('slider-ctx').addEventListener('input', calcUpdate);
+document.getElementById('select-model').addEventListener('change', calcUpdate);
+calcUpdate();
+
 function handleSubmit(e) {
   e.preventDefault();
   const form  = e.target;
