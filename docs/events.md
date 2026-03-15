@@ -1,6 +1,6 @@
 # Usage Event Schemas
 
-ContextBudget emits structured usage events when telemetry is explicitly enabled. The default
+Redcon emits structured usage events when telemetry is explicitly enabled. The default
 behavior is fully local-first: no network calls are made by any built-in sink.
 
 ## Enable Telemetry
@@ -9,14 +9,14 @@ behavior is fully local-first: no network calls are made by any built-in sink.
 [telemetry]
 enabled = true
 sink    = "file"
-file_path = ".contextbudget/telemetry.jsonl"
+file_path = ".redcon/telemetry.jsonl"
 ```
 
 | Key | Default | Description |
 |-----|---------|-------------|
 | `enabled` | `false` | Must be `true` to emit any events |
 | `sink` | `"noop"` | `"noop"` drops all events; `"file"` / `"jsonl"` writes JSONL to disk |
-| `file_path` | `.contextbudget/telemetry.jsonl` | Destination for the `file` sink |
+| `file_path` | `.redcon/telemetry.jsonl` | Destination for the `file` sink |
 
 ## Privacy Model
 
@@ -331,7 +331,7 @@ versions concurrently:
 - Additive changes (new nullable fields) do not require a version bump.
 - Breaking changes (removed or renamed fields, changed semantics) must introduce a new version
   tag (e.g., `"v2"`) rather than modifying `v1` in place.
-- `EVENT_SCHEMA_VERSIONS` in `contextbudget/telemetry/schemas.py` is the authoritative map
+- `EVENT_SCHEMA_VERSIONS` in `redcon/telemetry/schemas.py` is the authoritative map
   from event name to version string.
 
 ## Stability Contract

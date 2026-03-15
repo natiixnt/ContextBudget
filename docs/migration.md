@@ -11,7 +11,7 @@ New optional entry points:
 - `--workspace <workspace.toml>` for `plan`, `pack`, and `benchmark`
 - `--config <path>` for loading an alternate config file
 
-New config areas that may appear in `contextbudget.toml` or workspace TOML:
+New config areas that may appear in `redcon.toml` or workspace TOML:
 
 - `[summarization]`
 - `[tokens]`
@@ -44,18 +44,18 @@ Consumers should ignore unknown keys rather than assuming a closed schema.
 Existing engine calls remain valid:
 
 ```python
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 run = engine.pack(task="refactor auth middleware", repo=".")
 ```
 
 New additive API surfaces:
 
 ```python
-from contextbudget import (
+from redcon import (
     AgentTaskRequest,
-    ContextBudgetMiddleware,
+    RedconMiddleware,
     LocalDemoAgentAdapter,
     prepare_context,
 )
@@ -65,7 +65,7 @@ result = prepare_context("update auth flow", workspace="workspace.toml")
 
 New public exports include:
 
-- `ContextBudgetMiddleware`
+- `RedconMiddleware`
 - `AgentTaskRequest`
 - `AgentMiddlewareResult`
 - `prepare_context(...)`
@@ -78,5 +78,5 @@ New public exports include:
 
 - keep existing single-repo automation unchanged
 - adopt workspace TOML only for cross-repo tasks
-- adopt middleware only when integrating ContextBudget into an agent loop
+- adopt middleware only when integrating Redcon into an agent loop
 - treat new artifact fields as additive metadata, not a breaking change

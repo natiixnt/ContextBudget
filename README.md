@@ -1,6 +1,6 @@
-# ContextBudget
+# Redcon
 
-ContextBudget selects, compresses, and budgets repository context for coding-agent workflows. It is deterministic, local-first, and built to produce machine-readable artifacts that can be reused in CI, local tooling, and agent middleware.
+Redcon selects, compresses, and budgets repository context for coding-agent workflows. It is deterministic, local-first, and built to produce machine-readable artifacts that can be reused in CI, local tooling, and agent middleware.
 
 ## What It Does
 
@@ -23,34 +23,34 @@ python3 -m pip install -e .[dev]
 python3 -m pip install -e .[tokenizers]
 
 # Rank likely-relevant files
-contextbudget plan "add caching to search API" --repo .
+redcon plan "add caching to search API" --repo .
 
 # Plan context across a multi-step agent workflow
-contextbudget plan-agent "refactor auth middleware" --repo .
+redcon plan-agent "refactor auth middleware" --repo .
 
 # Pack context for one repository
-contextbudget pack "refactor auth middleware" --repo . --max-tokens 30000
+redcon pack "refactor auth middleware" --repo . --max-tokens 30000
 
 # Pack context across multiple local repositories or packages
-contextbudget pack "update auth flow across services" --workspace workspace.toml
+redcon pack "update auth flow across services" --workspace workspace.toml
 
 # Summarize an existing run artifact
-contextbudget report run.json
+redcon report run.json
 
 # Compare two runs
-contextbudget diff old-run.json new-run.json
+redcon diff old-run.json new-run.json
 
 # Audit a pull request for context growth
-contextbudget pr-audit --repo . --base origin/main --head HEAD
+redcon pr-audit --repo . --base origin/main --head HEAD
 
 # Compare packing strategies
-contextbudget benchmark "add rate limiting to auth API" --repo .
+redcon benchmark "add rate limiting to auth API" --repo .
 
 # Aggregate historical token hotspots
-contextbudget heatmap .
+redcon heatmap .
 
 # Refresh scan state once without entering watch mode
-contextbudget watch --repo . --once
+redcon watch --repo . --once
 ```
 
 ## Workspaces
@@ -88,10 +88,10 @@ See [docs/workspace.md](docs/workspace.md) and the examples in [`examples/worksp
 
 ## Agent Middleware
 
-The middleware layer sits on top of `ContextBudgetEngine`; it does not duplicate packing logic. It prepares context, optionally enforces policy, and records additive metadata for agent loops.
+The middleware layer sits on top of `RedconEngine`; it does not duplicate packing logic. It prepares context, optionally enforces policy, and records additive metadata for agent loops.
 
 ```python
-from contextbudget import ContextBudgetEngine, enforce_budget, prepare_context, record_run
+from redcon import RedconEngine, enforce_budget, prepare_context, record_run
 
 result = prepare_context(
     "update auth flow across services",
@@ -100,7 +100,7 @@ result = prepare_context(
     metadata={"agent": "local-demo"},
 )
 
-policy = ContextBudgetEngine.make_policy(
+policy = RedconEngine.make_policy(
     max_estimated_input_tokens=28000,
     max_quality_risk_level="medium",
 )
@@ -113,7 +113,7 @@ record_run(checked, "agent-run.json")
 
 ## Extension Points
 
-ContextBudget stays deterministic by default but exposes explicit hooks for local extensions:
+Redcon stays deterministic by default but exposes explicit hooks for local extensions:
 
 - scorer plugins
 - compressor plugins
@@ -131,7 +131,7 @@ Recent additions are additive rather than disruptive:
 - existing single-repo CLI flows stay unchanged
 - multi-repo analysis is opt-in through `--workspace <workspace.toml>` or `workspace=...`
 - workspace TOML files can carry shared config plus `[[repos]]` entries
-- the public Python API now exports `ContextBudgetMiddleware`, `AgentTaskRequest`, `prepare_context(...)`, `enforce_budget(...)`, `record_run(...)`, and `LocalDemoAgentAdapter`
+- the public Python API now exports `RedconMiddleware`, `AgentTaskRequest`, `prepare_context(...)`, `enforce_budget(...)`, `record_run(...)`, and `LocalDemoAgentAdapter`
 - machine-readable artifacts can now include `workspace`, `scanned_repos`, `selected_repos`, `implementations`, `token_estimator`, `summarizer`, and `agent_middleware`
 
 Detailed upgrade notes: [docs/migration.md](docs/migration.md).

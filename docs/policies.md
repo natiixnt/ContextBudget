@@ -18,7 +18,7 @@ All fields are optional. An empty `spec` object `{}` creates a version that pass
 
 ```http
 POST /orgs/1/policies
-Authorization: Bearer cbk_...
+Authorization: Bearer rck_...
 Content-Type: application/json
 
 {
@@ -52,7 +52,7 @@ Newly created versions are inactive until explicitly activated.
 
 ```http
 PUT /orgs/1/policies/20/activate
-Authorization: Bearer cbk_...
+Authorization: Bearer rck_...
 ```
 
 Activation is atomic: all other active versions at the same scope are deactivated before the requested version becomes active.
@@ -81,7 +81,7 @@ To create a repo-scoped policy:
 
 ```http
 GET /orgs/1/policies
-Authorization: Bearer cbk_...
+Authorization: Bearer rck_...
 ```
 
 Returns all versions (active and inactive) ordered by `created_at DESC`.
@@ -90,7 +90,7 @@ Returns all versions (active and inactive) ordered by `created_at DESC`.
 
 ```http
 GET /policies/active?org_id=1&repo_id=100
-Authorization: Bearer cbk_...
+Authorization: Bearer rck_...
 ```
 
 Returns the active `PolicyVersionResponse` for the given scope, or `null` if no active policy exists.
@@ -100,19 +100,19 @@ Returns the active `PolicyVersionResponse` for the given scope, or `null` if no 
 Set these environment variables on the runtime gateway to enable remote policy fetching:
 
 ```bash
-export CB_GATEWAY_CLOUD_POLICY_URL=https://cloud.example.com
-export CB_GATEWAY_CLOUD_API_KEY=cbk_...
-export CB_GATEWAY_CLOUD_ORG_ID=1
+export RC_GATEWAY_CLOUD_POLICY_URL=https://cloud.example.com
+export RC_GATEWAY_CLOUD_API_KEY=rck_...
+export RC_GATEWAY_CLOUD_ORG_ID=1
 ```
 
 Or in Python:
 
 ```python
-from contextbudget.gateway import GatewayConfig, GatewayServer
+from redcon.gateway import GatewayConfig, GatewayServer
 
 server = GatewayServer(GatewayConfig(
     cloud_policy_url="https://cloud.example.com",
-    cloud_api_key="cbk_...",
+    cloud_api_key="rck_...",
     cloud_policy_org_id=1,
 ))
 server.start()
@@ -123,14 +123,14 @@ When configured, the gateway fetches the active policy from the control plane be
 ## Policy in Python API
 
 ```python
-from contextbudget.core.policy import PolicySpec
-from contextbudget.engine import ContextBudgetEngine
+from redcon.core.policy import PolicySpec
+from redcon.engine import RedconEngine
 
 policy = PolicySpec(
     max_estimated_input_tokens=64_000,
     max_quality_risk_level="medium",
 )
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 engine.make_policy(
     max_estimated_input_tokens=64_000,
     max_quality_risk_level="medium",

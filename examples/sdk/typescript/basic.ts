@@ -1,5 +1,5 @@
 /**
- * Basic ContextBudget TypeScript SDK usage.
+ * Basic Redcon TypeScript SDK usage.
  *
  * Demonstrates all three primary SDK entry points:
  *
@@ -8,19 +8,19 @@
  *   profileRun      — pack and return compression profiling metrics
  *
  * Prerequisites:
- *   pip install contextbudget   (or: pip install -e . from repo root)
+ *   pip install redcon   (or: pip install -e . from repo root)
  *   npm install                 (from this directory)
  *
  * Run:
  *   npx ts-node basic.ts
  */
 
-import { ContextBudgetSDK } from "./contextbudget-sdk";
+import { RedconSDK } from "./redcon-sdk";
 
 const TASK = "add Redis caching to the session store";
 const REPO = "examples/small-feature/repo";
 
-const sdk = new ContextBudgetSDK({ maxTokens: 30_000 });
+const sdk = new RedconSDK({ maxTokens: 30_000 });
 
 // -----------------------------------------------------------------------
 // 1. simulateAgent — check token and cost estimates before packing

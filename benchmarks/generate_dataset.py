@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Benchmark dataset generator for ContextBudget.
+"""Benchmark dataset generator for Redcon.
 
 Demonstrates token reduction on real coding tasks by running baseline context
 selection vs optimised context selection and storing the delta.
@@ -31,13 +31,13 @@ from pathlib import Path
 _repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_repo_root))
 
-from contextbudget import ContextBudgetEngine  # noqa: E402
-from contextbudget.core.context_dataset_builder import (  # noqa: E402
+from redcon import RedconEngine  # noqa: E402
+from redcon.core.context_dataset_builder import (  # noqa: E402
     BUILTIN_TASKS,
     build_context_dataset,
     context_dataset_as_dict,
 )
-from contextbudget.core.dataset import DatasetTask  # noqa: E402
+from redcon.core.dataset import DatasetTask  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -79,7 +79,7 @@ def _render_markdown(report_dict: dict) -> str:
     lines: list[str] = [
         "# Benchmark Dataset: Token Reduction Report",
         "",
-        "Reproducible evidence of token savings when using ContextBudget's optimised "
+        "Reproducible evidence of token savings when using Redcon's optimised "
         "context selection versus naive full-repository context.",
         "",
         "## Settings",
@@ -135,7 +135,7 @@ def _render_markdown(report_dict: dict) -> str:
             f"> {task_desc}",
             "",
             f"- **Baseline:** {baseline:,} tokens (full repo, no selection)",
-            f"- **Optimized:** {optimized:,} tokens (ContextBudget compressed pack)",
+            f"- **Optimized:** {optimized:,} tokens (Redcon compressed pack)",
             f"- **Saved:** {saved:,} tokens ({_pct(reduction)} reduction)",
             "",
         ]
@@ -166,7 +166,7 @@ def _render_markdown(report_dict: dict) -> str:
 
 def _clear_cache(dataset_dir: Path) -> None:
     """Remove the summary cache so the first run measures cold-cache performance."""
-    cache_file = dataset_dir / ".contextbudget_cache.json"
+    cache_file = dataset_dir / ".redcon_cache.json"
     if cache_file.exists():
         cache_file.unlink()
 
@@ -183,9 +183,9 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     _clear_cache(DATASET_DIR)
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
 
-    print("ContextBudget benchmark dataset generator")
+    print("Redcon benchmark dataset generator")
     print(f"  dataset : {DATASET_DIR}")
     print(f"  output  : {OUT_DIR}")
     print(f"  budget  : {MAX_TOKENS:,} tokens, top {TOP_FILES} files")

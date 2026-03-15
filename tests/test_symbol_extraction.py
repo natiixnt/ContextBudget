@@ -4,10 +4,10 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget.compressors import context_compressor
-from contextbudget.compressors.symbols import select_symbol_aware_chunks
-from contextbudget.config import CompressionSettings, ContextBudgetConfig
-from contextbudget.core.pipeline import as_json_dict, run_pack
+from redcon.compressors import context_compressor
+from redcon.compressors.symbols import select_symbol_aware_chunks
+from redcon.config import CompressionSettings, RedconConfig
+from redcon.core.pipeline import as_json_dict, run_pack
 
 
 def _write(path: Path, content: str) -> None:
@@ -125,7 +125,7 @@ def helper() -> None:
         + "\n",
     )
 
-    cfg = ContextBudgetConfig(
+    cfg = RedconConfig(
         compression=CompressionSettings(
             full_file_threshold_tokens=1,
             snippet_score_threshold=0,
@@ -171,7 +171,7 @@ def helper() -> None:
 
     monkeypatch.setattr(context_compressor, "select_symbol_aware_chunks", _raise_symbol_error)
 
-    cfg = ContextBudgetConfig(
+    cfg = RedconConfig(
         compression=CompressionSettings(
             full_file_threshold_tokens=1,
             snippet_score_threshold=0,
@@ -209,14 +209,14 @@ class AuthService:
         ),
     )
 
-    full_cfg = ContextBudgetConfig(
+    full_cfg = RedconConfig(
         compression=CompressionSettings(
             full_file_threshold_tokens=100_000,
             snippet_score_threshold=0,
             symbol_extraction_enabled=True,
         )
     )
-    symbol_cfg = ContextBudgetConfig(
+    symbol_cfg = RedconConfig(
         compression=CompressionSettings(
             full_file_threshold_tokens=1,
             snippet_score_threshold=0,

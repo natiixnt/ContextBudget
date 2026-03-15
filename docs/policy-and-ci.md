@@ -5,7 +5,7 @@
 Use strict mode when agent context quality must be gated.
 
 ```bash
-contextbudget pack "tighten auth middleware token validation" \
+redcon pack "tighten auth middleware token validation" \
   --repo . \
   --strict \
   --policy examples/policy.toml
@@ -20,8 +20,8 @@ Supported checks:
 ## Existing GitHub Action
 
 This repository includes:
-- `.github/workflows/contextbudget.yml`
-- `.github/contextbudget-policy.toml`
+- `.github/workflows/redcon.yml`
+- `.github/redcon-policy.toml`
 
 The workflow can run in pull requests or `workflow_dispatch`, produce Markdown summaries, upload artifacts, and fail on strict policy violations.
 

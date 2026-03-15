@@ -5,7 +5,7 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget.core.heatmap import build_heatmap_report
+from redcon.core.heatmap import build_heatmap_report
 
 
 def _write(path: Path, content: str) -> None:

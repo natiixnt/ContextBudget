@@ -21,7 +21,7 @@ const EMPTY: Record<string, unknown> = {
 };
 
 export async function GET() {
-  const apiUrl = process.env.CONTEXTBUDGET_API_URL ?? "http://localhost:7842";
+  const apiUrl = process.env.REDCON_API_URL ?? "http://localhost:7842";
   try {
     const res = await fetch(`${apiUrl}/api/data`, {
       next: { revalidate: 15 },

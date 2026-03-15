@@ -1,5 +1,5 @@
 /**
- * Shared type definitions for the ContextBudget SDK.
+ * Shared type definitions for the Redcon SDK.
  */
 
 // ── Cloud API types ──────────────────────────────────────────────────────────
@@ -265,16 +265,16 @@ export interface ReportRunResponse {
 // ── SDK options ───────────────────────────────────────────────────────────────
 
 export interface CloudClientOptions {
-  /** Base URL of the contextbudget-cloud service, e.g. https://cloud.example.com */
+  /** Base URL of the redcon-cloud service, e.g. https://cloud.example.com */
   baseUrl: string;
-  /** Bearer API key (cbk_...) */
+  /** Bearer API key (rck_...) */
   apiKey: string;
   /** Request timeout in milliseconds (default: 30000) */
   timeoutMs?: number;
 }
 
 export interface GatewayClientOptions {
-  /** Base URL of the contextbudget gateway, e.g. http://localhost:8787 */
+  /** Base URL of the redcon gateway, e.g. http://localhost:8787 */
   baseUrl: string;
   /** Optional Bearer API key when gateway auth is enabled */
   apiKey?: string;

@@ -11,9 +11,9 @@ from http.server import HTTPServer
 
 import pytest
 
-from contextbudget.control_plane.models import AgentRun, Organization, Project, Repository
-from contextbudget.control_plane.server import _Handler
-from contextbudget.control_plane.store import ControlPlaneStore
+from redcon.control_plane.models import AgentRun, Organization, Project, Repository
+from redcon.control_plane.server import _Handler
+from redcon.control_plane.store import ControlPlaneStore
 
 
 # ---------------------------------------------------------------------------

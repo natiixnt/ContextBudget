@@ -1,6 +1,6 @@
 # Cost Analytics
 
-The cost analytics API compares the token cost of running ContextBudget (optimized) against what a naive full-context approach would cost (baseline). All queries are against the `events` table populated by telemetry from the runtime.
+The cost analytics API compares the token cost of running Redcon (optimized) against what a naive full-context approach would cost (baseline). All queries are against the `events` table populated by telemetry from the runtime.
 
 ## Concepts
 
@@ -31,7 +31,7 @@ Overall cost summary with optional filtering.
 
 ```bash
 curl "https://cloud.example.com/analytics/cost?from_date=2026-03-01T00:00:00Z" \
-     -H "Authorization: Bearer cbk_..."
+     -H "Authorization: Bearer rck_..."
 ```
 
 **Response:**
@@ -54,7 +54,7 @@ Cost breakdown grouped by repository.
 
 ```bash
 curl "https://cloud.example.com/analytics/cost/by-repo" \
-     -H "Authorization: Bearer cbk_..."
+     -H "Authorization: Bearer rck_..."
 ```
 
 Response:
@@ -84,7 +84,7 @@ Daily cost breakdown, newest days first.
 
 ```bash
 curl "https://cloud.example.com/analytics/cost/by-date?from_date=2026-03-01T00:00:00Z" \
-     -H "Authorization: Bearer cbk_..."
+     -H "Authorization: Bearer rck_..."
 ```
 
 Response:
@@ -111,7 +111,7 @@ Response:
 Use the pricing module to estimate dollar costs from token counts:
 
 ```python
-from contextbudget.telemetry.pricing import tokens_to_usd, get_pricing
+from redcon.telemetry.pricing import tokens_to_usd, get_pricing
 
 pricing = get_pricing("claude-sonnet-4-6")
 
@@ -125,7 +125,7 @@ print(f"Saved ${saved_usd:.4f} on this run")
 Or use the high-level helper:
 
 ```python
-from contextbudget.telemetry.pricing import compute_run_costs
+from redcon.telemetry.pricing import compute_run_costs
 
 costs = compute_run_costs(
     model="claude-sonnet-4-6",

@@ -1,7 +1,7 @@
-# ContextBudget Summary Report
+# Redcon Summary Report
 
 Task: tighten auth middleware token validation
-Repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo
+Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/risky-auth-change/repo
 Generated at: 2026-03-12T19:59:47.457540+00:00
 
 - Estimated input tokens: 85

@@ -1,15 +1,15 @@
 # Agent integrations
 
-`contextbudget.integrations` provides production-ready wrappers that slot
-ContextBudget into the call path between a coding agent and the downstream LLM.
+`redcon.integrations` provides production-ready wrappers that slot
+Redcon into the call path between a coding agent and the downstream LLM.
 
 Every wrapper:
 
 1. **Intercepts** the task description and repository path.
-2. **Optimises** context via the full ContextBudget pipeline (scan → rank →
+2. **Optimises** context via the full Redcon pipeline (scan → rank →
    compress → cache → delta).
 3. **Calls** the model API with the packed prompt.
-4. **Emits** run telemetry to `.contextbudget/observe-history.json`.
+4. **Emits** run telemetry to `.redcon/observe-history.json`.
 
 ---
 
@@ -26,7 +26,7 @@ pip install openai
 ### Basic usage
 
 ```python
-from contextbudget.integrations import OpenAIAgentWrapper
+from redcon.integrations import OpenAIAgentWrapper
 
 agent = OpenAIAgentWrapper(
     model="gpt-4.1",
@@ -52,23 +52,23 @@ print(f"tokens saved: {result.prepared_context.tokens_saved}")
 | `policy` | `PolicySpec \| None` | `None` | Budget policy to enforce |
 | `strict` | `bool` | `False` | Raise on policy violations |
 | `delta` | `bool` | `True` | Enable incremental delta context |
-| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `config_path` | `str \| Path \| None` | `None` | Path to `redcon.toml` |
 | `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
-| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `engine` | `RedconEngine \| None` | `None` | Reuse an existing engine |
 | `openai_client` | `openai.OpenAI \| None` | `None` | Pre-constructed client |
 | `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
 
 ### With a policy
 
 ```python
-from contextbudget.integrations import OpenAIAgentWrapper
-from contextbudget.engine import ContextBudgetEngine
+from redcon.integrations import OpenAIAgentWrapper
+from redcon.engine import RedconEngine
 
 agent = OpenAIAgentWrapper(
     model="gpt-4.1",
     repo=".",
     max_tokens=32_000,
-    policy=ContextBudgetEngine.make_policy(
+    policy=RedconEngine.make_policy(
         max_estimated_input_tokens=32_000,
         max_quality_risk_level="medium",
     ),
@@ -108,7 +108,7 @@ pip install anthropic
 ### Basic usage
 
 ```python
-from contextbudget.integrations import AnthropicAgentWrapper
+from redcon.integrations import AnthropicAgentWrapper
 
 agent = AnthropicAgentWrapper(
     model="claude-sonnet-4-6",
@@ -132,16 +132,16 @@ print(result.llm_response)
 | `policy` | `PolicySpec \| None` | `None` | Budget policy to enforce |
 | `strict` | `bool` | `False` | Raise on policy violations |
 | `delta` | `bool` | `True` | Enable incremental delta context |
-| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `config_path` | `str \| Path \| None` | `None` | Path to `redcon.toml` |
 | `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
-| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `engine` | `RedconEngine \| None` | `None` | Reuse an existing engine |
 | `anthropic_client` | `anthropic.Anthropic \| None` | `None` | Pre-constructed client |
 | `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
 
 ### With a system prompt
 
 ```python
-from contextbudget.integrations import AnthropicAgentWrapper
+from redcon.integrations import AnthropicAgentWrapper
 
 agent = AnthropicAgentWrapper(
     model="claude-opus-4-6",
@@ -168,7 +168,7 @@ provider not covered by the first-party wrappers.
 ### Basic usage
 
 ```python
-from contextbudget.integrations import GenericAgentRunner
+from redcon.integrations import GenericAgentRunner
 
 def my_llm(prompt: str) -> str:
     # call any model you like
@@ -191,16 +191,16 @@ print(result.llm_response)
 | `policy` | `PolicySpec \| None` | `None` | Budget policy to enforce |
 | `strict` | `bool` | `False` | Raise on policy violations |
 | `delta` | `bool` | `True` | Enable incremental delta context |
-| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `config_path` | `str \| Path \| None` | `None` | Path to `redcon.toml` |
 | `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
-| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `engine` | `RedconEngine \| None` | `None` | Reuse an existing engine |
 | `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
 
 ### Example: local Ollama model
 
 ```python
 import requests
-from contextbudget.integrations import GenericAgentRunner
+from redcon.integrations import GenericAgentRunner
 
 def ollama_llm(prompt: str) -> str:
     response = requests.post(
@@ -253,7 +253,7 @@ All three wrappers return a
 
 ## Telemetry
 
-Each `run_task` call appends an entry to `.contextbudget/observe-history.json`
+Each `run_task` call appends an entry to `.redcon/observe-history.json`
 (capped at 500 entries).  The entry schema:
 
 ```json
@@ -284,7 +284,7 @@ Each `run_task` call appends an entry to `.contextbudget/observe-history.json`
 Read history programmatically:
 
 ```python
-from contextbudget.telemetry.store import load_observe_history
+from redcon.telemetry.store import load_observe_history
 
 entries = load_observe_history(base_dir=".")
 for entry in entries:
@@ -296,7 +296,7 @@ for entry in entries:
 ## NodeJSAgentRunner
 
 A runner that passes the optimised context prompt to a **Node.js script** via
-stdin and reads the LLM response from stdout.  Use this to plug ContextBudget
+stdin and reads the LLM response from stdout.  Use this to plug Redcon
 into any Node.js agent loop — LangChain.js, Vercel AI SDK, OpenAI Node SDK,
 or custom scripts — without writing Python.
 
@@ -329,7 +329,7 @@ process.stdout.write(response.choices[0].message.content);
 ### Basic usage
 
 ```python
-from contextbudget.integrations import NodeJSAgentRunner
+from redcon.integrations import NodeJSAgentRunner
 
 runner = NodeJSAgentRunner(
     script="./agent.js",
@@ -370,9 +370,9 @@ result = runner.run_task("refactor auth middleware")
 | `delta` | `bool` | `True` | Enable incremental delta context |
 | `timeout` | `float \| None` | `None` | Seconds to wait for the script |
 | `env` | `dict[str, str] \| None` | `None` | Extra environment variables for the script |
-| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `config_path` | `str \| Path \| None` | `None` | Path to `redcon.toml` |
 | `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
-| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `engine` | `RedconEngine \| None` | `None` | Reuse an existing engine |
 | `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
 
 ### Passing environment variables
@@ -428,9 +428,9 @@ process.stdout.write(text);
 
 All wrappers delegate to
 [`AgentRuntime`](agent-runtime.md), which is the canonical
-`agent → ContextBudget → LLM` entry point.  Any feature supported by
+`agent → Redcon → LLM` entry point.  Any feature supported by
 `AgentRuntime` — policies, delta context, custom engines, session replay — is
 available through the integration wrappers.
 
 To compose with the lower-level middleware directly, see
-[`ContextBudgetMiddleware`](agent-integration.md).
+[`RedconMiddleware`](agent-integration.md).

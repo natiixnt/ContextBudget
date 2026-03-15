@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget.config import load_config
-from contextbudget.core.pipeline import as_json_dict, run_pack
-from contextbudget.plugins import resolve_plugins
+from redcon.config import load_config
+from redcon.core.pipeline import as_json_dict, run_pack
+from redcon.plugins import resolve_plugins
 
 
 def _write(path: Path, content: str) -> None:
@@ -14,18 +14,18 @@ def _write(path: Path, content: str) -> None:
 
 def test_plugin_discovery_loads_explicit_registrations(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [plugins]
 scorer = "example.path_glob_bonus"
 compressor = "example.leading_summary"
 
 [[plugins.registrations]]
-target = "contextbudget.plugins.examples:path_glob_bonus_scorer"
+target = "redcon.plugins.examples:path_glob_bonus_scorer"
 options = { path_patterns = ["docs/**"], bonus = 8.0 }
 
 [[plugins.registrations]]
-target = "contextbudget.plugins.examples:leading_summary_compressor"
+target = "redcon.plugins.examples:leading_summary_compressor"
 options = { preview_lines = 2 }
 """.strip(),
     )
@@ -42,18 +42,18 @@ options = { preview_lines = 2 }
 
 def test_plugins_execute_when_selected_in_config(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [plugins]
 scorer = "example.path_glob_bonus"
 compressor = "example.leading_summary"
 
 [[plugins.registrations]]
-target = "contextbudget.plugins.examples:path_glob_bonus_scorer"
+target = "redcon.plugins.examples:path_glob_bonus_scorer"
 options = { path_patterns = ["docs/**"], bonus = 10.0 }
 
 [[plugins.registrations]]
-target = "contextbudget.plugins.examples:leading_summary_compressor"
+target = "redcon.plugins.examples:leading_summary_compressor"
 options = { preview_lines = 2 }
 """.strip(),
     )

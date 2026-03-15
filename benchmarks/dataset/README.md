@@ -1,7 +1,7 @@
 # Benchmark Dataset - Task Manager API
 
 A realistic multi-file Python service used as the target repository for
-ContextBudget token-reduction benchmarks.
+Redcon token-reduction benchmarks.
 
 ## Structure
 

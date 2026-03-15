@@ -1,16 +1,16 @@
 # API Keys
 
-API keys authenticate requests to the ContextBudget Cloud control plane.
+API keys authenticate requests to the Redcon Cloud control plane.
 
 ## Format
 
 ```
-cbk_<64 hex chars>
+rck_<64 hex chars>
 ```
 
-Example: `cbk_a3f4b2c1d0e9f8...` (68 characters total)
+Example: `rck_a3f4b2c1d0e9f8...` (68 characters total)
 
-Keys use `cbk_` as a scannable prefix so they can be detected in secret scanning tools (GitHub, GitLab, pre-commit hooks, etc.).
+Keys use `rck_` as a scannable prefix so they can be detected in secret scanning tools (GitHub, GitLab, pre-commit hooks, etc.).
 
 ## Issuance
 
@@ -27,9 +27,9 @@ Response (returned **once** — store it immediately):
 {
   "id": 5,
   "org_id": 1,
-  "key_prefix": "cbk_a3f4b2",
+  "key_prefix": "rck_a3f4b2",
   "label": "ci-pipeline",
-  "raw_key": "cbk_a3f4b2c1d0e9f8...",
+  "raw_key": "rck_a3f4b2c1d0e9f8...",
   "created_at": "2026-03-15T12:00:00Z"
 }
 ```
@@ -41,7 +41,7 @@ Response (returned **once** — store it immediately):
 Only a SHA-256 hash of the raw key is stored in the database. The hash cannot be reversed.
 
 ```
-stored:  SHA-256("cbk_a3f4b2c1d0e9f8...") → "8f3ab12..."
+stored:  SHA-256("rck_a3f4b2c1d0e9f8...") → "8f3ab12..."
 ```
 
 ## Using a key
@@ -49,7 +49,7 @@ stored:  SHA-256("cbk_a3f4b2c1d0e9f8...") → "8f3ab12..."
 Include the key as a Bearer token in all authenticated requests:
 
 ```bash
-curl -H "Authorization: Bearer cbk_a3f4b2c1d0e9f8..." \
+curl -H "Authorization: Bearer rck_a3f4b2c1d0e9f8..." \
      https://cloud.example.com/orgs/1/projects
 ```
 
@@ -60,7 +60,7 @@ import urllib.request, json
 
 req = urllib.request.Request(
     "https://cloud.example.com/analytics/cost",
-    headers={"Authorization": "Bearer cbk_..."},
+    headers={"Authorization": "Bearer rck_..."},
 )
 with urllib.request.urlopen(req) as resp:
     print(json.loads(resp.read()))
@@ -70,7 +70,7 @@ with urllib.request.urlopen(req) as resp:
 
 ```http
 GET /orgs/{org_id}/api-keys
-Authorization: Bearer cbk_...
+Authorization: Bearer rck_...
 ```
 
 Response lists active and revoked keys. The `raw_key` field is never returned in list responses — only `key_prefix` (the first 12 characters) is shown for identification.
@@ -80,7 +80,7 @@ Response lists active and revoked keys. The `raw_key` field is never returned in
   {
     "id": 5,
     "org_id": 1,
-    "key_prefix": "cbk_a3f4b2",
+    "key_prefix": "rck_a3f4b2",
     "label": "ci-pipeline",
     "revoked": false,
     "created_at": "2026-03-15T12:00:00Z",
@@ -93,7 +93,7 @@ Response lists active and revoked keys. The `raw_key` field is never returned in
 
 ```http
 DELETE /orgs/{org_id}/api-keys/{key_id}
-Authorization: Bearer cbk_...
+Authorization: Bearer rck_...
 ```
 
 Returns `204 No Content` on success. The row is marked `revoked = true` and `revoked_at` is set. Revoked keys are rejected immediately on the next request — no propagation delay.

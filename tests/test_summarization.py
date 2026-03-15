@@ -2,15 +2,15 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget import (
-    ContextBudgetEngine,
+from redcon import (
+    RedconEngine,
     ExternalSummaryAdapter,
     register_external_summarizer_adapter,
     unregister_external_summarizer_adapter,
 )
-from contextbudget.cli import main
-from contextbudget.core.pipeline import as_json_dict, run_pack
-from contextbudget.core.render import render_report_markdown
+from redcon.cli import main
+from redcon.core.pipeline import as_json_dict, run_pack
+from redcon.core.render import render_report_markdown
 
 
 def _write(path: Path, content: str) -> None:
@@ -49,7 +49,7 @@ def test_external_summarizer_is_used_when_configured(tmp_path: Path) -> None:
     register_external_summarizer_adapter("echo", _EchoExternalSummarizer())
     try:
         _write(
-            tmp_path / "contextbudget.toml",
+            tmp_path / "redcon.toml",
             """
 [summarization]
 backend = "external"
@@ -76,7 +76,7 @@ def test_external_summarizer_failure_falls_back_to_deterministic(tmp_path: Path)
     register_external_summarizer_adapter("broken", _BrokenExternalSummarizer())
     try:
         _write(
-            tmp_path / "contextbudget.toml",
+            tmp_path / "redcon.toml",
             """
 [summarization]
 backend = "external"
@@ -101,7 +101,7 @@ adapter = "broken"
     assert entry["chunk_strategy"] == "summary-preview"
     assert "fallback summary" in entry["chunk_reason"]
 
-    summary = ContextBudgetEngine().report(data)
+    summary = RedconEngine().report(data)
     markdown = render_report_markdown(summary)
     assert "- Summarizer fallback used: True" in markdown
     assert "adapter boom" in markdown
@@ -113,7 +113,7 @@ def test_cli_pack_prints_summarizer_fallback_logs(tmp_path: Path, monkeypatch, c
         repo = tmp_path / "repo"
         repo.mkdir()
         _write(
-            repo / "contextbudget.toml",
+            repo / "redcon.toml",
             """
 [summarization]
 backend = "external"
@@ -125,7 +125,7 @@ adapter = "broken"
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "pack", "touch unrelated", "--repo", str(repo), "--out-prefix", "summ-run"],
+            ["redcon", "pack", "touch unrelated", "--repo", str(repo), "--out-prefix", "summ-run"],
         )
         assert main() == 0
     finally:

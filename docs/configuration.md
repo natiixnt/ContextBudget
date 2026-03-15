@@ -1,11 +1,11 @@
 # Configuration
 
-ContextBudget loads `contextbudget.toml` from repo root by default.
+Redcon loads `redcon.toml` from repo root by default.
 Workspace runs load shared config directly from the workspace TOML unless `--config` overrides it.
 
 Precedence:
 1. CLI flags
-2. `contextbudget.toml`
+2. `redcon.toml`
 3. built-in defaults
 
 ## Sections
@@ -67,13 +67,13 @@ token_estimator = "builtin.char4"
 [cache]
 backend = "local_file"
 summary_cache_enabled = true
-cache_file = ".contextbudget_cache.json"
+cache_file = ".redcon_cache.json"
 duplicate_hash_cache_enabled = true
 
 [telemetry]
 enabled = false
 sink = "file"
-file_path = ".contextbudget/telemetry.jsonl"
+file_path = ".redcon/telemetry.jsonl"
 ```
 
 Telemetry remains disabled by default and sends no network traffic.
@@ -82,7 +82,7 @@ Plugin selection and explicit registration are documented in [Plugins](plugins.m
 
 ## Model Profiles
 
-`model_profile` enables built-in model-aware packing defaults. ContextBudget currently ships profile coverage for:
+`model_profile` enables built-in model-aware packing defaults. Redcon currently ships profile coverage for:
 
 - GPT models
 - Claude models
@@ -95,7 +95,7 @@ Each resolved profile carries:
 - context window
 - recommended compression strategy
 
-When a profile is active, ContextBudget automatically:
+When a profile is active, Redcon automatically:
 
 - selects a matching token-estimation backend unless `[tokens]` or `[plugins].token_estimator` is explicitly set
 - scales the default `max_tokens` budget to the model context window, leaving deterministic output headroom
@@ -137,7 +137,7 @@ Artifacts and Markdown reports include a `model_profile` block so downstream too
 - `encoding`: optional explicit `tiktoken` encoding name for `exact`.
 - `fallback_backend`: safe deterministic fallback when `exact` is selected but unavailable.
 
-When `[tokens]` is present and `[plugins].token_estimator` is not explicitly set, ContextBudget
+When `[tokens]` is present and `[plugins].token_estimator` is not explicitly set, Redcon
 automatically selects the matching built-in token-estimator plugin.
 
 ## Workspace TOML
@@ -179,7 +179,7 @@ Rules:
 
 ## Incremental Scan Index
 
-ContextBudget automatically stores a scan index at `.contextbudget/scan-index.json`.
+Redcon automatically stores a scan index at `.redcon/scan-index.json`.
 The index records file path, size, mtime, content hash, and scan classification metadata
 so unchanged files can reuse prior scan results across `plan`, `pack`, `benchmark`, and `watch`.
 Deleted files are pruned from the index on the next refresh.
@@ -190,7 +190,7 @@ Deleted files are pruned from the index on the next refresh.
 - `backend = "external"`: opt-in adapter path. Requires a registered adapter named by `adapter`.
 - `adapter`: logical adapter name used for lookup and artifact reporting.
 
-If an external adapter is selected but missing or failing, ContextBudget falls back automatically to deterministic summarization and records that fallback in `run.json` and Markdown reports.
+If an external adapter is selected but missing or failing, Redcon falls back automatically to deterministic summarization and records that fallback in `run.json` and Markdown reports.
 
 ## Cache Backends
 

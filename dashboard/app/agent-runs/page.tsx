@@ -41,7 +41,7 @@ export default function AgentRunsPage() {
           Simulation, plan, and benchmark runs across agent workflows.
           {!data.connected && !loading && (
             <span className="text-amber-600 font-medium ml-1">
-              No live data — run <code className="font-mono bg-amber-50 px-1 rounded">contextbudget dashboard</code>.
+              No live data — run <code className="font-mono bg-amber-50 px-1 rounded">redcon dashboard</code>.
             </span>
           )}
         </p>
@@ -79,7 +79,7 @@ export default function AgentRunsPage() {
           <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
             <p className="text-slate-400 text-sm">
               {simulations.length === 0
-                ? "No simulation runs found. Run contextbudget simulate-agent."
+                ? "No simulation runs found. Run redcon simulate-agent."
                 : "No results for current filter."}
             </p>
           </div>
@@ -131,7 +131,7 @@ export default function AgentRunsPage() {
         </div>
         {benchmarks.length === 0 ? (
           <div className="rounded-xl border border-slate-200 bg-white p-10 text-center">
-            <p className="text-slate-400 text-sm">No benchmarks found. Run contextbudget benchmark.</p>
+            <p className="text-slate-400 text-sm">No benchmarks found. Run redcon benchmark.</p>
           </div>
         ) : (
           <div className="space-y-5">

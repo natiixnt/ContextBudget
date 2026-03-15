@@ -2,23 +2,23 @@
 
 ## Commands
 
-### `contextbudget plan <task> --repo <path>`
+### `redcon plan <task> --repo <path>`
 Rank relevant files for a natural-language task.
 
-### `contextbudget plan <task> --workspace <workspace.toml>`
+### `redcon plan <task> --workspace <workspace.toml>`
 Rank relevant files across multiple local repositories or monorepo packages.
 
-### `contextbudget plan-agent <task> --repo <path>`
+### `redcon plan-agent <task> --repo <path>`
 Plan context usage across a multi-step agent workflow. The artifact includes step order,
 context assigned per step, token estimates per step, shared context, and total token estimates.
 
-### `contextbudget plan-agent <task> --workspace <workspace.toml>`
+### `redcon plan-agent <task> --workspace <workspace.toml>`
 Plan the same lifecycle-aware workflow across multiple local repositories or monorepo packages.
 
-### `contextbudget pack <task> --repo <path> [--max-tokens N] [--top-files N]`
+### `redcon pack <task> --repo <path> [--max-tokens N] [--top-files N]`
 Build compressed context package and write `run.json` + `run.md` by default.
 
-### `contextbudget pack <task> --repo <path> --delta <previous-run.json>`
+### `redcon pack <task> --repo <path> --delta <previous-run.json>`
 Build the normal current pack artifact plus a `delta` block that contains only the
 changes relative to the previous run. The delta package records:
 - added files
@@ -27,10 +27,10 @@ changes relative to the previous run. The delta package records:
 - changed symbols
 - original tokens, delta tokens, and tokens saved
 
-### `contextbudget pack <task> --workspace <workspace.toml> [--max-tokens N] [--top-files N]`
+### `redcon pack <task> --workspace <workspace.toml> [--max-tokens N] [--top-files N]`
 Build compressed context across a local workspace while recording scanned and selected repos.
 
-### `contextbudget profile <run.json> [--out-prefix <prefix>]`
+### `redcon profile <run.json> [--out-prefix <prefix>]`
 
 Explain where token savings came from in a pack run.  Reads a `run.json` artifact
 produced by `pack` and emits a `<prefix>.json` + `<prefix>.md` breakdown.
@@ -57,14 +57,14 @@ The profile shows:
 **Example:**
 
 ```bash
-contextbudget pack "add caching" --repo . --max-tokens 20000
-contextbudget profile run.json
+redcon pack "add caching" --repo . --max-tokens 20000
+redcon profile run.json
 ```
 
 **Sample output (`run-profile.md`):**
 
 ```markdown
-# ContextBudget Token Savings Profile
+# Redcon Token Savings Profile
 
 ## Summary
 
@@ -84,7 +84,7 @@ contextbudget profile run.json
 | Cache Reuse      |     1 |         400 |               7.5% |
 ```
 
-### `contextbudget read-profiler <run.json> [--out-prefix <prefix>]`
+### `redcon read-profiler <run.json> [--out-prefix <prefix>]`
 
 Analyze how a coding agent read repository files in a pack run.  Detects access
 pattern problems and quantifies tokens wasted.
@@ -110,14 +110,14 @@ pattern problems and quantifies tokens wasted.
 **Example:**
 
 ```bash
-contextbudget pack "add caching" --repo . --max-tokens 20000
-contextbudget read-profiler run.json
+redcon pack "add caching" --repo . --max-tokens 20000
+redcon read-profiler run.json
 ```
 
 **Sample output (`run-read-profile.md`):**
 
 ```markdown
-# ContextBudget Agent Read Profile
+# Redcon Agent Read Profile
 
 ## Summary
 
@@ -140,13 +140,13 @@ contextbudget read-profiler run.json
 | `src/router.py`   | 2          | 340         | 340           |
 ```
 
-### `contextbudget report <run.json> [--out <path>] [--policy <policy.toml>]`
+### `redcon report <run.json> [--out <path>] [--policy <policy.toml>]`
 Render summary report from run artifact.
 
-### `contextbudget diff <old-run.json> <new-run.json>`
+### `redcon diff <old-run.json> <new-run.json>`
 Compare two run artifacts and emit JSON + Markdown delta outputs.
 
-### `contextbudget pr-audit --repo <path> [--base <ref>] [--head <ref>]`
+### `redcon pr-audit --repo <path> [--base <ref>] [--head <ref>]`
 Analyze a pull request diff directly from git and emit:
 - `<prefix>.json`
 - `<prefix>.md`
@@ -161,32 +161,32 @@ Useful CI gates:
 In GitHub Actions, prefer explicit SHAs from the pull-request event:
 
 ```bash
-contextbudget pr-audit \
+redcon pr-audit \
   --repo . \
   --base "${{ github.event.pull_request.base.sha }}" \
   --head "${{ github.event.pull_request.head.sha }}" \
-  --out-prefix contextbudget-pr
+  --out-prefix redcon-pr
 ```
 
-### `contextbudget prepare-context <task> --repo <path> [--max-tokens N] [--top-files N]`
+### `redcon prepare-context <task> --repo <path> [--max-tokens N] [--top-files N]`
 
 Run the full middleware pipeline: pack context, optionally enforce a budget policy, and
 write a machine-readable artifact with an additive `agent_middleware` block.
 
 ```bash
-contextbudget prepare-context "add caching to search API" --repo . --max-tokens 20000
+redcon prepare-context "add caching to search API" --repo . --max-tokens 20000
 ```
 
 **With delta mode:**
 
 ```bash
-contextbudget prepare-context "add caching" --repo . --delta previous-run.json
+redcon prepare-context "add caching" --repo . --delta previous-run.json
 ```
 
 **With strict policy enforcement:**
 
 ```bash
-contextbudget prepare-context "large refactor" --repo . --strict --policy policy.toml
+redcon prepare-context "large refactor" --repo . --strict --policy policy.toml
 ```
 
 Returns non-zero when `--strict` is set and a policy violation is detected.
@@ -197,7 +197,7 @@ and the original request parameters. Use `--out-prefix` to control the output fi
 
 ---
 
-### `contextbudget benchmark <task> --repo <path>`
+### `redcon benchmark <task> --repo <path>`
 Compare deterministic strategies:
 - naive full-context
 - top-k selection
@@ -209,18 +209,18 @@ on local sample text from the run.
 
 `benchmark` also accepts `--workspace <workspace.toml>` for multi-repo/local-package runs.
 
-### `contextbudget heatmap [<history> ...] [--limit N] [--out-prefix <path>]`
+### `redcon heatmap [<history> ...] [--limit N] [--out-prefix <path>]`
 Aggregate historical `pack` artifacts into file and directory token heatmaps.
 Directories are scanned recursively for `*.json` files and non-pack artifacts are skipped.
 
-### `contextbudget watch --repo <path> [--poll-interval S] [--once]`
+### `redcon watch --repo <path> [--poll-interval S] [--once]`
 Refresh the incremental scan index and print concise file-change summaries.
 
 Example:
 
 ```bash
-contextbudget watch --repo .
-contextbudget watch --repo . --once
+redcon watch --repo .
+redcon watch --repo . --once
 ```
 
 Sample output:
@@ -228,7 +228,7 @@ Sample output:
 ```text
 Watching repository: /repo
 Polling interval: 1.00s
-Scan index: /repo/.contextbudget/scan-index.json
+Scan index: /repo/.redcon/scan-index.json
 Initial scan: repo=/repo tracked=12 included=10 reused=0 added=12 updated=0 removed=0
 added[src/auth.py, src/cache.py, docs/notes.md]
 Scan change: repo=/repo tracked=12 included=10 reused=11 added=0 updated=1 removed=0
@@ -242,7 +242,7 @@ updated[src/auth.py]
 These commands turn raw run artifacts into actionable developer intelligence.
 All six analytics commands support `--json` as a shorthand for `--format json`.
 
-### `contextbudget observe <run.json> [--json]`
+### `redcon observe <run.json> [--json]`
 
 Extract and store observability metrics from a `pack` run artifact.
 
@@ -252,7 +252,7 @@ Reads a `run.json` produced by `pack` and computes:
 - **files_read** / **unique_files_read** / **duplicate_reads**
 - **cache_hits** / **run_duration_ms**
 
-Metrics are persisted to `.contextbudget/observe-history.json` for trend tracking.
+Metrics are persisted to `.redcon/observe-history.json` for trend tracking.
 
 **Flags:**
 
@@ -260,7 +260,7 @@ Metrics are persisted to `.contextbudget/observe-history.json` for trend trackin
 |------|-------------|
 | `--no-store` | Skip persisting to history |
 | `--export-history` | Also dump the full history store to `<prefix>-history.json` |
-| `--base-dir` | Root used to locate the `.contextbudget/` directory |
+| `--base-dir` | Root used to locate the `.redcon/` directory |
 | `--out-prefix` | Output file prefix (default: `<run>-observe`) |
 | `--json` | Print raw JSON to stdout (shorthand for `--format json`) |
 | `--format human\|json` | `human` prints the markdown report; `json` prints raw JSON to stdout |
@@ -269,21 +269,21 @@ Metrics are persisted to `.contextbudget/observe-history.json` for trend trackin
 
 ```bash
 # After a pack run
-contextbudget pack "add caching" --repo . --max-tokens 20000
-contextbudget observe run.json
+redcon pack "add caching" --repo . --max-tokens 20000
+redcon observe run.json
 
 # Machine-readable for scripting
-contextbudget observe run.json --json | jq '.total_tokens'
+redcon observe run.json --json | jq '.total_tokens'
 
 # Export full history
-contextbudget observe run.json --export-history
+redcon observe run.json --export-history
 ```
 
 **Outputs:** `<prefix>.json`, `<prefix>.md`, optionally `<prefix>-history.json`
 
 ---
 
-### `contextbudget simulate-agent [<task>] --repo <path> [--json]`
+### `redcon simulate-agent [<task>] --repo <path> [--json]`
 
 Estimate token costs and USD spend for a multi-step agent workflow **before** running it.
 
@@ -317,20 +317,20 @@ Accepts an existing run artifact via `--run-artifact` to seed task and repo with
 
 ```bash
 # Estimate costs with rolling context for Claude Sonnet
-contextbudget simulate-agent "implement OAuth2" \
+redcon simulate-agent "implement OAuth2" \
   --repo . \
   --model claude-3-5-sonnet-20241022 \
   --context-mode rolling
 
 # Load task and repo from an existing run artifact
-contextbudget simulate-agent --run-artifact run.json \
+redcon simulate-agent --run-artifact run.json \
   --model claude-sonnet-4-5 --context-mode full
 
 # List all supported models
-contextbudget simulate-agent --list-models
+redcon simulate-agent --list-models
 
 # JSON output for CI integration
-contextbudget simulate-agent "add caching" --repo . --json \
+redcon simulate-agent "add caching" --repo . --json \
   | jq '.cost_estimate.total_cost_usd'
 ```
 
@@ -338,11 +338,11 @@ contextbudget simulate-agent "add caching" --repo . --json \
 
 ---
 
-### `contextbudget drift [--repo <path>] [--json]`
+### `redcon drift [--repo <path>] [--json]`
 
 Detect token usage growth trends across historical `pack` runs and alert when context is expanding.
 
-Reads `.contextbudget/history.json` by default, or accepts explicit run artifact files via `--runs`.
+Reads `.redcon/history.json` by default, or accepts explicit run artifact files via `--runs`.
 Splits entries into a baseline window and a recent window and computes drift across three dimensions:
 
 | Metric | Description |
@@ -361,7 +361,7 @@ Returns **exit code 2** when drift exceeds the threshold (useful in CI).
 | `--threshold` | `10.0` | Drift % that triggers an alert |
 | `--task` | — | Filter history by task substring |
 | `--runs` | — | Explicit run artifact JSON files (alternative to repo history) |
-| `--out-prefix` | `contextbudget-drift` | Output file prefix |
+| `--out-prefix` | `redcon-drift` | Output file prefix |
 | `--json` | — | Print raw JSON to stdout (shorthand for `--format json`) |
 | `--format human\|json` | `human` | `json` prints raw JSON to stdout |
 
@@ -369,26 +369,26 @@ Returns **exit code 2** when drift exceeds the threshold (useful in CI).
 
 ```bash
 # Detect drift (exits 2 if alert, 0 if clean)
-contextbudget drift --repo . --threshold 15
+redcon drift --repo . --threshold 15
 
 # Filter to a specific task area
-contextbudget drift --repo . --task "auth"
+redcon drift --repo . --task "auth"
 
 # Drift from explicit run artifacts (no history.json required)
-contextbudget drift --runs run-1.json run-2.json run-3.json
+redcon drift --runs run-1.json run-2.json run-3.json
 
 # CI gate
-contextbudget drift --repo . && echo "Context stable" || echo "DRIFT DETECTED"
+redcon drift --repo . && echo "Context stable" || echo "DRIFT DETECTED"
 
 # JSON for dashboards
-contextbudget drift --repo . --json | jq '.drift.token_drift_pct'
+redcon drift --repo . --json | jq '.drift.token_drift_pct'
 ```
 
-**Outputs:** `contextbudget-drift.json`, `contextbudget-drift.md`
+**Outputs:** `redcon-drift.json`, `redcon-drift.md`
 
 ---
 
-### `contextbudget advise [--repo <path>] [--json]`
+### `redcon advise [--repo <path>] [--json]`
 
 Analyze a repository's import graph and suggest architecture improvements to reduce context bloat.
 
@@ -419,21 +419,21 @@ Each suggestion includes an `estimated_token_impact` showing how many tokens cou
 
 ```bash
 # Basic analysis
-contextbudget advise --repo .
+redcon advise --repo .
 
 # With pack history for frequency signals
-contextbudget advise --repo . --history run*.json
+redcon advise --repo . --history run*.json
 
 # JSON for tooling integration
-contextbudget advise --repo . --json \
+redcon advise --repo . --json \
   | jq '[.suggestions[] | select(.suggestion == "split_file")]'
 ```
 
-**Outputs:** `contextbudget-advise.json`, `contextbudget-advise.md`
+**Outputs:** `redcon-advise.json`, `redcon-advise.md`
 
 ---
 
-### `contextbudget visualize [--repo <path>] [--html] [--json]`
+### `redcon visualize [--repo <path>] [--html] [--json]`
 
 Build and export a repository dependency graph annotated with token counts and historical inclusion frequency.
 
@@ -449,7 +449,7 @@ Each graph node carries:
 |------|-------------|
 | `--history` | Pack run JSON files or directories to compute inclusion-frequency annotations |
 | `--html` | Also write a self-contained interactive HTML visualization |
-| `--out-prefix` | Output file prefix (default: `contextbudget-graph`) |
+| `--out-prefix` | Output file prefix (default: `redcon-graph`) |
 | `--json` | Print raw JSON to stdout (shorthand for `--format json`) |
 | `--format human\|json` | `human` prints a summary; `json` prints raw JSON to stdout |
 
@@ -457,20 +457,20 @@ Each graph node carries:
 
 ```bash
 # Build the graph
-contextbudget visualize --repo .
+redcon visualize --repo .
 
 # With history + interactive HTML
-contextbudget visualize --repo . --history run*.json --html
+redcon visualize --repo . --history run*.json --html
 
 # JSON for external graph tools
-contextbudget visualize --repo . --json > graph.json
+redcon visualize --repo . --json > graph.json
 ```
 
-**Outputs:** `contextbudget-graph.json`, `contextbudget-graph.md`, optionally `contextbudget-graph.html`
+**Outputs:** `redcon-graph.json`, `redcon-graph.md`, optionally `redcon-graph.html`
 
 ---
 
-### `contextbudget dashboard [<paths>...] [--port N] [--export] [--format human|json]`
+### `redcon dashboard [<paths>...] [--port N] [--export] [--format human|json]`
 
 Start a local web UI to browse and compare all run artifacts interactively, or export the aggregated data.
 
@@ -483,28 +483,28 @@ Scans directories and JSON artifact files for pack, benchmark, simulate-agent, p
 | `--port` | `7842` | Port for the local server |
 | `--no-open` | false | Don't auto-open the browser |
 | `--export` | false | Export aggregated data as JSON and exit (no server) |
-| `--out-prefix` | `contextbudget-dashboard` | File prefix for `--export` mode |
+| `--out-prefix` | `redcon-dashboard` | File prefix for `--export` mode |
 | `--format human\|json` | `human` | `json` prints dashboard data to stdout and exits |
 
 **Example:**
 
 ```bash
 # Start the dashboard
-contextbudget dashboard
+redcon dashboard
 
 # Scan specific directories
-contextbudget dashboard ./runs/ ../other-project/
+redcon dashboard ./runs/ ../other-project/
 
 # Export data without starting the server
-contextbudget dashboard --export --out-prefix ./reports/dashboard
+redcon dashboard --export --out-prefix ./reports/dashboard
 
 # Pipe to jq
-contextbudget dashboard --format json | jq '.summary'
+redcon dashboard --format json | jq '.summary'
 ```
 
 ---
 
-### `contextbudget read-profiler <run.json> [--format human|json]`
+### `redcon read-profiler <run.json> [--format human|json]`
 
 Detect duplicate and unnecessary file reads in a pack run and quantify the tokens wasted.
 
@@ -518,11 +518,11 @@ Detect duplicate and unnecessary file reads in a pack run and quantify the token
 **Example:**
 
 ```bash
-contextbudget pack "add caching" --repo . --max-tokens 20000
-contextbudget read-profiler run.json
+redcon pack "add caching" --repo . --max-tokens 20000
+redcon read-profiler run.json
 
 # JSON for CI checks
-contextbudget read-profiler run.json --format json \
+redcon read-profiler run.json --format json \
   | jq '.tokens_wasted_total'
 ```
 
@@ -530,7 +530,7 @@ contextbudget read-profiler run.json --format json \
 
 ---
 
-### `contextbudget dataset [<tasks.toml>] --repo <path> [--json]`
+### `redcon dataset [<tasks.toml>] --repo <path> [--json]`
 
 Build a reproducible benchmark dataset and export per-task token reduction metrics.
 
@@ -553,7 +553,7 @@ name = "Add authentication"
 task = "add JWT authentication to user routes"
 ```
 
-Use `contextbudget build-dataset` to run the same pipeline with built-in tasks (no TOML required).
+Use `redcon build-dataset` to run the same pipeline with built-in tasks (no TOML required).
 
 **Flags:**
 
@@ -562,7 +562,7 @@ Use `contextbudget build-dataset` to run the same pipeline with built-in tasks (
 | `--runs` | One or more existing pack/benchmark run artifact JSON files (skips re-running) |
 | `--max-tokens` | Token budget for each benchmark run |
 | `--top-files` | Top-files limit for each run |
-| `--out-prefix` | Output file prefix (default: `contextbudget-dataset`) |
+| `--out-prefix` | Output file prefix (default: `redcon-dataset`) |
 | `--json` | Print raw JSON to stdout (shorthand for `--format json`) |
 | `--format human\|json` | `human` prints per-task summary; `json` prints raw JSON to stdout |
 
@@ -570,20 +570,20 @@ Use `contextbudget build-dataset` to run the same pipeline with built-in tasks (
 
 ```bash
 # Run the benchmark suite from TOML
-contextbudget dataset tasks.toml --repo .
+redcon dataset tasks.toml --repo .
 
 # Build dataset from pre-existing run artifacts (no re-running)
-contextbudget dataset --runs run-1.json run-2.json run-3.json
+redcon dataset --runs run-1.json run-2.json run-3.json
 
 # JSON output
-contextbudget dataset tasks.toml --repo . --json \
+redcon dataset tasks.toml --repo . --json \
   | jq '.aggregate.avg_reduction_pct'
 
 # Built-in task suite (no TOML required)
-contextbudget build-dataset --repo .
+redcon build-dataset --repo .
 ```
 
-**Outputs:** `contextbudget-dataset.json`, `contextbudget-dataset.md`
+**Outputs:** `redcon-dataset.json`, `redcon-dataset.md`
 
 ---
 
@@ -600,11 +600,11 @@ This is useful for:
 
 ```bash
 # Short form
-contextbudget observe run.json --json | jq '.total_tokens'
-contextbudget drift --repo . --json | jq '.drift.token_drift_pct'
+redcon observe run.json --json | jq '.total_tokens'
+redcon drift --repo . --json | jq '.drift.token_drift_pct'
 
 # Long form (backwards compatible)
-contextbudget drift --repo . --format json \
+redcon drift --repo . --format json \
   | jq '{alert: .drift.alert, token_drift: .drift.token_drift_pct}'
 ```
 
@@ -613,7 +613,7 @@ contextbudget drift --repo . --format json \
 ## Strict Policy Mode
 
 ```bash
-contextbudget pack "refactor auth middleware" --repo . --strict --policy examples/policy.toml
+redcon pack "refactor auth middleware" --repo . --strict --policy examples/policy.toml
 ```
 
 Strict mode returns non-zero on policy violations.
@@ -623,7 +623,7 @@ instead of the full current baseline.
 
 ## Config Override
 
-Each command supports `--config <path>` to load a custom `contextbudget.toml`.
+Each command supports `--config <path>` to load a custom `redcon.toml`.
 
 ## Workspace Config
 
@@ -645,5 +645,5 @@ ignore_globs = ["**/generated/**"]
 
 ## Incremental Scan Index
 
-`plan`, `pack`, and `benchmark` automatically maintain `.contextbudget/scan-index.json`.
+`plan`, `pack`, and `benchmark` automatically maintain `.redcon/scan-index.json`.
 Unchanged files reuse prior scan metadata; changed and deleted files are refreshed incrementally.

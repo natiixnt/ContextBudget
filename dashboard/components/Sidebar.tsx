@@ -78,7 +78,7 @@ export default function Sidebar() {
           </svg>
         </div>
         <div>
-          <div className="text-white font-semibold text-sm leading-tight">ContextBudget</div>
+          <div className="text-white font-semibold text-sm leading-tight">Redcon</div>
           <div className="text-slate-400 text-xs leading-tight">Cloud</div>
         </div>
       </div>
@@ -106,7 +106,7 @@ export default function Sidebar() {
 
       {/* Footer */}
       <div className="px-5 py-4 border-t border-slate-700/50">
-        <p className="text-slate-500 text-xs">v0.2.0</p>
+        <p className="text-slate-500 text-xs">v1.1.0</p>
       </div>
     </aside>
   );

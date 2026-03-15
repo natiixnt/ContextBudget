@@ -1,13 +1,13 @@
 /**
- * @contextbudget/sdk — TypeScript/Node.js SDK for ContextBudget
+ * @redcon/sdk — TypeScript/Node.js SDK for Redcon
  *
  * @example Cloud API
  * ```ts
- * import { CloudClient } from "@contextbudget/sdk";
+ * import { CloudClient } from "@redcon/sdk";
  *
  * const client = new CloudClient({
  *   baseUrl: "https://cloud.example.com",
- *   apiKey: process.env.CB_CLOUD_API_KEY!,
+ *   apiKey: process.env.RC_CLOUD_API_KEY!,
  * });
  *
  * const roi = await client.getDashboardROI();
@@ -15,7 +15,7 @@
  *
  * @example Gateway
  * ```ts
- * import { GatewayClient } from "@contextbudget/sdk";
+ * import { GatewayClient } from "@redcon/sdk";
  *
  * const gateway = new GatewayClient({ baseUrl: "http://localhost:8787" });
  * const ctx = await gateway.prepareContext({ task: "...", repo: "." });

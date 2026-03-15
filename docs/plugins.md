@@ -16,7 +16,7 @@ Built-in defaults:
 
 ## Registration Model
 
-ContextBudget does not scan entry points or auto-discover packages. Every plugin must be registered in `contextbudget.toml` with a concrete `package.module:attribute` target.
+Redcon does not scan entry points or auto-discover packages. Every plugin must be registered in `redcon.toml` with a concrete `package.module:attribute` target.
 
 ```toml
 [plugins]
@@ -28,11 +28,11 @@ token_estimator = "builtin.char4"
 backend = "heuristic"
 
 [[plugins.registrations]]
-target = "contextbudget.plugins.examples:path_glob_bonus_scorer"
+target = "redcon.plugins.examples:path_glob_bonus_scorer"
 options = { path_patterns = ["docs/**"], bonus = 8.0 }
 
 [[plugins.registrations]]
-target = "contextbudget.plugins.examples:leading_summary_compressor"
+target = "redcon.plugins.examples:leading_summary_compressor"
 options = { preview_lines = 3 }
 ```
 
@@ -46,16 +46,16 @@ Selection rules:
 
 ## Contract Surface
 
-Import the typed definitions from `contextbudget.plugins`:
+Import the typed definitions from `redcon.plugins`:
 
 ```python
-from contextbudget.plugins import CompressorPlugin, ScorerPlugin, TokenEstimatorPlugin
+from redcon.plugins import CompressorPlugin, ScorerPlugin, TokenEstimatorPlugin
 ```
 
 ### Scorer Plugins
 
 ```python
-from contextbudget.plugins import ScorerPlugin
+from redcon.plugins import ScorerPlugin
 
 
 def score_custom(*, task, files, settings, options, estimate_tokens):
@@ -74,7 +74,7 @@ Scorers receive the task, scanned `FileRecord` values, `ScoreSettings`, registra
 ### Compressor Plugins
 
 ```python
-from contextbudget.plugins import CompressorPlugin
+from redcon.plugins import CompressorPlugin
 
 
 def compress_custom(
@@ -105,7 +105,7 @@ Compressors receive ranked files, the selected budget, the active cache backend,
 ### Token-Estimator Plugins
 
 ```python
-from contextbudget.plugins import TokenEstimatorPlugin
+from redcon.plugins import TokenEstimatorPlugin
 
 
 def estimate_custom(*, text, options):
@@ -123,7 +123,7 @@ Token estimators can optionally expose a `describe(...)` callable so artifacts i
 
 ## Built-in Examples
 
-ContextBudget ships two minimal reference plugins in `contextbudget.plugins.examples`:
+Redcon ships two minimal reference plugins in `redcon.plugins.examples`:
 
 - `path_glob_bonus_scorer`
 - `leading_summary_compressor`

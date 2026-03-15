@@ -3,7 +3,7 @@ import "./globals.css";
 import Sidebar from "@/components/Sidebar";
 
 export const metadata: Metadata = {
-  title: "ContextBudget Cloud",
+  title: "Redcon Cloud",
   description: "Visual insights into agent context infrastructure",
 };
 

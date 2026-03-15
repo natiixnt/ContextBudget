@@ -2,7 +2,7 @@
 
 > **Task:** Add Redis caching to task lookup endpoints to reduce database load and improve response times
 
-Evaluates how well ContextBudget selects the task service, route handlers, and repository layer when the goal is to introduce a caching layer.
+Evaluates how well Redcon selects the task service, route handlers, and repository layer when the goal is to introduce a caching layer.
 
 ## Settings
 

@@ -1,7 +1,7 @@
 {
   "command": "benchmark",
   "task": "Refactor the database repository layer to use connection pooling for better performance and separation of concerns",
-  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/benchmarks/dataset",
+  "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/benchmarks/dataset",
   "max_tokens": 8000,
   "top_files": 20,
   "baseline_full_context_tokens": 12230,
@@ -66,7 +66,7 @@
     },
     {
       "strategy": "compressed_pack",
-      "description": "Use ContextBudget scoring + compression under configured token budget.",
+      "description": "Use Redcon scoring + compression under configured token budget.",
       "estimated_input_tokens": 2484,
       "estimated_saved_tokens": 9746,
       "files_included": [

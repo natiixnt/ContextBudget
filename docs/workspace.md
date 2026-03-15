@@ -1,6 +1,6 @@
 # Workspace
 
-Workspace support lets one task span multiple local repositories or monorepo packages while keeping the existing ContextBudget scan, score, and pack flow.
+Workspace support lets one task span multiple local repositories or monorepo packages while keeping the existing Redcon scan, score, and pack flow.
 
 The first version is intentionally simple:
 
@@ -44,7 +44,7 @@ path = "../billing-service"
 ignore_globs = ["tests/fixtures/**"]
 ```
 
-Shared config sections use the same schema as `contextbudget.toml`, including:
+Shared config sections use the same schema as `redcon.toml`, including:
 
 - `[scan]`
 - `[budget]`
@@ -71,33 +71,33 @@ If a repo path does not exist, workspace loading fails early.
 Plan across a workspace:
 
 ```bash
-contextbudget plan "update auth flow across services" --workspace workspace.toml
+redcon plan "update auth flow across services" --workspace workspace.toml
 ```
 
 Pack across a workspace:
 
 ```bash
-contextbudget pack "update auth flow across services" --workspace workspace.toml
+redcon pack "update auth flow across services" --workspace workspace.toml
 ```
 
 Benchmark across a workspace:
 
 ```bash
-contextbudget benchmark "update auth flow across services" --workspace workspace.toml
+redcon benchmark "update auth flow across services" --workspace workspace.toml
 ```
 
 Single-repo commands still work exactly as before:
 
 ```bash
-contextbudget pack "update auth flow" --repo .
+redcon pack "update auth flow" --repo .
 ```
 
 ## Python API Usage
 
 ```python
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 plan = engine.plan(task="update auth flow across services", workspace="workspace.toml")
 run = engine.pack(task="update auth flow across services", workspace="workspace.toml", max_tokens=28000)
 ```
@@ -105,7 +105,7 @@ run = engine.pack(task="update auth flow across services", workspace="workspace.
 Agent middleware uses the same workspace support:
 
 ```python
-from contextbudget import prepare_context
+from redcon import prepare_context
 
 result = prepare_context("update auth flow across services", workspace="workspace.toml")
 ```

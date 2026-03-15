@@ -8,16 +8,16 @@ from typing import Any
 
 import pytest
 
-from contextbudget.cli import main
-from contextbudget.core.context_dataset_builder import (
+from redcon.cli import main
+from redcon.core.context_dataset_builder import (
     BUILTIN_TASKS,
     ContextDatasetBuilderConfig,
     build_context_dataset,
     context_dataset_as_dict,
     load_extra_tasks_toml,
 )
-from contextbudget.core.dataset import DatasetTask
-from contextbudget.core.render import render_context_dataset_markdown
+from redcon.core.dataset import DatasetTask
+from redcon.core.render import render_context_dataset_markdown
 
 
 # ---------------------------------------------------------------------------
@@ -225,7 +225,7 @@ def test_render_context_dataset_markdown_header() -> None:
         "entries": [],
     }
     md = render_context_dataset_markdown(data)
-    assert "# ContextBudget Context Dataset Report" in md
+    assert "# Redcon Context Dataset Report" in md
 
 
 def test_render_context_dataset_markdown_builtin_source() -> None:
@@ -295,7 +295,7 @@ def test_render_context_dataset_markdown_entries() -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI - contextbudget build-dataset (integration)
+# CLI - redcon build-dataset (integration)
 # ---------------------------------------------------------------------------
 
 
@@ -304,7 +304,7 @@ def test_cli_build_dataset_writes_json_and_markdown(tmp_path: Path, monkeypatch)
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd"],
+        ["redcon", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd"],
     )
     assert main() == 0
     assert (tmp_path / "cbd.json").exists()
@@ -316,7 +316,7 @@ def test_cli_build_dataset_json_has_required_keys(tmp_path: Path, monkeypatch) -
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd2"],
+        ["redcon", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd2"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "cbd2.json").read_text(encoding="utf-8"))
@@ -333,7 +333,7 @@ def test_cli_build_dataset_entry_has_reduction_metrics(tmp_path: Path, monkeypat
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd3"],
+        ["redcon", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd3"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "cbd3.json").read_text(encoding="utf-8"))
@@ -354,7 +354,7 @@ def test_cli_build_dataset_with_extra_toml(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "build-dataset",
+            "redcon", "build-dataset",
             "--repo", str(repo),
             "--tasks-toml", str(toml_path),
             "--out-prefix", "cbd4",
@@ -378,7 +378,7 @@ def test_cli_build_dataset_no_builtin_with_toml(tmp_path: Path, monkeypatch) -> 
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "build-dataset",
+            "redcon", "build-dataset",
             "--repo", str(repo),
             "--tasks-toml", str(toml_path),
             "--no-builtin",
@@ -397,11 +397,11 @@ def test_cli_build_dataset_markdown_header(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd6"],
+        ["redcon", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd6"],
     )
     assert main() == 0
     md = (tmp_path / "cbd6.md").read_text(encoding="utf-8")
-    assert "# ContextBudget Context Dataset Report" in md
+    assert "# Redcon Context Dataset Report" in md
 
 
 def test_cli_build_dataset_aggregate_in_json(tmp_path: Path, monkeypatch) -> None:
@@ -409,7 +409,7 @@ def test_cli_build_dataset_aggregate_in_json(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd7"],
+        ["redcon", "build-dataset", "--repo", str(repo), "--out-prefix", "cbd7"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "cbd7.json").read_text(encoding="utf-8"))

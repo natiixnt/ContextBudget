@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run ContextBudget benchmarks against the included dataset.
+"""Run Redcon benchmarks against the included dataset.
 
 Produces one JSON artifact and one Markdown report per task inside
 docs/benchmarks/, plus a combined summary table.
@@ -10,7 +10,7 @@ Usage
 
 Options (env vars)
 ------------------
-    BENCHMARK_MAX_TOKENS   Token budget passed to ContextBudget (default: 8000)
+    BENCHMARK_MAX_TOKENS   Token budget passed to Redcon (default: 8000)
     BENCHMARK_TOP_FILES    Max files to rank (default: 20)
     BENCHMARK_OUT_DIR      Output directory (default: docs/benchmarks)
 """
@@ -23,11 +23,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-# Allow importing contextbudget from the repo root without installation.
+# Allow importing redcon from the repo root without installation.
 _repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_repo_root))
 
-from contextbudget import ContextBudgetEngine  # noqa: E402
+from redcon import RedconEngine  # noqa: E402
 
 # ---------------------------------------------------------------------------
 # Configuration
@@ -40,7 +40,7 @@ TASKS: list[dict] = [
         "slug": "add-caching",
         "task": "Add Redis caching to task lookup endpoints to reduce database load",
         "description": (
-            "Evaluates how well ContextBudget selects the task service, "
+            "Evaluates how well Redcon selects the task service, "
             "route handlers, and repository layer when the goal is to "
             "introduce a caching layer."
         ),
@@ -210,7 +210,7 @@ def _render_summary(all_results: list[tuple[dict, dict]]) -> str:
     lines = [
         "# Benchmark Summary",
         "",
-        "Results from running ContextBudget against the included dataset "
+        "Results from running Redcon against the included dataset "
         f"(token budget: {MAX_TOKENS:,}, top files: {TOP_FILES}).",
         "",
         "| Task | Baseline tokens | Compressed tokens | Reduction | Quality risk |",
@@ -242,7 +242,7 @@ def _render_summary(all_results: list[tuple[dict, dict]]) -> str:
         "Or run a single task via the CLI:",
         "",
         "```bash",
-        'contextbudget benchmark "Add Redis caching to task lookup endpoints" \\',
+        'redcon benchmark "Add Redis caching to task lookup endpoints" \\',
         f"    --repo benchmarks/dataset --max-tokens {MAX_TOKENS}",
         "```",
         "",
@@ -256,14 +256,14 @@ def _render_summary(all_results: list[tuple[dict, dict]]) -> str:
 # ---------------------------------------------------------------------------
 
 def _clear_dataset_cache() -> None:
-    """Remove the ContextBudget summary cache from the dataset directory.
+    """Remove the Redcon summary cache from the dataset directory.
 
     This ensures the first compressed_pack measurement reflects a cold-cache
     run, producing reproducible token counts across repeated invocations.
     The cache-assisted row still shows warm-cache behaviour within the same
     run (two consecutive pack calls on the same task).
     """
-    cache_file = DATASET_DIR / ".contextbudget_cache.json"
+    cache_file = DATASET_DIR / ".redcon_cache.json"
     if cache_file.exists():
         cache_file.unlink()
 
@@ -276,10 +276,10 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     _clear_dataset_cache()
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     all_results: list[tuple[dict, dict]] = []
 
-    print(f"ContextBudget benchmark runner")
+    print(f"Redcon benchmark runner")
     print(f"  dataset : {DATASET_DIR}")
     print(f"  output  : {OUT_DIR}")
     print(f"  budget  : {MAX_TOKENS:,} tokens, top {TOP_FILES} files")

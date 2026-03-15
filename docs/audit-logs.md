@@ -6,7 +6,7 @@ The audit log is an append-only record of significant events within an org: poli
 
 ```http
 GET /orgs/{org_id}/audit-log?limit=100&offset=0
-Authorization: Bearer cbk_...
+Authorization: Bearer rck_...
 ```
 
 Response:

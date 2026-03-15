@@ -23,7 +23,7 @@
       "original_input_tokens": 85,
       "quality_risk_estimate": "medium",
       "ranked_files_count": 3,
-      "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+      "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/examples/risky-auth-change/repo",
       "request_metadata": {
         "agent": "my-agent",
         "session": "sess-001"
@@ -33,7 +33,7 @@
       "task": "refactor auth middleware token validation",
       "workspace": ""
     },
-    "recorded_path": "/Users/naithai/Desktop/amogus/praca/ContextBudget/run-option-a.json",
+    "recorded_path": "/Users/naithai/Desktop/amogus/praca/Redcon/run-option-a.json",
     "request": {
       "max_tokens": 28000,
       "metadata": {
@@ -201,7 +201,7 @@
       "score": 0.35
     }
   ],
-  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+  "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/examples/risky-auth-change/repo",
   "summarizer": {
     "effective_backend": "unused",
     "external_adapter": "",

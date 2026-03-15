@@ -1,7 +1,7 @@
 {
-  "name": "@contextbudget/sdk",
+  "name": "@redcon/sdk",
   "version": "1.0.0",
-  "description": "TypeScript/Node.js SDK for the ContextBudget Cloud API and Runtime Gateway",
+  "description": "TypeScript/Node.js SDK for the Redcon Cloud API and Runtime Gateway",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "exports": {
@@ -26,7 +26,7 @@
     "test": "node --test dist/test/*.test.js",
     "lint": "eslint src --ext .ts"
   },
-  "keywords": ["contextbudget", "llm", "token-budget", "ai", "cost-optimization"],
+  "keywords": ["redcon", "llm", "token-budget", "ai", "cost-optimization"],
   "license": "MIT",
   "engines": {
     "node": ">=18"

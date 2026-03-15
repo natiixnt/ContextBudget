@@ -47,12 +47,12 @@ function StepIndicator({ current }: { current: Step }) {
 function WelcomeStep({ onNext }: { onNext: () => void }) {
   return (
     <div className="max-w-lg">
-      <h2 className="text-2xl font-bold text-slate-900 mb-3">Welcome to ContextBudget</h2>
+      <h2 className="text-2xl font-bold text-slate-900 mb-3">Welcome to Redcon</h2>
       <p className="text-slate-600 mb-6">
         This wizard sets up your cloud control plane in about 2 minutes. You will:
       </p>
       <ol className="list-decimal list-inside space-y-2 text-slate-700 mb-8 text-sm">
-        <li>Connect to your ContextBudget Cloud instance</li>
+        <li>Connect to your Redcon Cloud instance</li>
         <li>Create your organisation</li>
         <li>Issue an API key for your team</li>
         <li>Copy the setup snippet for your CI / developer machines</li>
@@ -112,7 +112,7 @@ function ConnectStep({
     <div className="max-w-lg">
       <h2 className="text-2xl font-bold text-slate-900 mb-1">Connect to Cloud</h2>
       <p className="text-slate-500 text-sm mb-6">
-        Enter the URL of your <code className="bg-slate-100 px-1 rounded">contextbudget-cloud</code> instance.
+        Enter the URL of your <code className="bg-slate-100 px-1 rounded">redcon-cloud</code> instance.
       </p>
 
       <div className="space-y-4 mb-6">
@@ -132,11 +132,11 @@ function ConnectStep({
             type="password"
             value={adminToken}
             onChange={(e) => setAdminToken(e.target.value)}
-            placeholder="CB_CLOUD_ADMIN_TOKEN value"
+            placeholder="RC_CLOUD_ADMIN_TOKEN value"
             className="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <p className="text-xs text-slate-400 mt-1">
-            The value of <code className="bg-slate-100 px-1 rounded">CB_CLOUD_ADMIN_TOKEN</code> on your cloud server.
+            The value of <code className="bg-slate-100 px-1 rounded">RC_CLOUD_ADMIN_TOKEN</code> on your cloud server.
           </p>
         </div>
       </div>
@@ -389,13 +389,13 @@ function DoneStep({
   const [copied, setCopied] = useState(false);
   const snippet = [
     `# Add to your shell profile or .env file`,
-    `export CB_GATEWAY_CLOUD_API_KEY="${rawKey}"`,
-    `export CB_GATEWAY_CLOUD_POLICY_URL="${cloudUrl}"`,
-    `export CB_GATEWAY_CLOUD_ORG_ID="${orgId}"`,
+    `export RC_GATEWAY_CLOUD_API_KEY="${rawKey}"`,
+    `export RC_GATEWAY_CLOUD_POLICY_URL="${cloudUrl}"`,
+    `export RC_GATEWAY_CLOUD_ORG_ID="${orgId}"`,
     ``,
     `# Install and initialise in each repo`,
-    `pip install contextbudget`,
-    `contextbudget init`,
+    `pip install redcon`,
+    `redcon init`,
   ].join("\n");
 
   async function copy() {
@@ -453,7 +453,7 @@ export default function OnboardingPage() {
     <div className="min-h-screen bg-slate-50 flex items-start justify-center pt-16 px-4">
       <div className="w-full max-w-2xl">
         <div className="mb-8">
-          <span className="text-slate-400 text-sm font-medium uppercase tracking-widest">ContextBudget</span>
+          <span className="text-slate-400 text-sm font-medium uppercase tracking-widest">Redcon</span>
           <h1 className="text-3xl font-bold text-slate-900 mt-1">Onboarding</h1>
         </div>
 

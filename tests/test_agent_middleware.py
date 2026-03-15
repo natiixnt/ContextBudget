@@ -7,18 +7,18 @@ import pytest
 
 import argparse
 
-from contextbudget import (
+from redcon import (
     AgentTaskRequest,
     BudgetPolicyViolationError,
-    ContextBudgetEngine,
-    ContextBudgetMiddleware,
+    RedconEngine,
+    RedconMiddleware,
     LocalDemoAgentAdapter,
     enforce_budget,
     prepare_context,
     record_run,
 )
-from contextbudget.cli import cmd_prepare_context
-from contextbudget.core.policy import PolicySpec
+from redcon.cli import cmd_prepare_context
+from redcon.core.policy import PolicySpec
 
 
 def _write(path: Path, content: str) -> None:
@@ -55,7 +55,7 @@ def _fake_run_artifact(repo: Path, *, max_tokens: int = 200) -> dict:
 
 
 def test_prepare_context_delegates_to_engine_pack(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     called: dict[str, object] = {}
 
     def fake_pack(
@@ -82,7 +82,7 @@ def test_prepare_context_delegates_to_engine_pack(tmp_path: Path, monkeypatch: p
         return _fake_run_artifact(Path(repo), max_tokens=int(max_tokens or 0))
 
     monkeypatch.setattr(engine, "pack", fake_pack)
-    middleware = ContextBudgetMiddleware(engine=engine)
+    middleware = RedconMiddleware(engine=engine)
 
     result = middleware.prepare_context(
         "update auth flow",
@@ -105,7 +105,7 @@ def test_enforce_budget_delegates_to_engine_policy_evaluation(
     tmp_path: Path,
     monkeypatch: pytest.MonkeyPatch,
 ) -> None:
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     called: dict[str, object] = {}
 
     def fake_evaluate_policy(
@@ -126,7 +126,7 @@ def test_enforce_budget_delegates_to_engine_policy_evaluation(
         return {"passed": True, "violations": [], "checks": {"max_estimated_input_tokens": {"passed": True}}}
 
     monkeypatch.setattr(engine, "evaluate_policy", fake_evaluate_policy)
-    middleware = ContextBudgetMiddleware(engine=engine)
+    middleware = RedconMiddleware(engine=engine)
     result = middleware.prepare_context("update auth flow", repo=tmp_path, max_tokens=200)
     policy = PolicySpec(max_estimated_input_tokens=200)
 
@@ -142,7 +142,7 @@ def test_record_run_writes_machine_readable_middleware_artifact(tmp_path: Path) 
     _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
 
     result = prepare_context("update auth flow", repo=tmp_path, max_tokens=400)
-    policy = ContextBudgetEngine.make_policy(max_estimated_input_tokens=400)
+    policy = RedconEngine.make_policy(max_estimated_input_tokens=400)
     checked = enforce_budget(result, policy=policy)
     output_path = record_run(checked, tmp_path / "agent-run.json")
 
@@ -152,7 +152,7 @@ def test_record_run_writes_machine_readable_middleware_artifact(tmp_path: Path) 
     assert data["agent_middleware"]["metadata"]["files_included_count"] == len(data["files_included"])
     assert data["agent_middleware"]["recorded_path"] == str(output_path)
 
-    summary = ContextBudgetEngine().report(output_path)
+    summary = RedconEngine().report(output_path)
     assert summary["task"] == "update auth flow"
 
 
@@ -160,7 +160,7 @@ def test_local_demo_adapter_simulates_agent_workflow(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
     _write(tmp_path / "src" / "permissions.py", "def allow() -> bool:\n    return True\n")
 
-    middleware = ContextBudgetMiddleware()
+    middleware = RedconMiddleware()
     adapter = LocalDemoAgentAdapter()
     request = AgentTaskRequest(task="update auth flow", repo=tmp_path, max_tokens=400)
 
@@ -177,7 +177,7 @@ def test_local_demo_adapter_simulates_agent_workflow(tmp_path: Path) -> None:
 
 def test_prepare_context_delta_metadata_prefers_delta_budget(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1

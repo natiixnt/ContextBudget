@@ -1,4 +1,4 @@
-"""Basic ContextBudget SDK usage.
+"""Basic Redcon SDK usage.
 
 Demonstrates all three primary SDK entry points:
 
@@ -10,12 +10,12 @@ Run from the repository root:
     python examples/sdk/python/basic.py
 """
 
-from contextbudget.sdk import ContextBudgetSDK
+from redcon.sdk import RedconSDK
 
 TASK = "add Redis caching to the session store"
 REPO = "examples/small-feature/repo"
 
-sdk = ContextBudgetSDK(max_tokens=30_000)
+sdk = RedconSDK(max_tokens=30_000)
 
 # -----------------------------------------------------------------------
 # 1. simulate_agent — check token and cost estimates before packing

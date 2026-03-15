@@ -1,6 +1,6 @@
 # Token Estimation
 
-ContextBudget uses token estimates for:
+Redcon uses token estimates for:
 
 - pack budget enforcement
 - policy checks
@@ -38,7 +38,7 @@ The default path stays lightweight and deterministic. No network access is requi
   - you want benchmark artifacts to reflect a specific tokenizer exactly
   - you are comfortable installing the optional tokenizer extra
 
-If `exact_tiktoken` is selected and unavailable, ContextBudget falls back to `fallback_backend`
+If `exact_tiktoken` is selected and unavailable, Redcon falls back to `fallback_backend`
 and records:
 
 - selected backend
@@ -99,7 +99,7 @@ Artifacts also keep the resolved implementation name under `implementations.toke
 
 ## Benchmark Samples
 
-`contextbudget benchmark` now includes a compact `estimator_samples` section that compares
+`redcon benchmark` now includes a compact `estimator_samples` section that compares
 the built-in estimators on local sample text from the current run:
 
 - the task text

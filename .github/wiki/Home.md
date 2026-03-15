@@ -1,6 +1,6 @@
-# ContextBudget Wiki
+# Redcon Wiki
 
-**ContextBudget** selects, compresses, and budgets repository context for coding-agent workflows. It is deterministic, local-first, and produces stable machine-readable artifacts for reuse in CI, local tooling, and agent middleware.
+**Redcon** selects, compresses, and budgets repository context for coding-agent workflows. It is deterministic, local-first, and produces stable machine-readable artifacts for reuse in CI, local tooling, and agent middleware.
 
 ---
 
@@ -10,13 +10,13 @@
 pip install -e .[dev]
 
 # Rank relevant files
-contextbudget plan "add caching to search API" --repo .
+redcon plan "add caching to search API" --repo .
 
 # Pack context under budget
-contextbudget pack "add caching to search API" --repo . --max-tokens 30000
+redcon pack "add caching to search API" --repo . --max-tokens 30000
 
 # Summarize the run artifact
-contextbudget report run.json
+redcon report run.json
 ```
 
 ---
@@ -43,8 +43,8 @@ contextbudget report run.json
 |------|-------------|
 | [[Getting Started]] | Installation and core workflow |
 | [[CLI Reference]] | All CLI commands and flags |
-| [[Python API]] | `BudgetGuard` and `ContextBudgetEngine` reference |
-| [[Configuration]] | `contextbudget.toml` schema and model profiles |
+| [[Python API]] | `BudgetGuard` and `RedconEngine` reference |
+| [[Configuration]] | `redcon.toml` schema and model profiles |
 | [[Architecture]] | System layers, pipeline stages, and design goals |
 | [[Agent Integration]] | Middleware, adapters, and multi-turn agent loops |
 | [[Plugins]] | Custom scorers, compressors, and token estimators |

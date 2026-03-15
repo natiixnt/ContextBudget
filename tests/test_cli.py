@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextbudget.cache.run_history import load_run_history
-from contextbudget.cli import main
+from redcon.cache.run_history import load_run_history
+from redcon.cli import main
 from tests.support_git import build_pr_audit_repo
 
 
@@ -21,7 +21,7 @@ def test_cli_pack_and_report(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "pack", "add caching to search api", "--repo", str(repo), "--out-prefix", "run"],
+        ["redcon", "pack", "add caching to search api", "--repo", str(repo), "--out-prefix", "run"],
     )
     assert main() == 0
     assert (tmp_path / "run.json").exists()
@@ -35,7 +35,7 @@ def test_cli_pack_and_report(tmp_path: Path, monkeypatch) -> None:
     assert entry.result_artifacts.get("run_json") == str((tmp_path / "run.json").resolve())
     assert entry.result_artifacts.get("run_markdown") == str((tmp_path / "run.md").resolve())
 
-    monkeypatch.setattr("sys.argv", ["contextbudget", "report", "run.json", "--out", "summary.md"])
+    monkeypatch.setattr("sys.argv", ["redcon", "report", "run.json", "--out", "summary.md"])
     assert main() == 0
     assert (tmp_path / "summary.md").exists()
     assert "combined:" in (tmp_path / "summary.md").read_text(encoding="utf-8")
@@ -44,13 +44,13 @@ def test_cli_pack_and_report(tmp_path: Path, monkeypatch) -> None:
 def test_cli_pack_uses_repo_config_default_max_tokens(tmp_path: Path, monkeypatch) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    _write(repo / "contextbudget.toml", "[budget]\nmax_tokens = 77\n")
+    _write(repo / "redcon.toml", "[budget]\nmax_tokens = 77\n")
     _write(repo / "src" / "search.py", "def search():\n    return []\n")
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "pack", "add caching to search api", "--repo", str(repo), "--out-prefix", "run2"],
+        ["redcon", "pack", "add caching to search api", "--repo", str(repo), "--out-prefix", "run2"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "run2.json").read_text(encoding="utf-8"))
@@ -60,14 +60,14 @@ def test_cli_pack_uses_repo_config_default_max_tokens(tmp_path: Path, monkeypatc
 def test_cli_max_tokens_flag_overrides_config(tmp_path: Path, monkeypatch) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    _write(repo / "contextbudget.toml", "[budget]\nmax_tokens = 77\n")
+    _write(repo / "redcon.toml", "[budget]\nmax_tokens = 77\n")
     _write(repo / "src" / "search.py", "def search():\n    return []\n")
 
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pack",
             "add caching to search api",
             "--repo",
@@ -86,7 +86,7 @@ def test_cli_max_tokens_flag_overrides_config(tmp_path: Path, monkeypatch) -> No
 def test_cli_top_files_flag_overrides_config(tmp_path: Path, monkeypatch) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
-    _write(repo / "contextbudget.toml", "[budget]\ntop_files = 1\n")
+    _write(repo / "redcon.toml", "[budget]\ntop_files = 1\n")
     _write(repo / "src" / "search.py", "def search():\n    return []\n")
     _write(repo / "src" / "cache.py", "def cache_search():\n    return []\n")
 
@@ -94,7 +94,7 @@ def test_cli_top_files_flag_overrides_config(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "plan",
             "add caching to search api",
             "--repo",
@@ -121,7 +121,7 @@ def test_cli_plan_agent_writes_json_and_markdown(tmp_path: Path, monkeypatch, ca
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "plan-agent",
             "update auth flow docs",
             "--repo",
@@ -173,7 +173,7 @@ def test_cli_diff_writes_json_and_markdown(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "diff",
             "old-run.json",
             "new-run.json",
@@ -196,7 +196,7 @@ def test_cli_pr_audit_writes_outputs_and_can_fail_gate(tmp_path: Path, monkeypat
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pr-audit",
             "--repo",
             str(repo),
@@ -214,12 +214,12 @@ def test_cli_pr_audit_writes_outputs_and_can_fail_gate(tmp_path: Path, monkeypat
     assert (tmp_path / "pr-audit.comment.md").exists()
     data = json.loads((tmp_path / "pr-audit.json").read_text(encoding="utf-8"))
     assert data["summary"]["estimated_token_delta"] > 0
-    assert "ContextBudget Analysis" in data["comment_markdown"]
+    assert "Redcon Analysis" in data["comment_markdown"]
 
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pr-audit",
             "--repo",
             str(repo),
@@ -267,7 +267,7 @@ def test_cli_heatmap_writes_json_and_markdown(tmp_path: Path, monkeypatch, capsy
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "heatmap",
             "history",
             "--limit",
@@ -307,7 +307,7 @@ max_quality_risk_level = "low"
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pack",
             "add caching to search api",
             "--repo",
@@ -341,7 +341,7 @@ max_estimated_input_tokens = 1
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pack",
             "add caching to search api",
             "--repo",
@@ -383,7 +383,7 @@ max_quality_risk_level = "medium"
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "report",
             "run.json",
             "--policy",
@@ -419,7 +419,7 @@ path = "services/billing"
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pack",
             "update auth flow across services",
             "--workspace",
@@ -442,7 +442,7 @@ def test_cli_pack_can_emit_delta_context_package(tmp_path: Path, monkeypatch) ->
     repo = tmp_path / "repo"
     repo.mkdir()
     _write(
-        repo / "contextbudget.toml",
+        repo / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1
@@ -456,7 +456,7 @@ snippet_total_line_limit = 40
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "pack", "update auth middleware", "--repo", str(repo), "--out-prefix", "first"],
+        ["redcon", "pack", "update auth middleware", "--repo", str(repo), "--out-prefix", "first"],
     )
     assert main() == 0
 
@@ -470,7 +470,7 @@ snippet_total_line_limit = 40
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pack",
             "update auth middleware",
             "--repo",
@@ -504,21 +504,21 @@ def test_cli_watch_once_writes_scan_index(tmp_path: Path, monkeypatch, capsys) -
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "watch", "--repo", str(repo), "--once"],
+        ["redcon", "watch", "--repo", str(repo), "--once"],
     )
     assert main() == 0
 
     output = capsys.readouterr().out
     assert "Initial scan:" in output
     assert "Scan index:" in output
-    assert (repo / ".contextbudget" / "scan-index.json").exists()
+    assert (repo / ".redcon" / "scan-index.json").exists()
 
 
 def test_cli_pack_reports_token_estimator_fallback(tmp_path: Path, monkeypatch, capsys) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
     _write(
-        repo / "contextbudget.toml",
+        repo / "redcon.toml",
         """
 [tokens]
 backend = "exact"
@@ -528,15 +528,15 @@ fallback_backend = "model_aligned"
     )
     _write(repo / "src" / "auth.py", "def login() -> bool:\n    return True\n" * 20)
 
-    from contextbudget.core import tokens as token_module
+    from redcon.core import tokens as token_module
 
-    monkeypatch.setattr("contextbudget.core.tokens._load_tiktoken", lambda: None)
+    monkeypatch.setattr("redcon.core.tokens._load_tiktoken", lambda: None)
     token_module._resolve_builtin_token_estimator.cache_clear()
     try:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "pack", "update auth flow", "--repo", str(repo), "--out-prefix", "token-run"],
+            ["redcon", "pack", "update auth flow", "--repo", str(repo), "--out-prefix", "token-run"],
         )
         assert main() == 0
     finally:
@@ -551,7 +551,7 @@ def test_cli_pack_reports_model_profile_assumptions(tmp_path: Path, monkeypatch,
     repo = tmp_path / "repo"
     repo.mkdir()
     _write(
-        repo / "contextbudget.toml",
+        repo / "redcon.toml",
         'model_profile = "claude-sonnet-4"\n',
     )
     _write(repo / "src" / "auth.py", "def login() -> bool:\n    return True\n")
@@ -560,7 +560,7 @@ def test_cli_pack_reports_model_profile_assumptions(tmp_path: Path, monkeypatch,
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "pack",
             "update auth flow",
             "--repo",
@@ -585,13 +585,13 @@ def test_cli_pack_reports_model_profile_assumptions(tmp_path: Path, monkeypatch,
 def _make_run_json(tmp_path: Path, *, repo: Path) -> Path:
     """Pack a repo and return the path to the generated run.json."""
     monkeypatch_obj = None  # helper used inline below
-    import contextbudget.cli as cli_mod
+    import redcon.cli as cli_mod
     import sys
 
     run_prefix = str(tmp_path / "enforce-run")
     old_argv = sys.argv[:]
     sys.argv = [
-        "contextbudget",
+        "redcon",
         "pack",
         "search feature",
         "--repo",
@@ -614,7 +614,7 @@ def test_cli_enforce_pass(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-run"],
+        ["redcon", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-run"],
     )
     assert main() == 0
     run_json = tmp_path / "enf-run.json"
@@ -628,7 +628,7 @@ def test_cli_enforce_pass(tmp_path: Path, monkeypatch) -> None:
 
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "enforce", str(policy_path), str(run_json)],
+        ["redcon", "enforce", str(policy_path), str(run_json)],
     )
     assert main() == 0
 
@@ -641,7 +641,7 @@ def test_cli_enforce_fail_token_limit(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-fail"],
+        ["redcon", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-fail"],
     )
     assert main() == 0
     run_json = tmp_path / "enf-fail.json"
@@ -655,7 +655,7 @@ def test_cli_enforce_fail_token_limit(tmp_path: Path, monkeypatch) -> None:
 
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "enforce", str(policy_path), str(run_json)],
+        ["redcon", "enforce", str(policy_path), str(run_json)],
     )
     assert main() == 2
 
@@ -668,7 +668,7 @@ def test_cli_enforce_fail_context_size_bytes(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-bytes"],
+        ["redcon", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-bytes"],
     )
     assert main() == 0
     run_json = tmp_path / "enf-bytes.json"
@@ -682,7 +682,7 @@ def test_cli_enforce_fail_context_size_bytes(tmp_path: Path, monkeypatch) -> Non
 
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "enforce", str(policy_path), str(run_json)],
+        ["redcon", "enforce", str(policy_path), str(run_json)],
     )
     assert main() == 2
 
@@ -694,7 +694,7 @@ def test_cli_enforce_missing_policy_file(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "enforce", str(tmp_path / "nonexistent.toml"), str(run_json)],
+        ["redcon", "enforce", str(tmp_path / "nonexistent.toml"), str(run_json)],
     )
     assert main() == 2
 
@@ -706,6 +706,6 @@ def test_cli_enforce_missing_run_file(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "enforce", str(policy_path), str(tmp_path / "nonexistent.json")],
+        ["redcon", "enforce", str(policy_path), str(tmp_path / "nonexistent.json")],
     )
     assert main() == 2

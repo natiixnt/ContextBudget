@@ -1,7 +1,7 @@
-# ContextBudget Summary Report
+# Redcon Summary Report
 
 Task: large service layer refactor
-Repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/large-refactor/repo
+Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/large-refactor/repo
 Generated at: 2026-03-12T19:45:56.375103+00:00
 
 - Estimated input tokens: 80

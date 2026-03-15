@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Agent run benchmark dataset builder for ContextBudget.
+"""Agent run benchmark dataset builder for Redcon.
 
 Measures token reduction across four canonical agent run scenarios by comparing
-full-repository baseline context against ContextBudget's optimised compressed-pack
+full-repository baseline context against Redcon's optimised compressed-pack
 selection.  Produces both per-task artifacts and an aggregated dataset report.
 
 Output artifacts (all under docs/benchmarks/)
@@ -37,12 +37,12 @@ from pathlib import Path
 _repo_root = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(_repo_root))
 
-from contextbudget import ContextBudgetEngine  # noqa: E402
-from contextbudget.core.agent_run_dataset_builder import (  # noqa: E402
+from redcon import RedconEngine  # noqa: E402
+from redcon.core.agent_run_dataset_builder import (  # noqa: E402
     AGENT_RUN_TASKS,
     agent_run_dataset_as_dict,
 )
-from contextbudget.core.dataset import (  # noqa: E402
+from redcon.core.dataset import (  # noqa: E402
     DatasetEntry,
     DatasetReport,
 )
@@ -69,7 +69,7 @@ _SLUG: dict[str, str] = {
 # Per-task descriptions used in Markdown reports
 _TASK_DESCRIPTIONS: dict[str, str] = {
     "Add Caching": (
-        "Evaluates how well ContextBudget selects the task service, "
+        "Evaluates how well Redcon selects the task service, "
         "route handlers, and repository layer when the goal is to "
         "introduce a caching layer."
     ),
@@ -246,7 +246,7 @@ def _render_dataset_report(report_dict: dict) -> str:
     lines: list[str] = [
         "# Agent Run Benchmark Dataset: Token Reduction Report",
         "",
-        "Reproducible evidence of token savings when using ContextBudget's optimised "
+        "Reproducible evidence of token savings when using Redcon's optimised "
         "context selection versus naive full-repository context across four canonical "
         "agent run scenarios.",
         "",
@@ -304,7 +304,7 @@ def _render_dataset_report(report_dict: dict) -> str:
             f"> {task_desc}",
             "",
             f"- **Baseline:** {baseline:,} tokens (full repo, no selection)",
-            f"- **Optimized:** {optimized:,} tokens (ContextBudget compressed pack)",
+            f"- **Optimized:** {optimized:,} tokens (Redcon compressed pack)",
             f"- **Saved:** {saved:,} tokens ({_pct_float(reduction)} reduction)",
             "",
         ]
@@ -334,7 +334,7 @@ def _render_dataset_report(report_dict: dict) -> str:
 
 
 def _clear_cache(dataset_dir: Path) -> None:
-    cache_file = dataset_dir / ".contextbudget_cache.json"
+    cache_file = dataset_dir / ".redcon_cache.json"
     if cache_file.exists():
         cache_file.unlink()
 
@@ -399,9 +399,9 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     _clear_cache(DATASET_DIR)
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
 
-    print("ContextBudget agent run benchmark dataset builder")
+    print("Redcon agent run benchmark dataset builder")
     print(f"  dataset : {DATASET_DIR}")
     print(f"  output  : {OUT_DIR}")
     print(f"  budget  : {MAX_TOKENS:,} tokens, top {TOP_FILES} files")

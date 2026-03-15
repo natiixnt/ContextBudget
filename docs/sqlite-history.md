@@ -1,25 +1,25 @@
 # SQLite Run History
 
-Starting with v1.0-alpha, ContextBudget uses a SQLite database to store run history instead of a flat JSON file.
+Starting with v1.0-alpha, Redcon uses a SQLite database to store run history instead of a flat JSON file.
 
 ## Why SQLite
 
 - **Indexed queries** — history lookups for scoring are O(log n) instead of full-file scans
 - **Concurrent writes** — SQLite handles concurrent appends from parallel agents without corruption
 - **No size limit** — avoids the memory and parse cost of loading large JSON arrays on every run
-- **Inspectable** — any SQLite viewer works (`sqlite3 .contextbudget/history.db .tables`)
+- **Inspectable** — any SQLite viewer works (`sqlite3 .redcon/history.db .tables`)
 
 ## Default paths
 
 | File | Purpose |
 |---|---|
-| `.contextbudget/history.db` | SQLite history database (new default) |
-| `.contextbudget/history.json` | Legacy JSON history (still read if SQLite unavailable) |
-| `.contextbudget/history.json.migrated` | Renamed original after auto-migration |
+| `.redcon/history.db` | SQLite history database (new default) |
+| `.redcon/history.json` | Legacy JSON history (still read if SQLite unavailable) |
+| `.redcon/history.json.migrated` | Renamed original after auto-migration |
 
 ## Auto-migration
 
-On first access after upgrading to v1.0-alpha, ContextBudget automatically:
+On first access after upgrading to v1.0-alpha, Redcon automatically:
 
 1. Detects the existing `history.json`
 2. Imports all entries into `history.db`
@@ -32,8 +32,8 @@ No manual steps are required. The migration is idempotent — if `history.db` al
 ```toml
 [cache]
 run_history_enabled = true
-history_db = ".contextbudget/history.db"   # SQLite path (new)
-history_file = ".contextbudget/history.json"  # Legacy JSON path (still used for fallback)
+history_db = ".redcon/history.db"   # SQLite path (new)
+history_file = ".redcon/history.json"  # Legacy JSON path (still used for fallback)
 history_max_entries = 200
 ```
 
@@ -47,7 +47,7 @@ history_db = ""  # empty string disables SQLite
 Or pass `use_sqlite=False` to the Python API:
 
 ```python
-from contextbudget.cache import load_run_history
+from redcon.cache import load_run_history
 
 entries = load_run_history(repo_path, use_sqlite=False)
 ```
@@ -76,7 +76,7 @@ List/array fields (`selected_files`, etc.) are stored as JSON strings.
 ## Querying directly
 
 ```bash
-sqlite3 .contextbudget/history.db \
+sqlite3 .redcon/history.db \
   "SELECT generated_at, task, json_array_length(selected_files) \
    FROM run_history ORDER BY generated_at DESC LIMIT 10;"
 ```

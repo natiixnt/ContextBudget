@@ -1,4 +1,4 @@
-# ContextBudget Dependency Graph
+# Redcon Dependency Graph
 
 Repository: .
 Generated at: 2026-03-15T11:30:00Z

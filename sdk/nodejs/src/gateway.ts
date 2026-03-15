@@ -1,5 +1,5 @@
 /**
- * ContextBudget Runtime Gateway client.
+ * Redcon Runtime Gateway client.
  *
  * Wraps the three gateway endpoints:
  *   - POST /prepare-context    — stateless context optimization
@@ -8,11 +8,11 @@
  *
  * @example
  * ```ts
- * import { GatewayClient } from "@contextbudget/sdk/gateway";
+ * import { GatewayClient } from "@redcon/sdk/gateway";
  *
  * const client = new GatewayClient({
  *   baseUrl: "http://localhost:8787",
- *   apiKey: process.env.CB_GATEWAY_API_KEY,
+ *   apiKey: process.env.RC_GATEWAY_API_KEY,
  * });
  *
  * const ctx = await client.prepareContext({

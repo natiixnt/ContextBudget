@@ -1,4 +1,4 @@
-# ContextBudget Architecture Advice
+# Redcon Architecture Advice
 
 Repository: .
 Generated at: 2026-03-15T11:15:00Z

@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget.core.benchmark import run_benchmark
-from contextbudget.core.pipeline import as_json_dict, run_pack
-from contextbudget.core import tokens as token_module
-from contextbudget.core.tokens import (
+from redcon.core.benchmark import run_benchmark
+from redcon.core.pipeline import as_json_dict, run_pack
+from redcon.core import tokens as token_module
+from redcon.core.tokens import (
     describe_builtin_token_estimator,
     estimate_tokens,
     estimate_tokens_model_aligned,
@@ -19,7 +19,7 @@ def _write(path: Path, content: str) -> None:
 
 
 def test_exact_backend_falls_back_deterministically_when_tiktoken_is_missing(monkeypatch) -> None:
-    monkeypatch.setattr("contextbudget.core.tokens._load_tiktoken", lambda: None)
+    monkeypatch.setattr("redcon.core.tokens._load_tiktoken", lambda: None)
     token_module._resolve_builtin_token_estimator.cache_clear()
     try:
         text = "def login(token: str) -> bool:\n    return token.startswith('prod_')\n"
@@ -48,7 +48,7 @@ def test_exact_backend_falls_back_deterministically_when_tiktoken_is_missing(mon
 
 def test_pack_records_selected_token_estimator_backend(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [tokens]
 backend = "model_aligned"
@@ -67,11 +67,11 @@ model = "gpt-4o-mini"
 
 
 def test_benchmark_includes_estimator_samples_and_fallback_status(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr("contextbudget.core.tokens._load_tiktoken", lambda: None)
+    monkeypatch.setattr("redcon.core.tokens._load_tiktoken", lambda: None)
     token_module._resolve_builtin_token_estimator.cache_clear()
     try:
         _write(
-            tmp_path / "contextbudget.toml",
+            tmp_path / "redcon.toml",
             """
 [tokens]
 backend = "exact"
@@ -103,7 +103,7 @@ fallback_backend = "heuristic"
 
 def test_slice_token_estimate_is_lower_than_full_file_tokens(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1

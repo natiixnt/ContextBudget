@@ -30,7 +30,7 @@ export default function SavingsPage() {
           Token compression and cache reuse savings across all runs.
           {!data.connected && !loading && (
             <span className="text-amber-600 font-medium ml-1">
-              No live data — run <code className="font-mono bg-amber-50 px-1 rounded">contextbudget dashboard</code>.
+              No live data — run <code className="font-mono bg-amber-50 px-1 rounded">redcon dashboard</code>.
             </span>
           )}
         </p>

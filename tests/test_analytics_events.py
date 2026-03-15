@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextbudget.telemetry.schemas import (
+from redcon.telemetry.schemas import (
     ANALYTICS_SCHEMA_V1,
     EVENT_SCHEMA_VERSIONS,
     build_analytics_payload,

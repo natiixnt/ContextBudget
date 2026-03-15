@@ -1,6 +1,6 @@
 # Architecture
 
-ContextBudget is organized around a single engine and explicit stage boundaries. CLI commands, Python API calls, workspace runs, agent middleware, and the runtime gateway all route through the same scan, score, pack, render, and policy machinery.
+Redcon is organized around a single engine and explicit stage boundaries. CLI commands, Python API calls, workspace runs, agent middleware, and the runtime gateway all route through the same scan, score, pack, render, and policy machinery.
 
 ## Design Goals
 
@@ -48,18 +48,18 @@ ContextBudget is organized around a single engine and explicit stage boundaries.
 
 ### Entry Points
 
-- `contextbudget/cli.py`: command-line interface (includes `init`, `pack`, `plan`, `gateway`, …)
-- `contextbudget/engine.py`: public library API (`ContextBudgetEngine`)
-- `contextbudget/agents/`: middleware and adapter abstractions
-- `contextbudget/gateway/`: HTTP gateway service for agent frameworks
+- `redcon/cli.py`: command-line interface (includes `init`, `pack`, `plan`, `gateway`, …)
+- `redcon/engine.py`: public library API (`RedconEngine`)
+- `redcon/agents/`: middleware and adapter abstractions
+- `redcon/gateway/`: HTTP gateway service for agent frameworks
 
 These layers delegate into the same core pipeline instead of maintaining parallel implementations.
 
 ### Core Pipeline
 
-`contextbudget/core/pipeline.py` is the high-level orchestrator. It re-exports `as_json_dict` and the `run_*` functions used by the engine and CLI.
+`redcon/core/pipeline.py` is the high-level orchestrator. It re-exports `as_json_dict` and the `run_*` functions used by the engine and CLI.
 
-`contextbudget/stages/workflow.py` is the **canonical stage implementation** — this is the single source of truth for:
+`redcon/stages/workflow.py` is the **canonical stage implementation** — this is the single source of truth for:
 
 - `run_scan_stage` / `run_scan_refresh_stage` / `run_scan_workspace_stage`
 - `run_score_stage`
@@ -69,28 +69,28 @@ These layers delegate into the same core pipeline instead of maintaining paralle
 - `build_plan_result` / `build_agent_plan_result`
 - `as_json_dict`
 
-`core/pipeline.py` imports these directly from `stages.workflow` and does **not** re-implement them. All new callers should import stage functions from `contextbudget.stages.workflow`.
+`core/pipeline.py` imports these directly from `stages.workflow` and does **not** re-implement them. All new callers should import stage functions from `redcon.stages.workflow`.
 
 ### Scanning
 
-`contextbudget/scanners/` is responsible for repository traversal and scan-state reuse.
+`redcon/scanners/` is responsible for repository traversal and scan-state reuse.
 
 Key behaviors:
 
 - respects include and ignore rules from config
-- maintains `.contextbudget/scan-index.json`
+- maintains `.redcon/scan-index.json`
 - reuses unchanged file metadata on later runs
 - supports workspace scans by iterating `[[repos]]` entries and tagging files with repo labels
 
 ### Scoring
 
-`contextbudget/scorers/` ranks `FileRecord` values against a task using deterministic relevance heuristics plus import-graph signals.
+`redcon/scorers/` ranks `FileRecord` values against a task using deterministic relevance heuristics plus import-graph signals.
 
 Workspace scoring is cross-repository at the ranking layer: all scanned files are scored together. Import-graph resolution stays repo-local so identical relative paths from different repos do not collide.
 
 ### Compression
 
-`contextbudget/compressors/` reduces ranked files into packed context.
+`redcon/compressors/` reduces ranked files into packed context.
 
 Built-in strategies include:
 
@@ -107,10 +107,10 @@ Compression also owns:
 
 ### Shared Services
 
-- `contextbudget/cache/`: summary cache backends and duplicate-read support
-- `contextbudget/plugins/`: explicit scorer, compressor, and token-estimator extension registry
-- `contextbudget/telemetry/`: optional event sink abstraction
-- `contextbudget/schemas/`: typed dataclasses and artifact models
+- `redcon/cache/`: summary cache backends and duplicate-read support
+- `redcon/plugins/`: explicit scorer, compressor, and token-estimator extension registry
+- `redcon/telemetry/`: optional event sink abstraction
+- `redcon/schemas/`: typed dataclasses and artifact models
 
 ## Artifact Model
 
@@ -149,7 +149,7 @@ Rendered plan and pack artifacts preserve repo provenance so downstream tools ca
 
 ## Agent Middleware Architecture
 
-`contextbudget/agents/middleware.py` adds an agent-facing boundary on top of `ContextBudgetEngine`.
+`redcon/agents/middleware.py` adds an agent-facing boundary on top of `RedconEngine`.
 
 Responsibilities:
 
@@ -159,7 +159,7 @@ Responsibilities:
 - optionally enforce policy
 - optionally record a combined artifact
 
-`contextbudget/agents/adapters.py` defines the adapter abstraction for local integrations. `LocalDemoAgentAdapter` is a simulation of an agent workflow, not a vendor integration.
+`redcon/agents/adapters.py` defines the adapter abstraction for local integrations. `LocalDemoAgentAdapter` is a simulation of an agent workflow, not a vendor integration.
 
 ## Extension Strategy
 

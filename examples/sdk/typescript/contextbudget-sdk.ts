@@ -1,12 +1,12 @@
 /**
- * ContextBudget TypeScript SDK.
+ * Redcon TypeScript SDK.
  *
  * Architecture
  * ────────────
- *   agent → ContextBudgetSDK → Python bridge → ContextBudget pipeline → model
+ *   agent → RedconSDK → Python bridge → Redcon pipeline → model
  *
  * The SDK spawns a lightweight Python bridge process (_bridge.py) for each
- * call.  The bridge runs the full ContextBudget pipeline in-process and
+ * call.  The bridge runs the full Redcon pipeline in-process and
  * returns a JSON artifact over stdout.
  *
  * Three primary entry points
@@ -17,15 +17,15 @@
  *
  * Quick-start
  * ──────────
- *   import { ContextBudgetSDK } from "./contextbudget-sdk";
+ *   import { RedconSDK } from "./redcon-sdk";
  *
- *   const sdk = new ContextBudgetSDK({ maxTokens: 32_000 });
+ *   const sdk = new RedconSDK({ maxTokens: 32_000 });
  *   const result = await sdk.prepareContext("add caching", { repo: "." });
  *   const prompt  = result.agent_middleware.metadata.estimated_input_tokens;
  *
  * Prerequisites
  * ─────────────
- *   pip install contextbudget   (or `pip install -e .` from repo root)
+ *   pip install redcon   (or `pip install -e .` from repo root)
  */
 
 import { spawnSync } from "child_process";
@@ -56,8 +56,8 @@ function callBridge<T>(
 ): T {
   if (!fs.existsSync(BRIDGE_SCRIPT)) {
     throw new Error(
-      `ContextBudget bridge script not found at ${BRIDGE_SCRIPT}. ` +
-        "Ensure _bridge.py is in the same directory as contextbudget-sdk.ts.",
+      `Redcon bridge script not found at ${BRIDGE_SCRIPT}. ` +
+        "Ensure _bridge.py is in the same directory as redcon-sdk.ts.",
     );
   }
 
@@ -76,34 +76,34 @@ function callBridge<T>(
   if (proc.status !== 0) {
     const stderr = (proc.stderr ?? "").trim();
     throw new Error(
-      `ContextBudget bridge exited with code ${proc.status}${stderr ? `: ${stderr}` : ""}`,
+      `Redcon bridge exited with code ${proc.status}${stderr ? `: ${stderr}` : ""}`,
     );
   }
 
   const stdout = (proc.stdout ?? "").trim();
   if (!stdout) {
-    throw new Error("ContextBudget bridge returned empty output");
+    throw new Error("Redcon bridge returned empty output");
   }
 
   try {
     return JSON.parse(stdout) as T;
   } catch {
-    throw new Error(`ContextBudget bridge returned invalid JSON: ${stdout.slice(0, 200)}`);
+    throw new Error(`Redcon bridge returned invalid JSON: ${stdout.slice(0, 200)}`);
   }
 }
 
 // ---------------------------------------------------------------------------
-// ContextBudgetSDK
+// RedconSDK
 // ---------------------------------------------------------------------------
 
 /**
- * TypeScript SDK entry point for ContextBudget agent framework integration.
+ * TypeScript SDK entry point for Redcon agent framework integration.
  *
  * Each method call spawns the Python bridge once and returns a typed result.
  * Calls are synchronous (spawnSync) so they can be used inside agent loops
  * without additional async wiring.
  */
-export class ContextBudgetSDK {
+export class RedconSDK {
   private readonly pythonBin: string;
   private readonly maxTokens: number | undefined;
   private readonly topFiles: number | undefined;
@@ -117,7 +117,7 @@ export class ContextBudgetSDK {
   /**
    * Pack repository context for a task under the configured token budget.
    *
-   * Runs the full ContextBudget pipeline — scan, rank, compress, cache —
+   * Runs the full Redcon pipeline — scan, rank, compress, cache —
    * and returns a structured result containing the compressed context and
    * additive middleware metadata.
    *
@@ -219,10 +219,10 @@ export class ContextBudgetSDK {
 // Module-level convenience functions
 // ---------------------------------------------------------------------------
 
-let _defaultSdk: ContextBudgetSDK | undefined;
+let _defaultSdk: RedconSDK | undefined;
 
-function getDefaultSdk(): ContextBudgetSDK {
-  _defaultSdk ??= new ContextBudgetSDK();
+function getDefaultSdk(): RedconSDK {
+  _defaultSdk ??= new RedconSDK();
   return _defaultSdk;
 }
 
@@ -230,7 +230,7 @@ function getDefaultSdk(): ContextBudgetSDK {
  * Prepare packed context for a task (module-level convenience).
  *
  * @example
- * import { prepareContext } from "./contextbudget-sdk";
+ * import { prepareContext } from "./redcon-sdk";
  * const result = prepareContext("add caching", ".", { maxTokens: 28_000 });
  */
 export function prepareContext(
@@ -245,7 +245,7 @@ export function prepareContext(
  * Simulate agent token and cost estimates (module-level convenience).
  *
  * @example
- * import { simulateAgent } from "./contextbudget-sdk";
+ * import { simulateAgent } from "./redcon-sdk";
  * const plan = simulateAgent("add caching", ".", { model: "claude-sonnet-4-6" });
  */
 export function simulateAgent(
@@ -260,7 +260,7 @@ export function simulateAgent(
  * Pack and return profiling metrics (module-level convenience).
  *
  * @example
- * import { profileRun } from "./contextbudget-sdk";
+ * import { profileRun } from "./redcon-sdk";
  * const prof = profileRun("add caching", ".");
  */
 export function profileRun(

@@ -1,5 +1,5 @@
 /**
- * ContextBudget Cloud API client.
+ * Redcon Cloud API client.
  *
  * Covers the full control-plane and analytics surface:
  *   - Org / Project / Repo management
@@ -14,11 +14,11 @@
  *
  * @example
  * ```ts
- * import { CloudClient } from "@contextbudget/sdk/cloud";
+ * import { CloudClient } from "@redcon/sdk/cloud";
  *
  * const client = new CloudClient({
  *   baseUrl: "https://cloud.example.com",
- *   apiKey: "cbk_...",
+ *   apiKey: "rck_...",
  * });
  *
  * const roi = await client.getDashboardROI();

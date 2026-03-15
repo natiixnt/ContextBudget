@@ -1,7 +1,7 @@
-# ContextBudget Summary Report
+# Redcon Summary Report
 
 Task: refactor auth exports
-Repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/language-aware/repo
+Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/language-aware/repo
 Generated at: 2026-03-12T19:47:21.954995+00:00
 
 - Estimated input tokens: 166

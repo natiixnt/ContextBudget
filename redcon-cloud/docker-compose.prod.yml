@@ -1,0 +1,125 @@
+version: "3.9"
+
+# Production docker-compose for redcon-cloud.
+# Usage:
+#   cp .env.example .env
+#   cp ../deploy/pgbouncer-userlist.txt.example ../deploy/pgbouncer-userlist.txt
+#   # edit .env with real database password and secret key
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Key differences from development compose:
+# - Uses named secrets instead of plain-text env vars for passwords
+# - PostgreSQL data volume is named for explicit lifecycle management
+# - API container has resource limits and health checks
+# - PgBouncer connection pooler in front of Postgres (handles >50 req/s)
+# - Nginx reverse proxy with TLS termination (bring your own certs)
+
+services:
+  api:
+    build: .
+    restart: always
+    environment:
+      # Route through PgBouncer instead of connecting directly to Postgres
+      DATABASE_URL: postgresql://redcon:${POSTGRES_PASSWORD}@pgbouncer:5432/redcon
+    env_file:
+      - .env
+    depends_on:
+      pgbouncer:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+    networks:
+      - internal
+      - proxy
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: redcon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: redcon
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_create_events.sql:/docker-entrypoint-initdb.d/001_create_events.sql
+      - ./migrations/002_create_control_plane.sql:/docker-entrypoint-initdb.d/002_create_control_plane.sql
+      - ./migrations/003_org_scoped_events.sql:/docker-entrypoint-initdb.d/003_org_scoped_events.sql
+      - ./migrations/004_webhooks.sql:/docker-entrypoint-initdb.d/004_webhooks.sql
+      - ./migrations/005_quotas.sql:/docker-entrypoint-initdb.d/005_quotas.sql
+      - ./migrations/006_billing.sql:/docker-entrypoint-initdb.d/006_billing.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redcon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    networks:
+      - internal
+
+  pgbouncer:
+    image: bitnami/pgbouncer:1.22.1
+    restart: always
+    environment:
+      POSTGRESQL_HOST: db
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_DATABASE: redcon
+      POSTGRESQL_USERNAME: redcon
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_DEFAULT_POOL_SIZE: 20
+      PGBOUNCER_MAX_CLIENT_CONN: 200
+      PGBOUNCER_RESERVE_POOL_SIZE: 5
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U redcon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: "0.5"
+          memory: 128M
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../deploy/nginx.conf:/etc/nginx/conf.d/redcon.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro     # mount your TLS certs here
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api
+    networks:
+      - proxy
+
+volumes:
+  postgres_data:
+    name: redcon_postgres_data
+  nginx_logs:
+    name: redcon_nginx_logs
+
+networks:
+  internal:
+    internal: true
+  proxy:

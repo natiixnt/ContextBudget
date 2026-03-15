@@ -1,10 +1,10 @@
-"""Explicit agent → ContextBudget → model middleware pipeline.
+"""Explicit agent → Redcon → model middleware pipeline.
 
 Shows the full prepare → enforce → record flow in two styles:
 
     Option A:  module-level helper functions  (lowest ceremony)
-    Option B:  ContextBudgetMiddleware class  (reusable, composable)
-    Option C:  ContextBudgetSDK.middleware()  (SDK-owned engine)
+    Option B:  RedconMiddleware class  (reusable, composable)
+    Option C:  RedconSDK.middleware()  (SDK-owned engine)
 
 The middleware layer sits between agent and model without touching the
 transport, authentication, or inference code.
@@ -13,16 +13,16 @@ Run from the repository root:
     python examples/sdk/python/middleware_pattern.py
 """
 
-from contextbudget import (
+from redcon import (
     AgentTaskRequest,
     BudgetPolicyViolationError,
-    ContextBudgetEngine,
-    ContextBudgetMiddleware,
+    RedconEngine,
+    RedconMiddleware,
     enforce_budget,
     prepare_context,
     record_run,
 )
-from contextbudget.sdk import ContextBudgetSDK
+from redcon.sdk import RedconSDK
 
 TASK = "refactor auth middleware token validation"
 REPO = "examples/risky-auth-change/repo"
@@ -39,7 +39,7 @@ result = prepare_context(
     metadata={"agent": "my-agent", "session": "sess-001"},
 )
 
-policy = ContextBudgetEngine.make_policy(
+policy = RedconEngine.make_policy(
     max_estimated_input_tokens=28_000,
     max_quality_risk_level="medium",
 )
@@ -65,11 +65,11 @@ print(f"  prompt length:  {len(prompt)} chars")
 print()
 
 # -----------------------------------------------------------------------
-# Option B — reusable ContextBudgetMiddleware instance
+# Option B — reusable RedconMiddleware instance
 # -----------------------------------------------------------------------
-print("=== Option B: ContextBudgetMiddleware ===")
+print("=== Option B: RedconMiddleware ===")
 
-middleware = ContextBudgetMiddleware()
+middleware = RedconMiddleware()
 
 request = AgentTaskRequest(
     task=TASK,
@@ -96,9 +96,9 @@ print()
 # -----------------------------------------------------------------------
 # Option C — SDK-owned middleware (shares engine state)
 # -----------------------------------------------------------------------
-print("=== Option C: ContextBudgetSDK.middleware() ===")
+print("=== Option C: RedconSDK.middleware() ===")
 
-sdk = ContextBudgetSDK(max_tokens=28_000)
+sdk = RedconSDK(max_tokens=28_000)
 mw = sdk.middleware()
 
 request3 = AgentTaskRequest(task=TASK, repo=REPO, max_tokens=28_000)

@@ -1,6 +1,6 @@
-name: "ContextBudget"
+name: "Redcon"
 description: "Optimize LLM context windows, enforce token budgets, and track cost savings across CI runs."
-author: "ContextBudget"
+author: "Redcon"
 
 branding:
   icon: "zap"
@@ -23,7 +23,7 @@ inputs:
   policy:
     description: >
       Path to a policy TOML file defining token budgets and quality constraints.
-      Example: .github/contextbudget-policy.toml
+      Example: .github/redcon-policy.toml
     required: false
     default: ""
 
@@ -48,24 +48,24 @@ inputs:
     default: "true"
 
   out-prefix:
-    description: "Output file prefix for JSON and Markdown artifacts (default: contextbudget-ci)."
+    description: "Output file prefix for JSON and Markdown artifacts (default: redcon-ci)."
     required: false
-    default: "contextbudget-ci"
+    default: "redcon-ci"
 
   model:
     description: >
       Model name for cost-analysis pricing (default: gpt-4o).
-      Run 'contextbudget cost-analysis --list-models' to see all supported models.
+      Run 'redcon cost-analysis --list-models' to see all supported models.
     required: false
     default: "gpt-4o"
 
   cloud-url:
-    description: "ContextBudget Cloud URL for sending telemetry events (optional)."
+    description: "Redcon Cloud URL for sending telemetry events (optional)."
     required: false
     default: ""
 
   cloud-api-key:
-    description: "API key for authenticating with ContextBudget Cloud (optional)."
+    description: "API key for authenticating with Redcon Cloud (optional)."
     required: false
     default: ""
 
@@ -101,13 +101,13 @@ outputs:
 runs:
   using: "composite"
   steps:
-    - name: Install ContextBudget
+    - name: Install Redcon
       shell: bash
       run: |
         python -m pip install --quiet --upgrade pip
-        python -m pip install --quiet contextbudget
+        python -m pip install --quiet redcon
 
-    - name: Run ContextBudget pack
+    - name: Run Redcon pack
       id: pack
       shell: bash
       run: |
@@ -130,7 +130,7 @@ runs:
           ARGS+=(--strict)
         fi
 
-        python -m contextbudget.cli "${ARGS[@]}" 2>&1 | tee /tmp/cb-pack-output.txt || true
+        python -m redcon.cli "${ARGS[@]}" 2>&1 | tee /tmp/cb-pack-output.txt || true
 
         # Parse key metrics from the JSON artifact
         JSON="${{ inputs.out-prefix }}.json"
@@ -163,7 +163,7 @@ runs:
         if [[ -n "${{ inputs.policy }}" && -f "${{ inputs.policy }}" ]]; then
           ARGS+=(--policy "${{ inputs.policy }}")
         fi
-        python -m contextbudget.cli "${ARGS[@]}"
+        python -m redcon.cli "${ARGS[@]}"
 
     - name: Compute cost savings
       id: cost
@@ -172,7 +172,7 @@ runs:
       run: |
         set -euo pipefail
         if [[ -f "${{ inputs.out-prefix }}.json" ]]; then
-          RESULT=$(python -m contextbudget.cli cost-analysis "${{ inputs.out-prefix }}.json" \
+          RESULT=$(python -m redcon.cli cost-analysis "${{ inputs.out-prefix }}.json" \
             --model "${{ inputs.model }}" --format json 2>/dev/null || echo '{}')
           DOLLARS=$(python3 -c "import json; d=json.loads('$RESULT'); print(round(d.get('saved_cost_usd',0),4))" 2>/dev/null || echo "0")
           echo "dollars_saved=$DOLLARS" >> "$GITHUB_OUTPUT"
@@ -185,7 +185,7 @@ runs:
       shell: bash
       run: |
         {
-          echo "## ContextBudget Results"
+          echo "## Redcon Results"
           echo ""
           echo "| Metric | Value |"
           echo "|--------|-------|"
@@ -211,7 +211,7 @@ runs:
       shell: bash
       run: |
         if [[ "${{ steps.pack.outputs.policy_passed }}" != "true" ]]; then
-          echo "ContextBudget: policy check FAILED in strict mode."
+          echo "Redcon: policy check FAILED in strict mode."
           exit 1
         fi
 
@@ -219,7 +219,7 @@ runs:
       if: inputs.upload-artifacts == 'true'
       uses: actions/upload-artifact@v4
       with:
-        name: contextbudget-artifacts
+        name: redcon-artifacts
         path: |
           ${{ inputs.out-prefix }}.json
           ${{ inputs.out-prefix }}.md

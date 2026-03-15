@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
 from tests.support_git import build_pr_audit_repo
 
@@ -11,7 +11,7 @@ from tests.support_git import build_pr_audit_repo
 def test_pr_audit_reports_token_growth_and_drivers(tmp_path: Path) -> None:
     repo, base_commit, head_commit = build_pr_audit_repo(tmp_path)
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     data = engine.pr_audit(repo=repo, base_ref=base_commit, head_ref=head_commit)
 
     assert data["command"] == "pr-audit"
@@ -22,7 +22,7 @@ def test_pr_audit_reports_token_growth_and_drivers(tmp_path: Path) -> None:
     assert "auth/service.py" in data["files_causing_increase"]
     assert "api/router.py" in data["files_causing_increase"]
     assert any(item["name"] == "httpx" for item in data["new_dependencies"])
-    assert "## ContextBudget Analysis" in data["comment_markdown"]
+    assert "## Redcon Analysis" in data["comment_markdown"]
     assert data["suggestions"]
 
 
@@ -42,7 +42,7 @@ def test_pr_audit_resolves_refs_from_github_event_payload(tmp_path: Path, monkey
     )
     monkeypatch.setenv("GITHUB_EVENT_PATH", str(event_path))
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     data = engine.pr_audit(repo=repo)
 
     assert data["base_commit"] == base_commit

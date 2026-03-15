@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Tests for the ContextBudget Runtime Gateway.
+"""Tests for the Redcon Runtime Gateway.
 
 Covers:
 - GatewayConfig construction and env-var loading
@@ -24,9 +24,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-from contextbudget.agents.middleware import AgentMiddlewareResult, AgentTaskRequest
-from contextbudget.gateway import GatewayConfig, GatewayHandlers, GatewayServer
-from contextbudget.gateway.models import (
+from redcon.agents.middleware import AgentMiddlewareResult, AgentTaskRequest
+from redcon.gateway import GatewayConfig, GatewayHandlers, GatewayServer
+from redcon.gateway.models import (
     OptimizedContext,
     PolicyStatus,
     PrepareContextRequest,
@@ -36,9 +36,9 @@ from contextbudget.gateway.models import (
     RunAgentStepRequest,
     RunAgentStepResponse,
 )
-from contextbudget.runtime.context import PreparedContext, RuntimeResult
-from contextbudget.runtime.session import RuntimeSession
-from contextbudget.telemetry import TelemetryEvent
+from redcon.runtime.context import PreparedContext, RuntimeResult
+from redcon.runtime.session import RuntimeSession
+from redcon.telemetry import TelemetryEvent
 
 
 # ---------------------------------------------------------------------------
@@ -134,12 +134,12 @@ class TestGatewayConfig:
         assert cfg.log_requests is True
 
     def test_from_env(self, monkeypatch):
-        monkeypatch.setenv("CB_GATEWAY_HOST", "0.0.0.0")
-        monkeypatch.setenv("CB_GATEWAY_PORT", "9090")
-        monkeypatch.setenv("CB_GATEWAY_MAX_TOKENS", "64000")
-        monkeypatch.setenv("CB_GATEWAY_MAX_FILES", "50")
-        monkeypatch.setenv("CB_GATEWAY_TELEMETRY", "true")
-        monkeypatch.setenv("CB_GATEWAY_LOG_REQUESTS", "false")
+        monkeypatch.setenv("RC_GATEWAY_HOST", "0.0.0.0")
+        monkeypatch.setenv("RC_GATEWAY_PORT", "9090")
+        monkeypatch.setenv("RC_GATEWAY_MAX_TOKENS", "64000")
+        monkeypatch.setenv("RC_GATEWAY_MAX_FILES", "50")
+        monkeypatch.setenv("RC_GATEWAY_TELEMETRY", "true")
+        monkeypatch.setenv("RC_GATEWAY_LOG_REQUESTS", "false")
 
         cfg = GatewayConfig.from_env()
         assert cfg.host == "0.0.0.0"
@@ -155,8 +155,8 @@ class TestGatewayConfig:
 
     def test_from_env_defaults_when_vars_absent(self, monkeypatch):
         for key in [
-            "CB_GATEWAY_HOST", "CB_GATEWAY_PORT", "CB_GATEWAY_MAX_TOKENS",
-            "CB_GATEWAY_MAX_FILES", "CB_GATEWAY_TELEMETRY", "CB_GATEWAY_LOG_REQUESTS",
+            "RC_GATEWAY_HOST", "RC_GATEWAY_PORT", "RC_GATEWAY_MAX_TOKENS",
+            "RC_GATEWAY_MAX_FILES", "RC_GATEWAY_TELEMETRY", "RC_GATEWAY_LOG_REQUESTS",
         ]:
             monkeypatch.delenv(key, raising=False)
         cfg = GatewayConfig.from_env()
@@ -252,8 +252,8 @@ class TestGatewayHandlers:
 
     @pytest.fixture
     def handlers(self, config, telemetry_sink):
-        with patch("contextbudget.gateway.handlers.ContextBudgetEngine"):
-            with patch("contextbudget.gateway.handlers.ContextBudgetMiddleware") as MockMW:
+        with patch("redcon.gateway.handlers.RedconEngine"):
+            with patch("redcon.gateway.handlers.RedconMiddleware") as MockMW:
                 middleware_instance = MagicMock()
                 MockMW.return_value = middleware_instance
                 h = GatewayHandlers(config, telemetry_sink=telemetry_sink)
@@ -305,7 +305,7 @@ class TestGatewayHandlers:
         h, mw = handlers
         ctx = _fake_prepared_context()
         with patch.object(h, "_sessions", {}):
-            with patch("contextbudget.gateway.handlers.AgentRuntime") as MockRT:
+            with patch("redcon.gateway.handlers.AgentRuntime") as MockRT:
                 rt_instance = MagicMock()
                 rt_instance.session.session_id = "new-session"
                 rt_instance.session.turn_number = 0
@@ -388,14 +388,14 @@ class TestGatewayServerHTTP:
         ctx = _fake_prepared_context(artifact)
         rt_result = _fake_runtime_result(ctx)
 
-        with patch("contextbudget.gateway.handlers.ContextBudgetEngine"):
-            with patch("contextbudget.gateway.handlers.ContextBudgetMiddleware") as MockMW:
+        with patch("redcon.gateway.handlers.RedconEngine"):
+            with patch("redcon.gateway.handlers.RedconMiddleware") as MockMW:
                 mw_inst = MagicMock()
                 mw_inst.prepare_context.return_value = mw_result
                 mw_inst.enforce_budget.return_value = mw_result
                 MockMW.return_value = mw_inst
 
-                with patch("contextbudget.gateway.handlers.AgentRuntime") as MockRT:
+                with patch("redcon.gateway.handlers.AgentRuntime") as MockRT:
                     rt_inst = MagicMock()
                     rt_inst.session.session_id = "srv-session"
                     rt_inst.session.turn_number = 0
@@ -488,23 +488,23 @@ class TestGatewayServerHTTP:
 
 class TestSDKGatewayExports:
     def test_gateway_config_importable_from_sdk(self):
-        from contextbudget.sdk import GatewayConfig as SDKGatewayConfig
+        from redcon.sdk import GatewayConfig as SDKGatewayConfig
         assert SDKGatewayConfig is GatewayConfig
 
     def test_gateway_server_importable_from_sdk(self):
-        from contextbudget.sdk import GatewayServer as SDKGatewayServer
+        from redcon.sdk import GatewayServer as SDKGatewayServer
         assert SDKGatewayServer is GatewayServer
 
     def test_start_gateway_importable(self):
-        from contextbudget.sdk import start_gateway
+        from redcon.sdk import start_gateway
         assert callable(start_gateway)
 
     def test_start_gateway_starts_server(self):
-        from contextbudget.sdk import start_gateway
+        from redcon.sdk import start_gateway
 
         port = _free_port()
-        with patch("contextbudget.gateway.handlers.ContextBudgetEngine"):
-            with patch("contextbudget.gateway.handlers.ContextBudgetMiddleware") as MockMW:
+        with patch("redcon.gateway.handlers.RedconEngine"):
+            with patch("redcon.gateway.handlers.RedconMiddleware") as MockMW:
                 mw_inst = MagicMock()
                 artifact = _fake_run_artifact()
                 mw_inst.prepare_context.return_value = _fake_middleware_result(artifact)

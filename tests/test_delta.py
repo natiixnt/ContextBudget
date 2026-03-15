@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextbudget.core.delta import build_delta_report
+from redcon.core.delta import build_delta_report
 
 
 def _entry(

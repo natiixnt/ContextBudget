@@ -24,11 +24,11 @@
 Rank relevant files for a natural-language task.
 
 ```bash
-contextbudget plan <task> --repo <path>
-contextbudget plan <task> --workspace <workspace.toml>
+redcon plan <task> --repo <path>
+redcon plan <task> --workspace <workspace.toml>
 ```
 
-Automatically maintains `.contextbudget/scan-index.json` for incremental reuse.
+Automatically maintains `.redcon/scan-index.json` for incremental reuse.
 
 ---
 
@@ -37,8 +37,8 @@ Automatically maintains `.contextbudget/scan-index.json` for incremental reuse.
 Plan context usage across a multi-step agent workflow. The artifact includes step order, context assigned per step, token estimates per step, shared context, and total token estimates.
 
 ```bash
-contextbudget plan-agent <task> --repo <path>
-contextbudget plan-agent <task> --workspace <workspace.toml>
+redcon plan-agent <task> --repo <path>
+redcon plan-agent <task> --workspace <workspace.toml>
 ```
 
 ---
@@ -48,13 +48,13 @@ contextbudget plan-agent <task> --workspace <workspace.toml>
 Build a compressed context package and write `run.json` + `run.md`.
 
 ```bash
-contextbudget pack <task> --repo <path> [--max-tokens N] [--top-files N]
+redcon pack <task> --repo <path> [--max-tokens N] [--top-files N]
 ```
 
 **Incremental (delta) mode** — only changed context is emitted:
 
 ```bash
-contextbudget pack <task> --repo <path> --delta <previous-run.json>
+redcon pack <task> --repo <path> --delta <previous-run.json>
 ```
 
 The `delta` block records:
@@ -64,7 +64,7 @@ The `delta` block records:
 **Workspace mode:**
 
 ```bash
-contextbudget pack <task> --workspace <workspace.toml> [--max-tokens N]
+redcon pack <task> --workspace <workspace.toml> [--max-tokens N]
 ```
 
 ---
@@ -74,8 +74,8 @@ contextbudget pack <task> --workspace <workspace.toml> [--max-tokens N]
 Explain where token savings came from in a pack run.
 
 ```bash
-contextbudget pack "add caching" --repo . --max-tokens 20000
-contextbudget profile run.json [--out-prefix <prefix>]
+redcon pack "add caching" --repo . --max-tokens 20000
+redcon profile run.json [--out-prefix <prefix>]
 ```
 
 Outputs `<prefix>.json` + `<prefix>.md` with savings broken down by stage:
@@ -108,7 +108,7 @@ Outputs `<prefix>.json` + `<prefix>.md` with savings broken down by stage:
 Analyze how a coding agent read repository files. Detects access pattern problems and quantifies wasted tokens.
 
 ```bash
-contextbudget read-profiler run.json [--out-prefix <prefix>]
+redcon read-profiler run.json [--out-prefix <prefix>]
 ```
 
 **Detects:**
@@ -126,7 +126,7 @@ contextbudget read-profiler run.json [--out-prefix <prefix>]
 Render a summary report from a run artifact.
 
 ```bash
-contextbudget report <run.json> [--out <path>] [--policy <policy.toml>]
+redcon report <run.json> [--out <path>] [--policy <policy.toml>]
 ```
 
 ---
@@ -136,7 +136,7 @@ contextbudget report <run.json> [--out <path>] [--policy <policy.toml>]
 Compare two run artifacts.
 
 ```bash
-contextbudget diff old-run.json new-run.json
+redcon diff old-run.json new-run.json
 ```
 
 Inspects: task differences, files added/removed, ranked score changes, token/savings/risk/cache deltas.
@@ -148,7 +148,7 @@ Inspects: task differences, files added/removed, ranked score changes, token/sav
 Analyze a pull request diff directly from git.
 
 ```bash
-contextbudget pr-audit --repo <path> [--base <ref>] [--head <ref>]
+redcon pr-audit --repo <path> [--base <ref>] [--head <ref>]
 ```
 
 Outputs:
@@ -165,11 +165,11 @@ Estimates changed-file token cost before and after the PR, flags files that grew
 **GitHub Actions example:**
 
 ```bash
-contextbudget pr-audit \
+redcon pr-audit \
   --repo . \
   --base "${{ github.event.pull_request.base.sha }}" \
   --head "${{ github.event.pull_request.head.sha }}" \
-  --out-prefix contextbudget-pr
+  --out-prefix redcon-pr
 ```
 
 ---
@@ -179,19 +179,19 @@ contextbudget pr-audit \
 Run the full middleware pipeline: pack context, optionally enforce a budget policy, and write a machine-readable artifact with an additive `agent_middleware` block.
 
 ```bash
-contextbudget prepare-context "add caching to search API" --repo . --max-tokens 20000
+redcon prepare-context "add caching to search API" --repo . --max-tokens 20000
 ```
 
 **With delta mode:**
 
 ```bash
-contextbudget prepare-context "add caching" --repo . --delta previous-run.json
+redcon prepare-context "add caching" --repo . --delta previous-run.json
 ```
 
 **With strict policy enforcement:**
 
 ```bash
-contextbudget prepare-context "large refactor" --repo . --strict --policy policy.toml
+redcon prepare-context "large refactor" --repo . --strict --policy policy.toml
 ```
 
 Returns non-zero when `--strict` is set and a policy violation is detected.
@@ -207,8 +207,8 @@ Compare deterministic strategies for one task:
 - cache-assisted pack
 
 ```bash
-contextbudget benchmark "add rate limiting to auth API" --repo .
-contextbudget benchmark <task> --workspace <workspace.toml>
+redcon benchmark "add rate limiting to auth API" --repo .
+redcon benchmark <task> --workspace <workspace.toml>
 ```
 
 Outputs: terminal summary, JSON artifact, Markdown report, and estimator comparison on local samples.
@@ -220,7 +220,7 @@ Outputs: terminal summary, JSON artifact, Markdown report, and estimator compari
 Aggregate historical pack artifacts into file and directory token heatmaps.
 
 ```bash
-contextbudget heatmap [<history> ...] [--limit N] [--out-prefix <path>]
+redcon heatmap [<history> ...] [--limit N] [--out-prefix <path>]
 ```
 
 Directories are scanned recursively for `*.json` files; non-pack artifacts are skipped.
@@ -232,7 +232,7 @@ Directories are scanned recursively for `*.json` files; non-pack artifacts are s
 Refresh the incremental scan index and print file-change summaries.
 
 ```bash
-contextbudget watch --repo <path> [--poll-interval S] [--once]
+redcon watch --repo <path> [--poll-interval S] [--once]
 ```
 
 **Sample output:**
@@ -240,7 +240,7 @@ contextbudget watch --repo <path> [--poll-interval S] [--once]
 ```
 Watching repository: /repo
 Polling interval: 1.00s
-Scan index: /repo/.contextbudget/scan-index.json
+Scan index: /repo/.redcon/scan-index.json
 Initial scan: repo=/repo tracked=12 included=10 reused=0 added=12 updated=0 removed=0
 added[src/auth.py, src/cache.py, docs/notes.md]
 Scan change: repo=/repo tracked=12 included=10 reused=11 added=0 updated=1 removed=0
@@ -253,7 +253,7 @@ updated[src/auth.py]
 
 | Flag | Description |
 |------|-------------|
-| `--config <path>` | Load a custom `contextbudget.toml` |
+| `--config <path>` | Load a custom `redcon.toml` |
 | `--policy <path>` | Apply a policy TOML file |
 | `--strict` | Return non-zero on policy violations |
 | `--max-tokens N` | Override token budget |
@@ -266,4 +266,4 @@ updated[src/auth.py]
 
 ## Incremental Scan Index
 
-`plan`, `pack`, and `benchmark` automatically maintain `.contextbudget/scan-index.json`. Unchanged files reuse prior scan metadata; changed and deleted files are refreshed incrementally.
+`plan`, `pack`, and `benchmark` automatically maintain `.redcon/scan-index.json`. Unchanged files reuse prior scan metadata; changed and deleted files are refreshed incrementally.

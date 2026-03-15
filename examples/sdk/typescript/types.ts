@@ -1,8 +1,8 @@
 /**
- * ContextBudget TypeScript type definitions.
+ * Redcon TypeScript type definitions.
  *
  * These types mirror the Python SDK's run artifact schema so TypeScript agents
- * get full type safety when consuming ContextBudget output.
+ * get full type safety when consuming Redcon output.
  */
 
 // ---------------------------------------------------------------------------
@@ -147,7 +147,7 @@ export interface ProfileRunResult extends PrepareContextResult {
 // ---------------------------------------------------------------------------
 
 export interface SDKOptions {
-  /** Path to the contextbudget Python binary (default: "contextbudget") */
+  /** Path to the redcon Python binary (default: "redcon") */
   pythonBin?: string;
   /** Default token budget for pack operations */
   maxTokens?: number;

@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextbudget import ContextBudgetEngine
-from contextbudget.core.profiler import (
+from redcon import RedconEngine
+from redcon.core.profiler import (
     STAGE_CACHE_REUSE,
     STAGE_COMPRESSION,
     STAGE_FULL,
@@ -12,7 +12,7 @@ from contextbudget.core.profiler import (
     STAGE_SYMBOL_EXTRACTION,
     build_savings_profile,
 )
-from contextbudget.core.render import render_profile_markdown
+from redcon.core.render import render_profile_markdown
 
 
 def _write(path: Path, content: str) -> None:
@@ -105,7 +105,7 @@ def test_profiler_attributes_cache_reuse_regardless_of_strategy() -> None:
 
 
 def test_profiler_attributes_snippet_strategy_to_snippet_stage() -> None:
-    from contextbudget.core.profiler import STAGE_SNIPPET
+    from redcon.core.profiler import STAGE_SNIPPET
     data = _make_run_data(
         [_make_compressed_entry("f.py", strategy="snippet", chunk_strategy="snippet-keyword", original_tokens=250, compressed_tokens=90)]
     )
@@ -185,7 +185,7 @@ def test_profiler_delta_savings_tracked_from_delta_budget() -> None:
         },
     }
     profile = build_savings_profile(data)
-    from contextbudget.core.profiler import STAGE_DELTA
+    from redcon.core.profiler import STAGE_DELTA
     assert profile.by_stage[STAGE_DELTA].tokens_saved == 850
 
 
@@ -201,7 +201,7 @@ def test_profile_from_real_pack_run_shows_savings(tmp_path: Path) -> None:
     ))
     _write(tmp_path / "src" / "auth.py", "def login(u, p):\n    return True\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="add auth to router", repo=tmp_path, max_tokens=800)
 
     profile = engine.profile(run)
@@ -223,7 +223,7 @@ def test_profile_token_savings_decrease_vs_full_file(tmp_path: Path) -> None:
         [f"def helper_{i}(): return {i}" for i in range(120)]
     ))
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="refactor helpers", repo=tmp_path, max_tokens=500)
     profile = engine.profile(run)
 
@@ -235,7 +235,7 @@ def test_profile_from_json_file(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "service.py", "\n".join(
         [f"def op_{i}(): pass" for i in range(80)]
     ))
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="optimize service", repo=tmp_path, max_tokens=400)
 
     run_json_path = tmp_path / "run.json"
@@ -264,7 +264,7 @@ def test_render_profile_markdown_contains_required_sections() -> None:
     from dataclasses import asdict
     md = render_profile_markdown(asdict(profile_data))
 
-    assert "# ContextBudget Token Savings Profile" in md
+    assert "# Redcon Token Savings Profile" in md
     assert "## Summary" in md
     assert "## Savings by Stage" in md
     assert "## Per-File Breakdown" in md
@@ -282,14 +282,14 @@ def test_cli_profile_writes_json_and_markdown(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "router.py", "\n".join(
         [f"def route_{i}(req): return '{i}'" for i in range(80)]
     ))
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="add auth to router", repo=tmp_path, max_tokens=600)
 
     run_json_path = tmp_path / "run.json"
     run_json_path.write_text(json.dumps(run, default=str), encoding="utf-8")
 
     import sys
-    from contextbudget.cli import build_parser
+    from redcon.cli import build_parser
 
     parser = build_parser()
     args = parser.parse_args(["profile", str(run_json_path), "--out-prefix", str(tmp_path / "profile")])
@@ -312,4 +312,4 @@ def test_cli_profile_writes_json_and_markdown(tmp_path: Path) -> None:
     assert "per_file" in profile_data
 
     md = (tmp_path / "profile.md").read_text(encoding="utf-8")
-    assert "# ContextBudget Token Savings Profile" in md
+    assert "# Redcon Token Savings Profile" in md

@@ -48,19 +48,19 @@ All main commands accept `--workspace` in place of `--repo`:
 
 ```bash
 # Rank files across all repos
-contextbudget plan "add caching" --workspace workspace.toml
+redcon plan "add caching" --workspace workspace.toml
 
 # Plan multi-step workflow across repos
-contextbudget plan-agent "add caching" --workspace workspace.toml
+redcon plan-agent "add caching" --workspace workspace.toml
 
 # Pack context across all repos
-contextbudget pack "add caching" --workspace workspace.toml --max-tokens 28000
+redcon pack "add caching" --workspace workspace.toml --max-tokens 28000
 
 # Compare strategies across repos
-contextbudget benchmark "add auth" --workspace workspace.toml
+redcon benchmark "add auth" --workspace workspace.toml
 
 # Full middleware pipeline
-contextbudget prepare-context "add caching" --workspace workspace.toml
+redcon prepare-context "add caching" --workspace workspace.toml
 ```
 
 ---
@@ -68,9 +68,9 @@ contextbudget prepare-context "add caching" --workspace workspace.toml
 ## Python API
 
 ```python
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 
 # Pack across workspace
 run = engine.pack(
@@ -90,7 +90,7 @@ plan = engine.plan_agent(
 With `BudgetGuard`:
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=28000)
 result = guard.pack_context(task="add caching", workspace="workspace.toml")
@@ -103,7 +103,7 @@ print(result["selected_repos"])      # repos that contributed selected files
 With middleware helpers:
 
 ```python
-from contextbudget import prepare_context
+from redcon import prepare_context
 
 result = prepare_context(
     "update auth flow across services",

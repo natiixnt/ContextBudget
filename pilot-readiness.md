@@ -1,7 +1,7 @@
-# ContextBudget — Pilot Readiness
+# Redcon — Pilot Readiness
 
 > Last updated: 2026-03-15
-> Version: v1.0
+> Version: v1.1
 
 This document describes what is production-ready, what is in beta, known limitations, and the recommended deployment model for early paid pilots.
 
@@ -19,7 +19,7 @@ This document describes what is production-ready, what is in beta, known limitat
 | Prompt cache tracking | ✅ Production | Local file and Redis backends |
 | Policy evaluation (PASS/FAIL) | ✅ Production | Strict and soft modes |
 
-### CLI (`contextbudget`)
+### CLI (`redcon`)
 | Command | Status | Notes |
 |---------|--------|-------|
 | `pack` | ✅ Production | Core use case |
@@ -43,7 +43,7 @@ This document describes what is production-ready, what is in beta, known limitat
 | Audit push to cloud | ✅ Production | Fire-and-forget; non-blocking |
 | Webhook dispatch | ✅ Production | Policy violations + budget overruns |
 
-### Cloud Control Plane (`contextbudget-cloud`)
+### Cloud Control Plane (`redcon-cloud`)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Event ingestion (`POST /events`) | ✅ Production | Batch-compatible |
@@ -130,25 +130,25 @@ This document describes what is production-ready, what is in beta, known limitat
 
 ```
 [Developer Machine / CI]
-  └─ contextbudget CLI (pip install contextbudget)
+  └─ redcon CLI (pip install redcon)
        ├─ cb pack / cb roi / cb benchmark-report
        └─ GitHub Action (action.yml in repo)
 
 [Single VPS or ECS task, 2 vCPU / 1 GB RAM]
-  └─ contextbudget-cloud (docker-compose.prod.yml)
+  └─ redcon-cloud (docker-compose.prod.yml)
        ├─ FastAPI (uvicorn, 2 workers)
        ├─ PostgreSQL 16
        └─ nginx (TLS termination)
 ```
 
 **Setup steps:**
-1. `pip install contextbudget` on developer machines or in CI.
-2. Run `contextbudget init` in each repo to generate `contextbudget.toml`.
-3. Deploy `contextbudget-cloud` using `docker-compose.prod.yml`.
+1. `pip install redcon` on developer machines or in CI.
+2. Run `redcon init` in each repo to generate `redcon.toml`.
+3. Deploy `redcon-cloud` using `docker-compose.prod.yml`.
 4. Run migrations (automatically applied via Docker init scripts).
 5. Create an org: `POST /orgs` → note the `id`.
 6. Issue an API key: `POST /orgs/{id}/api-keys` → save the `raw_key`.
-7. Set `CB_GATEWAY_CLOUD_API_KEY` and `CB_GATEWAY_CLOUD_POLICY_URL` on developer machines.
+7. Set `RC_GATEWAY_CLOUD_API_KEY` and `RC_GATEWAY_CLOUD_POLICY_URL` on developer machines.
 8. Add the GitHub Action to CI repos.
 
 ### What to show in a pilot demo
@@ -156,7 +156,7 @@ This document describes what is production-ready, what is in beta, known limitat
 1. **ROI report**: run `cb roi` across a week of PR pack runs → show tokens saved and USD saved.
 2. **Benchmark report**: run `cb benchmark-report` on a real pack artifact → share the markdown with stakeholders.
 3. **`/dashboard/roi` endpoint**: wire to a simple HTML page or Retool dashboard.
-4. **GitHub Action step summary**: open any merged PR and click the ContextBudget step → tokens saved and $ saved visible inline.
+4. **GitHub Action step summary**: open any merged PR and click the Redcon step → tokens saved and $ saved visible inline.
 5. **Policy gate**: set a `max_estimated_input_tokens` limit and open a PR that exceeds it → CI fails with a clear policy violation message.
 
 ---
@@ -168,14 +168,14 @@ All items below have been implemented and are included in v1.1.0.
 | Priority | Item | Status | Notes |
 |----------|------|--------|-------|
 | P0 | Prometheus `/metrics` endpoint on cloud service | ✅ Done | `GET /metrics` — standard text exposition; `app/metrics.py` |
-| P0 | Rate limiting per API key on event ingestion | ✅ Done | Sliding window; `CB_CLOUD_EVENTS_RATE_LIMIT` / `_RATE_WINDOW`; `app/rate_limit.py` |
-| P0 | Block `POST /orgs` by default (require admin token) | ✅ Done | `CB_CLOUD_ADMIN_TOKEN` Bearer required; 403 when unset |
-| P1 | Horizontal gateway scaling (Redis session store) | ✅ Done | `CB_GATEWAY_REDIS_URL`; `contextbudget/gateway/session_store.py`; in-memory fallback |
+| P0 | Rate limiting per API key on event ingestion | ✅ Done | Sliding window; `RC_CLOUD_EVENTS_RATE_LIMIT` / `_RATE_WINDOW`; `app/rate_limit.py` |
+| P0 | Block `POST /orgs` by default (require admin token) | ✅ Done | `RC_CLOUD_ADMIN_TOKEN` Bearer required; 403 when unset |
+| P1 | Horizontal gateway scaling (Redis session store) | ✅ Done | `RC_GATEWAY_REDIS_URL`; `redcon/gateway/session_store.py`; in-memory fallback |
 | P1 | PgBouncer connection pooling for >50 req/s | ✅ Done | `docker-compose.prod.yml` — `pgbouncer` service (bitnami/pgbouncer); `deploy/pgbouncer.ini`; transaction pool mode; 20 connections per node |
 | P1 | Usage quotas + per-org token allowances | ✅ Done | `app/quotas.py`; `GET|PUT /orgs/{id}/quota`; migration 005 |
 | P1 | TypeScript/Node.js SDK | ✅ Done | `sdk/nodejs/` — `CloudClient` + `GatewayClient`; no runtime deps |
-| P2 | SSO (OIDC) for the cloud control plane | ✅ Done | `app/oidc.py`; `CB_CLOUD_OIDC_*` env vars; `GET /auth/oidc/config` |
-| P2 | Slack + PagerDuty webhook adapters | ✅ Done | `app/webhook_adapters.py`; `CB_CLOUD_SLACK_WEBHOOK_URL` / `CB_CLOUD_PAGERDUTY_ROUTING_KEY` |
+| P2 | SSO (OIDC) for the cloud control plane | ✅ Done | `app/oidc.py`; `RC_CLOUD_OIDC_*` env vars; `GET /auth/oidc/config` |
+| P2 | Slack + PagerDuty webhook adapters | ✅ Done | `app/webhook_adapters.py`; `RC_CLOUD_SLACK_WEBHOOK_URL` / `RC_CLOUD_PAGERDUTY_ROUTING_KEY` |
 | P2 | Multi-region Postgres replication | ✅ Done | `docker-compose.multiregion.yml` — primary + streaming replica + two PgBouncer pools; `READ_DATABASE_URL` routes analytics reads to replica; `deploy/postgres-primary.conf` / `postgres-replica.conf` |
-| P3 | Billing meter integration (Stripe) | ✅ Done | `app/billing.py`; `CB_CLOUD_STRIPE_*` env vars; migration 006; `GET /orgs/{id}/billing` |
+| P3 | Billing meter integration (Stripe) | ✅ Done | `app/billing.py`; `RC_CLOUD_STRIPE_*` env vars; migration 006; `GET /orgs/{id}/billing` |
 | P3 | Self-service onboarding UI | ✅ Done | `dashboard/app/onboarding/` — 5-step wizard; connects to cloud, creates org, issues key |

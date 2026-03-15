@@ -3,7 +3,7 @@
   "command": "benchmark",
   "generated_at": "2026-03-12T20:08:28.601050+00:00",
   "max_tokens": 2500,
-  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/benchmark/repo",
+  "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/examples/benchmark/repo",
   "scan_runtime_ms": 2,
   "strategies": [
     {
@@ -13,7 +13,7 @@
       "estimated_input_tokens": 5295,
       "estimated_saved_tokens": 0,
       "files_included": [
-        "contextbudget.toml",
+        "redcon.toml",
         "src/auth.py",
         "src/middleware.py",
         "src/notes.py"
@@ -35,7 +35,7 @@
         "src/notes.py"
       ],
       "files_skipped": [
-        "contextbudget.toml"
+        "redcon.toml"
       ],
       "notes": "top_files=20",
       "quality_risk_estimate": "low",
@@ -44,7 +44,7 @@
     },
     {
       "cache_hits": 0,
-      "description": "Use ContextBudget scoring + compression under configured token budget.",
+      "description": "Use Redcon scoring + compression under configured token budget.",
       "duplicate_reads_prevented": 0,
       "estimated_input_tokens": 91,
       "estimated_saved_tokens": 5204,

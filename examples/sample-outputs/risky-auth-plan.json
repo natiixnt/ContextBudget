@@ -27,7 +27,7 @@
       "score": 0.35
     }
   ],
-  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+  "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/examples/risky-auth-change/repo",
   "scanned_files": 3,
   "task": "tighten auth middleware token validation"
 }

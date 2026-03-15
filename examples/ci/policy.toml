@@ -1,5 +1,5 @@
-# CI budget policy for ContextBudget enforcement.
-# Use with: contextbudget enforce policy.toml run.json
+# CI budget policy for Redcon enforcement.
+# Use with: redcon enforce policy.toml run.json
 
 [policy]
 # Maximum estimated input tokens allowed in the packed context.

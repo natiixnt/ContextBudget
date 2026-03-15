@@ -2,14 +2,14 @@
 
 ## Overview
 
-ContextBudget has two independently deployable tiers.
+Redcon has two independently deployable tiers.
 
 ```
 ┌──────────────────────────────────────────────────────────┐
 │                      AGENT TIER                          │
 │                                                          │
-│  Agent process  →  ContextBudget Gateway  →  LLM API    │
-│                     (contextbudget package)              │
+│  Agent process  →  Redcon Gateway  →  LLM API    │
+│                     (redcon package)              │
 │                     FastAPI / stdlib HTTP                │
 │                     port 8787 (default)                  │
 └─────────────────────────┬────────────────────────────────┘
@@ -19,7 +19,7 @@ ContextBudget has two independently deployable tiers.
 ┌──────────────────────────────────────────────────────────┐
 │                   CONTROL PLANE TIER                     │
 │                                                          │
-│  contextbudget-cloud  (FastAPI + asyncpg)                │
+│  redcon-cloud  (FastAPI + asyncpg)                │
 │  PostgreSQL database                                     │
 │  port 8080 (default)                                     │
 └──────────────────────────────────────────────────────────┘
@@ -31,36 +31,36 @@ The two tiers are **decoupled** — the agent tier runs without the control plan
 
 ## Agent Tier
 
-The runtime gateway is part of the `contextbudget` Python package.
+The runtime gateway is part of the `redcon` Python package.
 
 ```bash
-pip install 'contextbudget[gateway]'
-export CB_GATEWAY_API_KEY=my-secret-key
-contextbudget gateway --host 0.0.0.0 --port 8787
+pip install 'redcon[gateway]'
+export RC_GATEWAY_API_KEY=my-secret-key
+redcon gateway --host 0.0.0.0 --port 8787
 ```
 
 ### Environment variables
 
 | Variable | Default | Description |
 |---|---|---|
-| `CB_GATEWAY_HOST` | `127.0.0.1` | Bind address |
-| `CB_GATEWAY_PORT` | `8787` | TCP port |
-| `CB_GATEWAY_API_KEY` | *(none)* | Bearer token auth (leave unset to disable) |
-| `CB_GATEWAY_MAX_TOKENS` | `128000` | Default token budget |
-| `CB_GATEWAY_MAX_FILES` | `100` | Default top-file cap |
-| `CB_GATEWAY_TIMEOUT_SECONDS` | `30` | Per-request timeout |
-| `CB_GATEWAY_CLOUD_POLICY_URL` | *(none)* | Cloud service base URL for remote policy fetch |
-| `CB_GATEWAY_CLOUD_API_KEY` | *(none)* | Bearer key for the cloud service |
-| `CB_GATEWAY_CLOUD_ORG_ID` | *(none)* | Org ID to scope policy lookups |
+| `RC_GATEWAY_HOST` | `127.0.0.1` | Bind address |
+| `RC_GATEWAY_PORT` | `8787` | TCP port |
+| `RC_GATEWAY_API_KEY` | *(none)* | Bearer token auth (leave unset to disable) |
+| `RC_GATEWAY_MAX_TOKENS` | `128000` | Default token budget |
+| `RC_GATEWAY_MAX_FILES` | `100` | Default top-file cap |
+| `RC_GATEWAY_TIMEOUT_SECONDS` | `30` | Per-request timeout |
+| `RC_GATEWAY_CLOUD_POLICY_URL` | *(none)* | Cloud service base URL for remote policy fetch |
+| `RC_GATEWAY_CLOUD_API_KEY` | *(none)* | Bearer key for the cloud service |
+| `RC_GATEWAY_CLOUD_ORG_ID` | *(none)* | Org ID to scope policy lookups |
 
-When `CB_GATEWAY_CLOUD_POLICY_URL` is set, the gateway fetches the active `PolicySpec` from the control plane before each request and enforces it server-side. If the fetch fails, the gateway continues with the locally-configured policy.
+When `RC_GATEWAY_CLOUD_POLICY_URL` is set, the gateway fetches the active `PolicySpec` from the control plane before each request and enforces it server-side. If the fetch fails, the gateway continues with the locally-configured policy.
 
 ---
 
 ## Control Plane Tier
 
 ```bash
-cd contextbudget-cloud
+cd redcon-cloud
 docker-compose up          # starts PostgreSQL + FastAPI on port 8080
 ```
 
@@ -68,7 +68,7 @@ Or run the app directly:
 
 ```bash
 pip install -r requirements.txt
-export DATABASE_URL=postgresql://user:pass@localhost:5432/contextbudget
+export DATABASE_URL=postgresql://user:pass@localhost:5432/redcon
 uvicorn app.main:app --host 0.0.0.0 --port 8080
 ```
 
@@ -87,7 +87,7 @@ Migrations are idempotent (`CREATE TABLE IF NOT EXISTS`).
 
 | Variable | Default | Description |
 |---|---|---|
-| `DATABASE_URL` | `postgresql://contextbudget:contextbudget@db:5432/contextbudget` | PostgreSQL DSN |
+| `DATABASE_URL` | `postgresql://redcon:redcon@db:5432/redcon` | PostgreSQL DSN |
 | `HOST` | `0.0.0.0` | Bind address |
 | `PORT` | `8080` | TCP port |
 
@@ -98,13 +98,13 @@ Migrations are idempotent (`CREATE TABLE IF NOT EXISTS`).
 The included `docker-compose.yml` starts both PostgreSQL and the cloud service:
 
 ```bash
-cd contextbudget-cloud
+cd redcon-cloud
 docker-compose up -d
 ```
 
 Services:
 - `db` — PostgreSQL 15 on port 5432
-- `app` — ContextBudget Cloud on port 8080
+- `app` — Redcon Cloud on port 8080
 
 ---
 

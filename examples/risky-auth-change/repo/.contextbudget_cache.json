@@ -1,0 +1,8 @@
+{
+  "fragments": {
+    "fragment:src/auth.py:ranges=full:1-2:b82b6909cfeb67b3175e310dbd1595d1c0f9eaf4930844e12a637c6312e0f52c": "cb-frag:cfc84ee657b5cad9",
+    "fragment:src/middleware.py:ranges=full:1-4:cad11e5fc2ac84472024545acb04463984f0af469492e2abad69e93db15377c6": "cb-frag:64a67d2f0fa014d2",
+    "fragment:src/permissions.py:ranges=full:1-2:11fdffd9cb402d9293a55ebbdb05e7ab1af0702133d794d367b576333e092481": "cb-frag:a50b235f001b5e75"
+  },
+  "summaries": {}
+}

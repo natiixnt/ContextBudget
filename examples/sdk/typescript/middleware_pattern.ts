@@ -1,5 +1,5 @@
 /**
- * Explicit agent → ContextBudget → model middleware pipeline (TypeScript).
+ * Explicit agent → Redcon → model middleware pipeline (TypeScript).
  *
  * Shows the middleware flow in two styles:
  *
@@ -9,17 +9,17 @@
  * The middleware layer intercepts every agent task, compresses the repository
  * context to fit under the token budget, and forwards the compact prompt to
  * the model.  The agent and the model are never directly coupled to the file
- * system or to ContextBudget internals.
+ * system or to Redcon internals.
  *
  * Prerequisites:
- *   pip install contextbudget     (Python side)
+ *   pip install redcon     (Python side)
  *   npm install                   (from this directory)
  *
  * Run:
  *   npx ts-node middleware_pattern.ts
  */
 
-import { ContextBudgetSDK, prepareContext, profileRun, simulateAgent } from "./contextbudget-sdk";
+import { RedconSDK, prepareContext, profileRun, simulateAgent } from "./redcon-sdk";
 import type { PrepareContextResult } from "./types";
 
 const TASK = "refactor auth middleware token validation";
@@ -37,9 +37,9 @@ function callModel(prompt: string): string {
 //
 // agent task → prepareContext() → policy check → callModel()
 // -----------------------------------------------------------------------
-console.log("=== Style A: ContextBudgetSDK ===");
+console.log("=== Style A: RedconSDK ===");
 
-const sdk = new ContextBudgetSDK({ maxTokens: 28_000 });
+const sdk = new RedconSDK({ maxTokens: 28_000 });
 
 // Step 1 — simulate cost before committing
 const plan = sdk.simulateAgent(TASK, REPO, { model: "claude-sonnet-4-6" });

@@ -1,6 +1,6 @@
 # Agent Integration
 
-ContextBudget exposes a stable SDK for coding-agent frameworks via `BudgetGuard`. Three primary integration methods:
+Redcon exposes a stable SDK for coding-agent frameworks via `BudgetGuard`. Three primary integration methods:
 
 | Method | Purpose |
 |--------|---------|
@@ -13,7 +13,7 @@ ContextBudget exposes a stable SDK for coding-agent frameworks via `BudgetGuard`
 ## Quickstart
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 
@@ -63,7 +63,7 @@ for iteration in range(3):
 ## Strict Policy Enforcement
 
 ```python
-from contextbudget import BudgetGuard, BudgetPolicyViolationError
+from redcon import BudgetGuard, BudgetPolicyViolationError
 
 guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=10)
 
@@ -82,7 +82,7 @@ except BudgetPolicyViolationError as err:
 For deeper integration, use the middleware layer directly:
 
 ```python
-from contextbudget import ContextBudgetEngine, enforce_budget, prepare_context, record_run
+from redcon import RedconEngine, enforce_budget, prepare_context, record_run
 
 result = prepare_context(
     "update auth flow across services",
@@ -92,7 +92,7 @@ result = prepare_context(
     metadata={"agent": "local-runner"},
 )
 
-policy = ContextBudgetEngine.make_policy(
+policy = RedconEngine.make_policy(
     max_estimated_input_tokens=28000,
     max_quality_risk_level="medium",
 )
@@ -110,12 +110,12 @@ These helpers return `AgentMiddlewareResult`, which contains:
 
 ## Typed Middleware API
 
-Use `ContextBudgetMiddleware` directly when an agent framework already has a request object or wants to share middleware state.
+Use `RedconMiddleware` directly when an agent framework already has a request object or wants to share middleware state.
 
 ```python
-from contextbudget import AgentTaskRequest, ContextBudgetMiddleware
+from redcon import AgentTaskRequest, RedconMiddleware
 
-middleware = ContextBudgetMiddleware()
+middleware = RedconMiddleware()
 request = AgentTaskRequest(
     task="update auth flow across services",
     workspace="workspace.toml",
@@ -137,9 +137,9 @@ print(result.metadata["selected_repos"])
 Use `plan_agent(...)` when an external agent loop needs to budget context across multiple steps before packing any single prompt:
 
 ```python
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 plan = engine.plan_agent(
     task="update auth flow across services",
     workspace="workspace.toml",
@@ -163,7 +163,7 @@ The workflow-planning artifact includes:
 Pass `delta_from` to emit an incremental package against the previous run artifact:
 
 ```python
-from contextbudget import prepare_context
+from redcon import prepare_context
 
 result = prepare_context(
     "tighten auth checks",
@@ -182,14 +182,14 @@ The recorded run keeps the full current baseline in `compressed_context` for the
 
 ## Adapter Abstraction
 
-`AgentAdapter` is the high-level abstraction for embedding ContextBudget into external agent tools while keeping transport and model calls outside this repository.
+`AgentAdapter` is the high-level abstraction for embedding Redcon into external agent tools while keeping transport and model calls outside this repository.
 
 `LocalDemoAgentAdapter` is a local simulation:
 
 ```python
-from contextbudget import AgentTaskRequest, ContextBudgetMiddleware, LocalDemoAgentAdapter
+from redcon import AgentTaskRequest, RedconMiddleware, LocalDemoAgentAdapter
 
-middleware = ContextBudgetMiddleware()
+middleware = RedconMiddleware()
 adapter = LocalDemoAgentAdapter()
 request = AgentTaskRequest(task="update auth flow", repo=".", max_tokens=400)
 
@@ -202,7 +202,7 @@ print(run.response)
 
 ## Model-Aware Packing
 
-Enable model-aware packing via `contextbudget.toml`:
+Enable model-aware packing via `redcon.toml`:
 
 ```toml
 model_profile = "gpt-4.1"
@@ -246,14 +246,14 @@ The recorded artifact includes a `model_profile` block with tokenizer assumption
 
 ## PR Audit Guard for CI
 
-For CI, pair the runtime middleware with `contextbudget pr-audit` so pull requests that expand default agent context are caught before merge:
+For CI, pair the runtime middleware with `redcon pr-audit` so pull requests that expand default agent context are caught before merge:
 
 ```bash
-contextbudget pr-audit \
+redcon pr-audit \
   --repo . \
   --base "${{ github.event.pull_request.base.sha }}" \
   --head "${{ github.event.pull_request.head.sha }}" \
-  --out-prefix contextbudget-pr
+  --out-prefix redcon-pr
 ```
 
 ---
@@ -263,7 +263,7 @@ contextbudget pr-audit \
 | Approach | When to use |
 |----------|-------------|
 | `prepare_context(...)` | Small, helper-based integration |
-| `ContextBudgetMiddleware` | Reusable local integration boundary |
-| `AgentAdapter` | Embedding ContextBudget into another agent tool |
+| `RedconMiddleware` | Reusable local integration boundary |
+| `AgentAdapter` | Embedding Redcon into another agent tool |
 
 Keep vendor-specific transport, inference, and authentication logic outside this repository.
