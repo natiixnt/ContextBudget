@@ -455,6 +455,7 @@ class ContextBudgetEngine:
         task: str | None = None,
         window: int = 20,
         threshold_pct: float = 10.0,
+        runs: Sequence[RunArtifactInput] | None = None,
     ) -> dict[str, Any]:
         """Detect context drift by comparing recent pack history.
 
@@ -475,6 +476,9 @@ class ContextBudgetEngine:
         threshold_pct:
             Token drift percentage at or above which ``alert`` is set and the
             verdict is elevated from ``"none"`` (default: 10.0).
+        runs:
+            Optional list of run artifact dicts or file paths.  When provided
+            these are used directly instead of loading from history.json.
 
         Returns
         -------
@@ -482,8 +486,31 @@ class ContextBudgetEngine:
             JSON-serialisable drift report with ``drift``, ``trend``, and
             ``top_contributors`` keys.
         """
+        from contextbudget.cache.run_history import RunHistoryEntry
+
         repo_path = normalize_repo(repo)
-        return run_drift(repo_path, task=task, window=window, threshold_pct=threshold_pct)
+        entries: list[RunHistoryEntry] | None = None
+        if runs is not None:
+            entries = []
+            for r in runs:
+                run_data = self._load_run_artifact(r)
+                budget = run_data.get("budget") or {}
+                entries.append(RunHistoryEntry(
+                    generated_at=str(run_data.get("generated_at", "") or ""),
+                    task=str(run_data.get("task", "") or ""),
+                    selected_files=list(run_data.get("files_included", []) or []),
+                    ignored_files=list(run_data.get("files_skipped", []) or []),
+                    candidate_files=list(run_data.get("candidate_files", []) or []),
+                    token_usage={
+                        "max_tokens": int(budget.get("max_tokens") or 0),
+                        "estimated_input_tokens": int(budget.get("estimated_input_tokens") or 0),
+                        "estimated_saved_tokens": int(budget.get("estimated_saved_tokens") or 0),
+                        "quality_risk_estimate": str(budget.get("quality_risk_estimate") or ""),
+                    },
+                    repo=str(run_data.get("repo", "") or ""),
+                    workspace=str(run_data.get("workspace", "") or ""),
+                ))
+        return run_drift(repo_path, task=task, window=window, threshold_pct=threshold_pct, entries=entries)
 
     def benchmark(
         self,
@@ -568,6 +595,77 @@ class ContextBudgetEngine:
             run_benchmark_fn=_run,
             max_tokens=max_tokens,
             top_files=top_files,
+        )
+        return dataset_as_dict(report)
+
+    def dataset_from_runs(
+        self,
+        runs: Sequence[RunArtifactInput],
+    ) -> dict[str, Any]:
+        """Build a dataset report from pre-existing run or benchmark artifacts.
+
+        Reads each artifact and extracts ``task``, baseline tokens, and
+        optimised tokens without re-running any benchmarks.  Useful for
+        building a dataset from runs already on disk.
+
+        Parameters
+        ----------
+        runs:
+            Sequence of run artifact dicts or file paths produced by
+            :meth:`pack` or :meth:`benchmark`.
+        """
+        from contextbudget.core.dataset import DatasetEntry, DatasetReport, dataset_as_dict, _reduction_pct
+        from datetime import datetime, timezone
+
+        entries: list[DatasetEntry] = []
+        repo_label = "."
+        for r in runs:
+            run_data = self._load_run_artifact(r)
+            task = str(run_data.get("task", "") or "")
+            task_name = str(run_data.get("task_name", "") or "")
+            repo_label = str(run_data.get("repo", repo_label) or repo_label)
+            budget = run_data.get("budget") or {}
+            # Accept both pack artifacts (budget keys) and benchmark artifacts
+            baseline = int(
+                run_data.get("baseline_full_context_tokens")
+                or (int(budget.get("estimated_input_tokens") or 0) + int(budget.get("estimated_saved_tokens") or 0))
+                or 0
+            )
+            optimized = int(budget.get("estimated_input_tokens") or 0)
+            # If benchmark artifact, prefer compressed_pack strategy
+            for strategy in run_data.get("strategies", []):
+                if isinstance(strategy, dict) and strategy.get("strategy") == "compressed_pack":
+                    optimized = int(strategy.get("estimated_input_tokens") or optimized)
+                    break
+            entries.append(DatasetEntry(
+                task=task,
+                task_name=task_name,
+                baseline_tokens=baseline,
+                optimized_tokens=optimized,
+                reduction_pct=_reduction_pct(baseline, optimized),
+                benchmark={},
+            ))
+
+        n = len(entries)
+        total_baseline = sum(e.baseline_tokens for e in entries)
+        total_optimized = sum(e.optimized_tokens for e in entries)
+        avg_baseline = round(total_baseline / n, 2) if n else 0.0
+        avg_optimized = round(total_optimized / n, 2) if n else 0.0
+        avg_reduction = round(sum(e.reduction_pct for e in entries) / n, 2) if n else 0.0
+
+        report = DatasetReport(
+            command="dataset",
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            repo=repo_label,
+            task_count=n,
+            aggregate={
+                "total_baseline_tokens": total_baseline,
+                "total_optimized_tokens": total_optimized,
+                "avg_baseline_tokens": avg_baseline,
+                "avg_optimized_tokens": avg_optimized,
+                "avg_reduction_pct": avg_reduction,
+            },
+            entries=entries,
         )
         return dataset_as_dict(report)
 
