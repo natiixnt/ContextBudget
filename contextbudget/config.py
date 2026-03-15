@@ -131,6 +131,10 @@ class CacheSettings:
     run_history_enabled: bool = True
     history_file: str = RUN_HISTORY_FILE
     history_max_entries: int = 200
+    # Redis backend settings
+    redis_url: str = "redis://localhost:6379/0"
+    redis_namespace: str = "contextbudget"
+    redis_ttl_seconds: int = 86400
 
 
 @dataclass(slots=True)
@@ -397,6 +401,13 @@ def _apply_cache_overrides(settings: CacheSettings, data: Mapping[str, Any]) -> 
         settings.history_file = str(data["history_file"])
     if "history_max_entries" in data:
         settings.history_max_entries = int(data["history_max_entries"])
+    # Redis backend settings
+    if "redis_url" in data:
+        settings.redis_url = str(data["redis_url"]).strip()
+    if "redis_namespace" in data:
+        settings.redis_namespace = str(data["redis_namespace"]).strip()
+    if "redis_ttl_seconds" in data:
+        settings.redis_ttl_seconds = int(data["redis_ttl_seconds"])
     # Backward-compatible key
     if "enabled" in data:
         settings.summary_cache_enabled = bool(data["enabled"])

@@ -3,8 +3,10 @@ from __future__ import annotations
 """Cache backend abstractions and built-in implementations."""
 
 import json
+import zlib
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
+from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -218,6 +220,152 @@ class SharedSummaryCacheBackendStub(SummaryCacheBackend):
         return False
 
 
+def build_redis_cache_key(
+    *,
+    org: str,
+    repo: str,
+    file_path: str,
+    symbol_or_slice: str,
+    content_hash: str,
+) -> str:
+    """Build a structured cache key for cross-agent context reuse.
+
+    The returned key encodes the full identity of a cached fragment so that
+    multiple agents working on the same codebase can share cached summaries
+    and context fragments without key collisions.
+
+    Example::
+
+        key = build_redis_cache_key(
+            org="acme",
+            repo="backend",
+            file_path="src/auth.py",
+            symbol_or_slice="def login",
+            content_hash=sha256(text.encode()).hexdigest(),
+        )
+        cache.get_fragment(key)
+    """
+
+    def _slug(value: str) -> str:
+        return value.replace(":", "_").replace("/", "|").strip() or "_"
+
+    parts = [
+        _slug(org),
+        _slug(repo),
+        _slug(file_path),
+        _slug(symbol_or_slice),
+        sha256(content_hash.encode()).hexdigest()[:16] if content_hash else "_",
+    ]
+    return ":".join(parts)
+
+
+class RedisSummaryCacheBackend(SummaryCacheBackend):
+    """Production-ready shared cache backend backed by Redis.
+
+    Stores compressed context fragments and symbol/slice summaries in Redis
+    with configurable TTL and namespace isolation.  Values are zlib-compressed
+    before storage to reduce network and memory overhead.
+
+    The backend is fully compatible with :class:`LocalFileSummaryCacheBackend`
+    and can be swapped in via ``cache_backend = redis`` in ``contextbudget.toml``.
+
+    Configuration example::
+
+        [cache]
+        backend = "redis"
+        redis_url = "redis://localhost:6379/0"
+        redis_namespace = "myorg:myrepo"
+        redis_ttl_seconds = 86400
+
+    Cross-agent reuse is enabled automatically: any agent that connects to the
+    same Redis instance with the same namespace will reuse cached summaries and
+    context fragments produced by prior runs.
+    """
+
+    backend_name = "redis"
+
+    def __init__(
+        self,
+        *,
+        redis_url: str = "redis://localhost:6379/0",
+        namespace: str = "contextbudget",
+        ttl_seconds: int = 86400,
+        enabled: bool = True,
+    ) -> None:
+        super().__init__(enabled=enabled)
+        self.redis_url = redis_url
+        self.namespace = namespace
+        self.ttl_seconds = ttl_seconds
+        self._redis: Any = None  # Lazy-initialised on first use
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _client(self) -> Any:
+        if self._redis is None:
+            try:
+                import redis as _redis  # type: ignore[import-not-found]
+            except ModuleNotFoundError as exc:  # pragma: no cover
+                raise RuntimeError(
+                    "The 'redis' package is required for the Redis cache backend. "
+                    "Install it with: pip install 'contextbudget[redis]'"
+                ) from exc
+            self._redis = _redis.Redis.from_url(self.redis_url, decode_responses=False)
+        return self._redis
+
+    def _namespace_key(self, prefix: str, key: str) -> str:
+        return f"{self.namespace}:{prefix}:{key}"
+
+    def _compress(self, value: str) -> bytes:
+        return zlib.compress(value.encode("utf-8"), level=6)
+
+    def _decompress(self, data: bytes) -> str:
+        return zlib.decompress(data).decode("utf-8")
+
+    def _redis_get(self, redis_key: str) -> str | None:
+        try:
+            raw = self._client().get(redis_key)
+        except Exception:  # noqa: BLE001 – connection failures degrade gracefully
+            return None
+        if raw is None:
+            return None
+        try:
+            return self._decompress(raw)
+        except zlib.error:
+            return None
+
+    def _redis_set(self, redis_key: str, value: str) -> bool:
+        """Store *value* at *redis_key* with TTL.  Returns True if key was new."""
+        compressed = self._compress(value)
+        try:
+            client = self._client()
+            is_new = not client.exists(redis_key)
+            if self.ttl_seconds > 0:
+                client.setex(redis_key, self.ttl_seconds, compressed)
+            else:
+                client.set(redis_key, compressed)
+        except Exception:  # noqa: BLE001
+            return False
+        return is_new
+
+    # ------------------------------------------------------------------
+    # SummaryCacheBackend protocol
+    # ------------------------------------------------------------------
+
+    def _get_summary(self, key: str) -> str | None:
+        return self._redis_get(self._namespace_key("s", key))
+
+    def _put_summary(self, key: str, summary: str) -> bool:
+        return self._redis_set(self._namespace_key("s", key), summary)
+
+    def _get_fragment(self, key: str) -> str | None:
+        return self._redis_get(self._namespace_key("f", key))
+
+    def _put_fragment(self, key: str, reference: str) -> bool:
+        return self._redis_set(self._namespace_key("f", key), reference)
+
+
 class InMemorySummaryCacheBackend(SummaryCacheBackend):
     """Process-local cache backend primarily for tests."""
 
@@ -259,12 +407,13 @@ def normalize_cache_backend_name(backend: str | None) -> str:
         "remote_stub": SharedSummaryCacheBackendStub.backend_name,
         "shared": SharedSummaryCacheBackendStub.backend_name,
         "shared_stub": SharedSummaryCacheBackendStub.backend_name,
+        "redis": RedisSummaryCacheBackend.backend_name,
     }
     normalized = aliases.get(value)
     if normalized is None:
         raise ValueError(
             "Unsupported cache backend "
-            f"{backend!r}. Expected one of: local_file, shared_stub, memory."
+            f"{backend!r}. Expected one of: local_file, redis, shared_stub, memory."
         )
     return normalized
 
@@ -275,6 +424,9 @@ def create_summary_cache_backend(
     backend: str = LocalFileSummaryCacheBackend.backend_name,
     cache_file: str = CACHE_FILE,
     enabled: bool = True,
+    redis_url: str = "redis://localhost:6379/0",
+    redis_namespace: str = "contextbudget",
+    redis_ttl_seconds: int = 86400,
 ) -> SummaryCacheBackend:
     """Build a configured cache backend."""
 
@@ -285,6 +437,13 @@ def create_summary_cache_backend(
         return SharedSummaryCacheBackendStub(namespace=repo_path.name or "default", enabled=enabled)
     if backend_name == InMemorySummaryCacheBackend.backend_name:
         return InMemorySummaryCacheBackend(enabled=enabled)
+    if backend_name == RedisSummaryCacheBackend.backend_name:
+        return RedisSummaryCacheBackend(
+            redis_url=redis_url,
+            namespace=redis_namespace,
+            ttl_seconds=redis_ttl_seconds,
+            enabled=enabled,
+        )
     raise AssertionError(f"Unhandled cache backend: {backend_name}")
 
 
