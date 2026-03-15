@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from contextbudget.cli import main
+from tests.support_git import build_pr_audit_repo
 
 
 def _write(path: Path, content: str) -> None:
@@ -24,10 +25,18 @@ def test_cli_pack_and_report(tmp_path: Path, monkeypatch) -> None:
     assert main() == 0
     assert (tmp_path / "run.json").exists()
     assert (tmp_path / "run.md").exists()
+    run_data = json.loads((tmp_path / "run.json").read_text(encoding="utf-8"))
+    assert {"score", "heuristic_score", "historical_score"}.issubset(run_data["ranked_files"][0])
+    history = json.loads((repo / ".contextbudget" / "history.json").read_text(encoding="utf-8"))
+    entry = history["entries"][-1]
+    assert entry["task"] == "add caching to search api"
+    assert entry["result_artifacts"]["run_json"] == str((tmp_path / "run.json").resolve())
+    assert entry["result_artifacts"]["run_markdown"] == str((tmp_path / "run.md").resolve())
 
     monkeypatch.setattr("sys.argv", ["contextbudget", "report", "run.json", "--out", "summary.md"])
     assert main() == 0
     assert (tmp_path / "summary.md").exists()
+    assert "combined:" in (tmp_path / "summary.md").read_text(encoding="utf-8")
 
 
 def test_cli_pack_uses_repo_config_default_max_tokens(tmp_path: Path, monkeypatch) -> None:
@@ -99,6 +108,39 @@ def test_cli_top_files_flag_overrides_config(tmp_path: Path, monkeypatch) -> Non
     assert len(data["ranked_files"]) == 2
 
 
+def test_cli_plan_agent_writes_json_and_markdown(tmp_path: Path, monkeypatch, capsys) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(repo / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+    _write(repo / "tests" / "test_auth.py", "def test_login() -> None:\n    assert True\n")
+    _write(repo / "README.md", "auth flow notes\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "contextbudget",
+            "plan-agent",
+            "update auth flow docs",
+            "--repo",
+            str(repo),
+            "--out-prefix",
+            "agent-plan",
+        ],
+    )
+    assert main() == 0
+
+    output = capsys.readouterr().out
+    assert "Wrote agent plan JSON: agent-plan.json" in output
+    assert "Total estimated tokens:" in output
+    assert "context:" in output
+    data = json.loads((tmp_path / "agent-plan.json").read_text(encoding="utf-8"))
+    assert data["command"] == "plan_agent"
+    assert data["steps"]
+    assert data["total_estimated_tokens"] >= data["unique_context_tokens"] > 0
+    assert (tmp_path / "agent-plan.md").exists()
+
+
 def test_cli_diff_writes_json_and_markdown(tmp_path: Path, monkeypatch) -> None:
     old_run = {
         "task": "old",
@@ -143,6 +185,107 @@ def test_cli_diff_writes_json_and_markdown(tmp_path: Path, monkeypatch) -> None:
     data = json.loads((tmp_path / "delta.json").read_text(encoding="utf-8"))
     assert data["task_diff"]["changed"] is True
     assert data["budget_delta"]["cache_hits"]["delta"] == 2
+
+
+def test_cli_pr_audit_writes_outputs_and_can_fail_gate(tmp_path: Path, monkeypatch) -> None:
+    repo, base_commit, head_commit = build_pr_audit_repo(tmp_path)
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "contextbudget",
+            "pr-audit",
+            "--repo",
+            str(repo),
+            "--base",
+            base_commit,
+            "--head",
+            head_commit,
+            "--out-prefix",
+            "pr-audit",
+        ],
+    )
+    assert main() == 0
+    assert (tmp_path / "pr-audit.json").exists()
+    assert (tmp_path / "pr-audit.md").exists()
+    assert (tmp_path / "pr-audit.comment.md").exists()
+    data = json.loads((tmp_path / "pr-audit.json").read_text(encoding="utf-8"))
+    assert data["summary"]["estimated_token_delta"] > 0
+    assert "ContextBudget Analysis" in data["comment_markdown"]
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "contextbudget",
+            "pr-audit",
+            "--repo",
+            str(repo),
+            "--base",
+            base_commit,
+            "--head",
+            head_commit,
+            "--max-token-increase",
+            "1",
+        ],
+    )
+    assert main() == 2
+
+
+def test_cli_heatmap_writes_json_and_markdown(tmp_path: Path, monkeypatch, capsys) -> None:
+    history = tmp_path / "history"
+    history.mkdir()
+    run_one = {
+        "command": "pack",
+        "generated_at": "2026-03-10T10:00:00+00:00",
+        "task": "run one",
+        "repo": str(tmp_path / "repo"),
+        "files_included": ["src/auth.py", "src/cache.py"],
+        "compressed_context": [
+            {"path": "src/auth.py", "original_tokens": 100, "compressed_tokens": 60},
+            {"path": "src/cache.py", "original_tokens": 40, "compressed_tokens": 20},
+        ],
+        "budget": {"estimated_input_tokens": 80, "estimated_saved_tokens": 60},
+    }
+    run_two = {
+        "command": "pack",
+        "generated_at": "2026-03-11T10:00:00+00:00",
+        "task": "run two",
+        "repo": str(tmp_path / "repo"),
+        "files_included": ["src/auth.py"],
+        "compressed_context": [
+            {"path": "src/auth.py", "original_tokens": 120, "compressed_tokens": 70},
+        ],
+        "budget": {"estimated_input_tokens": 70, "estimated_saved_tokens": 50},
+    }
+    (history / "run-one.json").write_text(json.dumps(run_one), encoding="utf-8")
+    (history / "run-two.json").write_text(json.dumps(run_two), encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "contextbudget",
+            "heatmap",
+            "history",
+            "--limit",
+            "2",
+            "--out-prefix",
+            "heatmap",
+        ],
+    )
+    assert main() == 0
+
+    output = capsys.readouterr().out
+    assert "Top token-heavy files:" in output
+    assert "Top token-heavy directories:" in output
+    assert (tmp_path / "heatmap.json").exists()
+    assert (tmp_path / "heatmap.md").exists()
+
+    data = json.loads((tmp_path / "heatmap.json").read_text(encoding="utf-8"))
+    assert data["runs_analyzed"] == 2
+    assert data["top_token_heavy_files"][0]["path"] == "src/auth.py"
+    assert data["most_frequently_included_files"][0]["path"] == "src/auth.py"
 
 
 def test_cli_pack_strict_policy_failure_returns_nonzero(tmp_path: Path, monkeypatch) -> None:
@@ -293,6 +436,64 @@ path = "services/billing"
     assert any(path.startswith("billing-service:") for path in data["files_included"])
 
 
+def test_cli_pack_can_emit_delta_context_package(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(
+        repo / "contextbudget.toml",
+        """
+[compression]
+full_file_threshold_tokens = 1
+snippet_score_threshold = 0
+snippet_total_line_limit = 40
+""".strip(),
+    )
+    _write(repo / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
+    _write(repo / "src" / "middleware.py", "def auth_middleware(token: str) -> bool:\n    return login(token)\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "pack", "update auth middleware", "--repo", str(repo), "--out-prefix", "first"],
+    )
+    assert main() == 0
+
+    (repo / "src" / "middleware.py").unlink()
+    _write(
+        repo / "src" / "auth.py",
+        "class AuthService:\n    def login_user(self, token: str) -> bool:\n        return token.startswith('prod_')\n",
+    )
+    _write(repo / "src" / "permissions.py", "def allow_auth(token: str) -> bool:\n    return token.startswith('prod_')\n")
+
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "contextbudget",
+            "pack",
+            "update auth middleware",
+            "--repo",
+            str(repo),
+            "--delta",
+            "first.json",
+            "--out-prefix",
+            "delta-run",
+        ],
+    )
+    assert main() == 0
+
+    data = json.loads((tmp_path / "delta-run.json").read_text(encoding="utf-8"))
+    markdown = (tmp_path / "delta-run.md").read_text(encoding="utf-8")
+
+    assert data["delta"]["previous_run"] == "first.json"
+    assert data["delta"]["files_added"] == ["src/permissions.py"]
+    assert data["delta"]["files_removed"] == ["src/middleware.py"]
+    assert data["delta"]["budget"]["original_tokens"] > 0
+    assert data["delta"]["budget"]["delta_tokens"] > 0
+    assert data["delta"]["budget"]["tokens_saved"] >= 0
+    assert "## Delta Context" in markdown
+    assert "Delta tokens:" in markdown
+
+
 def test_cli_watch_once_writes_scan_index(tmp_path: Path, monkeypatch, capsys) -> None:
     repo = tmp_path / "repo"
     repo.mkdir()
@@ -342,3 +543,34 @@ fallback_backend = "model_aligned"
     output = capsys.readouterr().out
     assert "Token estimator: selected=exact_tiktoken effective=model_aligned fallback=True" in output
     assert "Token estimator note:" in output
+
+
+def test_cli_pack_reports_model_profile_assumptions(tmp_path: Path, monkeypatch, capsys) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(
+        repo / "contextbudget.toml",
+        'model_profile = "claude-sonnet-4"\n',
+    )
+    _write(repo / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "contextbudget",
+            "pack",
+            "update auth flow",
+            "--repo",
+            str(repo),
+            "--max-tokens",
+            "500000",
+            "--out-prefix",
+            "model-run",
+        ],
+    )
+    assert main() == 0
+
+    output = capsys.readouterr().out
+    assert "Model profile: selected=claude-sonnet-4" in output
+    assert "Model profile note: max_tokens was clamped to fit the configured context window" in output

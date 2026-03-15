@@ -6,6 +6,8 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
+from contextbudget.core.delta import effective_pack_metrics
+
 try:
     import tomllib  # type: ignore[attr-defined]
 except ModuleNotFoundError:  # pragma: no cover - Python < 3.11 fallback
@@ -111,12 +113,14 @@ def _extract_metrics(run_data: dict[str, Any]) -> dict[str, Any]:
     budget = run_data.get("budget", {})
     if not isinstance(budget, dict):
         budget = {}
-
-    estimated_input_tokens = int(budget.get("estimated_input_tokens", 0) or 0)
-    estimated_saved_tokens = int(budget.get("estimated_saved_tokens", 0) or 0)
-    files_included = run_data.get("files_included", [])
+    effective = effective_pack_metrics(run_data)
+    files_included = effective.get("files_included", [])
     if not isinstance(files_included, list):
         files_included = []
+    estimated_input_tokens = int(effective.get("estimated_input_tokens", budget.get("estimated_input_tokens", 0)) or 0)
+    estimated_saved_tokens = int(
+        effective.get("estimated_saved_tokens", budget.get("estimated_saved_tokens", 0)) or 0
+    )
 
     total_tokens = estimated_input_tokens + estimated_saved_tokens
     if total_tokens > 0:

@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextbudget.config import ScoreSettings
 from contextbudget.core.text import task_keywords
 from contextbudget.schemas.models import FileRecord, RankedFile
+from contextbudget.scorers.history import TaskSimilarityCallable, compute_historical_adjustments
 from contextbudget.scorers.import_graph import build_import_graph
 
 _SIGNAL_FILES = {
@@ -29,13 +30,20 @@ def _format_graph_reason(prefix: str, related: set[str]) -> str:
     return f"{prefix}: {sorted_related[0]} (+{len(sorted_related) - 1} more)"
 
 
-def score_files(task: str, files: list[FileRecord], settings: ScoreSettings | None = None) -> list[RankedFile]:
+def score_files(
+    task: str,
+    files: list[FileRecord],
+    settings: ScoreSettings | None = None,
+    *,
+    history_entries=None,
+    similarity: TaskSimilarityCallable | None = None,
+) -> list[RankedFile]:
     """Score files for a task using deterministic keyword and import-graph heuristics."""
 
     cfg = settings if settings is not None else ScoreSettings()
     keywords = task_keywords(task)
 
-    base_scores: dict[str, float] = {}
+    heuristic_scores: dict[str, float] = {}
     reasons_by_path: dict[str, list[str]] = {}
 
     for record in files:
@@ -75,7 +83,7 @@ def score_files(task: str, files: list[FileRecord], settings: ScoreSettings | No
         if record.line_count > cfg.large_file_line_threshold:
             score -= cfg.large_file_penalty
 
-        base_scores[record.path] = score
+        heuristic_scores[record.path] = score
         reasons_by_path[record.path] = reasons
 
     if cfg.enable_import_graph_signals and files:
@@ -85,11 +93,11 @@ def score_files(task: str, files: list[FileRecord], settings: ScoreSettings | No
         # 1) Find seed files from high base scores.
         # 2) Award deterministic bonuses to one-hop neighbors.
         # 3) Keep explanations tied to specific graph relationships.
-        seed_paths = {path for path, score in base_scores.items() if score >= cfg.graph_seed_score_threshold}
+        seed_paths = {path for path, score in heuristic_scores.items() if score >= cfg.graph_seed_score_threshold}
         if not seed_paths:
             # Fallback seed for sparse tasks: top positive base score only.
             positive = sorted(
-                [(path, score) for path, score in base_scores.items() if score > 0],
+                [(path, score) for path, score in heuristic_scores.items() if score > 0],
                 key=lambda item: (-item[1], item[0]),
             )
             if positive:
@@ -97,7 +105,7 @@ def score_files(task: str, files: list[FileRecord], settings: ScoreSettings | No
 
         for record in files:
             path = record.path
-            score = base_scores[path]
+            score = heuristic_scores[path]
             reasons = reasons_by_path[path]
 
             inbound_from_seed = graph.incoming.get(path, set()) & seed_paths
@@ -117,16 +125,38 @@ def score_files(task: str, files: list[FileRecord], settings: ScoreSettings | No
                 score += cfg.graph_entrypoint_adjacency_bonus
                 _add_reason(reasons, _format_graph_reason("adjacent to entrypoint", adjacent_entrypoints))
 
-            base_scores[path] = score
+            heuristic_scores[path] = score
             reasons_by_path[path] = reasons
+
+    historical_adjustments = compute_historical_adjustments(
+        task,
+        files,
+        cfg,
+        history_entries=history_entries,
+        similarity=similarity,
+    )
 
     ranked: list[RankedFile] = []
     for record in files:
-        score = base_scores[record.path]
-        if score <= 0:
+        heuristic_score = round(heuristic_scores[record.path], 3)
+        historical_score = historical_adjustments.get(record.path, None)
+        historical_value = historical_score.score if historical_score is not None else 0.0
+        combined_score = round(heuristic_scores[record.path] + historical_value, 3)
+        if combined_score <= 0:
             continue
         reasons = reasons_by_path[record.path]
-        ranked.append(RankedFile(file=record, score=round(score, 3), reasons=reasons[:6]))
+        if historical_score is not None:
+            for reason in historical_score.reasons:
+                _add_reason(reasons, reason)
+        ranked.append(
+            RankedFile(
+                file=record,
+                score=combined_score,
+                heuristic_score=heuristic_score,
+                historical_score=round(historical_value, 3),
+                reasons=reasons[:6],
+            )
+        )
 
     ranked.sort(key=lambda item: (-item.score, item.file.path))
     return ranked

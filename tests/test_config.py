@@ -18,33 +18,56 @@ def test_load_config_defaults_when_file_missing(tmp_path: Path) -> None:
     assert cfg.scan.max_file_size_bytes == 2_000_000
     assert cfg.summarization.backend == "deterministic"
     assert cfg.cache.backend == "local_file"
+    assert cfg.cache.run_history_enabled is True
+    assert cfg.cache.history_file == ".contextbudget/history.json"
     assert cfg.tokens.backend == "heuristic"
     assert cfg.tokens.model == "gpt-4o-mini"
     assert cfg.tokens.fallback_backend == "heuristic"
+    assert cfg.model.profile == ""
     assert cfg.telemetry.enabled is False
     assert cfg.plugins.scorer == "builtin.relevance"
     assert cfg.plugins.compressor == "builtin.default"
     assert cfg.plugins.token_estimator == "builtin.char4"
+    assert cfg.compression.symbol_extraction_enabled is True
+    assert cfg.score.history_selected_file_boost == 1.25
 
 
 def test_load_config_overrides_from_toml(tmp_path: Path) -> None:
     _write(
         tmp_path / "contextbudget.toml",
         """
+model_profile = "gpt-4.1"
+
 [budget]
 max_tokens = 1234
 top_files = 10
 
 [compression]
 summary_preview_lines = 5
+symbol_extraction_enabled = false
 
 [summarization]
 backend = "external"
 adapter = "demo"
 
+[model]
+tokenizer = "llama-bpe"
+context_window = 65536
+recommended_compression_strategy = "aggressive"
+output_reserve_tokens = 8192
+
 [cache]
 backend = "shared_stub"
 duplicate_hash_cache_enabled = false
+run_history_enabled = false
+history_file = ".local/history.json"
+history_max_entries = 50
+
+[score]
+history_selected_file_boost = 2.0
+history_ignored_file_penalty = 0.5
+history_task_similarity_threshold = 0.4
+history_entry_limit = 8
 
 [tokens]
 backend = "model_aligned"
@@ -68,10 +91,23 @@ options = { path_patterns = ["docs/**"], bonus = 5.0 }
     assert cfg.budget.max_tokens == 1234
     assert cfg.budget.top_files == 10
     assert cfg.compression.summary_preview_lines == 5
+    assert cfg.compression.symbol_extraction_enabled is False
     assert cfg.summarization.backend == "external"
     assert cfg.summarization.adapter == "demo"
+    assert cfg.model.profile == "gpt-4.1"
+    assert cfg.model.tokenizer == "llama-bpe"
+    assert cfg.model.context_window == 65536
+    assert cfg.model.recommended_compression_strategy == "aggressive"
+    assert cfg.model.output_reserve_tokens == 8192
     assert cfg.cache.backend == "shared_stub"
     assert cfg.cache.duplicate_hash_cache_enabled is False
+    assert cfg.cache.run_history_enabled is False
+    assert cfg.cache.history_file == ".local/history.json"
+    assert cfg.cache.history_max_entries == 50
+    assert cfg.score.history_selected_file_boost == 2.0
+    assert cfg.score.history_ignored_file_penalty == 0.5
+    assert cfg.score.history_task_similarity_threshold == 0.4
+    assert cfg.score.history_entry_limit == 8
     assert cfg.tokens.backend == "model_aligned"
     assert cfg.tokens.model == "gpt-4.1-mini"
     assert cfg.telemetry.enabled is True

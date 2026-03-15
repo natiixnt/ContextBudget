@@ -7,6 +7,8 @@ from pathlib import Path
 
 from contextbudget.cache import normalize_cache_report
 from contextbudget.compressors.summarizers import normalize_summarizer_report
+from contextbudget.core.delta import normalize_delta_report
+from contextbudget.core.model_profiles import normalize_model_profile_report
 from contextbudget.core.tokens import normalize_token_estimator_report
 
 
@@ -94,6 +96,36 @@ def _append_token_estimator_lines(lines: list[str], data: dict) -> None:
             lines.append(f"  - {item}")
 
 
+def _append_model_profile_lines(lines: list[str], data: dict) -> None:
+    model_profile = normalize_model_profile_report(data)
+    if not model_profile:
+        return
+    lines.extend(
+        [
+            f"- Model profile selected: {model_profile.get('selected_profile', '')}",
+            f"- Model profile resolved: {model_profile.get('resolved_profile', '')}",
+            f"- Model family: {model_profile.get('family', '')}",
+            f"- Model tokenizer: {model_profile.get('tokenizer', '')}",
+            f"- Model context window: {model_profile.get('context_window', 0)}",
+            "- Recommended compression strategy: "
+            f"{model_profile.get('recommended_compression_strategy', '')}",
+            f"- Effective max tokens: {model_profile.get('effective_max_tokens', 0)}",
+            f"- Reserved output tokens: {model_profile.get('reserved_output_tokens', 0)}",
+            f"- Budget source: {model_profile.get('budget_source', '')}",
+            f"- Budget clamped: {model_profile.get('budget_clamped', False)}",
+        ]
+    )
+    notes = model_profile.get("notes", [])
+    if isinstance(notes, list) and notes:
+        lines.append("- Model profile notes:")
+        for item in notes:
+            lines.append(f"  - {item}")
+
+
+def _has_model_profile(data: dict) -> bool:
+    return bool(normalize_model_profile_report(data))
+
+
 def _append_implementation_lines(lines: list[str], data: dict) -> None:
     implementations = data.get("implementations", {})
     if not isinstance(implementations, dict) or not implementations:
@@ -103,6 +135,75 @@ def _append_implementation_lines(lines: list[str], data: dict) -> None:
         value = implementations.get(key)
         if value:
             lines.append(f"- {key}: {value}")
+
+
+def _format_ranked_file_scores(item: dict) -> str:
+    score = item.get("score", 0)
+    if "heuristic_score" not in item and "historical_score" not in item:
+        return f"score: {score}"
+    return (
+        f"combined: {score}, "
+        f"heuristic: {item.get('heuristic_score', 0)}, "
+        f"history: {item.get('historical_score', 0)}"
+    )
+
+
+def _append_delta_lines(lines: list[str], data: dict) -> None:
+    delta = normalize_delta_report(data)
+    if not delta:
+        return
+
+    budget = delta.get("budget", {})
+    if not isinstance(budget, dict):
+        budget = {}
+    files_added = delta.get("files_added", [])
+    if not isinstance(files_added, list):
+        files_added = []
+    files_removed = delta.get("files_removed", [])
+    if not isinstance(files_removed, list):
+        files_removed = []
+    changed_files = delta.get("changed_files", [])
+    if not isinstance(changed_files, list):
+        changed_files = []
+    changed_slices = delta.get("changed_slices", [])
+    if not isinstance(changed_slices, list):
+        changed_slices = []
+    changed_symbols = delta.get("changed_symbols", [])
+    if not isinstance(changed_symbols, list):
+        changed_symbols = []
+
+    lines.extend(
+        [
+            "",
+            "## Delta Context",
+            f"- Previous run: {delta.get('previous_run', '')}",
+            f"- Original tokens: {budget.get('original_tokens', 0)}",
+            f"- Delta tokens: {budget.get('delta_tokens', 0)}",
+            f"- Tokens saved: {budget.get('tokens_saved', 0)}",
+            f"- Files added: {len(files_added)}",
+            f"- Files removed: {len(files_removed)}",
+            f"- Changed files: {len(changed_files)}",
+            f"- Changed slices: {len(changed_slices)}",
+            f"- Changed symbols: {len(changed_symbols)}",
+        ]
+    )
+    for path in files_added:
+        lines.append(f"- Added: `{path}`")
+    for path in files_removed:
+        lines.append(f"- Removed: `{path}`")
+    for path in changed_files:
+        lines.append(f"- Updated: `{path}`")
+    for item in changed_symbols[:10]:
+        if not isinstance(item, dict):
+            continue
+        added = item.get("added_symbols", [])
+        removed = item.get("removed_symbols", [])
+        changed = item.get("changed_symbols", [])
+        lines.append(
+            f"- Symbol delta `{item.get('path', '')}`: +{len(added) if isinstance(added, list) else 0} "
+            f"-{len(removed) if isinstance(removed, list) else 0} "
+            f"~{len(changed) if isinstance(changed, list) else 0}"
+        )
 
 
 def render_plan_markdown(data: dict) -> str:
@@ -117,14 +218,101 @@ def render_plan_markdown(data: dict) -> str:
     ]
     _append_workspace_lines(lines, data)
     _append_implementation_lines(lines, data)
+    if _has_model_profile(data):
+        lines.extend(["", "## Model Assumptions"])
+        _append_model_profile_lines(lines, data)
     lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
     lines.extend(["", "## Ranked Relevant Files"])
     for item in data["ranked_files"]:
         reasons = ", ".join(item["reasons"]) if item["reasons"] else "no specific reason"
-        lines.append(f"- `{item['path']}` (score: {item['score']}) - {reasons}")
+        lines.append(f"- `{item['path']}` ({_format_ranked_file_scores(item)}) - {reasons}")
     if not data["ranked_files"]:
         lines.append("- No files matched current heuristic signals.")
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_agent_plan_markdown(data: dict) -> str:
+    """Render agent workflow planning payload to Markdown."""
+
+    steps = data.get("steps", [])
+    shared_context = data.get("shared_context", [])
+    lines = [
+        "# ContextBudget Agent Plan",
+        "",
+        f"Task: {data.get('task', '')}",
+        f"Repository: {data.get('repo', '')}",
+        f"Scanned files: {data.get('scanned_files', 0)}",
+        f"Workflow steps: {len(steps) if isinstance(steps, list) else 0}",
+        f"Total estimated tokens: {data.get('total_estimated_tokens', 0)}",
+        f"Unique context tokens: {data.get('unique_context_tokens', 0)}",
+        f"Reused context tokens: {data.get('reused_context_tokens', 0)}",
+    ]
+    _append_workspace_lines(lines, data)
+    _append_implementation_lines(lines, data)
+    if _has_model_profile(data):
+        lines.extend(["", "## Model Assumptions"])
+        _append_model_profile_lines(lines, data)
+    lines.extend(["", "## Token Estimator"])
+    _append_token_estimator_lines(lines, data)
+
+    lines.extend(["", "## Shared Context"])
+    if isinstance(shared_context, list) and shared_context:
+        for item in shared_context:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"- `{item.get('path', '')}` "
+                f"({item.get('estimated_tokens', 0)} tokens, reused in {item.get('reuse_count', 0)} steps)"
+            )
+    else:
+        lines.append("- None")
+
+    lines.extend(["", "## Workflow Steps"])
+    if isinstance(steps, list) and steps:
+        for idx, step in enumerate(steps, start=1):
+            if not isinstance(step, dict):
+                continue
+            lines.extend(
+                [
+                    f"### {idx}. {step.get('title', '')}",
+                    f"- Step id: {step.get('id', '')}",
+                    f"- Objective: {step.get('objective', '')}",
+                    f"- Estimated tokens: {step.get('estimated_tokens', 0)}",
+                    f"- Shared context tokens: {step.get('shared_context_tokens', 0)}",
+                    f"- Step-specific tokens: {step.get('step_context_tokens', 0)}",
+                    f"- Planning prompt: `{step.get('planning_prompt', '')}`",
+                    "- Context:",
+                ]
+            )
+            context = step.get("context", [])
+            if isinstance(context, list) and context:
+                for item in context:
+                    if not isinstance(item, dict):
+                        continue
+                    lines.append(
+                        "  - "
+                        f"`{item.get('path', '')}` "
+                        f"[{item.get('source', 'step')}] "
+                        f"({item.get('estimated_tokens', 0)} tokens, score: {item.get('score', 0)})"
+                    )
+            else:
+                lines.append("  - None")
+    else:
+        lines.append("- No workflow steps produced.")
+
+    lines.extend(["", "## Ranked Relevant Files"])
+    ranked_files = data.get("ranked_files", [])
+    if isinstance(ranked_files, list) and ranked_files:
+        for item in ranked_files:
+            if not isinstance(item, dict):
+                continue
+            reasons = ", ".join(item.get("reasons", [])) if item.get("reasons") else "no specific reason"
+            lines.append(f"- `{item.get('path', '')}` (score: {item.get('score', 0)}) - {reasons}")
+    else:
+        lines.append("- No files matched current heuristic signals.")
+
     lines.append("")
     return "\n".join(lines)
 
@@ -143,10 +331,10 @@ def render_pack_markdown(data: dict) -> str:
     ]
     _append_workspace_lines(lines, data)
     _append_implementation_lines(lines, data)
-    lines.extend([
-        "",
-        "## Token Estimator",
-    ])
+    if _has_model_profile(data):
+        lines.extend(["", "## Model Assumptions"])
+        _append_model_profile_lines(lines, data)
+    lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
     lines.extend([
         "",
@@ -159,8 +347,13 @@ def render_pack_markdown(data: dict) -> str:
         f"- Cache hits: {cache.get('hits', 0)}",
         f"- Cache misses: {cache.get('misses', 0)}",
         f"- Cache writes: {cache.get('writes', 0)}",
+        f"- Cache tokens saved: {cache.get('tokens_saved', 0)}",
+        f"- Fragment cache hits: {cache.get('fragment_hits', 0)}",
+        f"- Fragment cache misses: {cache.get('fragment_misses', 0)}",
+        f"- Fragment cache writes: {cache.get('fragment_writes', 0)}",
     ])
     _append_summarizer_lines(lines, data)
+    _append_delta_lines(lines, data)
     lines.extend(["", "## Files Included"])
     included = data.get("files_included", [])
     if included:
@@ -179,11 +372,12 @@ def render_pack_markdown(data: dict) -> str:
 
     lines.extend(["", "## Ranked Relevant Files"])
     for item in data.get("ranked_files", []):
-        lines.append(f"- `{item['path']}` (score: {item['score']})")
+        lines.append(f"- `{item['path']}` ({_format_ranked_file_scores(item)})")
 
     lines.extend(["", "## Chunk Selection"])
     for item in data.get("compressed_context", []):
         ranges = item.get("selected_ranges", [])
+        symbols = item.get("symbols", [])
         if ranges:
             first = ranges[0]
             range_preview = f"{first.get('start_line', '?')}-{first.get('end_line', '?')}"
@@ -195,6 +389,23 @@ def render_pack_markdown(data: dict) -> str:
             f"- `{item.get('path', '')}`: {item.get('chunk_strategy', 'none')} - "
             f"{item.get('chunk_reason', '')} (ranges: {range_preview})"
         )
+        cache_status = str(item.get("cache_status", "") or "")
+        cache_reference = str(item.get("cache_reference", "") or "")
+        if cache_status:
+            cache_line = f"  - cache: {cache_status}"
+            if cache_reference:
+                cache_line = f"{cache_line} ({cache_reference})"
+            lines.append(cache_line)
+        if isinstance(symbols, list) and symbols:
+            preview = ", ".join(
+                f"{symbol.get('symbol_type', 'symbol')} {symbol.get('name', '')}"
+                for symbol in symbols[:3]
+                if isinstance(symbol, dict)
+            )
+            if preview:
+                if len(symbols) > 3:
+                    preview = f"{preview}, +{len(symbols) - 3} more"
+                lines.append(f"  - symbols: {preview}")
 
     lines.append("")
     return "\n".join(lines)
@@ -213,10 +424,10 @@ def render_report_markdown(data: dict) -> str:
     ]
     _append_workspace_lines(lines, data)
     _append_implementation_lines(lines, data)
-    lines.extend([
-        "",
-        "## Token Estimator",
-    ])
+    if _has_model_profile(data):
+        lines.extend(["", "## Model Assumptions"])
+        _append_model_profile_lines(lines, data)
+    lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
     lines.extend([
         "",
@@ -228,8 +439,13 @@ def render_report_markdown(data: dict) -> str:
         f"- Cache hits: {cache.get('hits', 0)}",
         f"- Cache misses: {cache.get('misses', 0)}",
         f"- Cache writes: {cache.get('writes', 0)}",
+        f"- Cache tokens saved: {cache.get('tokens_saved', 0)}",
+        f"- Fragment cache hits: {cache.get('fragment_hits', 0)}",
+        f"- Fragment cache misses: {cache.get('fragment_misses', 0)}",
+        f"- Fragment cache writes: {cache.get('fragment_writes', 0)}",
     ])
     _append_summarizer_lines(lines, data)
+    _append_delta_lines(lines, data)
     lines.extend(["", "## Files Included"])
 
     included = data.get("files_included", [])
@@ -246,6 +462,71 @@ def render_report_markdown(data: dict) -> str:
             lines.append(f"- `{item}`")
     else:
         lines.append("- None")
+
+    lines.extend(["", "## Ranked Relevant Files"])
+    ranked_files = data.get("ranked_files", [])
+    if ranked_files:
+        for item in ranked_files:
+            lines.append(f"- `{item['path']}` ({_format_ranked_file_scores(item)})")
+    else:
+        lines.append("- None")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def _append_heatmap_rows(lines: list[str], items: list[dict], *, runs_analyzed: int) -> None:
+    if not items:
+        lines.append("- None")
+        return
+    for item in items:
+        rate = float(item.get("inclusion_rate", 0.0) or 0.0) * 100.0
+        lines.append(
+            "- "
+            f"`{item.get('path', '')}`: "
+            f"compressed={item.get('total_compressed_tokens', 0)} "
+            f"original={item.get('total_original_tokens', 0)} "
+            f"saved={item.get('total_saved_tokens', 0)} "
+            f"included={item.get('inclusion_count', 0)}/{runs_analyzed} "
+            f"rate={rate:.1f}%"
+        )
+
+
+def render_heatmap_markdown(data: dict) -> str:
+    """Render historical token heatmap analytics to Markdown."""
+
+    runs_analyzed = int(data.get("runs_analyzed", 0) or 0)
+    lines = [
+        "# ContextBudget Heatmap Report",
+        "",
+        f"Generated at: {data.get('generated_at', '')}",
+        f"Runs analyzed: {runs_analyzed}",
+        f"Unique files: {data.get('unique_files', 0)}",
+        f"Unique directories: {data.get('unique_directories', 0)}",
+        f"Artifacts scanned: {len(data.get('artifacts_scanned', []))}",
+        f"Skipped artifacts: {len(data.get('skipped_artifacts', []))}",
+        "",
+        "## Top Token-Heavy Files",
+    ]
+    _append_heatmap_rows(lines, data.get("top_token_heavy_files", []), runs_analyzed=runs_analyzed)
+    lines.extend(["", "## Top Token-Heavy Directories"])
+    _append_heatmap_rows(lines, data.get("top_token_heavy_directories", []), runs_analyzed=runs_analyzed)
+    lines.extend(["", "## Most Frequently Included Files"])
+    _append_heatmap_rows(lines, data.get("most_frequently_included_files", []), runs_analyzed=runs_analyzed)
+    lines.extend(["", "## Largest Token Savings Opportunities"])
+    _append_heatmap_rows(
+        lines,
+        data.get("largest_token_savings_opportunities", []),
+        runs_analyzed=runs_analyzed,
+    )
+
+    skipped = data.get("skipped_artifacts", [])
+    if isinstance(skipped, list) and skipped:
+        lines.extend(["", "## Skipped Artifacts"])
+        for item in skipped:
+            if not isinstance(item, dict):
+                continue
+            lines.append(f"- `{item.get('artifact_path', '')}`: {item.get('reason', '')}")
 
     lines.append("")
     return "\n".join(lines)
@@ -352,6 +633,205 @@ def render_diff_markdown(data: dict) -> str:
     return "\n".join(lines)
 
 
+def _format_signed_int(value: int) -> str:
+    return f"{int(value):+d}"
+
+
+def _format_signed_float(value: float) -> str:
+    numeric = float(value)
+    rounded = round(numeric, 1)
+    if rounded.is_integer():
+        return f"{rounded:+.0f}"
+    return f"{rounded:+.1f}"
+
+
+def _format_signed_percent(value: float) -> str:
+    numeric = float(value)
+    rounded = round(numeric, 1)
+    if rounded.is_integer():
+        return f"{rounded:+.0f}%"
+    return f"{rounded:+.1f}%"
+
+
+def _pr_audit_file_map(data: dict) -> dict[str, dict]:
+    files = data.get("files", [])
+    if not isinstance(files, list):
+        return {}
+    mapping: dict[str, dict] = {}
+    for item in files:
+        if not isinstance(item, dict):
+            continue
+        path = str(item.get("path", "")).strip()
+        if path:
+            mapping[path] = item
+    return mapping
+
+
+def render_pr_comment_markdown(data: dict) -> str:
+    """Render the concise PR comment for context-growth auditing."""
+
+    summary = data.get("summary", {})
+    files_by_path = _pr_audit_file_map(data)
+    causing_increase = data.get("files_causing_increase", [])
+    lines = [
+        "## ContextBudget Analysis",
+        "",
+        f"Estimated token impact: {_format_signed_percent(float(summary.get('estimated_token_delta_pct', 0.0) or 0.0))}",
+        (
+            "Estimated tokens: "
+            f"{summary.get('estimated_tokens_before', 0)} -> {summary.get('estimated_tokens_after', 0)} "
+            f"({_format_signed_int(int(summary.get('estimated_token_delta', 0) or 0))})"
+        ),
+        "",
+        "Files causing increase:",
+    ]
+
+    if isinstance(causing_increase, list) and causing_increase:
+        for path in causing_increase:
+            entry = files_by_path.get(str(path), {})
+            details: list[str] = []
+            token_delta = int(entry.get("token_delta", 0) or 0)
+            if token_delta > 0:
+                details.append(f"{_format_signed_int(token_delta)} tokens")
+            new_dependencies = entry.get("new_dependencies", [])
+            if isinstance(new_dependencies, list) and new_dependencies:
+                details.append(f"+{len(new_dependencies)} dependencies")
+            complexity_delta = float(entry.get("complexity_delta", 0.0) or 0.0)
+            if complexity_delta > 0:
+                details.append(f"complexity {_format_signed_float(complexity_delta)}")
+            if details:
+                lines.append(f"- {path} ({', '.join(details)})")
+            else:
+                lines.append(f"- {path}")
+    else:
+        lines.append("- None")
+
+    larger_files = data.get("larger_files", [])
+    new_dependencies = data.get("new_dependencies", [])
+    increased_complexity = data.get("increased_complexity", [])
+    if any((larger_files, new_dependencies, increased_complexity)):
+        lines.extend(["", "Signals:"])
+        if isinstance(larger_files, list) and larger_files:
+            lines.append(f"- Larger files: {', '.join(str(item) for item in larger_files[:5])}")
+        if isinstance(new_dependencies, list) and new_dependencies:
+            preview = ", ".join(str(item.get("name", "")) for item in new_dependencies[:5] if isinstance(item, dict))
+            if preview:
+                lines.append(f"- New dependencies: {preview}")
+        if isinstance(increased_complexity, list) and increased_complexity:
+            lines.append(f"- Increased context complexity: {', '.join(str(item) for item in increased_complexity[:5])}")
+
+    suggestions = data.get("suggestions", [])
+    lines.extend(["", "Suggestions:"])
+    if isinstance(suggestions, list) and suggestions:
+        for item in suggestions:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- None")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_pr_audit_markdown(data: dict) -> str:
+    """Render the full PR context audit artifact to Markdown."""
+
+    summary = data.get("summary", {})
+    files = data.get("files", [])
+    lines = [
+        "# ContextBudget PR Audit",
+        "",
+        f"Repository: {data.get('repo', '')}",
+        f"Base ref: {data.get('base_ref', '')}",
+        f"Head ref: {data.get('head_ref', '')}",
+        f"Merge base: {data.get('merge_base', '')}",
+        f"Generated at: {data.get('generated_at', '')}",
+        "",
+        "## Token Estimator",
+    ]
+    _append_token_estimator_lines(lines, data)
+    lines.extend(
+        [
+            "",
+            "## Summary",
+            f"- Changed files: {summary.get('changed_files', 0)}",
+            f"- Analyzed files: {summary.get('analyzed_files', 0)}",
+            f"- Skipped files: {summary.get('skipped_files', 0)}",
+            f"- Estimated tokens before: {summary.get('estimated_tokens_before', 0)}",
+            f"- Estimated tokens after: {summary.get('estimated_tokens_after', 0)}",
+            f"- Estimated token delta: {_format_signed_int(int(summary.get('estimated_token_delta', 0) or 0))}",
+            f"- Estimated token impact: {_format_signed_percent(float(summary.get('estimated_token_delta_pct', 0.0) or 0.0))}",
+            f"- Larger files: {summary.get('larger_file_count', 0)}",
+            f"- New dependencies: {summary.get('new_dependency_count', 0)}",
+            f"- Increased complexity: {summary.get('increased_complexity_count', 0)}",
+            "",
+            "## Files Causing Increase",
+        ]
+    )
+
+    causing_increase = data.get("files_causing_increase", [])
+    files_by_path = _pr_audit_file_map(data)
+    if isinstance(causing_increase, list) and causing_increase:
+        for path in causing_increase:
+            entry = files_by_path.get(str(path), {})
+            lines.append(
+                f"- `{path}`: "
+                f"tokens {_format_signed_int(int(entry.get('token_delta', 0) or 0))}, "
+                f"lines {_format_signed_int(int(entry.get('line_delta', 0) or 0))}, "
+                f"complexity {_format_signed_float(float(entry.get('complexity_delta', 0.0) or 0.0))}"
+            )
+    else:
+        lines.append("- None")
+
+    lines.extend(["", "## File Details"])
+    if isinstance(files, list) and files:
+        for item in files:
+            if not isinstance(item, dict):
+                continue
+            if not bool(item.get("analyzed", True)):
+                lines.append(
+                    f"- `{item.get('path', '')}`: skipped ({item.get('skipped_reason', 'unknown')})"
+                )
+                continue
+            lines.append(
+                f"- `{item.get('path', '')}` "
+                f"[{item.get('change_type', 'modified')}]: "
+                f"tokens {item.get('before', {}).get('token_count', 0)} -> {item.get('after', {}).get('token_count', 0)}, "
+                f"complexity {item.get('before', {}).get('complexity_score', 0)} -> {item.get('after', {}).get('complexity_score', 0)}"
+            )
+            new_dependencies = item.get("new_dependencies", [])
+            if isinstance(new_dependencies, list) and new_dependencies:
+                lines.append(f"  - new dependencies: {', '.join(str(dep) for dep in new_dependencies)}")
+            reasons = item.get("growth_reasons", [])
+            if isinstance(reasons, list) and reasons:
+                lines.append(f"  - growth reasons: {', '.join(str(reason) for reason in reasons)}")
+    else:
+        lines.append("- None")
+
+    dependencies = data.get("new_dependencies", [])
+    lines.extend(["", "## New Dependencies"])
+    if isinstance(dependencies, list) and dependencies:
+        for item in dependencies:
+            if not isinstance(item, dict):
+                continue
+            lines.append(
+                f"- `{item.get('name', '')}` via {item.get('source', '')} in `{item.get('file', '')}`"
+            )
+    else:
+        lines.append("- None")
+
+    suggestions = data.get("suggestions", [])
+    lines.extend(["", "## Suggestions"])
+    if isinstance(suggestions, list) and suggestions:
+        for item in suggestions:
+            lines.append(f"- {item}")
+    else:
+        lines.append("- None")
+
+    lines.extend(["", "## PR Comment Preview", "", render_pr_comment_markdown(data)])
+    lines.append("")
+    return "\n".join(lines)
+
+
 def render_benchmark_markdown(data: dict) -> str:
     """Render benchmark artifact to Markdown."""
 
@@ -367,6 +847,9 @@ def render_benchmark_markdown(data: dict) -> str:
     ]
     _append_workspace_lines(lines, data)
     _append_implementation_lines(lines, data)
+    if _has_model_profile(data):
+        lines.extend(["", "## Model Assumptions"])
+        _append_model_profile_lines(lines, data)
     lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
     lines.extend([

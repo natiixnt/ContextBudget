@@ -3,15 +3,20 @@ from __future__ import annotations
 """Public library API for ContextBudget workflows."""
 
 from pathlib import Path
-from typing import Any
+from typing import Any, Mapping, Sequence
 
+from contextbudget.cache import update_run_history_artifacts
 from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_config, load_workspace
 from contextbudget.core.benchmark import run_benchmark
+from contextbudget.core.delta import effective_pack_metrics
 from contextbudget.core.pipeline import (
     as_json_dict,
     run_diff_from_json,
+    run_heatmap,
     run_pack,
     run_plan,
+    run_plan_agent,
+    run_pr_audit,
     run_report_from_json,
 )
 from contextbudget.core.policy import (
@@ -169,6 +174,40 @@ class ContextBudgetEngine:
             telemetry_sink=self._telemetry_sink,
         )
 
+    def plan_agent(
+        self,
+        *,
+        task: str,
+        repo: str | Path = ".",
+        workspace: str | Path | None = None,
+        top_files: int | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Build a multi-step context plan for agent workflows."""
+
+        repo_path = normalize_repo(repo)
+        if workspace is not None:
+            workspace_definition = self._load_workspace(workspace, config_path=config_path)
+            effective_top_files = top_files if top_files is not None else workspace_definition.config.budget.top_files
+            return run_plan_agent(
+                task,
+                repo=workspace_definition.root,
+                top_n=effective_top_files,
+                config=workspace_definition.config,
+                telemetry_sink=self._telemetry_sink,
+                workspace=workspace_definition,
+            )
+
+        cfg = self._load_config(repo_path, config_path=config_path)
+        effective_top_files = top_files if top_files is not None else cfg.budget.top_files
+        return run_plan_agent(
+            task,
+            repo=repo_path,
+            top_n=effective_top_files,
+            config=cfg,
+            telemetry_sink=self._telemetry_sink,
+        )
+
     def pack(
         self,
         *,
@@ -177,6 +216,7 @@ class ContextBudgetEngine:
         workspace: str | Path | None = None,
         max_tokens: int | None = None,
         top_files: int | None = None,
+        delta_from: RunArtifactInput | None = None,
         config_path: str | Path | None = None,
     ) -> dict[str, Any]:
         """Build compressed context under token and file budgets."""
@@ -189,6 +229,7 @@ class ContextBudgetEngine:
                 repo=workspace_definition.root,
                 max_tokens=max_tokens,
                 top_files=top_files,
+                delta_from=delta_from,
                 config=workspace_definition.config,
                 telemetry_sink=self._telemetry_sink,
                 workspace=workspace_definition,
@@ -201,6 +242,7 @@ class ContextBudgetEngine:
             repo=repo_path,
             max_tokens=max_tokens,
             top_files=top_files,
+            delta_from=delta_from,
             config=cfg,
             telemetry_sink=self._telemetry_sink,
         )
@@ -211,6 +253,35 @@ class ContextBudgetEngine:
 
         run_data = self._load_run_artifact(run_artifact)
         return run_report_from_json(run_data)
+
+    def record_history_artifacts(
+        self,
+        run_artifact: RunArtifactInput,
+        *,
+        artifacts: Mapping[str, str],
+        config_path: str | Path | None = None,
+    ) -> bool:
+        """Attach persisted artifact paths to a previously recorded history entry."""
+
+        run_data = self._load_run_artifact(run_artifact)
+        generated_at = str(run_data.get("generated_at", "") or "").strip()
+        if not generated_at:
+            return False
+
+        repo = self._resolve_repo_from_run_data(run_data)
+        workspace_path = self._resolve_workspace_from_run_data(run_data)
+        if workspace_path is not None:
+            cfg = self._load_workspace(workspace_path, config_path=config_path).config
+        else:
+            cfg = self._load_config(repo, config_path=config_path)
+
+        return update_run_history_artifacts(
+            repo,
+            generated_at=generated_at,
+            result_artifacts=artifacts,
+            enabled=cfg.cache.run_history_enabled,
+            history_file=cfg.cache.history_file,
+        )
 
     def evaluate_policy(
         self,
@@ -237,16 +308,19 @@ class ContextBudgetEngine:
         if not bool(policy_result.get("passed", False)):
             telemetry = self._build_policy_telemetry_session(run_data, config_path=config_path)
             budget = run_data.get("budget", {})
-            files_included = run_data.get("files_included", [])
             files_skipped = run_data.get("files_skipped", [])
+            effective = effective_pack_metrics(run_data)
+            effective_files = effective.get("files_included", [])
+            if not isinstance(effective_files, list):
+                effective_files = []
             telemetry.emit(
                 "policy_failed",
                 violations=list(policy_result.get("violations", [])),
                 checks=policy_result.get("checks", {}),
                 max_tokens=run_data.get("max_tokens"),
-                estimated_input_tokens=budget.get("estimated_input_tokens") if isinstance(budget, dict) else None,
-                estimated_saved_tokens=budget.get("estimated_saved_tokens") if isinstance(budget, dict) else None,
-                files_included=len(files_included) if isinstance(files_included, list) else None,
+                estimated_input_tokens=effective.get("estimated_input_tokens"),
+                estimated_saved_tokens=effective.get("estimated_saved_tokens"),
+                files_included=len(effective_files),
                 files_skipped=len(files_skipped) if isinstance(files_skipped, list) else None,
                 cache_hits=run_data.get("cache_hits"),
                 duplicate_reads_prevented=(
@@ -269,6 +343,35 @@ class ContextBudgetEngine:
         old_data = self._load_run_artifact(old_run_artifact)
         new_data = self._load_run_artifact(new_run_artifact)
         return run_diff_from_json(old_data, new_data, old_label=old_label, new_label=new_label)
+
+    def pr_audit(
+        self,
+        *,
+        repo: str | Path = ".",
+        base_ref: str | None = None,
+        head_ref: str | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Analyze a pull-request diff for token and context-growth impact."""
+
+        repo_path = normalize_repo(repo)
+        cfg = self._load_config(repo_path, config_path=config_path)
+        return run_pr_audit(
+            repo_path,
+            base_ref=base_ref,
+            head_ref=head_ref,
+            config=cfg,
+        )
+
+    def heatmap(
+        self,
+        history: Sequence[str | Path] | None = None,
+        *,
+        limit: int = 10,
+    ) -> dict[str, Any]:
+        """Aggregate historical pack artifacts into a heatmap report."""
+
+        return run_heatmap(history=history, limit=limit)
 
     def benchmark(
         self,
@@ -365,6 +468,7 @@ class BudgetGuard:
         workspace: str | Path | None = None,
         max_tokens: int | None = None,
         top_files: int | None = None,
+        delta_from: RunArtifactInput | None = None,
         strict: bool | None = None,
         policy_path: str | Path | None = None,
         config_path: str | Path | None = None,
@@ -384,6 +488,7 @@ class BudgetGuard:
             workspace=workspace,
             max_tokens=effective_max_tokens,
             top_files=effective_top_files,
+            delta_from=delta_from,
             config_path=config_path,
         )
 

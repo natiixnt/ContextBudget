@@ -28,3 +28,26 @@ def test_run_pack_stage_supports_in_memory_cache_backend(tmp_path: Path) -> None
     assert first.cache.misses >= 1
     assert second.cache.backend == "memory"
     assert second.cache.hits >= 1
+
+
+def test_in_memory_cache_tracks_fragment_reuse_stats(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
+
+    cfg = default_config()
+    cfg.compression.full_file_threshold_tokens = 1000
+    cfg.compression.snippet_score_threshold = 999.0
+    files = run_scan_stage(tmp_path, cfg)
+    ranked = run_score_stage("update auth flow", files, cfg)
+    cache = InMemorySummaryCacheBackend()
+
+    first = run_pack_stage("update auth flow", tmp_path, ranked, 1000, cache, cfg)
+    second = run_pack_stage("update auth flow", tmp_path, ranked, 1000, cache, cfg)
+
+    assert first.cache.fragment_misses >= 1
+    assert first.cache.tokens_saved == 0
+    assert first.compressed_files[0].cache_status == "stored"
+    assert second.cache.fragment_hits >= 1
+    assert second.compressed_files[0].cache_status == "reused"
+    assert second.cache.tokens_saved == (
+        first.compressed_files[0].compressed_tokens - second.compressed_files[0].compressed_tokens
+    )

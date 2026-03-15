@@ -25,8 +25,14 @@ def _builtin_relevance_score(
     options: Mapping[str, Any],
     estimate_tokens,
 ):
-    del options, estimate_tokens
-    return score_files(task, files, settings=settings)
+    del estimate_tokens
+    return score_files(
+        task,
+        files,
+        settings=settings,
+        history_entries=options.get("history_entries"),
+        similarity=options.get("task_similarity"),
+    )
 
 
 def _builtin_default_compress(

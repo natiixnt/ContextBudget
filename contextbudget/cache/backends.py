@@ -18,6 +18,10 @@ class CacheStats:
     hits: int = 0
     misses: int = 0
     writes: int = 0
+    tokens_saved: int = 0
+    fragment_hits: int = 0
+    fragment_misses: int = 0
+    fragment_writes: int = 0
 
 
 class SummaryCacheBackend(ABC):
@@ -41,13 +45,47 @@ class SummaryCacheBackend(ABC):
         self.stats.hits += 1
         return summary
 
-    def put_summary(self, key: str, summary: str) -> None:
+    def put_summary(self, key: str, summary: str) -> bool:
         """Store a summary if the backend accepts writes."""
 
         if not self.enabled:
-            return
+            return False
         if self._put_summary(key, summary):
             self.stats.writes += 1
+            return True
+        return False
+
+    def get_fragment(self, key: str) -> str | None:
+        """Lookup a cached fragment reference and update counters."""
+
+        if not self.enabled:
+            return None
+        fragment = self._get_fragment(key)
+        if fragment is None:
+            self.stats.misses += 1
+            self.stats.fragment_misses += 1
+            return None
+        self.stats.hits += 1
+        self.stats.fragment_hits += 1
+        return fragment
+
+    def put_fragment(self, key: str, reference: str) -> bool:
+        """Store a fragment reference if the backend accepts writes."""
+
+        if not self.enabled:
+            return False
+        if self._put_fragment(key, reference):
+            self.stats.writes += 1
+            self.stats.fragment_writes += 1
+            return True
+        return False
+
+    def record_tokens_saved(self, tokens_saved: int) -> None:
+        """Record prompt tokens saved by fragment reuse."""
+
+        if not self.enabled:
+            return
+        self.stats.tokens_saved += max(0, int(tokens_saved))
 
     def save(self) -> None:
         """Flush backend state if needed."""
@@ -65,6 +103,10 @@ class SummaryCacheBackend(ABC):
             hits=self.stats.hits,
             misses=self.stats.misses,
             writes=self.stats.writes,
+            tokens_saved=self.stats.tokens_saved,
+            fragment_hits=self.stats.fragment_hits,
+            fragment_misses=self.stats.fragment_misses,
+            fragment_writes=self.stats.fragment_writes,
         )
 
     @abstractmethod
@@ -74,6 +116,14 @@ class SummaryCacheBackend(ABC):
     @abstractmethod
     def _put_summary(self, key: str, summary: str) -> bool:
         """Persist ``summary`` and return ``True`` if it counted as a new write."""
+
+    @abstractmethod
+    def _get_fragment(self, key: str) -> str | None:
+        """Return a cached fragment reference for ``key`` if available."""
+
+    @abstractmethod
+    def _put_fragment(self, key: str, reference: str) -> bool:
+        """Persist ``reference`` and return ``True`` if it counted as a new write."""
 
     def _save(self) -> None:
         """Optional persistence hook."""
@@ -88,7 +138,7 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
         super().__init__(enabled=enabled)
         self.repo_path = repo_path
         self.cache_path = repo_path / cache_file
-        self._data: dict[str, Any] = {"summaries": {}}
+        self._data: dict[str, Any] = {"summaries": {}, "fragments": {}}
         self._load()
 
     def _load(self) -> None:
@@ -99,28 +149,40 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
         try:
             raw_data = json.loads(self.cache_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            self._data = {"summaries": {}}
+            self._data = {"summaries": {}, "fragments": {}}
             return
-        self._data = raw_data if isinstance(raw_data, dict) else {"summaries": {}}
+        self._data = raw_data if isinstance(raw_data, dict) else {"summaries": {}, "fragments": {}}
 
-    def _summaries(self) -> dict[str, str]:
-        raw = self._data.get("summaries")
+    def _store(self, name: str) -> dict[str, str]:
+        raw = self._data.get(name)
         if isinstance(raw, dict):
             return raw
         summaries: dict[str, str] = {}
-        self._data["summaries"] = summaries
+        self._data[name] = summaries
         return summaries
 
     def _get_summary(self, key: str) -> str | None:
-        summaries = self._summaries()
+        summaries = self._store("summaries")
         if key in summaries:
             return str(summaries[key])
         return None
 
     def _put_summary(self, key: str, summary: str) -> bool:
-        summaries = self._summaries()
+        summaries = self._store("summaries")
         is_new_key = key not in summaries
         summaries[key] = summary
+        return is_new_key
+
+    def _get_fragment(self, key: str) -> str | None:
+        fragments = self._store("fragments")
+        if key in fragments:
+            return str(fragments[key])
+        return None
+
+    def _put_fragment(self, key: str, reference: str) -> bool:
+        fragments = self._store("fragments")
+        is_new_key = key not in fragments
+        fragments[key] = reference
         return is_new_key
 
     def _save(self) -> None:
@@ -149,6 +211,12 @@ class SharedSummaryCacheBackendStub(SummaryCacheBackend):
     def _put_summary(self, key: str, summary: str) -> bool:
         return False
 
+    def _get_fragment(self, key: str) -> str | None:
+        return None
+
+    def _put_fragment(self, key: str, reference: str) -> bool:
+        return False
+
 
 class InMemorySummaryCacheBackend(SummaryCacheBackend):
     """Process-local cache backend primarily for tests."""
@@ -158,6 +226,7 @@ class InMemorySummaryCacheBackend(SummaryCacheBackend):
     def __init__(self, initial_summaries: Mapping[str, str] | None = None, *, enabled: bool = True) -> None:
         super().__init__(enabled=enabled)
         self._summaries_store = dict(initial_summaries or {})
+        self._fragments_store: dict[str, str] = {}
 
     def _get_summary(self, key: str) -> str | None:
         return self._summaries_store.get(key)
@@ -165,6 +234,14 @@ class InMemorySummaryCacheBackend(SummaryCacheBackend):
     def _put_summary(self, key: str, summary: str) -> bool:
         is_new_key = key not in self._summaries_store
         self._summaries_store[key] = summary
+        return is_new_key
+
+    def _get_fragment(self, key: str) -> str | None:
+        return self._fragments_store.get(key)
+
+    def _put_fragment(self, key: str, reference: str) -> bool:
+        is_new_key = key not in self._fragments_store
+        self._fragments_store[key] = reference
         return is_new_key
 
 
@@ -221,12 +298,20 @@ def normalize_cache_report(data: Mapping[str, Any]) -> dict[str, Any]:
         hits_raw = raw_cache.get("hits", data.get("cache_hits", 0))
         misses_raw = raw_cache.get("misses", 0)
         writes_raw = raw_cache.get("writes", 0)
+        tokens_saved_raw = raw_cache.get("tokens_saved", 0)
+        fragment_hits_raw = raw_cache.get("fragment_hits", 0)
+        fragment_misses_raw = raw_cache.get("fragment_misses", 0)
+        fragment_writes_raw = raw_cache.get("fragment_writes", 0)
     else:
         backend = "unknown"
         enabled = True
         hits_raw = data.get("cache_hits", 0)
         misses_raw = 0
         writes_raw = 0
+        tokens_saved_raw = 0
+        fragment_hits_raw = 0
+        fragment_misses_raw = 0
+        fragment_writes_raw = 0
 
     return {
         "backend": backend,
@@ -234,6 +319,10 @@ def normalize_cache_report(data: Mapping[str, Any]) -> dict[str, Any]:
         "hits": _to_int(hits_raw),
         "misses": _to_int(misses_raw),
         "writes": _to_int(writes_raw),
+        "tokens_saved": _to_int(tokens_saved_raw),
+        "fragment_hits": _to_int(fragment_hits_raw),
+        "fragment_misses": _to_int(fragment_misses_raw),
+        "fragment_writes": _to_int(fragment_writes_raw),
     }
 
 

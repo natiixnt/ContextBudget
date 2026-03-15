@@ -25,6 +25,16 @@ _MODEL_CHAR_RATIO_PROFILES: tuple[tuple[str, float], ...] = (
     ("gpt-4.1-mini", 3.55),
     ("gpt-4.1", 3.6),
     ("claude", 3.9),
+    ("codestral", 3.8),
+    ("mistral", 3.85),
+    ("ministral", 3.85),
+    ("devstral", 3.8),
+    ("local-llm", 4.0),
+    ("gpt-oss", 3.75),
+    ("llama", 4.0),
+    ("qwen", 3.9),
+    ("gemma", 4.0),
+    ("phi", 4.0),
 )
 
 

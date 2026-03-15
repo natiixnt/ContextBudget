@@ -2,11 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from contextbudget.cache import RunHistoryEntry
+from contextbudget.config import default_config
 from contextbudget.config import load_workspace
 from contextbudget.config import ScoreSettings
 from contextbudget.scanners.repository import scan_repository
 from contextbudget.scanners.workspace import scan_workspace
 from contextbudget.scorers.relevance import score_files
+from contextbudget.stages.workflow import run_score_stage
 
 
 def _write(path: Path, content: str) -> None:
@@ -18,6 +21,7 @@ def test_scan_repository_finds_text_files(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "auth.py", "def check_token():\n    return True\n")
     _write(tmp_path / "README.md", "Authentication module")
     _write(tmp_path / ".contextbudget_cache.json", "{\"summaries\": {}}")
+    _write(tmp_path / ".contextbudget" / "history.json", "{\"entries\": [], \"version\": 1}")
     (tmp_path / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
 
     records = scan_repository(tmp_path)
@@ -27,6 +31,7 @@ def test_scan_repository_finds_text_files(tmp_path: Path) -> None:
     assert "README.md" in paths
     assert "image.png" not in paths
     assert ".contextbudget_cache.json" not in paths
+    assert ".contextbudget/history.json" not in paths
     assert ".contextbudget/scan-index.json" not in paths
 
 
@@ -40,6 +45,59 @@ def test_score_files_ranks_keyword_matches(tmp_path: Path) -> None:
     assert ranked
     assert ranked[0].file.path == "api/search.py"
     assert ranked[0].score > 0
+
+
+def test_score_files_rerank_using_similar_history(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "search_api.py", "def cache_search():\n    return []\n")
+    _write(tmp_path / "src" / "cache.py", "def cache_get(key: str) -> str | None:\n    return None\n")
+
+    records = scan_repository(tmp_path)
+    baseline = score_files("add caching to search API", records)
+    assert baseline[0].file.path == "src/search_api.py"
+
+    history_entries = [
+        RunHistoryEntry(
+            generated_at="2026-03-10T00:00:00+00:00",
+            task="add caching to search API",
+            selected_files=["src/cache.py"],
+            ignored_files=["src/search_api.py"],
+            candidate_files=["src/search_api.py", "src/cache.py"],
+            token_usage={"estimated_input_tokens": 40, "estimated_saved_tokens": 10, "max_tokens": 500},
+            result_artifacts={"run_json": "/tmp/run-1.json"},
+        ),
+        RunHistoryEntry(
+            generated_at="2026-03-11T00:00:00+00:00",
+            task="add caching to search API",
+            selected_files=["src/cache.py"],
+            ignored_files=["src/search_api.py"],
+            candidate_files=["src/search_api.py", "src/cache.py"],
+            token_usage={"estimated_input_tokens": 35, "estimated_saved_tokens": 12, "max_tokens": 500},
+            result_artifacts={"run_json": "/tmp/run-2.json"},
+        ),
+    ]
+
+    reranked = score_files("add caching to search API", records, history_entries=history_entries)
+    by_path = {item.file.path: item for item in reranked}
+
+    assert reranked[0].file.path == "src/cache.py"
+    assert by_path["src/cache.py"].historical_score > 0
+    assert by_path["src/search_api.py"].historical_score < 0
+    assert by_path["src/cache.py"].score == round(
+        by_path["src/cache.py"].heuristic_score + by_path["src/cache.py"].historical_score,
+        3,
+    )
+
+
+def test_run_score_stage_keeps_zero_history_when_history_file_is_missing(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "search.py", "def search() -> list[str]:\n    return []\n")
+
+    cfg = default_config()
+    records = scan_repository(tmp_path)
+    ranked = run_score_stage("add caching to search api", records, cfg, repo=tmp_path)
+
+    assert ranked
+    assert all(item.historical_score == 0 for item in ranked)
+    assert not (tmp_path / ".contextbudget" / "history.json").exists()
 
 
 def test_scan_repository_respects_include_and_ignore_globs(tmp_path: Path) -> None:

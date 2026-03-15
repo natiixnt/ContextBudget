@@ -1,4 +1,5 @@
 # Example ContextBudget configuration
+model_profile = "gpt-4.1"
 
 [scan]
 include_globs = ["**/*.py", "**/*.md", "pyproject.toml"]
@@ -11,6 +12,13 @@ top_files = 25
 
 [score]
 critical_path_keywords = ["auth", "permission", "billing", "security"]
+
+[model]
+# Optional overrides, useful for local/self-hosted models.
+# tokenizer = "llama-bpe"
+# context_window = 65536
+# recommended_compression_strategy = "aggressive"
+# output_reserve_tokens = 8192
 
 [compression]
 summary_preview_lines = 10

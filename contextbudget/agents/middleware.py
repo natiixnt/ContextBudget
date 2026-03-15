@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 from contextbudget.cache import normalize_cache_report
+from contextbudget.core.delta import effective_pack_metrics
 from contextbudget.core.policy import PolicySpec, default_strict_policy
 from contextbudget.core.render import write_json
 from contextbudget.engine import BudgetPolicyViolationError, ContextBudgetEngine
@@ -27,6 +28,7 @@ class AgentTaskRequest:
     workspace: str | Path | None = None
     max_tokens: int | None = None
     top_files: int | None = None
+    delta_from: str | Path | None = None
     config_path: str | Path | None = None
     metadata: dict[str, Any] = field(default_factory=dict)
 
@@ -42,6 +44,8 @@ class AgentTaskRequest:
         }
         if self.workspace is not None:
             data["workspace"] = _stringify_path(self.workspace)
+        if self.delta_from is not None:
+            data["delta_from"] = _stringify_path(self.delta_from)
         if self.config_path is not None:
             data["config_path"] = _stringify_path(self.config_path)
         return data
@@ -88,9 +92,13 @@ def _build_middleware_metadata(
     budget = run_artifact.get("budget", {})
     if not isinstance(budget, Mapping):
         budget = {}
-    files_included = run_artifact.get("files_included", [])
+    effective = effective_pack_metrics(run_artifact)
+    files_included = effective.get("files_included", [])
     if not isinstance(files_included, list):
         files_included = []
+    files_removed = effective.get("files_removed", [])
+    if not isinstance(files_removed, list):
+        files_removed = []
     files_skipped = run_artifact.get("files_skipped", [])
     if not isinstance(files_skipped, list):
         files_skipped = []
@@ -104,6 +112,7 @@ def _build_middleware_metadata(
         "workspace": str(run_artifact.get("workspace", "")),
         "max_tokens": int(run_artifact.get("max_tokens", 0) or 0),
         "files_included_count": len(files_included),
+        "files_removed_count": len(files_removed),
         "files_skipped_count": len(files_skipped),
         "ranked_files_count": len(ranked_files),
         "selected_repos": list(run_artifact.get("selected_repos", []))
@@ -112,8 +121,10 @@ def _build_middleware_metadata(
         "scanned_repos": list(run_artifact.get("scanned_repos", []))
         if isinstance(run_artifact.get("scanned_repos", []), list)
         else [],
-        "estimated_input_tokens": int(budget.get("estimated_input_tokens", 0) or 0),
-        "estimated_saved_tokens": int(budget.get("estimated_saved_tokens", 0) or 0),
+        "delta_enabled": bool(effective.get("delta_enabled", False)),
+        "estimated_input_tokens": int(effective.get("estimated_input_tokens", budget.get("estimated_input_tokens", 0)) or 0),
+        "estimated_saved_tokens": int(effective.get("estimated_saved_tokens", budget.get("estimated_saved_tokens", 0)) or 0),
+        "original_input_tokens": int(effective.get("original_input_tokens", budget.get("estimated_input_tokens", 0)) or 0),
         "duplicate_reads_prevented": int(budget.get("duplicate_reads_prevented", 0) or 0),
         "quality_risk_estimate": str(budget.get("quality_risk_estimate", "unknown")),
         "cache": normalize_cache_report(run_artifact),
@@ -140,6 +151,7 @@ class ContextBudgetMiddleware:
         workspace: str | Path | None = None,
         max_tokens: int | None = None,
         top_files: int | None = None,
+        delta_from: str | Path | None = None,
         config_path: str | Path | None = None,
         metadata: Mapping[str, Any] | None = None,
     ) -> AgentMiddlewareResult:
@@ -151,6 +163,7 @@ class ContextBudgetMiddleware:
             workspace=workspace,
             max_tokens=max_tokens,
             top_files=top_files,
+            delta_from=delta_from,
             config_path=config_path,
             metadata=dict(metadata or {}),
         )
@@ -165,6 +178,7 @@ class ContextBudgetMiddleware:
             workspace=request.workspace,
             max_tokens=request.max_tokens,
             top_files=request.top_files,
+            delta_from=request.delta_from,
             config_path=request.config_path,
         )
         metadata = _build_middleware_metadata(request, run_artifact)
@@ -212,6 +226,13 @@ class ContextBudgetMiddleware:
         output_path = Path(path).resolve()
         result.recorded_path = str(output_path)
         write_json(output_path, result.as_record())
+        self.engine.record_history_artifacts(
+            result.run_artifact,
+            artifacts={
+                "run_json": str(output_path),
+            },
+            config_path=result.request.config_path,
+        )
         return output_path
 
     def handle(
@@ -243,6 +264,7 @@ def prepare_context(
     workspace: str | Path | None = None,
     max_tokens: int | None = None,
     top_files: int | None = None,
+    delta_from: str | Path | None = None,
     config_path: str | Path | None = None,
     metadata: Mapping[str, Any] | None = None,
     middleware: ContextBudgetMiddleware | None = None,
@@ -256,6 +278,7 @@ def prepare_context(
         workspace=workspace,
         max_tokens=max_tokens,
         top_files=top_files,
+        delta_from=delta_from,
         config_path=config_path,
         metadata=metadata,
     )

@@ -7,6 +7,7 @@ from contextbudget.core.pipeline import as_json_dict, run_pack
 from contextbudget.core import tokens as token_module
 from contextbudget.core.tokens import (
     describe_builtin_token_estimator,
+    estimate_tokens,
     estimate_tokens_model_aligned,
     estimate_with_builtin_backend,
 )
@@ -98,3 +99,46 @@ fallback_backend = "heuristic"
         assert exact_entry["fallback_used"] is True
     finally:
         token_module._resolve_builtin_token_estimator.cache_clear()
+
+
+def test_slice_token_estimate_is_lower_than_full_file_tokens(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "contextbudget.toml",
+        """
+[compression]
+full_file_threshold_tokens = 1
+snippet_score_threshold = 0
+symbol_extraction_enabled = false
+snippet_context_lines = 1
+snippet_total_line_limit = 8
+""".strip(),
+    )
+    _write(
+        tmp_path / "src" / "auth.py",
+        """
+def login(token: str) -> bool:
+    normalized = token.strip()
+    if not normalized:
+        return False
+    return normalized.startswith("prod_")
+
+
+def audit_everything(token: str) -> bool:
+    events = []
+    for _ in range(30):
+        events.append(token)
+    return bool(events)
+""".strip()
+        + "\n",
+    )
+
+    full_text = (tmp_path / "src" / "auth.py").read_text(encoding="utf-8")
+    full_tokens = estimate_tokens(full_text)
+    data = as_json_dict(run_pack("tighten auth login", repo=tmp_path, max_tokens=200))
+    entry = next(item for item in data["compressed_context"] if item["path"] == "src/auth.py")
+
+    assert entry["strategy"] == "slice"
+    assert entry["original_tokens"] == full_tokens
+    assert entry["compressed_tokens"] == estimate_tokens(entry["text"])
+    assert entry["compressed_tokens"] < full_tokens
+    assert data["budget"]["estimated_input_tokens"] == entry["compressed_tokens"]

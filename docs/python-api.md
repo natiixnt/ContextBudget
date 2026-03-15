@@ -9,10 +9,18 @@ from contextbudget import ContextBudgetEngine
 
 engine = ContextBudgetEngine()
 plan = engine.plan(task="refactor auth middleware", repo=".")
+agent_plan = engine.plan_agent(task="refactor auth middleware", repo=".")
 run = engine.pack(task="refactor auth middleware", repo=".", max_tokens=24000)
 workspace_run = engine.pack(task="update auth flow", workspace="workspace.toml", max_tokens=24000)
 summary = engine.report(run)
 ```
+
+`engine.plan_agent(...)` returns a machine-readable workflow artifact with:
+
+- ordered workflow `steps`
+- assigned `context` per step
+- `estimated_tokens` per step
+- `total_estimated_tokens` across the workflow
 
 ## Budget Guard API
 

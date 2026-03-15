@@ -5,8 +5,10 @@ ContextBudget selects, compresses, and budgets repository context for coding-age
 ## What It Does
 
 - ranks repository files against a natural-language task
+- plans step-by-step context usage across multi-step agent workflows
 - packs relevant context under an explicit token budget
 - records stable `run.json` and `run.md` artifacts
+- aggregates historical `run.json` artifacts into file and directory heatmaps
 - reuses cached summaries and an incremental scan index
 - supports local multi-repo and monorepo-package workspaces
 - exposes an adapter-ready middleware layer for external agent tools
@@ -23,6 +25,9 @@ python3 -m pip install -e .[tokenizers]
 # Rank likely-relevant files
 contextbudget plan "add caching to search API" --repo .
 
+# Plan context across a multi-step agent workflow
+contextbudget plan-agent "refactor auth middleware" --repo .
+
 # Pack context for one repository
 contextbudget pack "refactor auth middleware" --repo . --max-tokens 30000
 
@@ -35,8 +40,14 @@ contextbudget report run.json
 # Compare two runs
 contextbudget diff old-run.json new-run.json
 
+# Audit a pull request for context growth
+contextbudget pr-audit --repo . --base origin/main --head HEAD
+
 # Compare packing strategies
 contextbudget benchmark "add rate limiting to auth API" --repo .
+
+# Aggregate historical token hotspots
+contextbudget heatmap .
 
 # Refresh scan state once without entering watch mode
 contextbudget watch --repo . --once

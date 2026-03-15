@@ -8,8 +8,24 @@ Rank relevant files for a natural-language task.
 ### `contextbudget plan <task> --workspace <workspace.toml>`
 Rank relevant files across multiple local repositories or monorepo packages.
 
+### `contextbudget plan-agent <task> --repo <path>`
+Plan context usage across a multi-step agent workflow. The artifact includes step order,
+context assigned per step, token estimates per step, shared context, and total token estimates.
+
+### `contextbudget plan-agent <task> --workspace <workspace.toml>`
+Plan the same lifecycle-aware workflow across multiple local repositories or monorepo packages.
+
 ### `contextbudget pack <task> --repo <path> [--max-tokens N] [--top-files N]`
 Build compressed context package and write `run.json` + `run.md` by default.
+
+### `contextbudget pack <task> --repo <path> --delta <previous-run.json>`
+Build the normal current pack artifact plus a `delta` block that contains only the
+changes relative to the previous run. The delta package records:
+- added files
+- removed files
+- changed files and slices
+- changed symbols
+- original tokens, delta tokens, and tokens saved
 
 ### `contextbudget pack <task> --workspace <workspace.toml> [--max-tokens N] [--top-files N]`
 Build compressed context across a local workspace while recording scanned and selected repos.
@@ -19,6 +35,28 @@ Render summary report from run artifact.
 
 ### `contextbudget diff <old-run.json> <new-run.json>`
 Compare two run artifacts and emit JSON + Markdown delta outputs.
+
+### `contextbudget pr-audit --repo <path> [--base <ref>] [--head <ref>]`
+Analyze a pull request diff directly from git and emit:
+- `<prefix>.json`
+- `<prefix>.md`
+- `<prefix>.comment.md`
+
+The audit estimates changed-file token cost before and after the PR, flags files that grew, detects newly introduced dependencies, highlights context-complexity increases, and produces a ready-to-post PR comment.
+
+Useful CI gates:
+- `--max-token-increase N`
+- `--max-token-increase-pct PCT`
+
+In GitHub Actions, prefer explicit SHAs from the pull-request event:
+
+```bash
+contextbudget pr-audit \
+  --repo . \
+  --base "${{ github.event.pull_request.base.sha }}" \
+  --head "${{ github.event.pull_request.head.sha }}" \
+  --out-prefix contextbudget-pr
+```
 
 ### `contextbudget benchmark <task> --repo <path>`
 Compare deterministic strategies:
@@ -31,6 +69,10 @@ Benchmark artifacts also record the active token-estimator backend and a small e
 on local sample text from the run.
 
 `benchmark` also accepts `--workspace <workspace.toml>` for multi-repo/local-package runs.
+
+### `contextbudget heatmap [<history> ...] [--limit N] [--out-prefix <path>]`
+Aggregate historical `pack` artifacts into file and directory token heatmaps.
+Directories are scanned recursively for `*.json` files and non-pack artifacts are skipped.
 
 ### `contextbudget watch --repo <path> [--poll-interval S] [--once]`
 Refresh the incremental scan index and print concise file-change summaries.
@@ -61,6 +103,9 @@ contextbudget pack "refactor auth middleware" --repo . --strict --policy example
 ```
 
 Strict mode returns non-zero on policy violations.
+
+When `--delta` is used, policy evaluation applies to the effective delta package size
+instead of the full current baseline.
 
 ## Config Override
 

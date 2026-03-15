@@ -55,10 +55,12 @@ def _path_glob_bonus_score(
             by_path[record.path] = RankedFile(
                 file=record,
                 score=round(bonus, 3),
+                heuristic_score=round(bonus, 3),
                 reasons=[reason],
             )
             continue
         item.score = round(item.score + bonus, 3)
+        item.heuristic_score = round(item.heuristic_score + bonus, 3)
         _add_reason(item.reasons, reason)
 
     output = list(by_path.values())

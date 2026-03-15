@@ -12,6 +12,7 @@ from contextbudget.schemas.models import (
     DEFAULT_TOP_FILES,
     DEFAULT_IGNORE_DIRS,
     DEFAULT_MAX_TOKENS,
+    RUN_HISTORY_FILE,
 )
 
 try:
@@ -62,6 +63,11 @@ class ScoreSettings:
     graph_depends_on_relevant_bonus: float = 0.7
     graph_entrypoint_adjacency_bonus: float = 0.45
     graph_bonus_cap: float = 2.5
+    history_selected_file_boost: float = 1.25
+    history_ignored_file_penalty: float = 0.35
+    history_score_cap: float = 3.0
+    history_task_similarity_threshold: float = 0.2
+    history_entry_limit: int = 50
     entrypoint_filenames: set[str] = field(
         default_factory=lambda: {
             "main.py",
@@ -96,6 +102,7 @@ class CompressionSettings:
 
     full_file_threshold_tokens: int = 600
     snippet_score_threshold: float = 2.5
+    symbol_extraction_enabled: bool = True
     snippet_hit_limit: int = 8
     snippet_context_lines: int = 2
     snippet_total_line_limit: int = 120
@@ -121,6 +128,9 @@ class CacheSettings:
     summary_cache_enabled: bool = True
     cache_file: str = CACHE_FILE
     duplicate_hash_cache_enabled: bool = True
+    run_history_enabled: bool = True
+    history_file: str = RUN_HISTORY_FILE
+    history_max_entries: int = 200
 
 
 @dataclass(slots=True)
@@ -131,6 +141,17 @@ class TokenEstimationSettings:
     model: str = "gpt-4o-mini"
     encoding: str = ""
     fallback_backend: str = "heuristic"
+
+
+@dataclass(slots=True)
+class ModelProfileSettings:
+    """Settings for resolved or custom model-profile assumptions."""
+
+    profile: str = ""
+    tokenizer: str = ""
+    context_window: int = 0
+    recommended_compression_strategy: str = ""
+    output_reserve_tokens: int = 0
 
 
 @dataclass(slots=True)
@@ -158,6 +179,17 @@ class PluginSettings:
     compressor: str = "builtin.default"
     token_estimator: str = "builtin.char4"
     registrations: list[PluginRegistrationSettings] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class ExplicitSettings:
+    """Internal record of fields explicitly configured by the user."""
+
+    budget: set[str] = field(default_factory=set)
+    compression: set[str] = field(default_factory=set)
+    tokens: set[str] = field(default_factory=set)
+    plugins: set[str] = field(default_factory=set)
+    model: set[str] = field(default_factory=set)
 
 
 @dataclass(slots=True)
@@ -192,8 +224,10 @@ class ContextBudgetConfig:
     summarization: SummarizationSettings = field(default_factory=SummarizationSettings)
     cache: CacheSettings = field(default_factory=CacheSettings)
     tokens: TokenEstimationSettings = field(default_factory=TokenEstimationSettings)
+    model: ModelProfileSettings = field(default_factory=ModelProfileSettings)
     telemetry: TelemetrySettings = field(default_factory=TelemetrySettings)
     plugins: PluginSettings = field(default_factory=PluginSettings)
+    explicit: ExplicitSettings = field(default_factory=ExplicitSettings, repr=False)
 
 
 def default_config() -> ContextBudgetConfig:
@@ -230,6 +264,12 @@ def _to_dict(value: Any) -> dict[str, Any]:
     if not isinstance(value, Mapping):
         return {}
     return {str(key): raw for key, raw in value.items()}
+
+
+def _mark_explicit_fields(explicit: set[str], data: Mapping[str, Any], field_map: Mapping[str, str]) -> None:
+    for raw_key, canonical_name in field_map.items():
+        if raw_key in data:
+            explicit.add(canonical_name)
 
 
 def _apply_scan_overrides(settings: ScanSettings, data: Mapping[str, Any]) -> None:
@@ -296,6 +336,16 @@ def _apply_score_overrides(settings: ScoreSettings, data: Mapping[str, Any]) -> 
         settings.graph_entrypoint_adjacency_bonus = float(data["graph_entrypoint_adjacency_bonus"])
     if "graph_bonus_cap" in data:
         settings.graph_bonus_cap = float(data["graph_bonus_cap"])
+    if "history_selected_file_boost" in data:
+        settings.history_selected_file_boost = float(data["history_selected_file_boost"])
+    if "history_ignored_file_penalty" in data:
+        settings.history_ignored_file_penalty = float(data["history_ignored_file_penalty"])
+    if "history_score_cap" in data:
+        settings.history_score_cap = float(data["history_score_cap"])
+    if "history_task_similarity_threshold" in data:
+        settings.history_task_similarity_threshold = float(data["history_task_similarity_threshold"])
+    if "history_entry_limit" in data:
+        settings.history_entry_limit = int(data["history_entry_limit"])
     if "entrypoint_filenames" in data:
         settings.entrypoint_filenames = _to_set(data["entrypoint_filenames"])
     if "code_extensions" in data:
@@ -311,6 +361,8 @@ def _apply_compression_overrides(settings: CompressionSettings, data: Mapping[st
         settings.full_file_threshold_tokens = int(data["full_file_threshold_tokens"])
     if "snippet_score_threshold" in data:
         settings.snippet_score_threshold = float(data["snippet_score_threshold"])
+    if "symbol_extraction_enabled" in data:
+        settings.symbol_extraction_enabled = bool(data["symbol_extraction_enabled"])
     if "snippet_hit_limit" in data:
         settings.snippet_hit_limit = int(data["snippet_hit_limit"])
     if "snippet_context_lines" in data:
@@ -339,6 +391,12 @@ def _apply_cache_overrides(settings: CacheSettings, data: Mapping[str, Any]) -> 
         settings.cache_file = str(data["cache_file"])
     if "duplicate_hash_cache_enabled" in data:
         settings.duplicate_hash_cache_enabled = bool(data["duplicate_hash_cache_enabled"])
+    if "run_history_enabled" in data:
+        settings.run_history_enabled = bool(data["run_history_enabled"])
+    if "history_file" in data:
+        settings.history_file = str(data["history_file"])
+    if "history_max_entries" in data:
+        settings.history_max_entries = int(data["history_max_entries"])
     # Backward-compatible key
     if "enabled" in data:
         settings.summary_cache_enabled = bool(data["enabled"])
@@ -362,6 +420,19 @@ def _apply_token_estimation_overrides(settings: TokenEstimationSettings, data: M
         settings.encoding = str(data["encoding"]).strip()
     if "fallback_backend" in data:
         settings.fallback_backend = str(data["fallback_backend"]).strip().lower() or settings.fallback_backend
+
+
+def _apply_model_overrides(settings: ModelProfileSettings, data: Mapping[str, Any]) -> None:
+    if "profile" in data:
+        settings.profile = str(data["profile"]).strip()
+    if "tokenizer" in data:
+        settings.tokenizer = str(data["tokenizer"]).strip()
+    if "context_window" in data:
+        settings.context_window = int(data["context_window"])
+    if "recommended_compression_strategy" in data:
+        settings.recommended_compression_strategy = str(data["recommended_compression_strategy"]).strip().lower()
+    if "output_reserve_tokens" in data:
+        settings.output_reserve_tokens = int(data["output_reserve_tokens"])
 
 
 def _apply_telemetry_overrides(settings: TelemetrySettings, data: Mapping[str, Any]) -> None:
@@ -403,6 +474,25 @@ def _apply_overrides(config: ContextBudgetConfig, data: Mapping[str, Any]) -> Co
     if isinstance(scan_data, Mapping):
         _apply_scan_overrides(config.scan, scan_data)
 
+    if "model_profile" in data:
+        config.model.profile = str(data["model_profile"]).strip()
+        config.explicit.model.add("profile")
+
+    model_data = data.get("model")
+    if isinstance(model_data, Mapping):
+        _mark_explicit_fields(
+            config.explicit.model,
+            model_data,
+            {
+                "profile": "profile",
+                "tokenizer": "tokenizer",
+                "context_window": "context_window",
+                "recommended_compression_strategy": "recommended_compression_strategy",
+                "output_reserve_tokens": "output_reserve_tokens",
+            },
+        )
+        _apply_model_overrides(config.model, model_data)
+
     score_data = data.get("score")
     if isinstance(score_data, Mapping):
         _apply_score_overrides(config.score, score_data)
@@ -417,6 +507,16 @@ def _apply_overrides(config: ContextBudgetConfig, data: Mapping[str, Any]) -> Co
 
     token_data = data.get("tokens")
     if isinstance(token_data, Mapping):
+        _mark_explicit_fields(
+            config.explicit.tokens,
+            token_data,
+            {
+                "backend": "backend",
+                "model": "model",
+                "encoding": "encoding",
+                "fallback_backend": "fallback_backend",
+            },
+        )
         _apply_token_estimation_overrides(config.tokens, token_data)
 
     telemetry_data = data.get("telemetry")
@@ -425,24 +525,101 @@ def _apply_overrides(config: ContextBudgetConfig, data: Mapping[str, Any]) -> Co
 
     plugin_data = data.get("plugins")
     if isinstance(plugin_data, Mapping):
+        _mark_explicit_fields(
+            config.explicit.plugins,
+            plugin_data,
+            {
+                "scorer": "scorer",
+                "compressor": "compressor",
+                "token_estimator": "token_estimator",
+                "registrations": "registrations",
+            },
+        )
         _apply_plugin_overrides(config.plugins, plugin_data)
 
     # Apply legacy sections first for compatibility, then new sections.
     legacy_pack_data = data.get("pack")
     if isinstance(legacy_pack_data, Mapping):
+        _mark_explicit_fields(
+            config.explicit.budget,
+            legacy_pack_data,
+            {
+                "max_tokens": "max_tokens",
+                "default_max_tokens": "max_tokens",
+                "top_files": "top_files",
+                "default_top_files": "top_files",
+                "plan_default_top_n": "top_files",
+            },
+        )
+        _mark_explicit_fields(
+            config.explicit.compression,
+            legacy_pack_data,
+            {
+                "full_file_threshold_tokens": "full_file_threshold_tokens",
+                "snippet_score_threshold": "snippet_score_threshold",
+                "symbol_extraction_enabled": "symbol_extraction_enabled",
+                "snippet_hit_limit": "snippet_hit_limit",
+                "snippet_context_lines": "snippet_context_lines",
+                "snippet_total_line_limit": "snippet_total_line_limit",
+                "snippet_fallback_lines": "snippet_fallback_lines",
+                "summary_preview_lines": "summary_preview_lines",
+                "summary_line_limit": "summary_preview_lines",
+                "risk_skip_weight": "risk_skip_weight",
+                "risk_compression_weight": "risk_compression_weight",
+            },
+        )
         _apply_budget_overrides(config.budget, legacy_pack_data)
         _apply_compression_overrides(config.compression, legacy_pack_data)
 
     legacy_output_data = data.get("output")
     if isinstance(legacy_output_data, Mapping):
+        _mark_explicit_fields(
+            config.explicit.budget,
+            legacy_output_data,
+            {
+                "max_tokens": "max_tokens",
+                "default_max_tokens": "max_tokens",
+                "top_files": "top_files",
+                "default_top_files": "top_files",
+                "plan_default_top_n": "top_files",
+            },
+        )
         _apply_budget_overrides(config.budget, legacy_output_data)
 
     budget_data = data.get("budget")
     if isinstance(budget_data, Mapping):
+        _mark_explicit_fields(
+            config.explicit.budget,
+            budget_data,
+            {
+                "max_tokens": "max_tokens",
+                "default_max_tokens": "max_tokens",
+                "top_files": "top_files",
+                "default_top_files": "top_files",
+                "plan_default_top_n": "top_files",
+            },
+        )
         _apply_budget_overrides(config.budget, budget_data)
 
     compression_data = data.get("compression")
     if isinstance(compression_data, Mapping):
+        _mark_explicit_fields(
+            config.explicit.compression,
+            compression_data,
+            {
+                "full_file_threshold_tokens": "full_file_threshold_tokens",
+                "snippet_score_threshold": "snippet_score_threshold",
+                "symbol_extraction_enabled": "symbol_extraction_enabled",
+                "snippet_hit_limit": "snippet_hit_limit",
+                "snippet_context_lines": "snippet_context_lines",
+                "snippet_total_line_limit": "snippet_total_line_limit",
+                "snippet_fallback_lines": "snippet_fallback_lines",
+                "summary_preview_lines": "summary_preview_lines",
+                "summary_line_limit": "summary_preview_lines",
+                "risk_skip_weight": "risk_skip_weight",
+                "risk_compression_weight": "risk_compression_weight",
+            },
+        )
         _apply_compression_overrides(config.compression, compression_data)
 
     if isinstance(token_data, Mapping) and not (

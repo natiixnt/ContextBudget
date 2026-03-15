@@ -16,6 +16,7 @@ from contextbudget.schemas.models import (
     CACHE_FILE,
     DEFAULT_IGNORE_DIRS,
     FileRecord,
+    RUN_HISTORY_FILE,
     SCAN_INDEX_FILE,
 )
 
@@ -105,7 +106,7 @@ def _scoped_path(relative_path: str, repo_label: str | None = None) -> str:
 
 
 def _default_internal_paths() -> set[str]:
-    return {CACHE_FILE, SCAN_INDEX_FILE}
+    return {CACHE_FILE, RUN_HISTORY_FILE, SCAN_INDEX_FILE}
 
 
 def _normalize_relative_path(path: Path, repo_path: Path) -> str | None:

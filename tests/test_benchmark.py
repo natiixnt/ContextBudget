@@ -95,3 +95,20 @@ path = "shared"
 
     assert data["workspace"].endswith("workspace.toml")
     assert {item["label"] for item in data["scanned_repos"]} == {"app", "shared"}
+
+
+def test_benchmark_records_model_profile_assumptions(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "contextbudget.toml",
+        'model_profile = "mistral-small"\n',
+    )
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n" * 20)
+
+    data = run_benchmark("update auth flow", repo=tmp_path)
+
+    assert data["max_tokens"] == 111616
+    assert data["model_profile"]["selected_profile"] == "mistral-small"
+    assert data["model_profile"]["resolved_profile"] == "mistral-small"
+    assert data["model_profile"]["family"] == "mistral"
+    assert data["model_profile"]["tokenizer"] == "tekken"
+    assert data["model_profile"]["recommended_compression_strategy"] == "balanced"

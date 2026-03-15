@@ -10,9 +10,11 @@ Precedence:
 
 ## Sections
 
+- top-level `model_profile`
 - `[scan]`
 - `[budget]`
 - `[score]`
+- `[model]`
 - `[compression]`
 - `[summarization]`
 - `[tokens]`
@@ -23,6 +25,8 @@ Precedence:
 ## Example
 
 ```toml
+model_profile = "gpt-4.1"
+
 [scan]
 include_globs = ["**/*.py", "**/*.md"]
 ignore_globs = ["**/generated/**"]
@@ -34,6 +38,13 @@ top_files = 25
 
 [score]
 critical_path_keywords = ["auth", "permissions", "billing"]
+
+[model]
+# Optional overrides for custom/self-hosted profiles.
+# tokenizer = "llama-bpe"
+# context_window = 65536
+# recommended_compression_strategy = "aggressive"
+# output_reserve_tokens = 8192
 
 [compression]
 summary_preview_lines = 10
@@ -68,6 +79,54 @@ file_path = ".contextbudget/telemetry.jsonl"
 Telemetry remains disabled by default and sends no network traffic.
 
 Plugin selection and explicit registration are documented in [Plugins](plugins.md).
+
+## Model Profiles
+
+`model_profile` enables built-in model-aware packing defaults. ContextBudget currently ships profile coverage for:
+
+- GPT models
+- Claude models
+- Mistral models
+- local/self-hosted LLMs
+
+Each resolved profile carries:
+
+- tokenizer assumption
+- context window
+- recommended compression strategy
+
+When a profile is active, ContextBudget automatically:
+
+- selects a matching token-estimation backend unless `[tokens]` or `[plugins].token_estimator` is explicitly set
+- scales the default `max_tokens` budget to the model context window, leaving deterministic output headroom
+- clamps oversized budgets to the resolved context window
+- adjusts compression defaults toward `expanded`, `balanced`, or `aggressive` packing unless `[compression]` overrides are explicit
+
+Examples:
+
+```toml
+model_profile = "gpt-4.1"
+```
+
+```toml
+model_profile = "claude-sonnet-4"
+```
+
+```toml
+model_profile = "mistral-small"
+```
+
+```toml
+model_profile = "local-llm"
+
+[model]
+tokenizer = "llama-bpe"
+context_window = 65536
+recommended_compression_strategy = "aggressive"
+output_reserve_tokens = 8192
+```
+
+Artifacts and Markdown reports include a `model_profile` block so downstream tooling can see the active assumptions.
 
 ## Token Estimation
 

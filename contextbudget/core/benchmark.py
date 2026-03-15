@@ -9,6 +9,7 @@ import time
 from typing import Any
 
 from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_config
+from contextbudget.core.model_profiles import prepare_config_for_model_profile
 from contextbudget.core.pipeline import run_pack
 from contextbudget.core.tokens import compare_builtin_token_estimators
 from contextbudget.plugins import ResolvedPlugins, resolve_plugins
@@ -60,17 +61,18 @@ def run_benchmark(
     """Run benchmark strategies and return JSON-serializable report."""
 
     cfg = config if config is not None else (workspace.config if workspace is not None else load_config(repo, config_path=config_path))
-    resolved_plugins = resolve_plugins(cfg)
-    effective_max_tokens = max_tokens if max_tokens is not None else cfg.budget.max_tokens
-    effective_top_files = top_files if top_files is not None else cfg.budget.top_files
+    prepared_cfg, model_profile = prepare_config_for_model_profile(cfg, requested_max_tokens=max_tokens)
+    resolved_plugins = resolve_plugins(prepared_cfg)
+    effective_max_tokens = prepared_cfg.budget.max_tokens
+    effective_top_files = top_files if top_files is not None else prepared_cfg.budget.top_files
     target_repo = workspace.root if workspace is not None else repo
     telemetry = TelemetrySession(
         sink=telemetry_sink
         or build_telemetry_sink(
             repo=target_repo,
-            enabled=cfg.telemetry.enabled,
-            sink=cfg.telemetry.sink,
-            file_path=cfg.telemetry.file_path,
+            enabled=prepared_cfg.telemetry.enabled,
+            sink=prepared_cfg.telemetry.sink,
+            file_path=prepared_cfg.telemetry.file_path,
         ),
         base_payload={
             "command": "benchmark",
@@ -88,12 +90,12 @@ def run_benchmark(
 
     scan_start = time.perf_counter()
     if workspace is not None:
-        files, scanned_repos = run_scan_workspace_stage(workspace, cfg)
+        files, scanned_repos = run_scan_workspace_stage(workspace, prepared_cfg)
     else:
-        files = run_scan_stage(repo, cfg)
+        files = run_scan_stage(repo, prepared_cfg)
         scanned_repos = []
     telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
-    ranked = run_score_stage(task, files, cfg, plugins=resolved_plugins)
+    ranked = run_score_stage(task, files, prepared_cfg, repo=target_repo, plugins=resolved_plugins)
     scan_end = time.perf_counter()
     telemetry.emit(
         "scoring_completed",
@@ -167,10 +169,11 @@ def run_benchmark(
             target_repo,
             max_tokens=effective_max_tokens,
             top_files=effective_top_files,
-            config=cfg,
+            config=prepared_cfg,
             telemetry_sink=NoOpTelemetrySink(),
             workspace=workspace,
             plugins=resolved_plugins,
+            record_history=False,
         )
     )
     pack_end = time.perf_counter()
@@ -199,10 +202,11 @@ def run_benchmark(
             target_repo,
             max_tokens=effective_max_tokens,
             top_files=effective_top_files,
-            config=cfg,
+            config=prepared_cfg,
             telemetry_sink=NoOpTelemetrySink(),
             workspace=workspace,
             plugins=resolved_plugins,
+            record_history=False,
         )
     )
     cache_end = time.perf_counter()
@@ -246,9 +250,9 @@ def run_benchmark(
                 ),
             },
         ],
-        model=cfg.tokens.model,
-        encoding=cfg.tokens.encoding,
-        fallback_backend=cfg.tokens.fallback_backend,
+        model=prepared_cfg.tokens.model,
+        encoding=prepared_cfg.tokens.encoding,
+        fallback_backend=prepared_cfg.tokens.fallback_backend,
     )
 
     result = {
@@ -261,6 +265,7 @@ def run_benchmark(
         "scan_runtime_ms": _round_runtime_ms(scan_start, scan_end),
         "strategies": strategies,
         "token_estimator": resolved_plugins.token_estimator_report,
+        "model_profile": model_profile,
         "estimator_samples": estimator_samples,
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "implementations": resolved_plugins.pack_implementations(),

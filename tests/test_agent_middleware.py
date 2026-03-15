@@ -62,6 +62,7 @@ def test_prepare_context_delegates_to_engine_pack(tmp_path: Path, monkeypatch: p
         workspace: str | Path | None = None,
         max_tokens: int | None = None,
         top_files: int | None = None,
+        delta_from: dict | str | Path | None = None,
         config_path: str | Path | None = None,
     ) -> dict:
         called.update(
@@ -71,6 +72,7 @@ def test_prepare_context_delegates_to_engine_pack(tmp_path: Path, monkeypatch: p
                 "workspace": workspace,
                 "max_tokens": max_tokens,
                 "top_files": top_files,
+                "delta_from": delta_from,
                 "config_path": config_path,
             }
         )
@@ -168,6 +170,37 @@ def test_local_demo_adapter_simulates_agent_workflow(tmp_path: Path) -> None:
     assert run.metadata["recorded_artifact"].endswith("demo-run.json")
     assert (tmp_path / "demo-run.json").exists()
     assert run.as_dict()["context"]["agent_middleware"]["adapter"] == "local_demo"
+
+
+def test_prepare_context_delta_metadata_prefers_delta_budget(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "contextbudget.toml",
+        """
+[compression]
+full_file_threshold_tokens = 1
+snippet_score_threshold = 0
+snippet_total_line_limit = 40
+""".strip(),
+    )
+    _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
+    _write(tmp_path / "src" / "middleware.py", "def auth_middleware(token: str) -> bool:\n    return login(token)\n")
+
+    first = prepare_context("update auth middleware", repo=tmp_path, max_tokens=400)
+    first_path = record_run(first, tmp_path / "first.json")
+
+    (tmp_path / "src" / "middleware.py").unlink()
+    _write(
+        tmp_path / "src" / "auth.py",
+        "class AuthService:\n    def login_user(self, token: str) -> bool:\n        return token.startswith('prod_')\n",
+    )
+    _write(tmp_path / "src" / "permissions.py", "def allow_auth(token: str) -> bool:\n    return token.startswith('prod_')\n")
+
+    second = prepare_context("update auth middleware", repo=tmp_path, max_tokens=400, delta_from=first_path)
+
+    assert second.metadata["delta_enabled"] is True
+    assert second.metadata["estimated_input_tokens"] == second.run_artifact["delta"]["budget"]["delta_tokens"]
+    assert second.metadata["original_input_tokens"] == second.run_artifact["delta"]["budget"]["original_tokens"]
+    assert second.metadata["files_removed_count"] == 1
 
 
 def test_enforce_budget_strict_raises_middleware_violation(tmp_path: Path) -> None:

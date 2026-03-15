@@ -7,6 +7,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from contextbudget.core.delta import effective_pack_metrics
 from contextbudget.core.policy import PolicySpec
 
 from contextbudget.agents.middleware import AgentMiddlewareResult, AgentTaskRequest, ContextBudgetMiddleware
@@ -83,12 +84,18 @@ class LocalDemoAgentAdapter(AgentAdapter):
         if record_path is not None:
             recorded_artifact = str(middleware.record_run(result, path=record_path))
 
-        included = result.run_artifact.get("files_included", [])
+        effective = effective_pack_metrics(result.run_artifact)
+        included = effective.get("files_included", [])
         if not isinstance(included, list):
             included = []
+        removed = effective.get("files_removed", [])
+        if not isinstance(removed, list):
+            removed = []
         preview_files = ", ".join(str(item) for item in included[:3]) if included else "none"
         if len(included) > 3:
             preview_files = f"{preview_files}, +{len(included) - 3} more"
+        if removed:
+            preview_files = f"{preview_files}; removed={len(removed)}"
 
         prompt_preview = (
             f"Task: {request.task}\n"

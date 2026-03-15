@@ -13,11 +13,15 @@ from contextbudget.core.policy import (
 )
 from contextbudget.engine import ContextBudgetEngine
 from contextbudget.core.render import (
+    render_agent_plan_markdown,
     render_benchmark_markdown,
     render_diff_markdown,
+    render_heatmap_markdown,
     render_pack_markdown,
     render_plan_markdown,
     render_policy_markdown,
+    render_pr_audit_markdown,
+    render_pr_comment_markdown,
     render_report_markdown,
     write_json,
 )
@@ -89,6 +93,62 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_plan_agent(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine(config_path=args.config)
+    data = engine.plan_agent(
+        task=args.task,
+        repo=args.repo,
+        workspace=args.workspace,
+        top_files=args.top_files,
+    )
+
+    base = args.out_prefix or f"contextbudget-agent-plan-{_base_name(args.task)}"
+    json_path = Path(f"{base}.json")
+    md_path = Path(f"{base}.md")
+
+    write_json(json_path, data)
+    md_path.write_text(render_agent_plan_markdown(data), encoding="utf-8")
+
+    print(f"Wrote agent plan JSON: {json_path}")
+    print(f"Wrote agent plan Markdown: {md_path}")
+    shared_context = data.get("shared_context", [])
+    if isinstance(shared_context, list) and shared_context:
+        preview = ", ".join(
+            f"{item.get('path', '')} ({item.get('estimated_tokens', 0)})"
+            for item in shared_context[:5]
+            if isinstance(item, dict)
+        )
+        if len(shared_context) > 5:
+            preview = f"{preview}, +{len(shared_context) - 5} more"
+        print(f"Shared context: {preview}")
+
+    steps = data.get("steps", [])
+    if isinstance(steps, list):
+        for idx, step in enumerate(steps, start=1):
+            if not isinstance(step, dict):
+                continue
+            print(f"{idx}. {step.get('title', '')} (tokens={step.get('estimated_tokens', 0)})")
+            context = step.get("context", [])
+            if isinstance(context, list) and context:
+                preview = ", ".join(
+                    item.get("path", "")
+                    for item in context[:5]
+                    if isinstance(item, dict)
+                )
+                if len(context) > 5:
+                    preview = f"{preview}, +{len(context) - 5} more"
+                print(f"   context: {preview}")
+            else:
+                print("   context: none")
+
+    print(
+        "Total estimated tokens: "
+        f"{data.get('total_estimated_tokens', 0)} "
+        f"(unique={data.get('unique_context_tokens', 0)}, reused={data.get('reused_context_tokens', 0)})"
+    )
+    return 0
+
+
 def cmd_pack(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
     data = engine.pack(
@@ -97,6 +157,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
         workspace=args.workspace,
         max_tokens=args.max_tokens,
         top_files=args.top_files,
+        delta_from=args.delta,
     )
 
     base = args.out_prefix or "run"
@@ -117,6 +178,13 @@ def cmd_pack(args: argparse.Namespace) -> int:
         write_json(json_path, data)
         markdown = f"{markdown}\n{render_policy_markdown(policy_result)}\n"
     md_path.write_text(markdown, encoding="utf-8")
+    engine.record_history_artifacts(
+        data,
+        artifacts={
+            "run_json": str(json_path.resolve()),
+            "run_markdown": str(md_path.resolve()),
+        },
+    )
 
     budget = data["budget"]
     print(f"Wrote run JSON: {json_path}")
@@ -127,6 +195,28 @@ def cmd_pack(args: argparse.Namespace) -> int:
         f"saved={budget['estimated_saved_tokens']} tokens, "
         f"risk={budget['quality_risk_estimate']}"
     )
+    model_profile = data.get("model_profile", {})
+    if isinstance(model_profile, dict) and model_profile:
+        print(
+            "Model profile: "
+            f"selected={model_profile.get('selected_profile', '')} "
+            f"resolved={model_profile.get('resolved_profile', '')} "
+            f"context={model_profile.get('context_window', 0)} "
+            f"compression={model_profile.get('recommended_compression_strategy', '')} "
+            f"max_tokens={model_profile.get('effective_max_tokens', data.get('max_tokens', 0))}"
+        )
+        if model_profile.get("budget_clamped", False):
+            print("Model profile note: max_tokens was clamped to fit the configured context window")
+    delta = data.get("delta", {})
+    if isinstance(delta, dict) and delta:
+        delta_budget = delta.get("budget", {})
+        if isinstance(delta_budget, dict):
+            print(
+                "Delta: "
+                f"original={delta_budget.get('original_tokens', 0)} tokens, "
+                f"delta={delta_budget.get('delta_tokens', 0)} tokens, "
+                f"saved={delta_budget.get('tokens_saved', 0)} tokens"
+            )
     estimator = data.get("token_estimator", {})
     if isinstance(estimator, dict):
         print(
@@ -215,6 +305,59 @@ def cmd_diff(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_pr_audit(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine(config_path=args.config)
+    audit_data = engine.pr_audit(
+        repo=args.repo,
+        base_ref=args.base,
+        head_ref=args.head,
+        config_path=args.config,
+    )
+    comment_markdown = render_pr_comment_markdown(audit_data)
+    audit_data["comment_markdown"] = comment_markdown
+    markdown = render_pr_audit_markdown(audit_data)
+
+    base = args.out_prefix or "contextbudget-pr-audit"
+    json_path = Path(f"{base}.json")
+    md_path = Path(f"{base}.md")
+    comment_path = Path(f"{base}.comment.md")
+    write_json(json_path, audit_data)
+    md_path.write_text(markdown, encoding="utf-8")
+    comment_path.write_text(comment_markdown, encoding="utf-8")
+
+    summary = audit_data.get("summary", {})
+    print(f"Wrote PR audit JSON: {json_path}")
+    print(f"Wrote PR audit Markdown: {md_path}")
+    print(f"Wrote PR comment Markdown: {comment_path}")
+    print(
+        "Estimated token impact: "
+        f"{float(summary.get('estimated_token_delta_pct', 0.0) or 0.0):+.1f}% "
+        f"({int(summary.get('estimated_tokens_before', 0) or 0)} -> "
+        f"{int(summary.get('estimated_tokens_after', 0) or 0)})"
+    )
+    causing_increase = audit_data.get("files_causing_increase", [])
+    if isinstance(causing_increase, list) and causing_increase:
+        print("Files causing increase:")
+        for path in causing_increase[:10]:
+            print(f"- {path}")
+
+    token_delta = int(summary.get("estimated_token_delta", 0) or 0)
+    token_delta_pct = float(summary.get("estimated_token_delta_pct", 0.0) or 0.0)
+    if args.max_token_increase is not None and token_delta > args.max_token_increase:
+        print(
+            "PR audit gate: FAIL "
+            f"(token delta {token_delta} exceeds limit {args.max_token_increase})"
+        )
+        return 2
+    if args.max_token_increase_pct is not None and token_delta_pct > args.max_token_increase_pct:
+        print(
+            "PR audit gate: FAIL "
+            f"(token impact {token_delta_pct:.1f}% exceeds limit {args.max_token_increase_pct:.1f}%)"
+        )
+        return 2
+    return 0
+
+
 def cmd_benchmark(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
     benchmark_data = engine.benchmark(
@@ -233,6 +376,16 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
     md_path.write_text(markdown, encoding="utf-8")
 
     print("Benchmark summary:")
+    model_profile = benchmark_data.get("model_profile", {})
+    if isinstance(model_profile, dict) and model_profile:
+        print(
+            "Model profile: "
+            f"selected={model_profile.get('selected_profile', '')} "
+            f"resolved={model_profile.get('resolved_profile', '')} "
+            f"context={model_profile.get('context_window', 0)} "
+            f"compression={model_profile.get('recommended_compression_strategy', '')} "
+            f"max_tokens={model_profile.get('effective_max_tokens', benchmark_data.get('max_tokens', 0))}"
+        )
     estimator = benchmark_data.get("token_estimator", {})
     if isinstance(estimator, dict):
         print(
@@ -255,6 +408,75 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
         )
     print(f"Wrote benchmark JSON: {json_path}")
     print(f"Wrote benchmark Markdown: {md_path}")
+    return 0
+
+
+def _print_heatmap_section(title: str, items: list[dict], *, runs_analyzed: int) -> None:
+    print(title)
+    if not items:
+        print("- None")
+        return
+    for item in items:
+        rate = float(item.get("inclusion_rate", 0.0) or 0.0) * 100.0
+        print(
+            "- "
+            f"{item.get('path', '')}: "
+            f"compressed={item.get('total_compressed_tokens', 0)} "
+            f"original={item.get('total_original_tokens', 0)} "
+            f"saved={item.get('total_saved_tokens', 0)} "
+            f"included={item.get('inclusion_count', 0)}/{runs_analyzed} "
+            f"rate={rate:.1f}%"
+        )
+
+
+def cmd_heatmap(args: argparse.Namespace) -> int:
+    if args.limit <= 0:
+        print("--limit must be greater than 0")
+        return 2
+
+    engine = ContextBudgetEngine()
+    try:
+        heatmap_data = engine.heatmap(history=args.history, limit=args.limit)
+    except ValueError as exc:
+        print(str(exc))
+        return 2
+
+    markdown = render_heatmap_markdown(heatmap_data)
+    base = args.out_prefix or "contextbudget-heatmap"
+    json_path = Path(f"{base}.json")
+    md_path = Path(f"{base}.md")
+    write_json(json_path, heatmap_data)
+    md_path.write_text(markdown, encoding="utf-8")
+
+    runs_analyzed = int(heatmap_data.get("runs_analyzed", 0) or 0)
+    print(f"Wrote heatmap JSON: {json_path}")
+    print(f"Wrote heatmap Markdown: {md_path}")
+    print(f"Runs analyzed: {runs_analyzed}")
+    print(f"Unique files: {int(heatmap_data.get('unique_files', 0) or 0)}")
+    print(f"Unique directories: {int(heatmap_data.get('unique_directories', 0) or 0)}")
+    skipped = heatmap_data.get("skipped_artifacts", [])
+    if isinstance(skipped, list) and skipped:
+        print(f"Skipped artifacts: {len(skipped)}")
+    _print_heatmap_section(
+        "Top token-heavy files:",
+        heatmap_data.get("top_token_heavy_files", []),
+        runs_analyzed=runs_analyzed,
+    )
+    _print_heatmap_section(
+        "Top token-heavy directories:",
+        heatmap_data.get("top_token_heavy_directories", []),
+        runs_analyzed=runs_analyzed,
+    )
+    _print_heatmap_section(
+        "Most frequently included files:",
+        heatmap_data.get("most_frequently_included_files", []),
+        runs_analyzed=runs_analyzed,
+    )
+    _print_heatmap_section(
+        "Largest token savings opportunities:",
+        heatmap_data.get("largest_token_savings_opportunities", []),
+        runs_analyzed=runs_analyzed,
+    )
     return 0
 
 
@@ -326,6 +548,23 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plan.set_defaults(func=cmd_plan)
 
+    plan_agent = sub.add_parser("plan-agent", help="Plan context usage across a multi-step agent workflow")
+    plan_agent.add_argument("task", help="Task description")
+    plan_agent.add_argument("--repo", default=".", help="Repository path")
+    plan_agent.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
+    plan_agent.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown")
+    plan_agent.add_argument(
+        "--top-files",
+        type=int,
+        default=None,
+        help="Max files assigned per step from each ranking pass (overrides [budget].top_files).",
+    )
+    plan_agent.add_argument(
+        "--config",
+        help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
+    )
+    plan_agent.set_defaults(func=cmd_plan_agent)
+
     pack = sub.add_parser("pack", help="Build compressed context under token budget")
     pack.add_argument("task", help="Task description")
     pack.add_argument("--repo", default=".", help="Repository path")
@@ -341,6 +580,10 @@ def build_parser() -> argparse.ArgumentParser:
         type=int,
         default=None,
         help="Max files considered during packing (overrides [budget].top_files).",
+    )
+    pack.add_argument(
+        "--delta",
+        help="Optional previous run JSON used to emit an incremental delta context package.",
     )
     pack.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown", default="run")
     pack.add_argument(
@@ -370,6 +613,26 @@ def build_parser() -> argparse.ArgumentParser:
     diff.add_argument("--out-prefix", help="Output prefix for diff JSON/Markdown")
     diff.set_defaults(func=cmd_diff)
 
+    pr_audit = sub.add_parser("pr-audit", help="Analyze pull-request diffs for context growth")
+    pr_audit.add_argument("--repo", default=".", help="Repository path")
+    pr_audit.add_argument("--base", help="Base git ref or commit SHA (defaults from CI env or HEAD~1).")
+    pr_audit.add_argument("--head", help="Head git ref or commit SHA (default: HEAD or CI SHA).")
+    pr_audit.add_argument("--config", help="Optional path to config TOML (default: <repo>/contextbudget.toml).")
+    pr_audit.add_argument("--out-prefix", help="Output prefix for PR audit JSON/Markdown/comment files")
+    pr_audit.add_argument(
+        "--max-token-increase",
+        type=int,
+        default=None,
+        help="Fail with non-zero exit if estimated token delta exceeds this absolute limit.",
+    )
+    pr_audit.add_argument(
+        "--max-token-increase-pct",
+        type=float,
+        default=None,
+        help="Fail with non-zero exit if estimated token impact exceeds this percentage.",
+    )
+    pr_audit.set_defaults(func=cmd_pr_audit)
+
     benchmark = sub.add_parser("benchmark", help="Compare context packing strategies")
     benchmark.add_argument("task", help="Task description")
     benchmark.add_argument("--repo", default=".", help="Repository path")
@@ -379,6 +642,26 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--config", help="Optional path to config TOML (default: <repo>/contextbudget.toml).")
     benchmark.add_argument("--out-prefix", help="Output file prefix for benchmark JSON/Markdown")
     benchmark.set_defaults(func=cmd_benchmark)
+
+    heatmap = sub.add_parser("heatmap", help="Aggregate historical pack runs into token heatmaps")
+    heatmap.add_argument(
+        "history",
+        nargs="*",
+        default=["."],
+        help="Run JSON files or directories to scan recursively for pack artifacts.",
+    )
+    heatmap.add_argument(
+        "--limit",
+        type=int,
+        default=10,
+        help="Max rows to print in top heatmap sections.",
+    )
+    heatmap.add_argument(
+        "--out-prefix",
+        help="Output file prefix for heatmap JSON/Markdown",
+        default="contextbudget-heatmap",
+    )
+    heatmap.set_defaults(func=cmd_heatmap)
 
     watch = sub.add_parser("watch", help="Watch a repository and update scan state incrementally")
     watch.add_argument("--repo", default=".", help="Repository path")
