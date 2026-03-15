@@ -1,6 +1,6 @@
-# Benchmark: add-authentication
+# Agent Run Benchmark: add-authentication
 
-> **Task:** Add JWT authentication middleware to protect task and user API routes
+> **Task:** Add JWT authentication middleware to protect task and user API routes and validate user sessions
 
 Evaluates context selection for an auth-focused change spanning route handlers, user model, and application bootstrap.
 
@@ -12,7 +12,7 @@ Evaluates context selection for an auth-focused change spanning route handlers, 
 | Top files | 20 |
 | Token estimator | heuristic |
 | Scan runtime | 3 ms |
-| Generated | 2026-03-15T10:04:25.421766+00:00 |
+| Generated | 2026-03-15T11:35:09.173424+00:00 |
 
 ## Baseline
 
@@ -24,13 +24,14 @@ Full repository context (no selection, no compression): **12,230 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,230 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,230 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 3,259 | 8,971 (73.4%) | low | 16 ms |
-| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 16 ms |
+| compressed_pack | 2,196 | 10,034 (82.0%) | low | 17 ms |
+| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 18 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 3,259 (26.6% of baseline)
-- **Saved tokens:** 8,971 (73.4% reduction)
+- **Baseline tokens:** 12,230
+- **Optimized tokens:** 2,196 (18.0% of baseline)
+- **Saved tokens:** 10,034 (82.0% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -54,12 +55,12 @@ Full repository context (no selection, no compression): **12,230 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 16 ms
+Second run (warm cache): **150 tokens**, 15 cache hits, 18 ms
 
 ## Token estimator comparison
 
 | Sample | heuristic | model_aligned | exact_tiktoken |
 |--------|-----------|---------------|----------------|
-| task | 18 | 20 | 18 *(fallback)* |
-| top_ranked_file | 616 | 704 | 616 *(fallback)* |
-| packed_context | 3265 | 3732 | 3265 *(fallback)* |
+| task | 24 | 28 | 24 *(fallback)* |
+| top_ranked_file | 1025 | 1172 | 1025 *(fallback)* |
+| packed_context | 2202 | 2517 | 2202 *(fallback)* |

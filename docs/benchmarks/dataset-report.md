@@ -9,7 +9,7 @@ Reproducible evidence of token savings when using ContextBudget's optimised cont
 | Token budget | 8,000 |
 | Top files | 20 |
 | Dataset repo | `/Users/naithai/Desktop/amogus/praca/ContextBudget/benchmarks/dataset` |
-| Generated | 2026-03-15T11:05:45.147657+00:00 |
+| Generated | 2026-03-15T11:32:08.522802+00:00 |
 
 ## Results
 

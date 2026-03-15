@@ -1,6 +1,6 @@
 {
   "command": "benchmark",
-  "task": "Refactor database repository layer to use connection pooling",
+  "task": "Refactor the database repository layer to use connection pooling for better performance and separation of concerns",
   "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/benchmarks/dataset",
   "max_tokens": 8000,
   "top_files": 20,
@@ -44,18 +44,18 @@
         "src/db/connection.py",
         "src/db/repository.py",
         "README.md",
-        "tests/test_tasks.py",
         "src/services/task_service.py",
+        "tests/test_tasks.py",
+        "src/models/user.py",
         "src/models/task.py",
         "src/services/user_service.py",
-        "src/models/user.py",
+        "src/utils/validators.py",
+        "src/utils/helpers.py",
         "src/config.py",
         "src/app.py",
         "tests/test_users.py",
         "src/routes/tasks.py",
-        "src/utils/validators.py",
-        "src/routes/users.py",
-        "src/utils/helpers.py"
+        "src/routes/users.py"
       ],
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
@@ -67,30 +67,30 @@
     {
       "strategy": "compressed_pack",
       "description": "Use ContextBudget scoring + compression under configured token budget.",
-      "estimated_input_tokens": 1768,
-      "estimated_saved_tokens": 10462,
+      "estimated_input_tokens": 2484,
+      "estimated_saved_tokens": 9746,
       "files_included": [
         "src/db/connection.py",
         "src/db/repository.py",
         "README.md",
-        "tests/test_tasks.py",
         "src/services/task_service.py",
+        "tests/test_tasks.py",
+        "src/models/user.py",
         "src/models/task.py",
         "src/services/user_service.py",
-        "src/models/user.py",
+        "src/utils/validators.py",
+        "src/utils/helpers.py",
         "src/config.py",
         "src/app.py",
         "tests/test_users.py",
         "src/routes/tasks.py",
-        "src/utils/validators.py",
-        "src/routes/users.py",
-        "src/utils/helpers.py"
+        "src/routes/users.py"
       ],
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 12,
-      "runtime_ms": 16
+      "cache_hits": 11,
+      "runtime_ms": 17
     },
     {
       "strategy": "cache_assisted_pack",
@@ -101,24 +101,24 @@
         "src/db/connection.py",
         "src/db/repository.py",
         "README.md",
-        "tests/test_tasks.py",
         "src/services/task_service.py",
+        "tests/test_tasks.py",
+        "src/models/user.py",
         "src/models/task.py",
         "src/services/user_service.py",
-        "src/models/user.py",
+        "src/utils/validators.py",
+        "src/utils/helpers.py",
         "src/config.py",
         "src/app.py",
         "tests/test_users.py",
         "src/routes/tasks.py",
-        "src/utils/validators.py",
-        "src/routes/users.py",
-        "src/utils/helpers.py"
+        "src/routes/users.py"
       ],
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
       "cache_hits": 15,
-      "runtime_ms": 15,
+      "runtime_ms": 17,
       "notes": "second run with warmed summary cache"
     }
   ],
@@ -139,19 +139,19 @@
   "estimator_samples": [
     {
       "name": "task",
-      "chars": 60,
+      "chars": 114,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 15,
+          "estimated_tokens": 29,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 18,
+          "estimated_tokens": 33,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -159,7 +159,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 15,
+          "estimated_tokens": 29,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -200,19 +200,19 @@
     },
     {
       "name": "packed_context",
-      "chars": 7096,
+      "chars": 9959,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 1774,
+          "estimated_tokens": 2490,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 2028,
+          "estimated_tokens": 2846,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +220,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 1774,
+          "estimated_tokens": 2490,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-15T10:04:25.457640+00:00",
+  "generated_at": "2026-03-15T11:35:09.212394+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",
