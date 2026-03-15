@@ -48,9 +48,23 @@ class GatewayConfig:
     api_key: str | None = None          # Required Bearer token; None = auth disabled
     request_timeout_seconds: int = 30   # Per-request processing timeout
 
+    # Remote policy — optional cloud control plane integration
+    # If set, the gateway fetches the active PolicySpec from the cloud service
+    # before each request and enforces it server-side.
+    cloud_policy_url: str | None = None   # e.g. https://cloud.example.com
+    cloud_api_key: str | None = None      # Bearer key for the cloud service
+    cloud_policy_org_id: int | None = None  # org_id to scope the policy lookup
+
+    # Webhook push notifications (optional)
+    # When set, the gateway fires a POST to webhook_url on policy violations and
+    # budget overruns.  webhook_secret is used for HMAC-SHA256 signing.
+    webhook_url: str | None = None
+    webhook_secret: str | None = None
+
     @classmethod
     def from_env(cls) -> GatewayConfig:
         """Build config from ``CB_GATEWAY_*`` environment variables."""
+        cloud_org_raw = os.environ.get("CB_GATEWAY_CLOUD_ORG_ID")
         return cls(
             host=os.environ.get("CB_GATEWAY_HOST", "127.0.0.1"),
             port=int(os.environ.get("CB_GATEWAY_PORT", "8787")),
@@ -71,6 +85,11 @@ class GatewayConfig:
             ),
             api_key=os.environ.get("CB_GATEWAY_API_KEY") or None,
             request_timeout_seconds=int(os.environ.get("CB_GATEWAY_TIMEOUT_SECONDS", "30")),
+            cloud_policy_url=os.environ.get("CB_GATEWAY_CLOUD_POLICY_URL") or None,
+            cloud_api_key=os.environ.get("CB_GATEWAY_CLOUD_API_KEY") or None,
+            cloud_policy_org_id=int(cloud_org_raw) if cloud_org_raw else None,
+            webhook_url=os.environ.get("CB_GATEWAY_WEBHOOK_URL") or None,
+            webhook_secret=os.environ.get("CB_GATEWAY_WEBHOOK_SECRET") or None,
         )
 
     @classmethod

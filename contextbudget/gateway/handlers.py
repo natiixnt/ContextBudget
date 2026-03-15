@@ -2,7 +2,10 @@ from __future__ import annotations
 
 """Endpoint handlers for the ContextBudget Runtime Gateway."""
 
+import json
 import logging
+import urllib.error
+import urllib.request
 import uuid
 from datetime import datetime, timezone
 from typing import Any
@@ -13,6 +16,7 @@ from contextbudget.engine import ContextBudgetEngine
 from contextbudget.runtime import AgentRuntime
 from contextbudget.telemetry import NoOpTelemetrySink, TelemetryEvent, TelemetrySink
 
+from contextbudget.core.webhooks import dispatch_budget_overrun, dispatch_policy_violation
 from contextbudget.gateway.config import GatewayConfig
 from contextbudget.gateway.models import (
     OptimizedContext,
@@ -26,6 +30,109 @@ from contextbudget.gateway.models import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+def _fetch_remote_policy(config: GatewayConfig, repository_id: str | None = None) -> PolicySpec | None:
+    """Fetch the active PolicySpec from the cloud control plane.
+
+    Returns ``None`` if the cloud URL is not configured, the request fails,
+    or no active policy exists for the given scope.  Failures are logged at
+    WARNING level so the gateway keeps running with no policy rather than
+    refusing requests.
+    """
+    if not config.cloud_policy_url or config.cloud_policy_org_id is None:
+        return None
+
+    params: list[str] = [f"org_id={config.cloud_policy_org_id}"]
+    if repository_id:
+        params.append(f"repository_id={urllib.request.quote(repository_id, safe='')}")
+    url = f"{config.cloud_policy_url.rstrip('/')}/policies/active?{'&'.join(params)}"
+
+    req = urllib.request.Request(url)
+    if config.cloud_api_key:
+        req.add_header("Authorization", f"Bearer {config.cloud_api_key}")
+
+    try:
+        with urllib.request.urlopen(req, timeout=5) as resp:  # noqa: S310
+            body = json.loads(resp.read())
+    except urllib.error.HTTPError as exc:
+        logger.warning("Remote policy fetch failed: HTTP %s from %s", exc.code, url)
+        return None
+    except Exception as exc:
+        logger.warning("Remote policy fetch error: %s", exc)
+        return None
+
+    if not body or not isinstance(body, dict):
+        return None
+
+    spec = body.get("spec") or {}
+    if not spec:
+        return None
+
+    try:
+        return PolicySpec(
+            max_estimated_input_tokens=spec.get("max_estimated_input_tokens"),
+            max_files_included=spec.get("max_files_included"),
+            max_quality_risk_level=spec.get("max_quality_risk_level"),
+            min_estimated_savings_percentage=spec.get("min_estimated_savings_percentage"),
+            max_context_size_bytes=spec.get("max_context_size_bytes"),
+        )
+    except Exception as exc:
+        logger.warning("Could not build PolicySpec from remote spec: %s", exc)
+        return None
+
+
+def _fire_webhooks(
+    config: GatewayConfig,
+    *,
+    run_id: str,
+    endpoint: str,
+    policy_status: "PolicyStatus",
+    tokens_used: int,
+    max_tokens: int,
+) -> None:
+    """Fire webhook notifications for policy violations and budget overruns."""
+    if not config.webhook_url:
+        return
+    if not policy_status.passed:
+        dispatch_policy_violation(
+            config.webhook_url,
+            secret=config.webhook_secret,
+            run_id=run_id,
+            endpoint=endpoint,
+            violations=policy_status.violations,
+            tokens_used=tokens_used,
+        )
+    if tokens_used > max_tokens:
+        dispatch_budget_overrun(
+            config.webhook_url,
+            secret=config.webhook_secret,
+            run_id=run_id,
+            endpoint=endpoint,
+            tokens_used=tokens_used,
+            max_tokens=max_tokens,
+        )
+
+
+def _push_audit_entry(config: GatewayConfig, **fields: Any) -> None:
+    """Fire-and-forget audit push to the cloud control plane.
+
+    Silently does nothing if cloud audit is not configured.  All network
+    failures are logged at WARNING level and swallowed so gateway requests
+    are never blocked by audit delivery.
+    """
+    if not config.cloud_policy_url or config.cloud_policy_org_id is None or not config.cloud_api_key:
+        return
+    url = f"{config.cloud_policy_url.rstrip('/')}/orgs/{config.cloud_policy_org_id}/audit-log"
+    data = json.dumps(fields).encode()
+    req = urllib.request.Request(url, data=data, method="POST")
+    req.add_header("Content-Type", "application/json")
+    req.add_header("Authorization", f"Bearer {config.cloud_api_key}")
+    try:
+        with urllib.request.urlopen(req, timeout=2) as _:  # noqa: S310
+            pass
+    except Exception as exc:
+        logger.warning("Audit push failed: %s", exc)
 
 
 def _utc_now() -> str:
@@ -178,6 +285,10 @@ class GatewayHandlers:
             max_files=max_files,
             max_context_size=max_context_size,
         )
+        # Override with remote policy if the cloud control plane is configured
+        remote = _fetch_remote_policy(self._config)
+        if remote is not None:
+            policy = remote
 
         result = self._middleware.prepare_context(
             req.task,
@@ -221,6 +332,24 @@ class GatewayHandlers:
             cache_hits=cache_hits,
         )
 
+        _push_audit_entry(
+            self._config,
+            endpoint="/prepare-context",
+            run_id=run_id,
+            tokens_used=estimated_tokens,
+            tokens_saved=tokens_saved,
+            violation_count=len(policy_status.violations),
+            policy_passed=policy_status.passed,
+            status_code=200,
+        )
+        _fire_webhooks(
+            self._config,
+            run_id=run_id,
+            endpoint="/prepare-context",
+            policy_status=policy_status,
+            tokens_used=estimated_tokens,
+            max_tokens=max_tokens,
+        )
         return PrepareContextResponse(
             optimized_context=OptimizedContext(
                 files=compressed_files,
@@ -256,6 +385,9 @@ class GatewayHandlers:
             max_files=max_files,
             max_context_size=max_context_size,
         )
+        remote = _fetch_remote_policy(self._config)
+        if remote is not None:
+            policy = remote
 
         # Retrieve or create the AgentRuntime for this session
         session_id = req.session_id
@@ -310,6 +442,24 @@ class GatewayHandlers:
             session_tokens=runtime_result.session_tokens,
         )
 
+        _push_audit_entry(
+            self._config,
+            endpoint="/run-agent-step",
+            run_id=run_id,
+            tokens_used=ctx.estimated_tokens,
+            tokens_saved=ctx.tokens_saved,
+            violation_count=len(policy_status.violations),
+            policy_passed=policy_status.passed,
+            status_code=200,
+        )
+        _fire_webhooks(
+            self._config,
+            run_id=run_id,
+            endpoint="/run-agent-step",
+            policy_status=policy_status,
+            tokens_used=ctx.estimated_tokens,
+            max_tokens=max_tokens,
+        )
         return RunAgentStepResponse(
             optimized_context=OptimizedContext(
                 files=compressed_files,
