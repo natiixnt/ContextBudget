@@ -63,6 +63,23 @@ BUILTIN_MODEL_PRICING: dict[str, ModelPricing] = {
     "mistral-large":            ModelPricing( 2.00,   6.00, provider="mistral"),
     "mistral-small":            ModelPricing( 0.20,   0.60, provider="mistral"),
     "codestral":                ModelPricing( 0.20,   0.60, provider="mistral"),
+    # --- Open Source (hosted API pricing, e.g. Groq / Together / DeepSeek) ---
+    # Meta Llama — Groq public pricing
+    "llama-3.3-70b":            ModelPricing( 0.59,   0.79, provider="meta", notes="Groq hosted"),
+    "llama-3.1-70b":            ModelPricing( 0.59,   0.79, provider="meta", notes="Groq hosted"),
+    "llama-3.1-8b":             ModelPricing( 0.05,   0.08, provider="meta", notes="Groq hosted"),
+    "llama-3-70b":              ModelPricing( 0.59,   0.79, provider="meta", notes="Groq hosted"),
+    "llama-3-8b":               ModelPricing( 0.05,   0.08, provider="meta", notes="Groq hosted"),
+    # DeepSeek — DeepSeek API pricing
+    "deepseek-v3":              ModelPricing( 0.27,   1.10, provider="deepseek"),
+    "deepseek-r1":              ModelPricing( 0.55,   2.19, provider="deepseek"),
+    "deepseek-r1-distill-70b":  ModelPricing( 0.55,   2.19, provider="deepseek"),
+    # Qwen — Together AI pricing
+    "qwen2.5-72b":              ModelPricing( 1.20,   1.20, provider="alibaba", notes="Together hosted"),
+    "qwen2.5-coder-32b":        ModelPricing( 0.80,   0.80, provider="alibaba", notes="Together hosted"),
+    # Cohere Command R
+    "command-r-plus":           ModelPricing( 2.50,  10.00, provider="cohere"),
+    "command-r":                ModelPricing( 0.15,   0.60, provider="cohere"),
 }
 
 # Aliases / common short names
@@ -77,6 +94,11 @@ _ALIASES: dict[str, str] = {
     "gpt4o":       "gpt-4o",
     "gpt-4o-mini-latest": "gpt-4o-mini",
     "o1":          "o3",          # treat deprecated o1 as o3-tier
+    "llama3":      "llama-3.3-70b",
+    "llama":       "llama-3.3-70b",
+    "deepseek":    "deepseek-v3",
+    "qwen":        "qwen2.5-72b",
+    "command-r+":  "command-r-plus",
 }
 
 
