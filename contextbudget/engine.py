@@ -753,6 +753,50 @@ class ContextBudgetEngine:
         profile = build_savings_profile(run_data, run_json=run_json)
         return savings_profile_as_dict(profile)
 
+    def cost_analysis(
+        self,
+        run: RunArtifactInput,
+        *,
+        model: str = "gpt-4o",
+        price_per_1m_input: float | None = None,
+    ) -> dict[str, Any]:
+        """Compute the financial cost analysis for a pack run artifact.
+
+        Translates token savings recorded in the run artifact into USD cost
+        savings using the built-in model pricing table.
+
+        Parameters
+        ----------
+        run:
+            A dict (already loaded), a path string, or a :class:`Path` to a
+            run JSON file produced by :meth:`pack`.
+        model:
+            Model name used to look up input-token pricing (e.g.
+            ``"claude-sonnet-4-6"``, ``"gpt-4o"``, ``"llama-3.3-70b"``).
+        price_per_1m_input:
+            Override the input-token price (USD per 1 000 000 tokens).
+
+        Returns
+        -------
+        dict
+            Keys: ``model``, ``provider``, ``input_per_1m_usd``,
+            ``baseline_tokens``, ``optimized_tokens``, ``saved_tokens``,
+            ``savings_pct``, ``baseline_cost_usd``, ``optimized_cost_usd``,
+            ``saved_cost_usd``, ``per_file``, ``run_meta``, ``notes``.
+        """
+        from contextbudget.core.cost_analysis import compute_cost_analysis, load_run_data
+
+        if isinstance(run, dict):
+            run_data = run
+        else:
+            run_data = load_run_data(run)
+
+        return compute_cost_analysis(
+            run_data,
+            model=model,
+            price_per_1m_input=price_per_1m_input,
+        )
+
     def pipeline_trace(self, run: RunArtifactInput) -> dict[str, Any]:
         """Reconstruct the full context optimization pipeline from a pack run artifact.
 

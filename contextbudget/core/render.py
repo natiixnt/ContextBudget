@@ -1838,3 +1838,86 @@ def render_visualize_markdown(data: dict) -> str:
 
     lines.extend(["", f"Total edges in graph: {len(edges)}", ""])
     return "\n".join(lines)
+
+
+def render_cost_analysis_markdown(data: dict) -> str:
+    """Render a cost analysis result dict to Markdown."""
+
+    run_meta = data.get("run_meta", {})
+    task = str(run_meta.get("task") or "")
+    repo = str(run_meta.get("repo") or "")
+    generated_at = str(run_meta.get("generated_at") or data.get("generated_at", ""))
+
+    model = str(data.get("model") or "")
+    provider = str(data.get("provider") or "")
+    input_per_1m = float(data.get("input_per_1m_usd") or 0.0)
+
+    baseline_tokens = int(data.get("baseline_tokens") or 0)
+    optimized_tokens = int(data.get("optimized_tokens") or 0)
+    saved_tokens = int(data.get("saved_tokens") or 0)
+    savings_pct = float(data.get("savings_pct") or 0.0)
+
+    baseline_cost = float(data.get("baseline_cost_usd") or 0.0)
+    optimized_cost = float(data.get("optimized_cost_usd") or 0.0)
+    saved_cost = float(data.get("saved_cost_usd") or 0.0)
+
+    lines = ["# ContextBudget Cost Analysis", ""]
+    if task:
+        lines.append(f"Task: {task}")
+    if repo:
+        lines.append(f"Repo: {repo}")
+    if generated_at:
+        lines.append(f"Generated at: {generated_at}")
+    lines.append("")
+
+    provider_str = f" ({provider})" if provider else ""
+    lines.extend(
+        [
+            "## Model Pricing",
+            "",
+            f"Model: **{model}**{provider_str}",
+            f"Input price: **${input_per_1m:.4f} / MTok**",
+            "",
+            "## Cost Summary",
+            "",
+            "| Metric | Tokens | Cost (USD) |",
+            "|--------|-------:|-----------:|",
+            f"| Baseline (unoptimized) | {baseline_tokens:,} | ${baseline_cost:.4f} |",
+            f"| Optimized              | {optimized_tokens:,} | ${optimized_cost:.4f} |",
+            f"| **Saved**              | **{saved_tokens:,}** | **${saved_cost:.4f}** |",
+            f"| Savings %              | {savings_pct:.1f}% | {savings_pct:.1f}% |",
+            "",
+        ]
+    )
+
+    per_file = data.get("per_file", [])
+    if isinstance(per_file, list) and per_file:
+        lines.extend(
+            [
+                "## Per-File Breakdown",
+                "",
+                "| File | Strategy | Original | Optimized | Saved | Cost Saved |",
+                "|------|----------|--------:|----------:|------:|-----------:|",
+            ]
+        )
+        for row in per_file:
+            if not isinstance(row, dict):
+                continue
+            lines.append(
+                f"| `{row.get('path', '')}` "
+                f"| {row.get('strategy', '')} "
+                f"| {int(row.get('original_tokens', 0) or 0):,} "
+                f"| {int(row.get('compressed_tokens', 0) or 0):,} "
+                f"| {int(row.get('saved_tokens', 0) or 0):,} "
+                f"| ${float(row.get('saved_cost_usd', 0.0) or 0.0):.6f} |"
+            )
+        lines.append("")
+
+    notes = data.get("notes", [])
+    if isinstance(notes, list) and notes:
+        lines.extend(["## Notes", ""])
+        for note in notes:
+            lines.append(f"- {note}")
+        lines.append("")
+
+    return "\n".join(lines)

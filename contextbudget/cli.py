@@ -1106,6 +1106,22 @@ def cmd_control_plane(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_gateway(args: argparse.Namespace) -> int:
+    from contextbudget.gateway import GatewayConfig, GatewayServer
+
+    config = GatewayConfig(
+        host=args.host,
+        port=args.port,
+        max_tokens=args.max_tokens,
+        max_files=args.max_files,
+        config_path=args.config or None,
+        telemetry_enabled=args.telemetry,
+        log_requests=not args.no_log_requests,
+    )
+    GatewayServer(config).start(block=True)
+    return 0
+
+
 def cmd_prepare_context(args: argparse.Namespace) -> int:
     middleware = ContextBudgetMiddleware(config_path=_resolve_config_path(args.config))
     result = middleware.prepare_context(
@@ -1165,6 +1181,90 @@ def cmd_prepare_context(args: argparse.Namespace) -> int:
                 print(f"- {violation}")
             return 2
 
+    return 0
+
+
+def cmd_cost_analysis(args: argparse.Namespace) -> int:
+    from contextbudget.core.cost_analysis import compute_cost_analysis, list_known_models, load_run_data
+
+    fmt = getattr(args, "format", "human")
+
+    if getattr(args, "list_models", False):
+        rows = list_known_models()
+        if fmt == "json":
+            print(_json_mod.dumps(rows, indent=2, default=str))
+        else:
+            print(f"{'Model':<36} {'Provider':<12} {'Input $/MTok':>14}")
+            print("-" * 66)
+            for row in rows:
+                print(
+                    f"{row['model']:<36} {row['provider']:<12} "
+                    f"{row['input_per_1m_usd']:>14.4f}"
+                )
+        return 0
+
+    if not args.run_json:
+        print("error: run_json is required (or use --list-models)")
+        return 2
+
+    run_path = Path(args.run_json)
+    if not run_path.exists():
+        print(f"Run artifact not found: {run_path}")
+        return 2
+
+    try:
+        run_data = load_run_data(run_path)
+    except Exception as exc:
+        print(f"Failed to read run artifact: {exc}")
+        return 2
+
+    result = compute_cost_analysis(
+        run_data,
+        model=args.model,
+        price_per_1m_input=args.price_input,
+    )
+
+    from contextbudget.core.render import render_cost_analysis_markdown, write_json
+
+    # Derive output paths: default to <run_stem>-cost-analysis.{json,md}
+    run_stem = run_path.with_suffix("").name
+    json_out = Path(args.out) if args.out else Path(f"{run_stem}-cost-analysis.json")
+    md_out = json_out.with_suffix(".md")
+
+    write_json(json_out, result)
+    markdown = render_cost_analysis_markdown(result)
+    md_out.write_text(markdown, encoding="utf-8")
+
+    if fmt == "json":
+        print(_json_mod.dumps(result, indent=2, default=str))
+        return 0
+
+    model_label = result["model"]
+    provider = result["provider"]
+    provider_str = f" ({provider})" if provider else ""
+    print(f"Model: {model_label}{provider_str}  |  input ${result['input_per_1m_usd']:.4f}/MTok")
+    print()
+    print(f"Baseline cost:  ${result['baseline_cost_usd']:.2f}  ({result['baseline_tokens']:,} tokens)")
+    print(f"Optimized cost: ${result['optimized_cost_usd']:.2f}  ({result['optimized_tokens']:,} tokens)")
+    print(f"Savings:        ${result['saved_cost_usd']:.2f}  ({result['saved_tokens']:,} tokens, {result['savings_pct']:.1f}%)")
+
+    per_file = result.get("per_file", [])
+    if per_file:
+        print()
+        print(f"{'File':<40} {'Saved tokens':>13} {'Saved $':>10}")
+        print("-" * 65)
+        for row in per_file:
+            path_label = row["path"]
+            if len(path_label) > 39:
+                path_label = "..." + path_label[-36:]
+            print(f"{path_label:<40} {row['saved_tokens']:>13,} {row['saved_cost_usd']:>10.6f}")
+
+    for note in result.get("notes", []):
+        print(f"Note: {note}")
+
+    print()
+    print(f"Wrote cost analysis JSON: {json_out}")
+    print(f"Wrote cost analysis Markdown: {md_out}")
     return 0
 
 
@@ -1786,6 +1886,100 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to SQLite database file (default: .contextbudget/control_plane.db).",
     )
     control_plane_cmd.set_defaults(func=cmd_control_plane)
+
+    cost_analysis = sub.add_parser(
+        "cost-analysis",
+        help="Compute financial impact of context optimisation from a run artifact",
+    )
+    cost_analysis.add_argument(
+        "run_json",
+        nargs="?",
+        default="",
+        help="Path to a run artifact JSON file produced by 'contextbudget pack'.",
+    )
+    cost_analysis.add_argument(
+        "--model",
+        default="gpt-4o",
+        help=(
+            "Model name used for pricing lookup (default: gpt-4o). "
+            "Supports Anthropic, OpenAI, Google, Mistral, Meta Llama, DeepSeek, Qwen, Cohere, and others. "
+            "Run `contextbudget cost-analysis --list-models` to see all known models."
+        ),
+    )
+    cost_analysis.add_argument(
+        "--price-input",
+        dest="price_input",
+        type=float,
+        default=None,
+        help="Custom input token price in USD per 1 000 000 tokens (overrides built-in model pricing).",
+    )
+    cost_analysis.add_argument(
+        "--out",
+        default="",
+        help="Write cost analysis metrics to this JSON file path.",
+    )
+    cost_analysis.add_argument(
+        "--list-models",
+        action="store_true",
+        default=False,
+        help="Print all models in the built-in pricing table and exit.",
+    )
+    cost_analysis.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format: human (default) for readable summary, json to print raw JSON to stdout.",
+    )
+    cost_analysis.set_defaults(func=cmd_cost_analysis)
+
+    gateway_cmd = sub.add_parser(
+        "gateway",
+        help="Start the ContextBudget Runtime Gateway (agent → ContextBudget → LLM middleware)",
+    )
+    gateway_cmd.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the gateway server to (default: 127.0.0.1).",
+    )
+    gateway_cmd.add_argument(
+        "--port",
+        type=int,
+        default=8787,
+        help="Port for the gateway server (default: 8787).",
+    )
+    gateway_cmd.add_argument(
+        "--max-tokens",
+        dest="max_tokens",
+        type=int,
+        default=128_000,
+        help="Default token budget applied when a request omits max_tokens (default: 128000).",
+    )
+    gateway_cmd.add_argument(
+        "--max-files",
+        dest="max_files",
+        type=int,
+        default=100,
+        help="Default top-files cap applied when a request omits max_files (default: 100).",
+    )
+    gateway_cmd.add_argument(
+        "--config",
+        default="",
+        help="Path to a contextbudget.toml shared by all gateway requests.",
+    )
+    gateway_cmd.add_argument(
+        "--telemetry",
+        action="store_true",
+        default=False,
+        help="Enable gateway telemetry event emission (default: off).",
+    )
+    gateway_cmd.add_argument(
+        "--no-log-requests",
+        dest="no_log_requests",
+        action="store_true",
+        default=False,
+        help="Suppress per-request HTTP log lines.",
+    )
+    gateway_cmd.set_defaults(func=cmd_gateway)
 
     return parser
 
