@@ -1,0 +1,1309 @@
+name: Populate Wiki
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  wiki:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Clone wiki
+        run: |
+          git clone "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git" wiki || \
+          (mkdir wiki && cd wiki && git init && git remote add origin "https://x-access-token:${{ secrets.GITHUB_TOKEN }}@github.com/${{ github.repository }}.wiki.git")
+
+      - name: Write wiki pages
+        run: |
+          cd wiki
+          cat > Home.md << 'WIKIEOF'
+# ContextBudget Wiki
+
+**ContextBudget** selects, compresses, and budgets repository context for coding-agent workflows. It is deterministic, local-first, and produces stable machine-readable artifacts for reuse in CI, local tools, and agent middleware.
+
+---
+
+## Quick Start
+
+```bash
+pip install -e .[dev]
+
+# Rank relevant files
+contextbudget plan "add caching to search API" --repo .
+
+# Pack context under budget
+contextbudget pack "add caching to search API" --repo . --max-tokens 30000
+
+# Summarize the run artifact
+contextbudget report run.json
+```
+
+---
+
+## Key Features
+
+| Feature | Description |
+|---------|-------------|
+| **File Ranking** | Deterministic relevance scoring against natural-language tasks |
+| **Token Packing** | Packs context under explicit token budgets with quality-risk estimation |
+| **Compression** | Snippet extraction, symbol extraction, language-aware chunking, deterministic summaries |
+| **Incremental / Delta** | Re-packs only changed files across agent loop iterations |
+| **Workspace Support** | Multi-repo and monorepo-package scanning with repo provenance tracking |
+| **Benchmarking** | Compares full-context, top-k, compressed, and cache-assisted strategies |
+| **Policy Enforcement** | Strict-mode CI gates on token count, file count, and quality risk |
+| **Agent Middleware** | Adapter-ready middleware layer for external agent tools |
+| **Stable Artifacts** | `run.json` and `run.md` with additive metadata blocks |
+
+---
+
+## Pages
+
+| Page | Description |
+|------|-------------|
+| [[Getting Started]] | Installation and core workflow |
+| [[CLI Reference]] | All CLI commands and flags |
+| [[Python API]] | `BudgetGuard` and `ContextBudgetEngine` reference |
+| [[Configuration]] | `contextbudget.toml` schema and model profiles |
+| [[Architecture]] | System layers, pipeline stages, and design goals |
+| [[Agent Integration]] | Middleware, adapters, and multi-turn agent loops |
+| [[Plugins]] | Custom scorers, compressors, and token estimators |
+| [[Benchmarking and Diff]] | Strategy comparison and run diffing |
+| [[Policy and CI]] | Budget policy enforcement and GitHub Actions |
+| [[Workspace]] | Multi-repo and monorepo workspace configuration |
+
+---
+
+## Requirements
+
+- Python 3.11+
+- Install: `pip install -e .[dev]`
+- Optional exact tokenization: `pip install -e .[tokenizers]`
+WIKIEOF
+
+          cat > Getting-Started.md << 'WIKIEOF'
+# Getting Started
+
+## Install
+
+```bash
+python3 -m pip install -e .[dev]
+```
+
+For exact tokenization via `tiktoken`:
+
+```bash
+python3 -m pip install -e .[tokenizers]
+```
+
+---
+
+## Core Workflow
+
+```bash
+# 1. Rank relevant files for a task
+contextbudget plan "add caching to search API" --repo .
+
+# 2. Pack context under a token budget
+contextbudget pack "add caching to search API" --repo . --max-tokens 30000
+
+# 3. Summarize the generated run artifact
+contextbudget report run.json
+```
+
+---
+
+## Extended Workflow
+
+```bash
+# Compare two run artifacts
+contextbudget diff old-run.json new-run.json
+
+# Compare packing strategies side-by-side
+contextbudget benchmark "add rate limiting to auth API" --repo .
+
+# Analyze token savings by compression stage
+contextbudget profile run.json
+
+# Detect duplicate or unnecessary file reads
+contextbudget read-profiler run.json
+```
+
+---
+
+## Multi-step Agent Planning
+
+```bash
+contextbudget plan-agent "refactor auth middleware" --repo .
+```
+
+---
+
+## Workspace (Multi-repo)
+
+Create a `workspace.toml`:
+
+```toml
+name = "backend-services"
+
+[scan]
+include_globs = ["**/*.py"]
+
+[budget]
+max_tokens = 28000
+
+[[repos]]
+label = "auth-service"
+path = "../auth-service"
+
+[[repos]]
+label = "billing-service"
+path = "../billing-service"
+```
+
+Then run across all repos:
+
+```bash
+contextbudget pack "add caching" --workspace workspace.toml
+```
+
+---
+
+## Python API Quickstart
+
+```python
+from contextbudget import BudgetGuard
+
+guard = BudgetGuard(max_tokens=30000)
+result = guard.pack_context(task="add caching", repo=".")
+
+budget = result["budget"]
+print(f"tokens: {budget['estimated_input_tokens']} / {guard.max_tokens}")
+print(f"saved:  {budget['estimated_saved_tokens']}")
+print(f"risk:   {budget['quality_risk_estimate']}")
+
+prompt = "\n".join(f["text"] for f in result["compressed_context"])
+```
+
+---
+
+## Next Steps
+
+- [[CLI Reference]] — complete command documentation
+- [[Configuration]] — `contextbudget.toml` settings
+- [[Agent Integration]] — embedding ContextBudget in agent loops
+- [[Benchmarking and Diff]] — strategy comparison
+WIKIEOF
+
+          cat > CLI-Reference.md << 'WIKIEOF'
+# CLI Reference
+
+## Commands Overview
+
+| Command | Purpose |
+|---------|---------|
+| `plan` | Rank relevant files for a task |
+| `plan-agent` | Plan multi-step agent workflow |
+| `pack` | Build compressed context package |
+| `profile` | Explain token savings by stage |
+| `read-profiler` | Analyze agent read patterns |
+| `report` | Render summary from run artifact |
+| `diff` | Compare two run artifacts |
+| `pr-audit` | Audit PR for context growth |
+| `prepare-context` | Full middleware pipeline |
+| `benchmark` | Compare packing strategies |
+| `heatmap` | Aggregate historical token hotspots |
+| `watch` | Monitor incremental scan index |
+
+---
+
+## `plan`
+
+Rank relevant files for a natural-language task.
+
+```bash
+contextbudget plan <task> --repo <path>
+contextbudget plan <task> --workspace <workspace.toml>
+```
+
+---
+
+## `plan-agent`
+
+Plan context usage across a multi-step agent workflow.
+
+```bash
+contextbudget plan-agent <task> --repo <path>
+contextbudget plan-agent <task> --workspace <workspace.toml>
+```
+
+---
+
+## `pack`
+
+Build a compressed context package and write `run.json` + `run.md`.
+
+```bash
+contextbudget pack <task> --repo <path> [--max-tokens N] [--top-files N]
+
+# Incremental (delta) mode:
+contextbudget pack <task> --repo <path> --delta <previous-run.json>
+
+# Workspace mode:
+contextbudget pack <task> --workspace <workspace.toml>
+```
+
+---
+
+## `profile`
+
+Explain where token savings came from in a pack run.
+
+```bash
+contextbudget profile run.json [--out-prefix <prefix>]
+```
+
+Stages tracked: `cache_reuse`, `symbol_extraction`, `slicing`, `compression`, `snippet`, `delta`, `full`.
+
+---
+
+## `read-profiler`
+
+Analyze agent file read patterns. Detects duplicate reads, unnecessary reads (low relevance + high cost), and high token-cost reads.
+
+```bash
+contextbudget read-profiler run.json [--out-prefix <prefix>]
+```
+
+---
+
+## `report`
+
+Render a summary report from a run artifact.
+
+```bash
+contextbudget report <run.json> [--out <path>] [--policy <policy.toml>]
+```
+
+---
+
+## `diff`
+
+Compare two run artifacts.
+
+```bash
+contextbudget diff old-run.json new-run.json
+```
+
+---
+
+## `pr-audit`
+
+Analyze a pull request diff directly from git.
+
+```bash
+contextbudget pr-audit --repo <path> [--base <ref>] [--head <ref>]
+
+# GitHub Actions:
+contextbudget pr-audit \
+  --repo . \
+  --base "${{ github.event.pull_request.base.sha }}" \
+  --head "${{ github.event.pull_request.head.sha }}" \
+  --out-prefix contextbudget-pr
+```
+
+CI gates: `--max-token-increase N`, `--max-token-increase-pct PCT`
+
+---
+
+## `prepare-context`
+
+Run the full middleware pipeline.
+
+```bash
+contextbudget prepare-context "add caching" --repo . --max-tokens 20000
+contextbudget prepare-context "add caching" --repo . --delta previous-run.json
+contextbudget prepare-context "large refactor" --repo . --strict --policy policy.toml
+```
+
+---
+
+## `benchmark`
+
+Compare strategies: naive full-context, top-k, compressed, cache-assisted.
+
+```bash
+contextbudget benchmark "add rate limiting to auth API" --repo .
+contextbudget benchmark <task> --workspace <workspace.toml>
+```
+
+---
+
+## `heatmap`
+
+Aggregate historical pack artifacts into token heatmaps.
+
+```bash
+contextbudget heatmap [<history> ...] [--limit N] [--out-prefix <path>]
+```
+
+---
+
+## `watch`
+
+Monitor the incremental scan index.
+
+```bash
+contextbudget watch --repo <path> [--poll-interval S] [--once]
+```
+
+---
+
+## Global Flags
+
+| Flag | Description |
+|------|-------------|
+| `--config <path>` | Load a custom `contextbudget.toml` |
+| `--policy <path>` | Apply a policy TOML file |
+| `--strict` | Return non-zero on policy violations |
+| `--max-tokens N` | Override token budget |
+| `--top-files N` | Override max candidate files |
+| `--delta <run.json>` | Enable incremental delta mode |
+| `--workspace <path>` | Use workspace TOML instead of `--repo` |
+| `--out-prefix <prefix>` | Control output file name prefix |
+WIKIEOF
+
+          cat > Python-API.md << 'WIKIEOF'
+# Python API
+
+Use ContextBudget as a reusable library for local tools, CI wrappers, and agent integrations.
+
+## Quick Start
+
+```python
+from contextbudget import BudgetGuard
+
+guard = BudgetGuard(max_tokens=30000)
+result = guard.pack_context(task="add caching", repo=".")
+print(result["budget"]["estimated_input_tokens"], "tokens")
+```
+
+---
+
+## BudgetGuard
+
+`BudgetGuard` is the stable SDK entry point.
+
+```python
+BudgetGuard(
+    max_tokens=None,
+    top_files=None,
+    max_files_included=None,       # policy
+    max_quality_risk_level=None,   # policy: "low", "medium", "high"
+    min_estimated_savings_percentage=None,  # policy
+    max_context_size_bytes=None,   # policy
+    policy_path=None,
+    strict=False,
+    config_path=None,
+    engine=None,
+)
+```
+
+---
+
+## `pack_context`
+
+```python
+result = guard.pack_context(
+    task="add caching to search API",
+    repo=".",
+    max_tokens=None,
+    top_files=None,
+    delta_from=None,   # previous run artifact for incremental context
+    strict=None,
+    policy_path=None,
+)
+```
+
+Key result fields: `ranked_files`, `files_included`, `files_skipped`, `compressed_context`, `budget`.
+
+Budget block: `estimated_input_tokens`, `estimated_saved_tokens`, `duplicate_reads_prevented`, `quality_risk_estimate`.
+
+**Strict policy:**
+
+```python
+from contextbudget import BudgetGuard, BudgetPolicyViolationError
+
+guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=10)
+try:
+    result = guard.pack_context(task="large refactor", repo=".")
+except BudgetPolicyViolationError as err:
+    for v in err.policy_result["violations"]:
+        print(f"  - {v}")
+```
+
+**Delta mode:**
+
+```python
+first = guard.pack_context(task="add caching", repo=".")
+second = guard.pack_context(task="add caching", repo=".", delta_from=first)
+print(second["delta"]["budget"]["tokens_saved"], "tokens saved by delta")
+```
+
+---
+
+## `simulate_agent`
+
+```python
+plan = guard.simulate_agent(task="refactor auth flow", repo=".", model="gpt-4o")
+
+for step in plan["steps"]:
+    print(f"{step['id']:12} {step['step_total_tokens']:6} tokens")
+
+print(f"Cost: ${plan['cost_estimate']['total_cost_usd']:.4f}")
+```
+
+Step IDs: `inspect`, `implement`, `test`, `validate`, `document`.
+
+---
+
+## `profile_run`
+
+```python
+result = guard.profile_run(task="add caching", repo=".")
+p = result["profile"]
+print(f"packed in {p['elapsed_ms']} ms")
+print(f"compression: {p['compression_ratio']:.1%} ({p['estimated_saved_tokens']} tokens saved)")
+```
+
+---
+
+## `read_profile`
+
+```python
+run = guard.pack_context(task="add caching", repo=".")
+report = guard.read_profile(run)
+
+print(f"Tokens wasted total: {report['tokens_wasted_total']}")
+for rec in report["duplicate_files"]:
+    print(f"  duplicate: {rec['path']} ({rec['waste_tokens']} tokens wasted)")
+```
+
+Also accepts a path: `guard.read_profile("run.json")`
+
+---
+
+## `evaluate_policy`
+
+```python
+policy_result = guard.evaluate_policy(result)
+if not policy_result["passed"]:
+    for v in policy_result["violations"]:
+        print(v)
+```
+
+---
+
+## ContextBudgetEngine
+
+Lower-level API:
+
+```python
+from contextbudget import ContextBudgetEngine
+
+engine = ContextBudgetEngine()
+plan = engine.plan(task="...", repo=".")
+run = engine.pack(task="...", repo=".", max_tokens=24000)
+advice = engine.advise(repo=".", history=["./runs/"])
+policy = engine.make_policy(max_files_included=12, max_quality_risk_level="medium")
+```
+
+---
+
+## Integration Patterns
+
+**Agent loop with delta context:**
+
+```python
+guard = BudgetGuard(max_tokens=30000)
+previous_run = None
+
+for iteration in range(3):
+    result = guard.pack_context(task="implement auth caching", repo=".", delta_from=previous_run)
+    context_text = "\n".join(f["text"] for f in result["compressed_context"])
+    # ... send to model ...
+    previous_run = result
+```
+
+**Pre-flight cost check:**
+
+```python
+plan = guard.simulate_agent(task="refactor auth flow", repo=".", model="gpt-4o")
+if plan["cost_estimate"]["total_cost_usd"] < 0.50:
+    result = guard.pack_context(task="refactor auth flow", repo=".")
+```
+WIKIEOF
+
+          cat > Configuration.md << 'WIKIEOF'
+# Configuration
+
+ContextBudget loads `contextbudget.toml` from the repo root by default.
+
+**Precedence:** CLI flags > `contextbudget.toml` > built-in defaults
+
+---
+
+## Full Example
+
+```toml
+model_profile = "gpt-4.1"
+
+[scan]
+include_globs = ["**/*.py", "**/*.md"]
+ignore_globs = ["**/generated/**"]
+max_file_size_bytes = 1500000
+
+[budget]
+max_tokens = 30000
+top_files = 25
+
+[score]
+critical_path_keywords = ["auth", "permissions", "billing"]
+enable_import_graph_signals = true
+
+[compression]
+symbol_extraction_enabled = true
+snippet_score_threshold = 2.5
+
+[summarization]
+backend = "deterministic"   # or "external"
+adapter = ""
+
+[tokens]
+backend = "heuristic"       # "heuristic", "model_aligned", or "exact"
+model = "gpt-4o-mini"
+
+[plugins]
+scorer = "builtin.relevance"
+compressor = "builtin.default"
+token_estimator = "builtin.char4"
+
+[cache]
+backend = "local_file"
+summary_cache_enabled = true
+cache_file = ".contextbudget_cache.json"
+duplicate_hash_cache_enabled = true
+
+[telemetry]
+enabled = false
+sink = "file"
+file_path = ".contextbudget/telemetry.jsonl"
+```
+
+---
+
+## Model Profiles
+
+| Profile | Description |
+|---------|-------------|
+| `gpt-4.1` | GPT-4.1 / GPT-4o family |
+| `claude-sonnet-4` | Claude Sonnet 4 family |
+| `mistral-small` | Mistral models |
+| `local-llm` | Self-hosted LLMs (customize via `[model]`) |
+
+```toml
+model_profile = "local-llm"
+
+[model]
+tokenizer = "llama-bpe"
+context_window = 65536
+recommended_compression_strategy = "aggressive"
+output_reserve_tokens = 8192
+```
+
+---
+
+## Token Estimation Backends
+
+| Backend | Description |
+|---------|-------------|
+| `heuristic` | Default char/4 estimator. Fastest and deterministic. |
+| `model_aligned` | Deterministic model-family approximation. |
+| `exact` | Exact local tokenization via `tiktoken`. Requires `pip install -e .[tokenizers]`. |
+
+---
+
+## Workspace TOML
+
+```toml
+name = "backend-services"
+
+[scan]
+include_globs = ["**/*.py", "**/*.ts"]
+
+[budget]
+max_tokens = 28000
+top_files = 30
+
+[[repos]]
+label = "auth-service"
+path = "../auth-service"
+
+[[repos]]
+label = "billing-service"
+path = "../billing-service"
+ignore_globs = ["tests/fixtures/**"]
+```
+
+- `path` is resolved relative to the workspace TOML file
+- `label` must be unique; namespaces artifact paths like `auth-service:src/auth.py`
+- Repo-specific `include_globs` replace shared `scan.include_globs` for that repo
+WIKIEOF
+
+          cat > Architecture.md << 'WIKIEOF'
+# Architecture
+
+ContextBudget is organized around a single engine and explicit stage boundaries. CLI, Python API, workspace runs, and agent middleware all route through the same pipeline.
+
+---
+
+## Design Goals
+
+- Deterministic heuristics over opaque model decisions
+- Stable machine-readable artifacts (`run.json`)
+- Local-first — no required network services
+- Explicit extension points: plugins, summarizers, telemetry sinks, agent adapters
+- Additive feature growth without breaking single-repo flows
+
+---
+
+## System Layers
+
+```
+Entry Points
+  cli.py  │  engine.py  │  agents/
+         ↓ (all delegate to)
+Core Pipeline
+  core/pipeline.py  (compat facade)
+  stages/workflow.py (explicit stage boundaries)
+
+  1. Scan Refresh   4. Cache
+  2. Scan           5. Pack / Compression
+  3. Score          6. Render
+         ↓
+Supporting Layers
+  scanners/  scorers/  compressors/
+  cache/     plugins/  telemetry/  schemas/
+```
+
+---
+
+## Pipeline Stages
+
+| Stage | Module | Description |
+|-------|--------|-------------|
+| Scan Refresh | `scanners/incremental.py` | Update `.contextbudget/scan-index.json` |
+| Scan | `scanners/repository.py` | File traversal with metadata |
+| Workspace Scan | `scanners/workspace.py` | Multi-repo scanning with repo labels |
+| Score | `scorers/relevance.py` | Deterministic relevance ranking |
+| Cache | `cache/summary_cache.py` | Reuse summaries; track duplicates |
+| Pack | `compressors/` | Reduce ranked files into context |
+| Render | `core/render.py` | Write `run.json` and `run.md` |
+
+---
+
+## Compression Strategies
+
+Built-in strategies (in order of token reduction):
+1. Full-file inclusion
+2. Snippet extraction (keyword-window slices)
+3. Symbol extraction (classes, functions, types)
+4. Language-aware import/dependency slicing
+5. Deterministic summaries
+6. External summarizer adapter
+
+---
+
+## Artifact Model
+
+`run.json` keeps a stable core shape and adds metadata blocks when features are active:
+
+| Block | When added |
+|-------|------------|
+| `cache` | Always |
+| `implementations` | Always (records active plugins) |
+| `workspace`, `scanned_repos`, `selected_repos` | Workspace runs |
+| `agent_middleware` | `prepare-context` and middleware API |
+| `delta` | Incremental delta runs |
+| `profile` | `profile_run()` |
+| `model_profile` | When `model_profile` is configured |
+
+**Compatibility rule:** New features add fields rather than replacing existing ones.
+
+---
+
+## Extension Points
+
+| Extension | What it changes |
+|-----------|-----------------|
+| `ScorerPlugin` | File relevance scoring |
+| `CompressorPlugin` | Context compression strategy |
+| `TokenEstimatorPlugin` | Token counting |
+| Summarizer adapters | Summary generation |
+| Telemetry sinks | Event handling |
+| Agent adapters | Local integration behavior |
+WIKIEOF
+
+          cat > Agent-Integration.md << 'WIKIEOF'
+# Agent Integration
+
+ContextBudget exposes a stable SDK for coding-agent frameworks via `BudgetGuard`.
+
+| Method | Purpose |
+|--------|---------|
+| `pack_context()` | Pack repository context under a token budget |
+| `simulate_agent()` | Estimate token use and API cost before packing |
+| `profile_run()` | Pack and return compression metrics in one call |
+
+---
+
+## Quickstart
+
+```python
+from contextbudget import BudgetGuard
+
+guard = BudgetGuard(max_tokens=30000)
+context = guard.pack_context(task="add caching", repo=".")
+prompt = "\n".join(f["text"] for f in context["compressed_context"])
+```
+
+---
+
+## Cost Simulation
+
+```python
+plan = guard.simulate_agent(task="add caching", repo=".", model="claude-sonnet-4-6")
+print(f"Estimated cost: ${plan['cost_estimate']['total_cost_usd']:.4f}")
+
+for step in plan["steps"]:
+    print(f"  {step['id']:12} {step['step_total_tokens']:6} tokens")
+```
+
+---
+
+## Multi-turn Agent Loop
+
+```python
+guard = BudgetGuard(max_tokens=30000)
+previous = None
+
+for iteration in range(3):
+    result = guard.pack_context(task="implement auth caching", repo=".", delta_from=previous)
+    prompt = "\n".join(f["text"] for f in result["compressed_context"])
+    # ... send to LLM ...
+    previous = result
+```
+
+---
+
+## Strict Policy Enforcement
+
+```python
+from contextbudget import BudgetGuard, BudgetPolicyViolationError
+
+guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=10)
+
+try:
+    result = guard.pack_context(task="large refactor", repo=".")
+except BudgetPolicyViolationError as err:
+    for v in err.policy_result["violations"]:
+        print(f"policy violation: {v}")
+```
+
+---
+
+## Middleware Helpers
+
+```python
+from contextbudget import ContextBudgetEngine, enforce_budget, prepare_context, record_run
+
+result = prepare_context(
+    "update auth flow across services",
+    workspace="workspace.toml",
+    max_tokens=28000,
+)
+
+policy = ContextBudgetEngine.make_policy(
+    max_estimated_input_tokens=28000,
+    max_quality_risk_level="medium",
+)
+
+checked = enforce_budget(result, policy=policy, strict=True)
+record_run(checked, "agent-run.json")
+```
+
+---
+
+## Typed Middleware API
+
+```python
+from contextbudget import AgentTaskRequest, ContextBudgetMiddleware
+
+middleware = ContextBudgetMiddleware()
+request = AgentTaskRequest(
+    task="update auth flow",
+    workspace="workspace.toml",
+    max_tokens=28000,
+)
+
+result = middleware.handle(request)
+print(result.metadata["estimated_input_tokens"])
+```
+
+---
+
+## Workflow Planning
+
+```python
+from contextbudget import ContextBudgetEngine
+
+engine = ContextBudgetEngine()
+plan = engine.plan_agent(task="update auth flow", workspace="workspace.toml", top_files=4)
+
+print(plan["total_estimated_tokens"])
+# Steps: inspect, implement, test, validate, document
+```
+
+---
+
+## Model-Aware Packing
+
+```toml
+model_profile = "gpt-4.1"
+```
+
+With a model profile, packing automatically aligns token estimation, context budget, and compression defaults to the target model.
+
+---
+
+## Integration Guidance
+
+| Approach | When to use |
+|----------|-------------|
+| `prepare_context(...)` | Small, helper-based integration |
+| `ContextBudgetMiddleware` | Reusable local integration boundary |
+| `AgentAdapter` | Embedding ContextBudget into another agent tool |
+WIKIEOF
+
+          cat > Plugins.md << 'WIKIEOF'
+# Plugins
+
+Plugins let you change scoring, compression, and token estimation without changing the engine, CLI, or agent middleware.
+
+---
+
+## Supported Plugin Types
+
+| Type | Built-in default |
+|------|-----------------|
+| `ScorerPlugin` | `builtin.relevance` |
+| `CompressorPlugin` | `builtin.default` |
+| `TokenEstimatorPlugin` | `builtin.char4` |
+
+---
+
+## Registration
+
+```toml
+[plugins]
+scorer = "example.path_glob_bonus"
+compressor = "example.leading_summary"
+token_estimator = "builtin.char4"
+
+[[plugins.registrations]]
+target = "contextbudget.plugins.examples:path_glob_bonus_scorer"
+options = { path_patterns = ["docs/**"], bonus = 8.0 }
+
+[[plugins.registrations]]
+target = "contextbudget.plugins.examples:leading_summary_compressor"
+options = { preview_lines = 3 }
+```
+
+---
+
+## Scorer Plugin
+
+```python
+from contextbudget.plugins import ScorerPlugin
+
+
+def score_custom(*, task, files, settings, options, estimate_tokens):
+    # Returns: list[RankedFile]
+    ...
+
+
+custom_scorer = ScorerPlugin(
+    name="acme.custom_scorer",
+    score=score_custom,
+    description="Custom deterministic scorer.",
+)
+```
+
+---
+
+## Compressor Plugin
+
+```python
+from contextbudget.plugins import CompressorPlugin
+
+
+def compress_custom(*, task, repo, ranked_files, max_tokens, cache,
+                    settings, summarization_settings, options,
+                    estimate_tokens, duplicate_hash_cache_enabled):
+    # Returns: CompressionResult
+    ...
+
+
+custom_compressor = CompressorPlugin(
+    name="acme.custom_compressor",
+    compress=compress_custom,
+    description="Custom compression strategy.",
+)
+```
+
+---
+
+## Token Estimator Plugin
+
+```python
+from contextbudget.plugins import TokenEstimatorPlugin
+
+
+def estimate_custom(*, text, options):
+    return max(1, len(text.split()))
+
+
+word_estimator = TokenEstimatorPlugin(
+    name="acme.word_count",
+    estimate=estimate_custom,
+    description="Example word-count estimator.",
+)
+```
+
+---
+
+## Built-in Examples
+
+- `path_glob_bonus_scorer` — adds score bonus to files matching path patterns
+- `leading_summary_compressor` — compresses files to their leading N lines
+
+Both live in `contextbudget.plugins.examples`.
+
+---
+
+## Artifact Recording
+
+Active plugin implementations are recorded in every artifact:
+
+```json
+{
+  "implementations": {
+    "scorer": "builtin.relevance",
+    "compressor": "builtin.default",
+    "token_estimator": "builtin.char4"
+  }
+}
+```
+WIKIEOF
+
+          cat > Benchmarking-and-Diff.md << 'WIKIEOF'
+# Benchmarking and Diff
+
+## `contextbudget benchmark`
+
+Compare packing strategies for one task:
+
+| Strategy | Description |
+|----------|-------------|
+| naive full-context | All files, no compression |
+| top-k selection | Top-ranked files, no compression |
+| compressed pack | Full compression pipeline |
+| cache-assisted pack | Compressed with summary cache |
+
+```bash
+contextbudget benchmark "add rate limiting to auth API" --repo .
+contextbudget benchmark <task> --workspace <workspace.toml>
+```
+
+Outputs: terminal summary, JSON artifact, Markdown report, estimator comparison.
+
+---
+
+## `contextbudget diff`
+
+Compare two run artifacts.
+
+```bash
+contextbudget diff old-run.json new-run.json
+```
+
+Inspects: task differences, files added/removed, score changes, token/savings/risk/cache deltas.
+
+---
+
+## Included Benchmark Dataset
+
+A realistic task-manager API ships at `benchmarks/dataset/` for reproducible benchmarks:
+
+| Task | Baseline | Compressed | Reduction |
+|------|----------|------------|-----------|
+| Add Redis caching | 12,230 tok | 7,937 tok | **35%** |
+| Add JWT authentication | 12,230 tok | 3,259 tok | **73%** |
+| Refactor database module | 12,230 tok | 1,768 tok | **86%** |
+
+---
+
+## Reproduce Locally
+
+```bash
+# All canonical tasks
+python benchmarks/run_benchmarks.py
+
+# Single task
+contextbudget benchmark "Add Redis caching to task lookup endpoints" \
+    --repo benchmarks/dataset --max-tokens 8000
+```
+WIKIEOF
+
+          cat > Policy-and-CI.md << 'WIKIEOF'
+# Policy and CI
+
+## Policy Checks
+
+| Check | Parameter |
+|-------|-----------|
+| Maximum estimated input tokens | `max_estimated_input_tokens` |
+| Maximum files included | `max_files_included` |
+| Maximum quality risk level | `max_quality_risk_level` (`"low"`, `"medium"`, `"high"`) |
+| Minimum estimated savings percentage | `min_estimated_savings_percentage` |
+
+---
+
+## Policy TOML
+
+```toml
+max_estimated_input_tokens = 28000
+max_files_included = 15
+max_quality_risk_level = "medium"
+min_estimated_savings_percentage = 20.0
+```
+
+---
+
+## CLI Strict Mode
+
+```bash
+contextbudget pack "tighten auth middleware" \
+  --repo . \
+  --strict \
+  --policy examples/policy.toml
+```
+
+Returns non-zero on policy violations.
+
+---
+
+## Python API Strict Mode
+
+```python
+from contextbudget import BudgetGuard, BudgetPolicyViolationError
+
+guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=15)
+
+try:
+    result = guard.pack_context(task="large refactor", repo=".")
+except BudgetPolicyViolationError as err:
+    for v in err.policy_result["violations"]:
+        print(f"violation: {v}")
+```
+
+### Evaluate without raising
+
+```python
+policy_result = guard.evaluate_policy(result)
+if not policy_result["passed"]:
+    for v in policy_result["violations"]:
+        print(v)
+```
+
+---
+
+## GitHub Actions
+
+```yaml
+name: ContextBudget
+
+on:
+  pull_request:
+
+jobs:
+  context-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - run: pip install -e .[dev]
+
+      - name: Pack with policy
+        run: |
+          contextbudget pack "review changed code" \
+            --repo . \
+            --strict \
+            --policy .github/contextbudget-policy.toml
+
+      - name: PR audit
+        run: |
+          contextbudget pr-audit \
+            --repo . \
+            --base "${{ github.event.pull_request.base.sha }}" \
+            --head "${{ github.event.pull_request.head.sha }}" \
+            --out-prefix contextbudget-pr
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: contextbudget
+          path: |
+            run.json
+            run.md
+            contextbudget-pr.json
+            contextbudget-pr.md
+            contextbudget-pr.comment.md
+```
+
+---
+
+## PR Audit
+
+```bash
+contextbudget pr-audit \
+  --repo . \
+  --base "${{ github.event.pull_request.base.sha }}" \
+  --head "${{ github.event.pull_request.head.sha }}" \
+  --max-token-increase 5000 \
+  --max-token-increase-pct 20
+```
+
+Outputs: `*.json`, `*.md`, `*.comment.md` (ready-to-post PR comment).
+WIKIEOF
+
+          cat > Workspace.md << 'WIKIEOF'
+# Workspace
+
+Workspace mode scans, ranks, and packs context across multiple local repositories or monorepo packages in a single run.
+
+---
+
+## Workspace TOML
+
+```toml
+name = "backend-services"
+
+[scan]
+include_globs = ["**/*.py", "**/*.ts"]
+ignore_globs = ["**/generated/**"]
+
+[budget]
+max_tokens = 28000
+top_files = 30
+
+[[repos]]
+label = "auth-service"
+path = "../auth-service"
+
+[[repos]]
+label = "billing-service"
+path = "../billing-service"
+ignore_globs = ["tests/fixtures/**"]
+
+[[repos]]
+label = "gateway"
+path = "../platform/packages/gateway"
+include_globs = ["src/**/*.ts"]
+```
+
+- `path` is resolved relative to the workspace TOML file
+- `label` must be unique; namespaces artifact paths like `auth-service:src/auth.py`
+- Repo-specific `include_globs` replace shared `scan.include_globs`
+- Repo-specific `ignore_globs` are added on top of shared `scan.ignore_globs`
+
+---
+
+## CLI Usage
+
+```bash
+contextbudget plan "add caching" --workspace workspace.toml
+contextbudget plan-agent "add caching" --workspace workspace.toml
+contextbudget pack "add caching" --workspace workspace.toml --max-tokens 28000
+contextbudget benchmark "add auth" --workspace workspace.toml
+contextbudget prepare-context "add caching" --workspace workspace.toml
+```
+
+---
+
+## Python API
+
+```python
+from contextbudget import BudgetGuard
+
+guard = BudgetGuard(max_tokens=28000)
+result = guard.pack_context(task="add caching", workspace="workspace.toml")
+
+print(result["workspace"])       # workspace name
+print(result["scanned_repos"])   # all scanned repos
+print(result["selected_repos"])  # repos that contributed files
+```
+
+---
+
+## Workspace Artifacts
+
+File paths in workspace artifacts are prefixed with repo labels:
+
+```json
+{
+  "files_included": [
+    "auth-service:src/auth.py",
+    "billing-service:src/payment.py"
+  ]
+}
+```
+
+Additional artifact fields: `workspace`, `scanned_repos`, `selected_repos`.
+
+---
+
+## Architecture Notes
+
+- Scoring is cross-repository: all files are ranked together
+- Import-graph resolution stays repo-local to avoid path collisions
+- Per-repo scan summaries are available for provenance tracking
+WIKIEOF
+
+      - name: Commit and push wiki
+        run: |
+          cd wiki
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git diff --cached --quiet || git commit -m "Add wiki: Home, Getting Started, CLI Reference, Python API, Configuration, Architecture, Agent Integration, Plugins, Benchmarking, Policy & CI, Workspace"
+          git push origin HEAD:master || git push origin HEAD:main
