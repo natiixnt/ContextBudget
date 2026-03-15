@@ -193,6 +193,29 @@ class ControlPlaneStore:
             ).fetchall()
         return [_row_to_run(r) for r in rows]
 
+    def get_repo_stats(self, repo_id: int) -> dict | None:
+        """Return aggregate token and cache statistics for all runs in a repository."""
+        if self.get_repo(repo_id) is None:
+            return None
+        row = self._conn.execute(
+            """SELECT
+                   COUNT(*)                        AS run_count,
+                   COALESCE(SUM(token_usage),  0)  AS total_token_usage,
+                   COALESCE(SUM(tokens_saved), 0)  AS total_tokens_saved,
+                   COALESCE(SUM(cache_hits),   0)  AS total_cache_hits,
+                   COALESCE(AVG(context_size), 0.0) AS avg_context_size
+               FROM agent_runs WHERE repo_id = ?""",
+            (repo_id,),
+        ).fetchone()
+        return {
+            "repo_id": repo_id,
+            "run_count": row["run_count"],
+            "total_token_usage": row["total_token_usage"],
+            "total_tokens_saved": row["total_tokens_saved"],
+            "total_cache_hits": row["total_cache_hits"],
+            "avg_context_size": round(row["avg_context_size"], 1),
+        }
+
 
 # ------------------------------------------------------------------
 # Row converters
