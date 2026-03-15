@@ -7,7 +7,25 @@ from fastapi import FastAPI, HTTPException, Request
 from pydantic import ValidationError
 
 from app import db, store, queries
-from app.models import IncomingEvent, IngestResponse
+from app.models import (
+    DashboardHeatmap,
+    DashboardOverview,
+    DashboardRepositories,
+    DashboardSavings,
+    IncomingEvent,
+    IngestResponse,
+)
+
+
+def _serializable_errors(exc: ValidationError) -> list[dict]:
+    """Return validation errors with ctx values converted to strings."""
+    result = []
+    for e in exc.errors(include_url=False):
+        entry = {k: v for k, v in e.items() if k != "ctx"}
+        if "ctx" in e:
+            entry["ctx"] = {k: str(v) for k, v in e["ctx"].items()}
+        result.append(entry)
+    return result
 
 
 @asynccontextmanager
@@ -50,7 +68,7 @@ async def ingest_events(request: Request) -> IngestResponse:
         except ValidationError as exc:
             raise HTTPException(
                 status_code=422,
-                detail={"index": i, "errors": exc.errors()},
+                detail={"index": i, "errors": _serializable_errors(exc)},
             )
 
     pool = db.get_pool()
@@ -71,3 +89,23 @@ async def get_tokens_per_task():
 @app.get("/analytics/cache-hit-rate")
 async def get_cache_hit_rate():
     return await queries.cache_hit_rate(db.get_pool())
+
+
+@app.get("/dashboard/overview", response_model=DashboardOverview)
+async def get_dashboard_overview() -> DashboardOverview:
+    return await queries.dashboard_overview(db.get_pool())
+
+
+@app.get("/dashboard/repositories", response_model=DashboardRepositories)
+async def get_dashboard_repositories() -> DashboardRepositories:
+    return await queries.dashboard_repositories(db.get_pool())
+
+
+@app.get("/dashboard/savings", response_model=DashboardSavings)
+async def get_dashboard_savings() -> DashboardSavings:
+    return await queries.dashboard_savings(db.get_pool())
+
+
+@app.get("/dashboard/heatmap", response_model=DashboardHeatmap)
+async def get_dashboard_heatmap() -> DashboardHeatmap:
+    return await queries.dashboard_heatmap(db.get_pool())

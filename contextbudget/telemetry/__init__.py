@@ -3,6 +3,9 @@ from __future__ import annotations
 """Telemetry abstraction layer for optional analytics sinks."""
 
 import json
+import os
+import urllib.error
+import urllib.request
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -90,6 +93,33 @@ class JsonlFileTelemetrySink:
 
 
 @dataclass(slots=True)
+class HttpTelemetrySink:
+    """
+    Sink that forwards events to the ContextBudget Cloud ingestion endpoint.
+
+    Delivery is best-effort: network errors are silently swallowed so they
+    never interrupt the main pipeline.
+    """
+
+    url: str
+    timeout: float = 5.0
+
+    def emit(self, event: TelemetryEvent) -> None:
+        body = json.dumps(event.to_dict(), sort_keys=True).encode()
+        req = urllib.request.Request(
+            self.url,
+            data=body,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=self.timeout):
+                pass
+        except Exception:
+            pass
+
+
+@dataclass(slots=True)
 class TelemetrySession:
     """Run-scoped telemetry emitter that adds shared context."""
 
@@ -124,6 +154,7 @@ def build_telemetry_sink(
     enabled: bool,
     sink: str,
     file_path: str,
+    endpoint_url: str = "",
 ) -> TelemetrySink:
     """
     Build sink from config-like values.
@@ -142,6 +173,13 @@ def build_telemetry_sink(
         if not path.is_absolute():
             path = repo / path
         return JsonlFileTelemetrySink(path=path)
+    if sink_name in {"cloud", "http"}:
+        url = (
+            endpoint_url.strip()
+            or os.environ.get("CONTEXTBUDGET_CLOUD_URL", "")
+            or "http://localhost:8080/events"
+        )
+        return HttpTelemetrySink(url=url)
     return NoOpTelemetrySink()
 
 
@@ -153,6 +191,7 @@ __all__ = [
     "TelemetrySink",
     "NoOpTelemetrySink",
     "JsonlFileTelemetrySink",
+    "HttpTelemetrySink",
     "TelemetrySession",
     "build_repository_identifiers",
     "build_telemetry_sink",
