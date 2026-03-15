@@ -61,6 +61,11 @@ class GatewayConfig:
     webhook_url: str | None = None
     webhook_secret: str | None = None
 
+    # Redis session store (optional — enables horizontal scaling of /run-agent-step)
+    # When set, session state is persisted to Redis so any replica can continue
+    # a multi-turn session started on another node.
+    redis_url: str | None = None  # e.g. redis://redis:6379/0
+
     @classmethod
     def from_env(cls) -> GatewayConfig:
         """Build config from ``CB_GATEWAY_*`` environment variables."""
@@ -90,6 +95,7 @@ class GatewayConfig:
             cloud_policy_org_id=int(cloud_org_raw) if cloud_org_raw else None,
             webhook_url=os.environ.get("CB_GATEWAY_WEBHOOK_URL") or None,
             webhook_secret=os.environ.get("CB_GATEWAY_WEBHOOK_SECRET") or None,
+            redis_url=os.environ.get("CB_GATEWAY_REDIS_URL") or None,
         )
 
     @classmethod

@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import time
 from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Any
 
-from fastapi import Depends, FastAPI, Header, HTTPException, Request
+from fastapi import Depends, FastAPI, Header, HTTPException, Request, Response
+from fastapi.responses import PlainTextResponse
 from pydantic import ValidationError
 
-from app import auth, cp_queries, cp_store, db, queries, store, webhook_store
+from app import auth, billing, cp_queries, cp_store, db, metrics, oidc, queries, quotas, rate_limit, store, webhook_store
+from app import config as cfg
 from app.models import (
     AgentRunResponse,
     ApiKeyCreate,
@@ -44,6 +47,18 @@ from app.models import (
     WebhookCreate,
     WebhookResponse,
 )
+from app.metrics import (
+    CONTENT_TYPE_LATEST,
+    EVENTS_INGESTED,
+    EVENTS_REJECTED,
+    QUOTA_EXCEEDED_REQUESTS,
+    RATE_LIMITED_REQUESTS,
+    REQUEST_LATENCY,
+    REQUESTS_TOTAL,
+    TOKENS_INGESTED,
+    TOKENS_SAVED,
+    generate_latest,
+)
 
 
 def _serializable_errors(exc: ValidationError) -> list[dict]:
@@ -65,9 +80,31 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="ContextBudget Cloud",
-    version="1.0.0b1",
+    version="1.0.0",
     lifespan=lifespan,
 )
+
+
+# ---------------------------------------------------------------------------
+# Prometheus instrumentation middleware
+# ---------------------------------------------------------------------------
+
+@app.middleware("http")
+async def prometheus_middleware(request: Request, call_next):
+    # Skip metrics endpoint itself to avoid recursion noise
+    if request.url.path == "/metrics":
+        return await call_next(request)
+    start = time.perf_counter()
+    response = await call_next(request)
+    duration = time.perf_counter() - start
+    endpoint = request.url.path
+    REQUEST_LATENCY.labels(endpoint=endpoint).observe(duration)
+    REQUESTS_TOTAL.labels(
+        method=request.method,
+        endpoint=endpoint,
+        status_code=str(response.status_code),
+    ).inc()
+    return response
 
 
 # ---------------------------------------------------------------------------
@@ -97,18 +134,50 @@ async def _optional_api_key_ctx(
     return await auth.verify_api_key(db.get_pool(), raw)
 
 
+async def _admin_token_ctx(
+    authorization: str | None = Header(default=None),
+) -> None:
+    """Require the admin bootstrap token (CB_CLOUD_ADMIN_TOKEN)."""
+    if not cfg.ADMIN_TOKEN:
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "Org creation is disabled. "
+                "Set CB_CLOUD_ADMIN_TOKEN to enable it."
+            ),
+        )
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Admin token required")
+    token = authorization.removeprefix("Bearer ")
+    if token != cfg.ADMIN_TOKEN:
+        raise HTTPException(status_code=403, detail="Invalid admin token")
+
+
 # ---------------------------------------------------------------------------
-# Health
+# Health + Metrics
 # ---------------------------------------------------------------------------
 
 @app.get("/health")
 async def health() -> dict[str, str]:
-    return {"status": "ok", "version": "1.0.0b1"}
+    return {"status": "ok", "version": "1.0.0"}
+
+
+@app.get("/metrics", response_class=PlainTextResponse)
+async def prometheus_metrics() -> PlainTextResponse:
+    """Prometheus text-format metrics endpoint.
+
+    Scrape with: ``prometheus.io/scrape: 'true'`` and point your scraper at
+    ``http://<host>:8080/metrics``.  No authentication is required (expose only
+    internally / behind your load balancer).
+    """
+    return PlainTextResponse(
+        content=generate_latest().decode("utf-8"),
+        media_type=CONTENT_TYPE_LATEST,
+    )
 
 
 # ---------------------------------------------------------------------------
-# Event ingestion
-# Follow-up #1: optional Bearer auth scopes events to an org
+# Event ingestion — with per-API-key rate limiting and quota enforcement
 # ---------------------------------------------------------------------------
 
 @app.post("/events", response_model=IngestResponse, status_code=201)
@@ -116,13 +185,15 @@ async def ingest_events(
     request: Request,
     authorization: str | None = Header(default=None),
 ) -> IngestResponse:
-    # Extract org_id from auth header if provided (no error on missing/invalid)
     org_id: int | None = None
+    api_key_hash: str | None = None
+
     if authorization and authorization.startswith("Bearer "):
         raw = authorization.removeprefix("Bearer ")
         ctx = await auth.verify_api_key(db.get_pool(), raw)
         if ctx is not None:
             org_id = ctx["org_id"]
+            api_key_hash = ctx.get("key_hash")
 
     body: Any = await request.json()
 
@@ -136,23 +207,70 @@ async def ingest_events(
     if not raw_events:
         raise HTTPException(status_code=422, detail="At least one event is required")
 
+    # ── Per-API-key rate limiting ────────────────────────────────────────────
+    if api_key_hash:
+        allowed = rate_limit.check_rate_limit(api_key_hash, n_events=len(raw_events))
+        if not allowed:
+            RATE_LIMITED_REQUESTS.labels(org_id=str(org_id or "anon")).inc()
+            EVENTS_REJECTED.labels(reason="rate_limit").inc()
+            raise HTTPException(
+                status_code=429,
+                detail=f"Rate limit exceeded. Max {rate_limit._LIMIT} events per {rate_limit._WINDOW}s window.",
+                headers={"Retry-After": str(rate_limit._WINDOW)},
+            )
+
     events: list[IncomingEvent] = []
     for i, raw in enumerate(raw_events):
         try:
             events.append(IncomingEvent.model_validate(raw))
         except ValidationError as exc:
+            EVENTS_REJECTED.labels(reason="validation").inc()
             raise HTTPException(
                 status_code=422,
                 detail={"index": i, "errors": _serializable_errors(exc)},
             )
 
+    # ── Per-org quota enforcement ────────────────────────────────────────────
+    if org_id is not None:
+        incoming_tokens = sum(
+            int(e.estimated_input_tokens or 0)
+            for e in events
+            if hasattr(e, "estimated_input_tokens")
+        )
+        allowed_quota, quota_reason = await quotas.check_quota(
+            db.get_pool(), org_id, incoming_tokens, len(events)
+        )
+        if not allowed_quota:
+            QUOTA_EXCEEDED_REQUESTS.labels(org_id=str(org_id)).inc()
+            EVENTS_REJECTED.labels(reason="quota_exceeded").inc()
+            raise HTTPException(status_code=429, detail=quota_reason)
+
     pool = db.get_pool()
     ids = await store.insert_events_batch(pool, events, org_id=org_id)
+
+    # ── Prometheus counters ──────────────────────────────────────────────────
+    org_label = str(org_id) if org_id else "anon"
+    EVENTS_INGESTED.labels(org_id=org_label).inc(len(ids))
+    token_sum = sum(
+        int(getattr(e, "estimated_input_tokens", None) or 0) for e in events
+    )
+    saved_sum = sum(
+        int(getattr(e, "estimated_saved_tokens", None) or 0) for e in events
+    )
+    if token_sum:
+        TOKENS_INGESTED.labels(org_id=org_label).inc(token_sum)
+    if saved_sum:
+        TOKENS_SAVED.labels(org_id=org_label).inc(saved_sum)
+
+    # ── Stripe billing ────────────────────────────────────────────────────────
+    if org_id is not None and token_sum > 0:
+        await billing.report_token_usage(pool, org_id=org_id, tokens=token_sum)
+
     return IngestResponse(accepted=len(ids), event_ids=ids)
 
 
 # ---------------------------------------------------------------------------
-# Analytics (Follow-up #3: auto-scope to caller's org when authenticated)
+# Analytics (auto-scope to caller's org when authenticated)
 # ---------------------------------------------------------------------------
 
 @app.get("/analytics/tokens-per-repo")
@@ -160,7 +278,7 @@ async def get_tokens_per_repo(
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ):
     org_id = ctx["org_id"] if ctx else None
-    return await queries.tokens_per_repo(db.get_pool(), org_id=org_id)
+    return await queries.tokens_per_repo(db.get_read_pool(), org_id=org_id)
 
 
 @app.get("/analytics/tokens-per-task")
@@ -168,7 +286,7 @@ async def get_tokens_per_task(
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ):
     org_id = ctx["org_id"] if ctx else None
-    return await queries.tokens_per_task(db.get_pool(), org_id=org_id)
+    return await queries.tokens_per_task(db.get_read_pool(), org_id=org_id)
 
 
 @app.get("/analytics/cache-hit-rate")
@@ -176,7 +294,7 @@ async def get_cache_hit_rate(
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ):
     org_id = ctx["org_id"] if ctx else None
-    return await queries.cache_hit_rate(db.get_pool(), org_id=org_id)
+    return await queries.cache_hit_rate(db.get_read_pool(), org_id=org_id)
 
 
 @app.get("/dashboard/overview", response_model=DashboardOverview)
@@ -184,7 +302,7 @@ async def get_dashboard_overview(
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ) -> DashboardOverview:
     org_id = ctx["org_id"] if ctx else None
-    return await queries.dashboard_overview(db.get_pool(), org_id=org_id)
+    return await queries.dashboard_overview(db.get_read_pool(), org_id=org_id)
 
 
 @app.get("/dashboard/repositories", response_model=DashboardRepositories)
@@ -192,7 +310,7 @@ async def get_dashboard_repositories(
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ) -> DashboardRepositories:
     org_id = ctx["org_id"] if ctx else None
-    return await queries.dashboard_repositories(db.get_pool(), org_id=org_id)
+    return await queries.dashboard_repositories(db.get_read_pool(), org_id=org_id)
 
 
 @app.get("/dashboard/savings", response_model=DashboardSavings)
@@ -200,7 +318,7 @@ async def get_dashboard_savings(
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ) -> DashboardSavings:
     org_id = ctx["org_id"] if ctx else None
-    return await queries.dashboard_savings(db.get_pool(), org_id=org_id)
+    return await queries.dashboard_savings(db.get_read_pool(), org_id=org_id)
 
 
 @app.get("/dashboard/heatmap", response_model=DashboardHeatmap)
@@ -208,15 +326,23 @@ async def get_dashboard_heatmap(
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ) -> DashboardHeatmap:
     org_id = ctx["org_id"] if ctx else None
-    return await queries.dashboard_heatmap(db.get_pool(), org_id=org_id)
+    return await queries.dashboard_heatmap(db.get_read_pool(), org_id=org_id)
 
 
 # ---------------------------------------------------------------------------
-# Organizations (provisioning — protect /orgs POST at network level in prod)
+# Organizations — POST /orgs now requires admin token
 # ---------------------------------------------------------------------------
 
 @app.post("/orgs", response_model=OrgResponse, status_code=201)
-async def create_org(body: OrgCreate) -> OrgResponse:
+async def create_org(
+    body: OrgCreate,
+    _admin: None = Depends(_admin_token_ctx),
+) -> OrgResponse:
+    """Create a new organisation.
+
+    Requires the ``CB_CLOUD_ADMIN_TOKEN`` Bearer token.  In production,
+    this endpoint should only be reachable from internal / admin networks.
+    """
     try:
         record = await cp_store.create_org(db.get_pool(), body.slug, body.display_name)
     except Exception as exc:
@@ -251,6 +377,45 @@ async def delete_org(
     deleted = await cp_store.delete_org(db.get_pool(), org_id)
     if not deleted:
         raise HTTPException(status_code=404, detail="Org not found")
+
+
+# ---------------------------------------------------------------------------
+# Quota management endpoints
+# ---------------------------------------------------------------------------
+
+@app.get("/orgs/{org_id}/quota")
+async def get_org_quota(
+    org_id: int,
+    _ctx: dict = Depends(_api_key_ctx),
+) -> dict:
+    """Return the current quota configuration for an org."""
+    quota = await quotas.get_quota(db.get_pool(), org_id)
+    usage = await quotas.get_monthly_usage(db.get_pool(), org_id)
+    return {
+        "org_id": org_id,
+        "quota": quota,
+        "monthly_usage": usage,
+    }
+
+
+@app.put("/orgs/{org_id}/quota", status_code=200)
+async def set_org_quota(
+    org_id: int,
+    body: dict,
+    _admin: None = Depends(_admin_token_ctx),
+) -> dict:
+    """Set token/event quotas for an org.  Requires admin token.
+
+    Body: ``{"token_allowance_monthly": 1000000000, "event_allowance_monthly": 100000}``
+    Use ``null`` to remove a limit.
+    """
+    updated = await quotas.set_quota(
+        db.get_pool(),
+        org_id,
+        token_allowance_monthly=body.get("token_allowance_monthly"),
+        event_allowance_monthly=body.get("event_allowance_monthly"),
+    )
+    return updated
 
 
 # ---------------------------------------------------------------------------
@@ -406,7 +571,6 @@ async def revoke_api_key(
 
 # ---------------------------------------------------------------------------
 # Audit log
-# Follow-up #4: POST endpoint for gateway to push entries
 # ---------------------------------------------------------------------------
 
 @app.post("/orgs/{org_id}/audit-log", status_code=201)
@@ -538,7 +702,7 @@ async def get_cost_summary(
     ctx: dict = Depends(_api_key_ctx),
 ) -> CostSummaryResponse:
     result = await cp_queries.cost_summary(
-        db.get_pool(),
+        db.get_read_pool(),
         repository_id=repository_id,
         from_date=from_date,
         to_date=to_date,
@@ -553,7 +717,7 @@ async def get_cost_by_repo(
     _ctx: dict = Depends(_api_key_ctx),
 ) -> CostByRepoResponse:
     rows = await cp_queries.cost_by_repo(
-        db.get_pool(), from_date=from_date, to_date=to_date
+        db.get_read_pool(), from_date=from_date, to_date=to_date
     )
     return CostByRepoResponse(repositories=[CostByRepoRow(**r) for r in rows])
 
@@ -566,7 +730,7 @@ async def get_cost_by_date(
     _ctx: dict = Depends(_api_key_ctx),
 ) -> CostByDateResponse:
     rows = await cp_queries.cost_by_date(
-        db.get_pool(),
+        db.get_read_pool(),
         repository_id=repository_id,
         from_date=from_date,
         to_date=to_date,
@@ -582,9 +746,8 @@ async def get_cost_by_run(
     limit: int = 100,
     ctx: dict = Depends(_api_key_ctx),
 ) -> CostByRunResponse:
-    """Per-run cost attribution — useful for chargeback and agent-level ROI reporting."""
     rows = await cp_queries.cost_by_run(
-        db.get_pool(),
+        db.get_read_pool(),
         repository_id=repository_id,
         from_date=from_date,
         to_date=to_date,
@@ -601,17 +764,14 @@ async def get_cost_by_stage(
     to_date: datetime | None = None,
     ctx: dict = Depends(_api_key_ctx),
 ) -> CostByStageResponse:
-    """Savings broken down by optimization stage (compression/ranking vs cache)."""
     result = await cp_queries.cost_by_stage(
-        db.get_pool(),
+        db.get_read_pool(),
         repository_id=repository_id,
         from_date=from_date,
         to_date=to_date,
         org_id=ctx["org_id"],
     )
-    stages = {
-        k: StageDetail(**v) for k, v in result["stages"].items()
-    }
+    stages = {k: StageDetail(**v) for k, v in result["stages"].items()}
     return CostByStageResponse(
         run_count=result["run_count"],
         total_baseline_tokens=result["total_baseline_tokens"],
@@ -627,14 +787,10 @@ async def get_dashboard_roi(
     price_per_1m: float = 15.0,
     ctx: dict | None = Depends(_optional_api_key_ctx),
 ) -> DashboardROI:
-    """ROI summary: tokens saved, dollars saved, cache hit rate, top repos.
-
-    Default pricing: $15/MTok (GPT-4o input rate).  Pass ``?price_per_1m=X``
-    to use a custom rate (e.g. Claude Sonnet = 3.0, GPT-4.1-mini = 0.4).
-    """
+    """ROI summary: tokens saved, dollars saved, cache hit rate, top repos."""
     org_id = ctx["org_id"] if ctx else None
     result = await cp_queries.roi_summary(
-        db.get_pool(),
+        db.get_read_pool(),
         org_id=org_id,
         price_per_1m=price_per_1m,
     )
@@ -655,7 +811,20 @@ async def get_dashboard_roi(
 
 
 # ---------------------------------------------------------------------------
-# Agent runs
+# Billing
+# ---------------------------------------------------------------------------
+
+@app.get("/orgs/{org_id}/billing")
+async def get_billing_summary(
+    org_id: int,
+    _ctx: dict = Depends(_api_key_ctx),
+) -> dict:
+    """Return Stripe billing summary for the org."""
+    return await billing.get_billing_summary(db.get_pool(), org_id)
+
+
+# ---------------------------------------------------------------------------
+# Webhooks
 # ---------------------------------------------------------------------------
 
 @app.post("/orgs/{org_id}/webhooks", response_model=WebhookResponse, status_code=201)
@@ -664,7 +833,6 @@ async def create_webhook(
     body: WebhookCreate,
     _ctx: dict = Depends(_api_key_ctx),
 ) -> WebhookResponse:
-    """Register a webhook URL for push notifications (policy violations, budget overruns, drift)."""
     record = await webhook_store.create_webhook(
         db.get_pool(),
         org_id=org_id,
@@ -695,6 +863,10 @@ async def delete_webhook(
         raise HTTPException(status_code=404, detail="Webhook not found")
 
 
+# ---------------------------------------------------------------------------
+# Agent runs
+# ---------------------------------------------------------------------------
+
 @app.get(
     "/orgs/{org_id}/projects/{project_id}/repos/{repo_id}/runs",
     response_model=list[AgentRunResponse],
@@ -717,3 +889,19 @@ async def list_agent_runs(
         db.get_pool(), repo_id, limit=limit, offset=offset
     )
     return [AgentRunResponse(**r) for r in records]
+
+
+# ---------------------------------------------------------------------------
+# OIDC info endpoint (when OIDC is enabled)
+# ---------------------------------------------------------------------------
+
+@app.get("/auth/oidc/config")
+async def oidc_config() -> dict:
+    """Return OIDC configuration for front-end clients."""
+    if not cfg.OIDC_ENABLED:
+        raise HTTPException(status_code=404, detail="OIDC is not enabled")
+    return {
+        "issuer": cfg.OIDC_ISSUER,
+        "audience": cfg.OIDC_AUDIENCE,
+        "jwks_uri": cfg.OIDC_JWKS_URI or f"{cfg.OIDC_ISSUER}/.well-known/jwks.json",
+    }

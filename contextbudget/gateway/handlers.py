@@ -18,6 +18,7 @@ from contextbudget.telemetry import NoOpTelemetrySink, TelemetryEvent, Telemetry
 
 from contextbudget.core.webhooks import dispatch_budget_overrun, dispatch_policy_violation
 from contextbudget.gateway.config import GatewayConfig
+from contextbudget.gateway.session_store import SessionStore
 from contextbudget.gateway.models import (
     OptimizedContext,
     PolicyStatus,
@@ -139,6 +140,22 @@ def _utc_now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _restore_session(session: Any, stored: dict[str, Any]) -> None:
+    """Restore persisted session fields into a freshly-created RuntimeSession."""
+    if "session_id" in stored:
+        session.session_id = stored["session_id"]
+    if "created_at" in stored:
+        session.created_at = stored["created_at"]
+    if "updated_at" in stored:
+        session.updated_at = stored["updated_at"]
+    if "turns" in stored:
+        session.turns = list(stored["turns"])
+    if "cumulative_tokens" in stored:
+        session.cumulative_tokens = int(stored["cumulative_tokens"])
+    if "last_run_artifact" in stored:
+        session.last_run_artifact = stored["last_run_artifact"]
+
+
 def _extract_compressed_files(run_artifact: dict[str, Any]) -> list[dict[str, Any]]:
     """Pull per-file compression entries from a pipeline run artifact."""
     files = []
@@ -215,6 +232,7 @@ class GatewayHandlers:
         config: GatewayConfig,
         *,
         telemetry_sink: TelemetrySink | None = None,
+        session_store: SessionStore | None = None,
     ) -> None:
         self._config = config
         self._sink: TelemetrySink = telemetry_sink or NoOpTelemetrySink()
@@ -225,7 +243,11 @@ class GatewayHandlers:
         )
         self._middleware = ContextBudgetMiddleware(engine=self._engine)
 
-        # session_id → AgentRuntime (multi-turn state)
+        # Session store: Redis-backed (distributed) or in-memory (single-node)
+        self._session_store: SessionStore = session_store or SessionStore.from_env()
+
+        # Local cache of live AgentRuntime objects (avoids re-creating per turn
+        # when the same node handles consecutive turns for the same session)
         self._sessions: dict[str, AgentRuntime] = {}
 
     # ── Telemetry ──────────────────────────────────────────────────────────────
@@ -389,7 +411,9 @@ class GatewayHandlers:
         if remote is not None:
             policy = remote
 
-        # Retrieve or create the AgentRuntime for this session
+        # Retrieve or create the AgentRuntime for this session.
+        # When the session store is Redis-backed, restore session state from
+        # Redis so any replica can continue a session started on another node.
         session_id = req.session_id
         if session_id and session_id in self._sessions:
             runtime = self._sessions[session_id]
@@ -400,7 +424,16 @@ class GatewayHandlers:
                 policy=policy,
                 engine=self._engine,
             )
-            session_id = runtime.session.session_id
+            # Restore persisted session state from store (Redis or in-memory)
+            if session_id:
+                stored = self._session_store.load(session_id)
+                if stored is not None:
+                    _restore_session(runtime.session, stored)
+                    session_id = stored.get("session_id", runtime.session.session_id)
+                else:
+                    session_id = runtime.session.session_id
+            else:
+                session_id = runtime.session.session_id
             self._sessions[session_id] = runtime
 
         run_id = uuid.uuid4().hex
@@ -460,6 +493,11 @@ class GatewayHandlers:
             tokens_used=ctx.estimated_tokens,
             max_tokens=max_tokens,
         )
+        # Persist session state so other replicas can continue this session
+        try:
+            self._session_store.save(session_id, runtime.session.as_dict())
+        except Exception as exc:
+            logger.warning("Session persist failed for %s: %s", session_id, exc)
         return RunAgentStepResponse(
             optimized_context=OptimizedContext(
                 files=compressed_files,

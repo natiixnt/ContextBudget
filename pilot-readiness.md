@@ -163,19 +163,19 @@ This document describes what is production-ready, what is in beta, known limitat
 
 ## Before Enterprise Rollout
 
-The following items should be addressed before a large enterprise deployment:
+All items below have been implemented and are included in v1.1.0.
 
-| Priority | Item | Effort |
-|----------|------|--------|
-| P0 | Prometheus `/metrics` endpoint on cloud service | 1 day |
-| P0 | Rate limiting per API key on event ingestion | 1 day |
-| P0 | Block `POST /orgs` by default (require admin token) | 0.5 days |
-| P1 | Horizontal gateway scaling (Redis session store) | 3 days |
-| P1 | PgBouncer connection pooling for >50 req/s | 1 day |
-| P1 | Usage quotas + per-org token allowances | 3 days |
-| P1 | TypeScript/Node.js SDK | 3 days |
-| P2 | SSO (OIDC) for the cloud control plane | 5 days |
-| P2 | Slack + PagerDuty webhook adapters | 2 days |
-| P2 | Multi-region Postgres replication | 5 days |
-| P3 | Billing meter integration (Stripe) | 5 days |
-| P3 | Self-service onboarding UI | 5 days |
+| Priority | Item | Status | Notes |
+|----------|------|--------|-------|
+| P0 | Prometheus `/metrics` endpoint on cloud service | ✅ Done | `GET /metrics` — standard text exposition; `app/metrics.py` |
+| P0 | Rate limiting per API key on event ingestion | ✅ Done | Sliding window; `CB_CLOUD_EVENTS_RATE_LIMIT` / `_RATE_WINDOW`; `app/rate_limit.py` |
+| P0 | Block `POST /orgs` by default (require admin token) | ✅ Done | `CB_CLOUD_ADMIN_TOKEN` Bearer required; 403 when unset |
+| P1 | Horizontal gateway scaling (Redis session store) | ✅ Done | `CB_GATEWAY_REDIS_URL`; `contextbudget/gateway/session_store.py`; in-memory fallback |
+| P1 | PgBouncer connection pooling for >50 req/s | ✅ Done | `docker-compose.prod.yml` — `pgbouncer` service (bitnami/pgbouncer); `deploy/pgbouncer.ini`; transaction pool mode; 20 connections per node |
+| P1 | Usage quotas + per-org token allowances | ✅ Done | `app/quotas.py`; `GET|PUT /orgs/{id}/quota`; migration 005 |
+| P1 | TypeScript/Node.js SDK | ✅ Done | `sdk/nodejs/` — `CloudClient` + `GatewayClient`; no runtime deps |
+| P2 | SSO (OIDC) for the cloud control plane | ✅ Done | `app/oidc.py`; `CB_CLOUD_OIDC_*` env vars; `GET /auth/oidc/config` |
+| P2 | Slack + PagerDuty webhook adapters | ✅ Done | `app/webhook_adapters.py`; `CB_CLOUD_SLACK_WEBHOOK_URL` / `CB_CLOUD_PAGERDUTY_ROUTING_KEY` |
+| P2 | Multi-region Postgres replication | ✅ Done | `docker-compose.multiregion.yml` — primary + streaming replica + two PgBouncer pools; `READ_DATABASE_URL` routes analytics reads to replica; `deploy/postgres-primary.conf` / `postgres-replica.conf` |
+| P3 | Billing meter integration (Stripe) | ✅ Done | `app/billing.py`; `CB_CLOUD_STRIPE_*` env vars; migration 006; `GET /orgs/{id}/billing` |
+| P3 | Self-service onboarding UI | ✅ Done | `dashboard/app/onboarding/` — 5-step wizard; connects to cloud, creates org, issues key |

@@ -81,6 +81,8 @@ def client():
 
 
 _AUTH = {"Authorization": "Bearer cbk_testkey"}
+_ADMIN_TOKEN = "test-admin-token-abc123"
+_ADMIN_AUTH = {"Authorization": f"Bearer {_ADMIN_TOKEN}"}
 
 
 # ---------------------------------------------------------------------------
@@ -89,20 +91,36 @@ _AUTH = {"Authorization": "Bearer cbk_testkey"}
 
 class TestOrgs:
     def test_create_org(self, client):
-        with patch("app.main.cp_store.create_org", new_callable=AsyncMock, return_value=_ORG):
-            r = client.post("/orgs", json={"slug": "acme", "display_name": "Acme Corp"})
+        with (
+            patch("app.main.cp_store.create_org", new_callable=AsyncMock, return_value=_ORG),
+            patch("app.main.cfg.ADMIN_TOKEN", _ADMIN_TOKEN),
+        ):
+            r = client.post("/orgs", json={"slug": "acme", "display_name": "Acme Corp"}, headers=_ADMIN_AUTH)
         assert r.status_code == 201
         body = r.json()
         assert body["slug"] == "acme"
         assert body["id"] == 1
 
+    def test_create_org_requires_admin_token(self, client):
+        with patch("app.main.cfg.ADMIN_TOKEN", _ADMIN_TOKEN):
+            r = client.post("/orgs", json={"slug": "acme"})
+        assert r.status_code == 401
+
+    def test_create_org_wrong_admin_token_returns_403(self, client):
+        with patch("app.main.cfg.ADMIN_TOKEN", _ADMIN_TOKEN):
+            r = client.post("/orgs", json={"slug": "acme"}, headers={"Authorization": "Bearer wrong"})
+        assert r.status_code == 403
+
     def test_create_org_duplicate_returns_409(self, client):
-        with patch(
-            "app.main.cp_store.create_org",
-            new_callable=AsyncMock,
-            side_effect=Exception("unique constraint"),
+        with (
+            patch(
+                "app.main.cp_store.create_org",
+                new_callable=AsyncMock,
+                side_effect=Exception("unique constraint"),
+            ),
+            patch("app.main.cfg.ADMIN_TOKEN", _ADMIN_TOKEN),
         ):
-            r = client.post("/orgs", json={"slug": "acme", "display_name": "Acme"})
+            r = client.post("/orgs", json={"slug": "acme", "display_name": "Acme"}, headers=_ADMIN_AUTH)
         assert r.status_code == 409
 
     def test_list_orgs_requires_auth(self, client):

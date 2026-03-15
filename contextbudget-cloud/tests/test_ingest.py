@@ -31,6 +31,8 @@ def client():
         patch.object(db_module, "close_pool", new_callable=AsyncMock),
         patch("app.main.db.get_pool", return_value=mock_pool),
         patch("app.main.store.insert_events_batch", new_callable=AsyncMock) as mock_insert,
+        patch("app.main.quotas.check_quota", new_callable=AsyncMock, return_value=(True, None)),
+        patch("app.main.billing.report_token_usage", new_callable=AsyncMock, return_value=False),
     ):
         mock_insert.return_value = [1]
         with TestClient(app, raise_server_exceptions=True) as c:

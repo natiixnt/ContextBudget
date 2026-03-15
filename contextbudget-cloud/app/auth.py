@@ -57,4 +57,9 @@ async def verify_api_key(pool: asyncpg.Pool, raw_key: str) -> dict | None:
         )
     if row is None:
         return None
-    return {"key_id": row["key_id"], "org_id": row["org_id"], "org_slug": row["org_slug"]}
+    return {
+        "key_id": row["key_id"],
+        "org_id": row["org_id"],
+        "org_slug": row["org_slug"],
+        "key_hash": key_hash,
+    }

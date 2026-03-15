@@ -80,7 +80,11 @@ async def test_verify_api_key_returns_context_on_valid_key():
     mock_pool.acquire = MagicMock(return_value=AsyncMock(__aenter__=AsyncMock(return_value=mock_conn), __aexit__=AsyncMock(return_value=False)))
 
     result = await verify_api_key(mock_pool, raw)
-    assert result == {"key_id": 1, "org_id": 5, "org_slug": "acme"}
+    assert result is not None
+    assert result["key_id"] == 1
+    assert result["org_id"] == 5
+    assert result["org_slug"] == "acme"
+    assert "key_hash" in result  # key_hash is now included for rate-limiting
 
 
 @pytest.mark.asyncio
