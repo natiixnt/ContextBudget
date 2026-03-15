@@ -13,8 +13,12 @@ EventName = Literal[
     "scan_completed",
     "scoring_completed",
     "pack_completed",
+    "plan_completed",
+    "cache_hit",
+    "delta_applied",
     "benchmark_completed",
     "policy_failed",
+    "policy_violation",
 ]
 
 ANALYTICS_EVENT_NAMES: tuple[EventName, ...] = (
@@ -22,8 +26,12 @@ ANALYTICS_EVENT_NAMES: tuple[EventName, ...] = (
     "scan_completed",
     "scoring_completed",
     "pack_completed",
+    "plan_completed",
+    "cache_hit",
+    "delta_applied",
     "benchmark_completed",
     "policy_failed",
+    "policy_violation",
 )
 ANALYTICS_SCHEMA_V1 = "v1"
 EVENT_SCHEMA_VERSIONS: dict[str, str] = {name: ANALYTICS_SCHEMA_V1 for name in ANALYTICS_EVENT_NAMES}
@@ -65,6 +73,10 @@ class CacheStats:
 
     cache_hits: int | None = None
     duplicate_reads_prevented: int | None = None
+    tokens_saved: int | None = None
+    backend: str | None = None
+    fragment_hits: int | None = None
+    fragment_misses: int | None = None
 
 
 @dataclass(slots=True)
@@ -77,6 +89,20 @@ class PolicyOutcome:
     violations: list[str] = field(default_factory=list)
     failing_checks: list[str] = field(default_factory=list)
     checks: dict[str, dict[str, Any]] = field(default_factory=dict)
+
+
+@dataclass(slots=True)
+class DeltaMetrics:
+    """Delta context metrics included in delta_applied events."""
+
+    files_added: int | None = None
+    files_removed: int | None = None
+    files_changed: int | None = None
+    delta_tokens: int | None = None
+    tokens_saved: int | None = None
+    has_previous_run: bool = False
+    slices_changed: int | None = None
+    symbols_changed: int | None = None
 
 
 @dataclass(slots=True)
@@ -114,6 +140,7 @@ class AnalyticsEventPayload:
     policy: PolicyOutcome = field(default_factory=PolicyOutcome)
     quality_risk_estimate: str | None = None
     benchmark: BenchmarkSummary = field(default_factory=BenchmarkSummary)
+    delta: DeltaMetrics = field(default_factory=DeltaMetrics)
 
 
 def _int_or_none(value: Any) -> int | None:
@@ -299,13 +326,54 @@ def _build_policy_failed_payload(command: str, repo: str | Path | None, data: Ma
     return asdict(payload)
 
 
+def _build_cache_hit_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+    payload = _base_payload(command, repo)
+    payload.cache.cache_hits = _int_or_none(data.get("total_hits"))
+    payload.cache.tokens_saved = _int_or_none(data.get("tokens_saved"))
+    payload.cache.backend = _string_or_none(data.get("backend"))
+    payload.cache.fragment_hits = _int_or_none(data.get("fragment_hits"))
+    payload.cache.fragment_misses = _int_or_none(data.get("fragment_misses"))
+    return asdict(payload)
+
+
+def _build_delta_applied_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+    payload = _base_payload(command, repo)
+    payload.delta.files_added = _int_or_none(data.get("files_added"))
+    payload.delta.files_removed = _int_or_none(data.get("files_removed"))
+    payload.delta.files_changed = _int_or_none(data.get("files_changed"))
+    payload.delta.delta_tokens = _int_or_none(data.get("delta_tokens"))
+    payload.delta.tokens_saved = _int_or_none(data.get("tokens_saved"))
+    payload.delta.has_previous_run = bool(data.get("has_previous_run", False))
+    payload.delta.slices_changed = _int_or_none(data.get("slices_changed"))
+    payload.delta.symbols_changed = _int_or_none(data.get("symbols_changed"))
+    return asdict(payload)
+
+
+def _build_policy_violation_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+    # Identical structure to policy_failed; canonical name going forward.
+    return _build_policy_failed_payload(command, repo, data)
+
+
+def _build_plan_completed_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+    payload = _base_payload(command, repo)
+    payload.files.scanned_files = _int_or_none(data.get("scanned_files"))
+    payload.files.ranked_files = _int_or_none(data.get("ranked_files"))
+    payload.files.top_files = _int_or_none(data.get("top_files"))
+    payload.tokens.estimated_input_tokens = _int_or_none(data.get("total_estimated_tokens"))
+    return asdict(payload)
+
+
 _PAYLOAD_BUILDERS = {
     "run_started": _build_run_started_payload,
     "scan_completed": _build_scan_completed_payload,
     "scoring_completed": _build_scoring_completed_payload,
     "pack_completed": _build_pack_completed_payload,
+    "plan_completed": _build_plan_completed_payload,
+    "cache_hit": _build_cache_hit_payload,
+    "delta_applied": _build_delta_applied_payload,
     "benchmark_completed": _build_benchmark_completed_payload,
     "policy_failed": _build_policy_failed_payload,
+    "policy_violation": _build_policy_violation_payload,
 }
 
 
@@ -337,6 +405,7 @@ __all__ = [
     "BenchmarkStrategySummary",
     "BenchmarkSummary",
     "CacheStats",
+    "DeltaMetrics",
     "EVENT_SCHEMA_VERSIONS",
     "EventName",
     "FileCounts",

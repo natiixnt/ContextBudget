@@ -32,6 +32,15 @@ from contextbudget.stages.workflow import (
 )
 
 
+def _list_len_or_int(value: Any) -> int:
+    if isinstance(value, list):
+        return len(value)
+    try:
+        return int(value or 0)
+    except (TypeError, ValueError):
+        return 0
+
+
 def _build_telemetry_session(
     *,
     repo: Path,
@@ -262,6 +271,16 @@ def run_pack(
         plugins=resolved_plugins,
     )
     cache.save()
+    cache_snap = cache.snapshot()
+    if (cache_snap.hits or 0) > 0:
+        telemetry.emit(
+            "cache_hit",
+            backend=cache_snap.backend or "",
+            total_hits=cache_snap.hits or 0,
+            tokens_saved=cache_snap.tokens_saved or 0,
+            fragment_hits=cache_snap.fragment_hits or 0,
+            fragment_misses=cache_snap.fragment_misses or 0,
+        )
     report = run_render_stage(
         task,
         target_repo,
@@ -317,6 +336,19 @@ def run_pack(
             previous_label=resolve_previous_run_label(delta_from),
             token_estimator=resolved_plugins.estimate_tokens,
         )
+        if isinstance(report.delta, dict):
+            _db = report.delta.get("budget") or {}
+            telemetry.emit(
+                "delta_applied",
+                files_added=len(report.delta.get("files_added") or []),
+                files_removed=len(report.delta.get("files_removed") or []),
+                files_changed=len(report.delta.get("files_changed") or []),
+                delta_tokens=int(_db.get("delta_tokens", 0) or 0),
+                tokens_saved=int(_db.get("tokens_saved", 0) or 0),
+                has_previous_run=bool(report.delta.get("previous_run")),
+                slices_changed=_list_len_or_int(report.delta.get("changed_slices")),
+                symbols_changed=_list_len_or_int(report.delta.get("changed_symbols")),
+            )
     effective_metrics = effective_pack_metrics(as_json_dict(report))
     effective_files_included = effective_metrics.get("files_included", [])
     if not isinstance(effective_files_included, list):

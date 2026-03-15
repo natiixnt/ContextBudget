@@ -20,13 +20,15 @@ TOP_LEVEL_PAYLOAD_KEYS = {
     "policy",
     "quality_risk_estimate",
     "benchmark",
+    "delta",
 }
 REPOSITORY_KEYS = {"repository_id", "workspace_id"}
 TOKEN_KEYS = {"max_tokens", "estimated_input_tokens", "estimated_saved_tokens", "baseline_full_context_tokens"}
 FILE_KEYS = {"scanned_files", "ranked_files", "included_files", "skipped_files", "top_files", "strategy_count"}
-CACHE_KEYS = {"cache_hits", "duplicate_reads_prevented"}
+CACHE_KEYS = {"cache_hits", "duplicate_reads_prevented", "tokens_saved", "backend", "fragment_hits", "fragment_misses"}
 POLICY_KEYS = {"evaluated", "passed", "violation_count", "violations", "failing_checks", "checks"}
 BENCHMARK_KEYS = {"scan_runtime_ms", "strategies"}
+DELTA_KEYS = {"files_added", "files_removed", "files_changed", "delta_tokens", "tokens_saved", "has_previous_run", "slices_changed", "symbols_changed"}
 BENCHMARK_STRATEGY_KEYS = {
     "name",
     "estimated_input_tokens",
@@ -48,6 +50,7 @@ def _assert_payload_shape(payload: dict) -> None:
     assert set(payload["cache"]) == CACHE_KEYS
     assert set(payload["policy"]) == POLICY_KEYS
     assert set(payload["benchmark"]) == BENCHMARK_KEYS
+    assert set(payload["delta"]) == DELTA_KEYS
     for strategy in payload["benchmark"]["strategies"]:
         assert set(strategy) == BENCHMARK_STRATEGY_KEYS
 
@@ -58,8 +61,12 @@ def test_event_schema_versions_are_stable() -> None:
         "scan_completed": ANALYTICS_SCHEMA_V1,
         "scoring_completed": ANALYTICS_SCHEMA_V1,
         "pack_completed": ANALYTICS_SCHEMA_V1,
+        "plan_completed": ANALYTICS_SCHEMA_V1,
+        "cache_hit": ANALYTICS_SCHEMA_V1,
+        "delta_applied": ANALYTICS_SCHEMA_V1,
         "benchmark_completed": ANALYTICS_SCHEMA_V1,
         "policy_failed": ANALYTICS_SCHEMA_V1,
+        "policy_violation": ANALYTICS_SCHEMA_V1,
     }
 
 
@@ -134,6 +141,27 @@ def test_build_analytics_payload_shapes_are_stable(tmp_path: Path) -> None:
                 ],
             },
         },
+        "plan_completed": {
+            "command": "plan_agent",
+            "data": {"scanned_files": 12, "ranked_files": 12, "top_files": 25, "total_estimated_tokens": 2400},
+        },
+        "cache_hit": {
+            "command": "pack",
+            "data": {"total_hits": 4, "tokens_saved": 1280, "backend": "local_file", "fragment_hits": 2, "fragment_misses": 1},
+        },
+        "delta_applied": {
+            "command": "pack",
+            "data": {
+                "files_added": 1,
+                "files_removed": 0,
+                "files_changed": 3,
+                "delta_tokens": 840,
+                "tokens_saved": 6200,
+                "has_previous_run": True,
+                "slices_changed": 5,
+                "symbols_changed": 2,
+            },
+        },
         "policy_failed": {
             "command": "pack",
             "data": {
@@ -144,6 +172,25 @@ def test_build_analytics_payload_shapes_are_stable(tmp_path: Path) -> None:
                 "files_skipped": 9,
                 "cache_hits": 1,
                 "duplicate_reads_prevented": 0,
+                "quality_risk_estimate": "medium",
+                "violations": ["estimated input tokens 180 exceed max 100"],
+                "checks": {
+                    "max_estimated_input_tokens": {
+                        "actual": 180,
+                        "limit": 100,
+                        "passed": False,
+                    }
+                },
+            },
+        },
+        "policy_violation": {
+            "command": "pack",
+            "data": {
+                "max_tokens": 512,
+                "estimated_input_tokens": 180,
+                "estimated_saved_tokens": 70,
+                "files_included": 3,
+                "files_skipped": 9,
                 "quality_risk_estimate": "medium",
                 "violations": ["estimated input tokens 180 exceed max 100"],
                 "checks": {

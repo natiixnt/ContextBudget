@@ -9,13 +9,14 @@ from contextbudget.telemetry import EVENT_SCHEMA_VERSIONS
 
 
 EVENT_KEYS = {"name", "schema_version", "timestamp", "run_id", "payload"}
-PAYLOAD_KEYS = {"command", "repository", "tokens", "files", "cache", "policy", "quality_risk_estimate", "benchmark"}
+PAYLOAD_KEYS = {"command", "repository", "tokens", "files", "cache", "policy", "quality_risk_estimate", "benchmark", "delta"}
 REPOSITORY_KEYS = {"repository_id", "workspace_id"}
 TOKEN_KEYS = {"max_tokens", "estimated_input_tokens", "estimated_saved_tokens", "baseline_full_context_tokens"}
 FILE_KEYS = {"scanned_files", "ranked_files", "included_files", "skipped_files", "top_files", "strategy_count"}
-CACHE_KEYS = {"cache_hits", "duplicate_reads_prevented"}
+CACHE_KEYS = {"cache_hits", "duplicate_reads_prevented", "tokens_saved", "backend", "fragment_hits", "fragment_misses"}
 POLICY_KEYS = {"evaluated", "passed", "violation_count", "violations", "failing_checks", "checks"}
 BENCHMARK_KEYS = {"scan_runtime_ms", "strategies"}
+DELTA_KEYS = {"files_added", "files_removed", "files_changed", "delta_tokens", "tokens_saved", "has_previous_run", "slices_changed", "symbols_changed"}
 BENCHMARK_STRATEGY_KEYS = {
     "name",
     "estimated_input_tokens",
@@ -50,6 +51,7 @@ def _assert_event_shape(event: dict) -> None:
     assert set(payload["cache"]) == CACHE_KEYS
     assert set(payload["policy"]) == POLICY_KEYS
     assert set(payload["benchmark"]) == BENCHMARK_KEYS
+    assert set(payload["delta"]) == DELTA_KEYS
     for strategy in payload["benchmark"]["strategies"]:
         assert set(strategy) == BENCHMARK_STRATEGY_KEYS
 
@@ -120,8 +122,9 @@ file_path = ".contextbudget/events.jsonl"
 
     assert result["passed"] is False
     events = _read_events(tmp_path / ".contextbudget" / "events.jsonl")
-    policy_event = events[-1]
-    assert policy_event["name"] == "policy_failed"
+    event_names = [e["name"] for e in events]
+    assert "policy_failed" in event_names
+    policy_event = next(e for e in events if e["name"] == "policy_failed")
     _assert_event_shape(policy_event)
     assert policy_event["payload"]["policy"]["evaluated"] is True
     assert policy_event["payload"]["policy"]["passed"] is False
@@ -165,3 +168,61 @@ file_path = ".contextbudget/events.jsonl"
     serialized = json.dumps(events, sort_keys=True)
     assert str(tmp_path) not in serialized
     assert "src/auth.py" not in serialized
+
+
+def test_delta_applied_event_emitted(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "contextbudget.toml",
+        """
+[telemetry]
+enabled = true
+sink = "file"
+file_path = ".contextbudget/events.jsonl"
+""".strip(),
+    )
+    _write(tmp_path / "src" / "search.py", "def search() -> list[str]:\n    return []\n")
+
+    first_run = run_pack("add caching to search api", repo=tmp_path, max_tokens=500)
+    from contextbudget.core.pipeline import as_json_dict
+    first_run_dict = as_json_dict(first_run)
+
+    _write(tmp_path / "src" / "cache.py", "def cache() -> None:\n    pass\n")
+    run_pack("add caching to search api", repo=tmp_path, max_tokens=500, delta_from=first_run_dict)
+
+    events = _read_events(tmp_path / ".contextbudget" / "events.jsonl")
+    event_names = [event["name"] for event in events]
+    assert "delta_applied" in event_names
+
+    delta_event = next(e for e in events if e["name"] == "delta_applied")
+    _assert_event_shape(delta_event)
+    assert delta_event["payload"]["delta"]["has_previous_run"] is True
+
+    serialized = json.dumps(events, sort_keys=True)
+    assert str(tmp_path) not in serialized
+
+
+def test_policy_violation_event_emitted(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "contextbudget.toml",
+        """
+[telemetry]
+enabled = true
+sink = "file"
+file_path = ".contextbudget/events.jsonl"
+""".strip(),
+    )
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+
+    engine = ContextBudgetEngine()
+    run = engine.pack(task="tighten auth checks", repo=tmp_path, max_tokens=300)
+    policy = engine.make_policy(max_estimated_input_tokens=1)
+    result = engine.evaluate_policy(run, policy=policy)
+
+    assert result["passed"] is False
+    events = _read_events(tmp_path / ".contextbudget" / "events.jsonl")
+    violation_event = next((e for e in events if e["name"] == "policy_violation"), None)
+    assert violation_event is not None, "policy_violation event not emitted"
+    _assert_event_shape(violation_event)
+    assert violation_event["payload"]["policy"]["evaluated"] is True
+    assert violation_event["payload"]["policy"]["passed"] is False
+    assert violation_event["payload"]["policy"]["violation_count"] >= 1
