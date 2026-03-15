@@ -1,0 +1,230 @@
+{
+  "agent_middleware": {
+    "metadata": {
+      "cache": {
+        "backend": "local_file",
+        "enabled": true,
+        "fragment_hits": 0,
+        "fragment_misses": 3,
+        "fragment_writes": 3,
+        "hits": 0,
+        "misses": 3,
+        "tokens_saved": 0,
+        "writes": 3
+      },
+      "delta_enabled": false,
+      "duplicate_reads_prevented": 0,
+      "estimated_input_tokens": 85,
+      "estimated_saved_tokens": 0,
+      "files_included_count": 3,
+      "files_removed_count": 0,
+      "files_skipped_count": 0,
+      "max_tokens": 28000,
+      "original_input_tokens": 85,
+      "quality_risk_estimate": "medium",
+      "ranked_files_count": 3,
+      "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+      "request_metadata": {
+        "agent": "my-agent",
+        "session": "sess-001"
+      },
+      "scanned_repos": [],
+      "selected_repos": [],
+      "task": "refactor auth middleware token validation",
+      "workspace": ""
+    },
+    "recorded_path": "/Users/naithai/Desktop/amogus/praca/ContextBudget/run-option-a.json",
+    "request": {
+      "max_tokens": 28000,
+      "metadata": {
+        "agent": "my-agent",
+        "session": "sess-001"
+      },
+      "repo": "examples/risky-auth-change/repo",
+      "task": "refactor auth middleware token validation",
+      "top_files": null
+    }
+  },
+  "budget": {
+    "duplicate_reads_prevented": 0,
+    "estimated_input_tokens": 85,
+    "estimated_saved_tokens": 0,
+    "quality_risk_estimate": "medium"
+  },
+  "cache": {
+    "backend": "local_file",
+    "enabled": true,
+    "fragment_hits": 0,
+    "fragment_misses": 3,
+    "fragment_writes": 3,
+    "hits": 0,
+    "misses": 3,
+    "tokens_saved": 0,
+    "writes": 3
+  },
+  "cache_hits": 0,
+  "command": "pack",
+  "compressed_context": [
+    {
+      "cache_reference": "cb-frag:64a67d2f0fa014d2",
+      "cache_status": "stored",
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 33,
+      "original_tokens": 26,
+      "path": "src/middleware.py",
+      "selected_ranges": [
+        {
+          "end_line": 4,
+          "kind": "full",
+          "reason": "file fits within full-file threshold",
+          "start_line": 1
+        }
+      ],
+      "strategy": "full",
+      "text": "# Full: src/middleware.py\nfrom .auth import verify_token\n\ndef auth_middleware(token: str) -> bool:\n    return verify_token(token)\n"
+    },
+    {
+      "cache_reference": "cb-frag:cfc84ee657b5cad9",
+      "cache_status": "stored",
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 24,
+      "original_tokens": 19,
+      "path": "src/auth.py",
+      "selected_ranges": [
+        {
+          "end_line": 2,
+          "kind": "full",
+          "reason": "file fits within full-file threshold",
+          "start_line": 1
+        }
+      ],
+      "strategy": "full",
+      "text": "# Full: src/auth.py\ndef verify_token(token: str) -> bool:\n    return token.startswith(\"prod_\")\n"
+    },
+    {
+      "cache_reference": "cb-frag:a50b235f001b5e75",
+      "cache_status": "stored",
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 28,
+      "original_tokens": 22,
+      "path": "src/permissions.py",
+      "selected_ranges": [
+        {
+          "end_line": 2,
+          "kind": "full",
+          "reason": "file fits within full-file threshold",
+          "start_line": 1
+        }
+      ],
+      "strategy": "full",
+      "text": "# Full: src/permissions.py\ndef can_access(user_role: str, action: str) -> bool:\n    return user_role == \"admin\"\n"
+    }
+  ],
+  "files_included": [
+    "src/middleware.py",
+    "src/auth.py",
+    "src/permissions.py"
+  ],
+  "files_skipped": [],
+  "generated_at": "2026-03-15T11:09:29.011960+00:00",
+  "implementations": {
+    "compressor": "builtin.default",
+    "scorer": "builtin.relevance",
+    "token_estimator": "builtin.char4"
+  },
+  "max_tokens": 28000,
+  "model_profile": {
+    "budget_clamped": false,
+    "budget_source": "",
+    "context_window": 0,
+    "effective_max_tokens": 0,
+    "family": "",
+    "notes": [],
+    "recommended_compression_strategy": "",
+    "reserved_output_tokens": 0,
+    "resolved_profile": "",
+    "selected_profile": "",
+    "tokenizer": ""
+  },
+  "policy": {
+    "checks": {
+      "max_estimated_input_tokens": {
+        "actual": 85,
+        "limit": 28000,
+        "passed": true
+      },
+      "max_quality_risk_level": {
+        "actual": "medium",
+        "limit": "medium",
+        "passed": true
+      }
+    },
+    "passed": true,
+    "violations": []
+  },
+  "ranked_files": [
+    {
+      "heuristic_score": 4.8,
+      "historical_score": 0.0,
+      "line_count": 4,
+      "path": "src/middleware.py",
+      "reasons": [
+        "content mentions 'auth'",
+        "path contains 'middleware'",
+        "content mentions 'middleware'",
+        "content mentions 'token'",
+        "depends on relevant module: src/auth.py"
+      ],
+      "score": 4.8
+    },
+    {
+      "heuristic_score": 4.0,
+      "historical_score": 0.0,
+      "line_count": 2,
+      "path": "src/auth.py",
+      "reasons": [
+        "path contains 'auth'",
+        "content mentions 'token'",
+        "imported by relevant file: src/middleware.py"
+      ],
+      "score": 4.0
+    },
+    {
+      "heuristic_score": 0.35,
+      "historical_score": 0.0,
+      "line_count": 2,
+      "path": "src/permissions.py",
+      "reasons": [],
+      "score": 0.35
+    }
+  ],
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo",
+  "summarizer": {
+    "effective_backend": "unused",
+    "external_adapter": "",
+    "external_configured": false,
+    "external_resolved": false,
+    "fallback_count": 0,
+    "fallback_used": false,
+    "logs": [],
+    "selected_backend": "deterministic",
+    "summary_count": 0
+  },
+  "task": "refactor auth middleware token validation",
+  "token_estimator": {
+    "available": true,
+    "effective_backend": "heuristic",
+    "encoding": "",
+    "fallback_reason": "",
+    "fallback_used": false,
+    "model": "",
+    "notes": [
+      "Deterministic baseline heuristic: 1 token ~= 4 chars."
+    ],
+    "selected_backend": "heuristic",
+    "uncertainty": "approximate"
+  }
+}
