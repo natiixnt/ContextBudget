@@ -10,6 +10,7 @@ from contextbudget.compressors.summarizers import normalize_summarizer_report
 from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_config
 from contextbudget.core.delta import build_delta_report, effective_pack_metrics, resolve_previous_run_label
 from contextbudget.core.agent_planning import build_agent_workflow_plan
+from contextbudget.core.agent_simulation import simulate_agent_workflow
 from contextbudget.core.model_profiles import normalize_model_profile_report, prepare_config_for_model_profile
 from contextbudget.core.diffing import diff_run_artifacts
 from contextbudget.core.heatmap import build_heatmap_report, heatmap_as_dict
@@ -211,6 +212,106 @@ def run_plan_agent(
         reused_context_tokens=report.reused_context_tokens,
     )
     return stage_as_json_dict(report)
+
+
+def run_simulate_agent(
+    task: str,
+    repo: Path,
+    top_n: int | None = None,
+    config: ContextBudgetConfig | None = None,
+    config_path: Path | None = None,
+    telemetry_sink: TelemetrySink | None = None,
+    workspace: WorkspaceDefinition | None = None,
+    plugins: ResolvedPlugins | None = None,
+    prompt_overhead_per_step: int = 800,
+    output_tokens_per_step: int = 600,
+    context_mode: str = "isolated",
+) -> dict:
+    """Simulate agent workflow token costs step by step and return a serializable artifact."""
+
+    from datetime import datetime, timezone
+
+    cfg = config if config is not None else (workspace.config if workspace is not None else load_config(repo, config_path=config_path))
+    prepared_cfg, model_profile = prepare_config_for_model_profile(cfg)
+    resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
+    effective_top_n = top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
+    target_repo = workspace.root if workspace is not None else repo
+    telemetry = _build_telemetry_session(
+        repo=target_repo,
+        config=prepared_cfg,
+        command="simulate_agent",
+        telemetry_sink=telemetry_sink,
+    )
+    telemetry.emit(
+        "run_started",
+        top_files=effective_top_n,
+        workspace=str(workspace.path) if workspace is not None else "",
+        repo_count=len(workspace.repos) if workspace is not None else 1,
+    )
+    if workspace is not None:
+        files, scanned_repos = run_scan_workspace_stage(workspace, prepared_cfg)
+    else:
+        files = run_scan_stage(repo, prepared_cfg)
+        scanned_repos = []
+    telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
+    ranked = run_score_stage(task, files, prepared_cfg, repo=target_repo, plugins=resolved_plugins)
+    telemetry.emit("scoring_completed", scanned_files=len(files), ranked_files=len(ranked), top_files=effective_top_n)
+
+    simulation = simulate_agent_workflow(
+        task=task,
+        files=files,
+        ranked=ranked,
+        top_n=effective_top_n,
+        estimate_tokens=resolved_plugins.estimate_tokens,
+        score_task=lambda step_task: run_score_stage(
+            step_task,
+            files,
+            prepared_cfg,
+            repo=target_repo,
+            plugins=resolved_plugins,
+        ),
+        prompt_overhead_per_step=prompt_overhead_per_step,
+        output_tokens_per_step=output_tokens_per_step,
+        context_mode=context_mode,
+        workspace_mode=workspace is not None,
+    )
+
+    telemetry.emit(
+        "plan_completed",
+        scanned_files=len(files),
+        scanned_repos=len(scanned_repos),
+        ranked_files=len(ranked),
+        top_files=effective_top_n,
+        workflow_steps=len(simulation.get("steps", [])),
+        total_estimated_tokens=simulation.get("total_tokens", 0),
+    )
+
+    data: dict = {
+        "command": "simulate-agent",
+        "task": task,
+        "repo": str(target_repo),
+        "generated_at": datetime.now(tz=timezone.utc).isoformat(),
+        "scanned_files": len(files),
+    }
+    data.update(simulation)
+    if workspace is not None:
+        data["workspace"] = str(workspace.path)
+        data["scanned_repos"] = [
+            {"label": getattr(r, "label", ""), "path": str(getattr(r, "root", ""))}
+            for r in (workspace.repos if workspace.repos else [])
+        ]
+    token_estimator_report = resolved_plugins.token_estimator_report
+    if token_estimator_report:
+        data["token_estimator"] = token_estimator_report
+    if model_profile and isinstance(model_profile, dict) and any(model_profile.values()):
+        data["model_profile"] = model_profile
+    implementations = {
+        **resolved_plugins.plan_implementations(),
+        "agent_simulator": "builtin.step_simulation",
+    }
+    if implementations:
+        data["implementations"] = implementations
+    return data
 
 
 def run_pack(

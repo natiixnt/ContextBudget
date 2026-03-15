@@ -1,0 +1,47 @@
+name: ContextBudget CI Budget Guard
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  context-budget-check:
+    name: Enforce context budget policy
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install ContextBudget
+        run: pip install contextbudget
+
+      # Pack the repository context for the current task.
+      # Adjust --max-tokens and the task description to match your workflow.
+      - name: Pack context
+        run: |
+          contextbudget pack "review pull request changes" \
+            --repo . \
+            --max-tokens 30000 \
+            --out-prefix ci-run
+
+      # Enforce the budget policy defined in examples/ci/policy.toml.
+      # Exits with code 2 if any policy limit is exceeded.
+      - name: Enforce budget policy
+        run: |
+          contextbudget enforce examples/ci/policy.toml ci-run.json
+
+      # Optional: upload the run artifact for inspection.
+      - name: Upload run artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: contextbudget-run
+          path: |
+            ci-run.json
+            ci-run.md

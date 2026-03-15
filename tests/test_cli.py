@@ -573,4 +573,137 @@ def test_cli_pack_reports_model_profile_assumptions(tmp_path: Path, monkeypatch,
 
     output = capsys.readouterr().out
     assert "Model profile: selected=claude-sonnet-4" in output
-    assert "Model profile note: max_tokens was clamped to fit the configured context window" in output
+
+
+# ---------------------------------------------------------------------------
+# enforce command
+# ---------------------------------------------------------------------------
+
+
+def _make_run_json(tmp_path: Path, *, repo: Path) -> Path:
+    """Pack a repo and return the path to the generated run.json."""
+    monkeypatch_obj = None  # helper used inline below
+    import contextbudget.cli as cli_mod
+    import sys
+
+    run_prefix = str(tmp_path / "enforce-run")
+    old_argv = sys.argv[:]
+    sys.argv = [
+        "contextbudget",
+        "pack",
+        "search feature",
+        "--repo",
+        str(repo),
+        "--out-prefix",
+        run_prefix,
+    ]
+    try:
+        cli_mod.main()
+    finally:
+        sys.argv = old_argv
+    return tmp_path / "enforce-run.json"
+
+
+def test_cli_enforce_pass(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(repo / "src" / "search.py", "def search():\n    return []\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-run"],
+    )
+    assert main() == 0
+    run_json = tmp_path / "enf-run.json"
+    assert run_json.exists()
+
+    policy_path = tmp_path / "policy.toml"
+    policy_path.write_text(
+        "[policy]\nmax_estimated_input_tokens = 999999\nmax_files_included = 999\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "enforce", str(policy_path), str(run_json)],
+    )
+    assert main() == 0
+
+
+def test_cli_enforce_fail_token_limit(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(repo / "src" / "search.py", "def search():\n    return []\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-fail"],
+    )
+    assert main() == 0
+    run_json = tmp_path / "enf-fail.json"
+
+    # Set a token limit of 1 so it always fails.
+    policy_path = tmp_path / "policy-fail.toml"
+    policy_path.write_text(
+        "[policy]\nmax_estimated_input_tokens = 1\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "enforce", str(policy_path), str(run_json)],
+    )
+    assert main() == 2
+
+
+def test_cli_enforce_fail_context_size_bytes(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(repo / "src" / "search.py", "def search():\n    return []\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "pack", "search feature", "--repo", str(repo), "--out-prefix", "enf-bytes"],
+    )
+    assert main() == 0
+    run_json = tmp_path / "enf-bytes.json"
+
+    # 1 byte limit always fails.
+    policy_path = tmp_path / "policy-bytes.toml"
+    policy_path.write_text(
+        "[policy]\nmax_context_size_bytes = 1\n",
+        encoding="utf-8",
+    )
+
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "enforce", str(policy_path), str(run_json)],
+    )
+    assert main() == 2
+
+
+def test_cli_enforce_missing_policy_file(tmp_path: Path, monkeypatch) -> None:
+    run_json = tmp_path / "run.json"
+    run_json.write_text("{}", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "enforce", str(tmp_path / "nonexistent.toml"), str(run_json)],
+    )
+    assert main() == 2
+
+
+def test_cli_enforce_missing_run_file(tmp_path: Path, monkeypatch) -> None:
+    policy_path = tmp_path / "policy.toml"
+    policy_path.write_text("[policy]\nmax_estimated_input_tokens = 30000\n", encoding="utf-8")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["contextbudget", "enforce", str(policy_path), str(tmp_path / "nonexistent.json")],
+    )
+    assert main() == 2

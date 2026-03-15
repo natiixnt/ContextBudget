@@ -1,0 +1,18 @@
+# CI budget policy for ContextBudget enforcement.
+# Use with: contextbudget enforce policy.toml run.json
+
+[policy]
+# Maximum estimated input tokens allowed in the packed context.
+max_estimated_input_tokens = 30000
+
+# Maximum number of files that may be included in a single pack.
+max_files_included = 20
+
+# Maximum tolerated compression quality risk level: "low", "medium", or "high".
+max_quality_risk_level = "medium"
+
+# Minimum required compression savings as a percentage of the original token count.
+min_estimated_savings_percentage = 5.0
+
+# Maximum total byte size of all compressed context text.
+max_context_size_bytes = 1048576

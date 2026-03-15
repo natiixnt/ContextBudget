@@ -206,6 +206,103 @@ def _append_delta_lines(lines: list[str], data: dict) -> None:
         )
 
 
+def render_agent_simulation_markdown(data: dict) -> str:
+    """Render agent workflow simulation artifact to Markdown."""
+
+    steps = data.get("steps", [])
+    context_mode = data.get("context_mode", "isolated")
+    lines = [
+        "# ContextBudget Agent Simulation",
+        "",
+        f"Task: {data.get('task', '')}",
+        f"Repository: {data.get('repo', '')}",
+        f"Scanned files: {data.get('scanned_files', 0)}",
+        f"Context mode: {context_mode}",
+        f"Prompt overhead per step: {data.get('prompt_overhead_per_step', 0)} tokens",
+        f"Output tokens per step: {data.get('output_tokens_per_step', 0)} tokens",
+        f"Workflow steps: {len(steps) if isinstance(steps, list) else 0}",
+    ]
+    _append_workspace_lines(lines, data)
+    _append_implementation_lines(lines, data)
+    if _has_model_profile(data):
+        lines.extend(["", "## Model Assumptions"])
+        _append_model_profile_lines(lines, data)
+    lines.extend(["", "## Token Estimator"])
+    _append_token_estimator_lines(lines, data)
+
+    lines.extend([
+        "",
+        "## Token Summary",
+        f"- Total tokens (all steps): {data.get('total_tokens', 0)}",
+        f"- Unique context tokens: {data.get('unique_context_tokens', 0)}",
+        f"- Total context tokens (with reuse): {data.get('total_context_tokens', 0)}",
+        f"- Total prompt overhead tokens: {data.get('total_prompt_tokens', 0)}",
+        f"- Total output tokens: {data.get('total_output_tokens', 0)}",
+        "",
+        "## Token Variance",
+        f"- Variance: {data.get('token_variance', 0.0)}",
+        f"- Std deviation: {data.get('token_std_dev', 0.0)}",
+        f"- Min step tokens: {data.get('min_step_tokens', 0)}",
+        f"- Max step tokens: {data.get('max_step_tokens', 0)}",
+        f"- Avg step tokens: {data.get('avg_step_tokens', 0.0)}",
+        "",
+        "## Step Breakdown",
+        "",
+        "| # | Step | Context | Prompt | Output | Step Total | Cumulative Context |",
+        "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+    ])
+    if isinstance(steps, list) and steps:
+        for idx, step in enumerate(steps, start=1):
+            if not isinstance(step, dict):
+                continue
+            lines.append(
+                f"| {idx} | {step.get('title', '')} "
+                f"| {step.get('context_tokens', 0)} "
+                f"| {step.get('prompt_tokens', 0)} "
+                f"| {step.get('output_tokens', 0)} "
+                f"| {step.get('step_total_tokens', 0)} "
+                f"| {step.get('cumulative_context_tokens', 0)} |"
+            )
+    else:
+        lines.append("| - | No steps | 0 | 0 | 0 | 0 | 0 |")
+
+    lines.extend(["", "## Step Details"])
+    if isinstance(steps, list) and steps:
+        for idx, step in enumerate(steps, start=1):
+            if not isinstance(step, dict):
+                continue
+            lines.extend([
+                f"### {idx}. {step.get('title', '')}",
+                f"- Step id: {step.get('id', '')}",
+                f"- Objective: {step.get('objective', '')}",
+                f"- Files read: {step.get('file_count', 0)}",
+                f"- Context tokens: {step.get('context_tokens', 0)}",
+                f"- Prompt overhead: {step.get('prompt_tokens', 0)}",
+                f"- Output tokens: {step.get('output_tokens', 0)}",
+                f"- Step total tokens: {step.get('step_total_tokens', 0)}",
+                f"- Cumulative context tokens: {step.get('cumulative_context_tokens', 0)}",
+                f"- Cumulative total tokens: {step.get('cumulative_total_tokens', 0)}",
+                "- Files read:",
+            ])
+            files_read = step.get("files_read", [])
+            if isinstance(files_read, list) and files_read:
+                for f in files_read:
+                    if not isinstance(f, dict):
+                        continue
+                    lines.append(
+                        f"  - `{f.get('path', '')}` "
+                        f"[{f.get('read_type', 'step')}] "
+                        f"({f.get('tokens', 0)} tokens)"
+                    )
+            else:
+                lines.append("  - None")
+    else:
+        lines.append("- No steps produced.")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
 def render_plan_markdown(data: dict) -> str:
     """Render plan-stage payload to Markdown."""
 

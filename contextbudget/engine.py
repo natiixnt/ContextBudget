@@ -8,8 +8,14 @@ from typing import Any, Mapping, Sequence
 
 from contextbudget.cache import update_run_history_artifacts
 from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_config, load_workspace
+from contextbudget.core.advisor import advise_as_dict, run_advise
 from contextbudget.core.benchmark import run_benchmark
 from contextbudget.core.delta import effective_pack_metrics
+from contextbudget.core.graph_visualizer import (
+    build_repo_graph,
+    render_graph_html,
+    visualize_as_dict,
+)
 from contextbudget.core.pipeline import (
     as_json_dict,
     run_diff_from_json,
@@ -19,6 +25,7 @@ from contextbudget.core.pipeline import (
     run_plan_agent,
     run_pr_audit,
     run_report_from_json,
+    run_simulate_agent,
 )
 from contextbudget.core.policy import (
     PolicySpec,
@@ -210,6 +217,49 @@ class ContextBudgetEngine:
             top_n=effective_top_files,
             config=cfg,
             telemetry_sink=self._telemetry_sink,
+        )
+
+    def simulate_agent(
+        self,
+        *,
+        task: str,
+        repo: str | Path = ".",
+        workspace: str | Path | None = None,
+        top_files: int | None = None,
+        prompt_overhead_per_step: int = 800,
+        output_tokens_per_step: int = 600,
+        context_mode: str = "isolated",
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Simulate agent workflow token costs step by step before execution."""
+
+        repo_path = normalize_repo(repo)
+        if workspace is not None:
+            workspace_definition = self._load_workspace(workspace, config_path=config_path)
+            effective_top_files = top_files if top_files is not None else workspace_definition.config.budget.top_files
+            return run_simulate_agent(
+                task,
+                repo=workspace_definition.root,
+                top_n=effective_top_files,
+                config=workspace_definition.config,
+                telemetry_sink=self._telemetry_sink,
+                workspace=workspace_definition,
+                prompt_overhead_per_step=prompt_overhead_per_step,
+                output_tokens_per_step=output_tokens_per_step,
+                context_mode=context_mode,
+            )
+
+        cfg = self._load_config(repo_path, config_path=config_path)
+        effective_top_files = top_files if top_files is not None else cfg.budget.top_files
+        return run_simulate_agent(
+            task,
+            repo=repo_path,
+            top_n=effective_top_files,
+            config=cfg,
+            telemetry_sink=self._telemetry_sink,
+            prompt_overhead_per_step=prompt_overhead_per_step,
+            output_tokens_per_step=output_tokens_per_step,
+            context_mode=context_mode,
         )
 
     def pack(
@@ -412,6 +462,108 @@ class ContextBudgetEngine:
             config=cfg,
             telemetry_sink=self._telemetry_sink,
         )
+
+    def visualize(
+        self,
+        *,
+        repo: str | Path = ".",
+        history: Sequence[str | Path] | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Build a repository context graph and return a serialisable report.
+
+        Scans *repo*, builds an import dependency graph, annotates every node
+        with its estimated token count and (optionally) its historical inclusion
+        frequency, and returns a JSON-serialisable dictionary with ``nodes``,
+        ``edges``, and ``stats`` keys.
+
+        Args:
+            repo: Repository root path.
+            history: Optional pack run JSON files or directories used to derive
+                     per-file inclusion counts and rates.  When omitted all
+                     inclusion statistics default to zero.
+            config_path: Optional path to a ``contextbudget.toml`` config file.
+        """
+        repo_path = normalize_repo(repo)
+        cfg = self._load_config(repo_path, config_path=config_path)
+        report = build_repo_graph(repo_path, cfg, history=history)
+        return visualize_as_dict(report)
+
+    def visualize_html(
+        self,
+        *,
+        repo: str | Path = ".",
+        history: Sequence[str | Path] | None = None,
+        config_path: str | Path | None = None,
+    ) -> str:
+        """Build an interactive HTML visualization of the repository graph.
+
+        Returns a self-contained HTML string that can be written to a file and
+        opened in any modern browser without additional dependencies.
+        """
+        repo_path = normalize_repo(repo)
+        cfg = self._load_config(repo_path, config_path=config_path)
+        report = build_repo_graph(repo_path, cfg, history=history)
+        return render_graph_html(report)
+
+
+    def advise(
+        self,
+        *,
+        repo: str | Path = ".",
+        history: Sequence[str | Path] | None = None,
+        large_file_tokens: int | None = None,
+        high_fanin: int | None = None,
+        high_fanout: int | None = None,
+        high_frequency_rate: float | None = None,
+        top_suggestions: int = 25,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Scan a repository and return ranked architecture suggestions.
+
+        Detects files that exceed token thresholds, appear frequently in context
+        packs, or have high dependency fan-in, then suggests splitting files,
+        extracting modules, or reducing dependencies.  Suggestions are ranked by
+        estimated token impact so the highest-value refactors appear first.
+
+        Parameters
+        ----------
+        repo:
+            Path to the repository to analyse.
+        history:
+            Optional list of run JSON files or directories containing pack
+            artifacts.  When provided, per-file pack frequency is used to
+            weight suggestions.
+        large_file_tokens:
+            Token threshold above which a file is considered large
+            (default: 500).
+        high_fanin:
+            Minimum number of importers to flag as high-fan-in (default: 5).
+        high_fanout:
+            Minimum number of outgoing imports to flag as high-fan-out
+            (default: 10).
+        high_frequency_rate:
+            Minimum pack-inclusion rate (0-1) to flag frequent inclusion
+            (default: 0.5).
+        top_suggestions:
+            Maximum number of suggestions to return (default: 25).
+        config_path:
+            Optional path to a contextbudget.toml config file.
+        """
+
+        repo_path = normalize_repo(repo)
+        cfg = self._load_config(repo_path, config_path=config_path)
+        report = run_advise(
+            repo_path,
+            config=cfg,
+            history=history,
+            large_file_tokens=large_file_tokens,
+            high_fanin=high_fanin,
+            high_fanout=high_fanout,
+            high_frequency_rate=high_frequency_rate,
+            top_suggestions=top_suggestions,
+        )
+        return advise_as_dict(report)
 
     def profile(self, run: RunArtifactInput) -> dict[str, Any]:
         """Build a token savings profile from a pack run artifact.

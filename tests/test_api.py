@@ -258,3 +258,127 @@ def test_engine_heatmap_aggregates_run_history(tmp_path: Path) -> None:
     assert heatmap["runs_analyzed"] == 2
     assert heatmap["top_token_heavy_files"][0]["path"] == "src/auth.py"
     assert heatmap["top_token_heavy_directories"][0]["path"] == "src"
+
+
+# ---------------------------------------------------------------------------
+# BudgetGuard SDK interface: pack_context, simulate_agent, profile_run
+# ---------------------------------------------------------------------------
+
+
+def test_budget_guard_pack_context_returns_packed_artifact(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "search_api.py", "def search(query: str) -> list[str]:\n    return [query]\n")
+    _write(tmp_path / "src" / "cache.py", "def cache_get(key: str) -> str | None:\n    return None\n")
+
+    guard = BudgetGuard(max_tokens=30000)
+    result = guard.pack_context(task="add caching", repo=tmp_path)
+
+    assert result["command"] == "pack"
+    assert result["max_tokens"] == 30000
+    assert result["task"] == "add caching"
+    assert isinstance(result["ranked_files"], list)
+
+
+def test_budget_guard_pack_context_inherits_max_tokens(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+
+    guard = BudgetGuard(max_tokens=8000)
+    result = guard.pack_context(task="tighten auth", repo=tmp_path)
+
+    assert result["max_tokens"] == 8000
+
+
+def test_budget_guard_pack_context_override_max_tokens(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+
+    guard = BudgetGuard(max_tokens=30000)
+    result = guard.pack_context(task="tighten auth", repo=tmp_path, max_tokens=5000)
+
+    assert result["max_tokens"] == 5000
+
+
+def test_budget_guard_pack_context_strict_raises_on_violation(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+    _write(
+        tmp_path / "policy.toml",
+        "[policy]\nmax_files_included = 0\n",
+    )
+
+    guard = BudgetGuard(strict=True, policy_path=tmp_path / "policy.toml")
+    with pytest.raises(BudgetPolicyViolationError):
+        guard.pack_context(task="update auth", repo=tmp_path)
+
+
+def test_budget_guard_simulate_agent_returns_workflow_steps(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
+    _write(tmp_path / "src" / "session.py", "from .auth import login\n\ndef create_session(token):\n    return login(token)\n")
+    _write(tmp_path / "tests" / "test_auth.py", "from src.auth import login\ndef test_login():\n    assert login('prod_x')\n")
+
+    guard = BudgetGuard(max_tokens=30000)
+    plan = guard.simulate_agent(task="update auth flow", repo=tmp_path)
+
+    assert plan["command"] == "plan_agent"
+    assert plan["task"] == "update auth flow"
+    assert isinstance(plan["steps"], list)
+    assert len(plan["steps"]) > 0
+    assert {step["id"] for step in plan["steps"]} >= {"inspect", "implement"}
+    assert "total_estimated_tokens" in plan
+    assert "shared_context" in plan
+
+
+def test_budget_guard_simulate_agent_inherits_top_files(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+    _write(tmp_path / "src" / "cache.py", "def get(k: str) -> None:\n    return None\n")
+
+    guard = BudgetGuard(max_tokens=30000, top_files=2)
+    plan = guard.simulate_agent(task="add caching", repo=tmp_path)
+
+    all_context_paths = {item["path"] for step in plan["steps"] for item in step["context"]}
+    assert len(all_context_paths) <= 2
+
+
+def test_budget_guard_profile_run_adds_profile_block(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "search_api.py", "def search(query: str) -> list[str]:\n    return [query]\n")
+    _write(tmp_path / "src" / "cache.py", "def cache_get(key: str) -> str | None:\n    return None\n")
+
+    guard = BudgetGuard(max_tokens=30000)
+    result = guard.profile_run(task="add caching", repo=tmp_path)
+
+    assert result["command"] == "pack"
+    assert "profile" in result
+    profile = result["profile"]
+    assert isinstance(profile["elapsed_ms"], int)
+    assert profile["elapsed_ms"] >= 0
+    assert isinstance(profile["estimated_input_tokens"], int)
+    assert isinstance(profile["estimated_saved_tokens"], int)
+    assert isinstance(profile["compression_ratio"], float)
+    assert 0.0 <= profile["compression_ratio"] <= 1.0
+    assert isinstance(profile["files_included_count"], int)
+    assert isinstance(profile["files_skipped_count"], int)
+    assert isinstance(profile["quality_risk_estimate"], str)
+
+
+def test_budget_guard_profile_run_compression_ratio_bounds(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
+
+    guard = BudgetGuard(max_tokens=500)
+    result = guard.profile_run(task="tighten auth checks", repo=tmp_path)
+
+    profile = result["profile"]
+    estimated_input = profile["estimated_input_tokens"]
+    estimated_saved = profile["estimated_saved_tokens"]
+    original = estimated_input + estimated_saved
+
+    if original > 0:
+        expected_ratio = round(estimated_saved / original, 4)
+        assert profile["compression_ratio"] == expected_ratio
+    else:
+        assert profile["compression_ratio"] == 0.0
+
+
+def test_budget_guard_profile_run_inherits_max_tokens(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+
+    guard = BudgetGuard(max_tokens=4000)
+    result = guard.profile_run(task="update auth", repo=tmp_path)
+
+    assert result["max_tokens"] == 4000

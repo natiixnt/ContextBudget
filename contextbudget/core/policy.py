@@ -31,6 +31,7 @@ class PolicySpec:
     max_files_included: int | None = None
     max_quality_risk_level: str | None = None
     min_estimated_savings_percentage: float | None = None
+    max_context_size_bytes: int | None = None
 
 
 @dataclass(slots=True)
@@ -82,12 +83,14 @@ def _parse_policy_dict(raw: dict[str, Any]) -> PolicySpec:
     max_files = _to_int(data.get("max_files_included"))
     max_quality_risk = _normalize_risk(data.get("max_quality_risk_level"))
     min_savings = _to_float(data.get("min_estimated_savings_percentage"))
+    max_context_size_bytes = _to_int(data.get("max_context_size_bytes"))
 
     return PolicySpec(
         max_estimated_input_tokens=max_input_tokens,
         max_files_included=max_files,
         max_quality_risk_level=max_quality_risk,
         min_estimated_savings_percentage=min_savings,
+        max_context_size_bytes=max_context_size_bytes,
     )
 
 
@@ -128,11 +131,21 @@ def _extract_metrics(run_data: dict[str, Any]) -> dict[str, Any]:
     else:
         savings_pct = 0.0
 
+    compressed_context = run_data.get("compressed_context", [])
+    context_size_bytes = 0
+    if isinstance(compressed_context, list):
+        for entry in compressed_context:
+            if isinstance(entry, dict):
+                text = entry.get("text", "")
+                if isinstance(text, str):
+                    context_size_bytes += len(text.encode("utf-8"))
+
     return {
         "estimated_input_tokens": estimated_input_tokens,
         "files_included_count": len(files_included),
         "quality_risk_estimate": str(budget.get("quality_risk_estimate", "unknown")).lower(),
         "estimated_savings_percentage": round(savings_pct, 3),
+        "context_size_bytes": context_size_bytes,
     }
 
 
@@ -178,6 +191,14 @@ def evaluate_policy(run_data: dict[str, Any], policy: PolicySpec) -> PolicyResul
         checks["min_estimated_savings_percentage"] = {"actual": actual, "limit": limit, "passed": passed}
         if not passed:
             violations.append(f"estimated savings {actual:.2f}% is below minimum {limit:.2f}%")
+
+    if policy.max_context_size_bytes is not None:
+        actual = int(metrics["context_size_bytes"])
+        limit = int(policy.max_context_size_bytes)
+        passed = actual <= limit
+        checks["max_context_size_bytes"] = {"actual": actual, "limit": limit, "passed": passed}
+        if not passed:
+            violations.append(f"context size {actual} bytes exceeds max {limit} bytes")
 
     return PolicyResult(passed=not violations, violations=violations, checks=checks)
 

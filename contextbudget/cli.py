@@ -13,7 +13,9 @@ from contextbudget.core.policy import (
 )
 from contextbudget.engine import ContextBudgetEngine
 from contextbudget.core.render import (
+    render_advise_markdown,
     render_agent_plan_markdown,
+    render_agent_simulation_markdown,
     render_benchmark_markdown,
     render_diff_markdown,
     render_heatmap_markdown,
@@ -146,6 +148,55 @@ def cmd_plan_agent(args: argparse.Namespace) -> int:
         "Total estimated tokens: "
         f"{data.get('total_estimated_tokens', 0)} "
         f"(unique={data.get('unique_context_tokens', 0)}, reused={data.get('reused_context_tokens', 0)})"
+    )
+    return 0
+
+
+def cmd_simulate_agent(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine(config_path=args.config)
+    data = engine.simulate_agent(
+        task=args.task,
+        repo=args.repo,
+        workspace=args.workspace,
+        top_files=args.top_files,
+        prompt_overhead_per_step=args.prompt_overhead,
+        output_tokens_per_step=args.output_tokens,
+        context_mode=args.context_mode,
+    )
+
+    base = args.out_prefix or f"contextbudget-simulate-{_base_name(args.task)}"
+    json_path = Path(f"{base}.json")
+    md_path = Path(f"{base}.md")
+
+    write_json(json_path, data)
+    md_path.write_text(render_agent_simulation_markdown(data), encoding="utf-8")
+
+    print(f"Wrote simulation JSON: {json_path}")
+    print(f"Wrote simulation Markdown: {md_path}")
+    print(f"Context mode: {data.get('context_mode', 'isolated')}")
+
+    steps = data.get("steps", [])
+    if isinstance(steps, list):
+        for idx, step in enumerate(steps, start=1):
+            if not isinstance(step, dict):
+                continue
+            print(
+                f"{idx}. {step.get('title', '')} "
+                f"(context={step.get('context_tokens', 0)}, "
+                f"total={step.get('step_total_tokens', 0)}, "
+                f"cumulative_ctx={step.get('cumulative_context_tokens', 0)})"
+            )
+
+    print(
+        f"Total tokens: {data.get('total_tokens', 0)} "
+        f"| variance: {data.get('token_variance', 0.0)} "
+        f"| std_dev: {data.get('token_std_dev', 0.0)}"
+    )
+    print(
+        f"Min/avg/max per step: "
+        f"{data.get('min_step_tokens', 0)} / "
+        f"{data.get('avg_step_tokens', 0.0)} / "
+        f"{data.get('max_step_tokens', 0)}"
     )
     return 0
 
@@ -571,6 +622,87 @@ def cmd_watch(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_advise(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine(config_path=args.config)
+    data = engine.advise(
+        repo=args.repo,
+        history=args.history or None,
+        large_file_tokens=args.large_file_tokens,
+        high_fanin=args.high_fanin,
+        high_fanout=args.high_fanout,
+        high_frequency_rate=args.high_frequency_rate,
+        top_suggestions=args.top,
+    )
+
+    base = args.out_prefix or "contextbudget-advise"
+    json_path = Path(f"{base}.json")
+    md_path = Path(f"{base}.md")
+    write_json(json_path, data)
+    md_path.write_text(render_advise_markdown(data), encoding="utf-8")
+
+    summary = data.get("summary", {})
+    suggestions = data.get("suggestions", [])
+    print(f"Wrote advise JSON: {json_path}")
+    print(f"Wrote advise Markdown: {md_path}")
+    print(
+        f"Suggestions: {summary.get('total_suggestions', 0)} total, "
+        f"{summary.get('split_file', 0)} split_file, "
+        f"{summary.get('extract_module', 0)} extract_module, "
+        f"{summary.get('reduce_dependencies', 0)} reduce_dependencies"
+    )
+    for idx, item in enumerate(suggestions[:10], start=1):
+        print(
+            f"{idx}. [{item.get('suggestion', '')}] {item.get('path', '')} "
+            f"(impact={item.get('estimated_token_impact', 0)})"
+        )
+    if len(suggestions) > 10:
+        print(f"... and {len(suggestions) - 10} more. See {md_path} for full report.")
+    return 0
+
+
+def cmd_visualize(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine(config_path=args.config)
+    history = args.history or []
+
+    graph_data = engine.visualize(
+        repo=args.repo,
+        history=history or None,
+    )
+
+    base = args.out_prefix or "contextbudget-graph"
+    json_path = Path(f"{base}.json")
+    write_json(json_path, graph_data)
+    print(f"Wrote graph JSON: {json_path}")
+
+    stats = graph_data.get("stats", {})
+    print(
+        f"Nodes: {stats.get('total_nodes', 0)}  "
+        f"Edges: {stats.get('total_edges', 0)}  "
+        f"Total tokens: {stats.get('total_estimated_tokens', 0):,}"
+    )
+    top_token = stats.get("top_token_files", [])
+    if top_token:
+        print("Top token-heavy files:")
+        for path in top_token:
+            print(f"  {path}")
+    most_imported = stats.get("most_imported_files", [])
+    if most_imported:
+        print("Most imported files:")
+        for path in most_imported:
+            print(f"  {path}")
+
+    if args.html:
+        html_str = engine.visualize_html(
+            repo=args.repo,
+            history=history or None,
+        )
+        html_path = Path(f"{base}.html")
+        html_path.write_text(html_str, encoding="utf-8")
+        print(f"Wrote graph HTML: {html_path}")
+
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="contextbudget",
@@ -615,6 +747,49 @@ def build_parser() -> argparse.ArgumentParser:
         help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
     )
     plan_agent.set_defaults(func=cmd_plan_agent)
+
+    simulate_agent = sub.add_parser(
+        "simulate-agent",
+        help="Simulate agent workflow token costs step by step before execution",
+    )
+    simulate_agent.add_argument("task", help="Task description")
+    simulate_agent.add_argument("--repo", default=".", help="Repository path")
+    simulate_agent.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
+    simulate_agent.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown")
+    simulate_agent.add_argument(
+        "--top-files",
+        type=int,
+        default=None,
+        help="Max files considered per workflow step (overrides [budget].top_files).",
+    )
+    simulate_agent.add_argument(
+        "--prompt-overhead",
+        type=int,
+        default=800,
+        help="Estimated prompt overhead tokens per step (system + user prompt, default: 800).",
+    )
+    simulate_agent.add_argument(
+        "--output-tokens",
+        type=int,
+        default=600,
+        help="Estimated model output tokens per step (default: 600).",
+    )
+    simulate_agent.add_argument(
+        "--context-mode",
+        default="isolated",
+        choices=["isolated", "rolling", "full"],
+        help=(
+            "Context accumulation mode: "
+            "isolated=each step is independent, "
+            "rolling=two-step sliding window, "
+            "full=context grows across all steps (default: isolated)."
+        ),
+    )
+    simulate_agent.add_argument(
+        "--config",
+        help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
+    )
+    simulate_agent.set_defaults(func=cmd_simulate_agent)
 
     pack = sub.add_parser("pack", help="Build compressed context under token budget")
     pack.add_argument("task", help="Task description")
@@ -745,6 +920,92 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run a single incremental refresh and exit.",
     )
     watch.set_defaults(func=cmd_watch)
+
+
+    advise = sub.add_parser(
+        "advise",
+        help="Analyse a repository and suggest architecture changes to reduce context size",
+    )
+    advise.add_argument("--repo", default=".", help="Repository path")
+    advise.add_argument(
+        "--history",
+        nargs="*",
+        default=[],
+        help=(
+            "Pack run JSON files or directories to use for inclusion-frequency signals. "
+            "When omitted, frequency-based signals are skipped."
+        ),
+    )
+    advise.add_argument(
+        "--large-file-tokens",
+        dest="large_file_tokens",
+        type=int,
+        default=None,
+        help="Token threshold above which a file is considered large (default: 500).",
+    )
+    advise.add_argument(
+        "--high-fanin",
+        dest="high_fanin",
+        type=int,
+        default=None,
+        help="Min importer count to flag a file as high-fan-in (default: 5).",
+    )
+    advise.add_argument(
+        "--high-fanout",
+        dest="high_fanout",
+        type=int,
+        default=None,
+        help="Min outgoing import count to flag high-fan-out (default: 10).",
+    )
+    advise.add_argument(
+        "--high-frequency-rate",
+        dest="high_frequency_rate",
+        type=float,
+        default=None,
+        help="Min pack-inclusion rate (0-1) to flag a frequently-included file (default: 0.5).",
+    )
+    advise.add_argument(
+        "--top",
+        type=int,
+        default=25,
+        help="Maximum number of suggestions to output (default: 25).",
+    )
+    advise.add_argument("--out-prefix", default="contextbudget-advise", help="Output file prefix")
+    advise.add_argument(
+        "--config",
+        help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
+    )
+    advise.set_defaults(func=cmd_advise)
+
+    visualize = sub.add_parser(
+        "visualize",
+        help="Build and export a repository dependency graph annotated with token usage",
+    )
+    visualize.add_argument("--repo", default=".", help="Repository path")
+    visualize.add_argument(
+        "--history",
+        nargs="*",
+        default=[],
+        help=(
+            "Pack run JSON files or directories to use for inclusion-frequency "
+            "annotations.  When omitted, inclusion counts default to zero."
+        ),
+    )
+    visualize.add_argument(
+        "--html",
+        action="store_true",
+        help="Also write a self-contained interactive HTML visualization.",
+    )
+    visualize.add_argument(
+        "--out-prefix",
+        default="contextbudget-graph",
+        help="Output file prefix for graph JSON (and optional HTML).",
+    )
+    visualize.add_argument(
+        "--config",
+        help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
+    )
+    visualize.set_defaults(func=cmd_visualize)
 
     return parser
 
