@@ -84,6 +84,62 @@ contextbudget profile run.json
 | Cache Reuse      |     1 |         400 |               7.5% |
 ```
 
+### `contextbudget read-profiler <run.json> [--out-prefix <prefix>]`
+
+Analyze how a coding agent read repository files in a pack run.  Detects access
+pattern problems and quantifies tokens wasted.
+
+**Detects:**
+
+| Flag | Condition |
+|------|-----------|
+| duplicate read | Same file path appears more than once in the context pack |
+| unnecessary read | Low relevance score (≤ 1.0) **and** file costs ≥ 50 tokens |
+| high token-cost read | File's original token count ≥ 500 |
+
+**Output includes:**
+
+- Files read (total and unique)
+- Duplicate reads detected vs. prevented-by-packer
+- Unnecessary reads count
+- High token-cost reads count
+- Tokens wasted (duplicates + unnecessary)
+- Per-file breakdown table with flags
+- Separate tables for duplicate, unnecessary, and high-cost files
+
+**Example:**
+
+```bash
+contextbudget pack "add caching" --repo . --max-tokens 20000
+contextbudget read-profiler run.json
+```
+
+**Sample output (`run-read-profile.md`):**
+
+```markdown
+# ContextBudget Agent Read Profile
+
+## Summary
+
+| Metric | Value |
+|--------|-------|
+| Files read (total)                | 9  |
+| Unique files read                 | 8  |
+| Duplicate reads detected          | 1  |
+| Duplicate reads prevented (packer)| 0  |
+| Unnecessary reads                 | 2  |
+| High token-cost reads             | 3  |
+| Tokens wasted (duplicates)        | 340 |
+| Tokens wasted (unnecessary)       | 680 |
+| Total tokens wasted               | 1020 |
+
+## Duplicate Reads
+
+| File              | Read Count | Tokens/Read | Tokens Wasted |
+|-------------------|-----------|------------|---------------|
+| `src/router.py`   | 2          | 340         | 340           |
+```
+
 ### `contextbudget report <run.json> [--out <path>] [--policy <policy.toml>]`
 Render summary report from run artifact.
 

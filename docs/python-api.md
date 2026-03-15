@@ -284,6 +284,74 @@ print(f"files: {p['files_included_count']} included, {p['files_skipped_count']} 
 print(f"risk: {p['quality_risk_estimate']}")
 ```
 
+### `read_profile`
+
+Analyze how a coding agent read repository files in a pack run.  Detects
+duplicate reads, unnecessary reads, and high token-cost reads, then quantifies
+tokens wasted.
+
+```python
+from contextbudget import BudgetGuard
+
+guard = BudgetGuard(max_tokens=30000)
+run = guard.pack_context(task="add caching", repo=".")
+report = guard.read_profile(run)
+
+print(f"Files read:          {report['unique_files_read']}")
+print(f"Duplicate reads:     {report['duplicate_reads']}")
+print(f"Unnecessary reads:   {report['unnecessary_reads']}")
+print(f"High-cost reads:     {report['high_cost_reads']}")
+print(f"Tokens wasted total: {report['tokens_wasted_total']}")
+
+for rec in report["duplicate_files"]:
+    print(f"  duplicate: {rec['path']} (read {rec['read_count']}x, "
+          f"wastes {rec['waste_tokens']} tokens)")
+
+for rec in report["high_cost_files"]:
+    print(f"  high-cost: {rec['path']} ({rec['original_tokens']} tokens)")
+```
+
+`read_profile` also accepts a path to a run JSON file:
+
+```python
+report = guard.read_profile("run.json")
+```
+
+#### Return value
+
+| Key | Type | Description |
+|-----|------|-------------|
+| `total_files_read` | int | Total entries in compressed_context (including duplicates) |
+| `unique_files_read` | int | Distinct file paths seen |
+| `duplicate_reads` | int | Extra reads beyond the first for any duplicated path |
+| `duplicate_reads_prevented` | int | Duplicates already filtered by the packer |
+| `unnecessary_reads` | int | Low-relevance files that still cost significant tokens |
+| `high_cost_reads` | int | Files with original tokens ≥ 500 |
+| `tokens_wasted_duplicates` | int | Tokens consumed by extra duplicate reads |
+| `tokens_wasted_unnecessary` | int | Tokens consumed by unnecessary reads |
+| `tokens_wasted_total` | int | Sum of the two waste categories |
+| `files` | list | All `FileReadRecord` dicts, sorted by original tokens descending |
+| `duplicate_files` | list | Subset of `files` where `is_duplicate=True` |
+| `unnecessary_files` | list | Subset where `is_unnecessary=True` |
+| `high_cost_files` | list | Subset where `is_high_cost=True` |
+
+Each `FileReadRecord` in `files` has:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `path` | str | File path |
+| `original_tokens` | int | Raw token count of the file |
+| `compressed_tokens` | int | Token count after compression |
+| `strategy` | str | Compression strategy used |
+| `chunk_strategy` | str | Fine-grained strategy label |
+| `read_count` | int | Number of times this path appeared |
+| `relevance_score` | float | Score from ranked_files; 0.0 if not ranked |
+| `is_duplicate` | bool | Path appeared more than once |
+| `is_unnecessary` | bool | Low relevance + high token cost |
+| `is_high_cost` | bool | original_tokens ≥ 500 |
+| `waste_tokens` | int | Tokens attributed to this file's access problems |
+| `reasons` | list[str] | Human-readable explanations of flags raised |
+
 ---
 
 ## Error handling
