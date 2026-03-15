@@ -1,0 +1,32 @@
+version: "3.9"
+
+services:
+  api:
+    build: .
+    ports:
+      - "8080:8080"
+    environment:
+      DATABASE_URL: postgresql://contextbudget:contextbudget@db:5432/contextbudget
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: unless-stopped
+
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: contextbudget
+      POSTGRES_PASSWORD: contextbudget
+      POSTGRES_DB: contextbudget
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_create_events.sql:/docker-entrypoint-initdb.d/001_create_events.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contextbudget"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
