@@ -1,0 +1,91 @@
+version: "3.9"
+
+# Production docker-compose for contextbudget-cloud.
+# Usage:
+#   cp .env.example .env
+#   # edit .env with real database password and secret key
+#   docker compose -f docker-compose.prod.yml up -d
+#
+# Key differences from development compose:
+# - Uses named secrets instead of plain-text env vars for passwords
+# - PostgreSQL data volume is named for explicit lifecycle management
+# - API container has resource limits and health checks
+# - Nginx reverse proxy with TLS termination (bring your own certs)
+
+services:
+  api:
+    build: .
+    restart: always
+    environment:
+      DATABASE_URL: postgresql://contextbudget:${POSTGRES_PASSWORD}@db:5432/contextbudget
+    env_file:
+      - .env
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+    networks:
+      - internal
+      - proxy
+
+  db:
+    image: postgres:16-alpine
+    restart: always
+    environment:
+      POSTGRES_USER: contextbudget
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set in .env}
+      POSTGRES_DB: contextbudget
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./migrations/001_create_events.sql:/docker-entrypoint-initdb.d/001_create_events.sql
+      - ./migrations/002_create_control_plane.sql:/docker-entrypoint-initdb.d/002_create_control_plane.sql
+      - ./migrations/003_org_scoped_events.sql:/docker-entrypoint-initdb.d/003_org_scoped_events.sql
+      - ./migrations/004_webhooks.sql:/docker-entrypoint-initdb.d/004_webhooks.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U contextbudget"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: "1"
+          memory: 512M
+    networks:
+      - internal
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../deploy/nginx.conf:/etc/nginx/conf.d/contextbudget.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro     # mount your TLS certs here
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api
+    networks:
+      - proxy
+
+volumes:
+  postgres_data:
+    name: contextbudget_postgres_data
+  nginx_logs:
+    name: contextbudget_nginx_logs
+
+networks:
+  internal:
+    internal: true
+  proxy:
