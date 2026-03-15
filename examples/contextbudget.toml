@@ -15,7 +15,12 @@ critical_path_keywords = ["auth", "permission", "billing", "security"]
 [compression]
 summary_preview_lines = 10
 
+[summarization]
+backend = "deterministic"
+adapter = ""
+
 [cache]
+backend = "local_file"
 summary_cache_enabled = true
 duplicate_hash_cache_enabled = true
 cache_file = ".contextbudget_cache.json"

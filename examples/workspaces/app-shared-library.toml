@@ -1,0 +1,21 @@
+name = "app-shared-library"
+
+[scan]
+include_globs = ["**/*.ts", "**/*.tsx", "**/*.md"]
+ignore_globs = ["**/dist/**", "**/storybook-static/**"]
+
+[budget]
+max_tokens = 26000
+top_files = 28
+
+[score]
+critical_path_keywords = ["auth", "client", "types"]
+
+[[repos]]
+label = "web-app"
+path = "../../apps/web"
+
+[[repos]]
+label = "shared-ui"
+path = "../../packages/shared-ui"
+include_globs = ["src/**/*.ts", "src/**/*.tsx"]

@@ -1,162 +1,140 @@
 # ContextBudget
 
-**Open-source infrastructure for token-aware coding-agent workflows.**
+ContextBudget selects, compresses, and budgets repository context for coding-agent workflows. It is deterministic, local-first, and built to produce machine-readable artifacts that can be reused in CI, local tooling, and agent middleware.
 
-## Why this matters for coding agents
+## What It Does
 
-Most agent failures are not model failures. They are context failures:
-- too much irrelevant code
-- repeated file reads
-- no budget guardrails
-- no deterministic way to explain what got packed and why
+- ranks repository files against a natural-language task
+- packs relevant context under an explicit token budget
+- records stable `run.json` and `run.md` artifacts
+- reuses cached summaries and an incremental scan index
+- supports local multi-repo and monorepo-package workspaces
+- exposes an adapter-ready middleware layer for external agent tools
 
-ContextBudget helps agents stay focused, cheaper, and easier to operate in local workflows, CI, and future agent integrations.
-
-## Problem
-
-Teams still send huge repository slices to models by default. That wastes tokens, increases latency, and raises failure risk on long tasks.
-
-You need deterministic context packing, explicit budgets, and machine-readable run artifacts.
-
-## Before vs After
-
-**Before**
-- Send broad repo context to every request
-- Re-read the same files across runs
-- Discover token overruns too late
-
-**After (ContextBudget)**
-- Rank relevant files deterministically
-- Compress context by strategy (`full`, `snippet`, `summary`)
-- Reuse cached summaries and detect duplicate reads
-- Enforce budget and policy thresholds in CI
-
-## Demo Commands
+## Quickstart
 
 ```bash
 # Install
 python3 -m pip install -e .[dev]
 
-# 1) Plan relevant context
+# Optional exact local tokenizer backend
+python3 -m pip install -e .[tokenizers]
+
+# Rank likely-relevant files
 contextbudget plan "add caching to search API" --repo .
 
-# 2) Pack under a token budget
+# Pack context for one repository
 contextbudget pack "refactor auth middleware" --repo . --max-tokens 30000
 
-# 3) Summarize a run artifact
+# Pack context across multiple local repositories or packages
+contextbudget pack "update auth flow across services" --workspace workspace.toml
+
+# Summarize an existing run artifact
 contextbudget report run.json
 
-# 4) Compare two runs
+# Compare two runs
 contextbudget diff old-run.json new-run.json
 
-# 5) Evaluate strategy quality
+# Compare packing strategies
 contextbudget benchmark "add rate limiting to auth API" --repo .
+
+# Refresh scan state once without entering watch mode
+contextbudget watch --repo . --once
 ```
 
-## Example Output
+## Workspaces
 
-`run.json` contains deterministic, machine-readable signals:
+Workspace files let one task span multiple local repositories or monorepo packages while keeping the same scan, score, and pack pipeline.
 
-```json
-{
-  "command": "pack",
-  "task": "refactor auth middleware",
-  "files_included": ["src/auth.py", "src/middleware.py"],
-  "files_skipped": ["docs/notes.md"],
-  "budget": {
-    "estimated_input_tokens": 1240,
-    "estimated_saved_tokens": 3860,
-    "duplicate_reads_prevented": 2,
-    "quality_risk_estimate": "medium"
-  },
-  "compressed_context": [
-    {
-      "path": "src/auth.py",
-      "strategy": "snippet",
-      "chunk_strategy": "language-aware-python",
-      "chunk_reason": "imports + function/class regions"
-    }
-  ]
-}
+```toml
+name = "backend-services"
+
+[scan]
+include_globs = ["**/*.py", "**/*.ts"]
+
+[budget]
+max_tokens = 28000
+top_files = 24
+
+[[repos]]
+label = "auth-service"
+path = "../auth-service"
+
+[[repos]]
+label = "billing-service"
+path = "../billing-service"
+ignore_globs = ["tests/fixtures/**"]
 ```
 
-Sample artifacts: `examples/sample-outputs/`.
+Workspace artifacts add provenance fields without changing single-repo flows:
 
-## Architecture
+- `workspace`
+- `scanned_repos`
+- `selected_repos`
+- repo-qualified file paths such as `auth-service:src/auth.py`
 
-```text
-contextbudget/
-  config.py      # contextbudget.toml loader + typed settings
-  core/          # orchestration, rendering, policies, benchmark, diff
-  stages/        # scan/score/pack/cache/render boundaries
-  scanners/      # repository traversal + metadata
-  scorers/       # deterministic relevance + import graph signals
-  compressors/   # full/snippet/summary + language-aware chunking
-  cache/         # summary cache + duplicate detection
-  telemetry/     # optional sink abstraction (no-op by default)
-  schemas/       # typed dataclasses + stable artifact shapes
-```
+See [docs/workspace.md](docs/workspace.md) and the examples in [`examples/workspaces/`](examples/workspaces/).
 
-Principles:
-- deterministic heuristics first
-- typed Python, lightweight dependencies
-- no hidden data collection, no required cloud
-- strong extension path for future model-backed summarization/plugins
+## Agent Middleware
 
-## CI + Policy Gates
-
-Use ContextBudget as a quality gate for agent context in CI.
-
-```bash
-# Fail build on policy violations
-contextbudget pack "refactor auth middleware" --repo . --strict --policy examples/policy.toml
-
-# Re-check an existing run artifact
-contextbudget report run.json --policy examples/policy.toml
-```
-
-Supported policy checks:
-- max estimated input tokens
-- max files included
-- max quality risk level
-- minimum estimated savings percentage
-
-Workflow example: `.github/workflows/contextbudget.yml`  
-Policy example: `.github/contextbudget-policy.toml`
-
-## Python API
+The middleware layer sits on top of `ContextBudgetEngine`; it does not duplicate packing logic. It prepares context, optionally enforces policy, and records additive metadata for agent loops.
 
 ```python
-from contextbudget import BudgetGuard, ContextBudgetEngine
+from contextbudget import ContextBudgetEngine, enforce_budget, prepare_context, record_run
 
-guard = BudgetGuard(max_tokens=30000)
-result = guard.pack(task="add caching to search API", repo=".")
+result = prepare_context(
+    "update auth flow across services",
+    workspace="workspace.toml",
+    max_tokens=28000,
+    metadata={"agent": "local-demo"},
+)
 
-engine = ContextBudgetEngine()
-plan = engine.plan(task="risky auth change", repo=".")
-policy = engine.make_policy(max_files_included=12, max_quality_risk_level="medium")
-policy_result = engine.evaluate_policy(result, policy=policy)
+policy = ContextBudgetEngine.make_policy(
+    max_estimated_input_tokens=28000,
+    max_quality_risk_level="medium",
+)
+
+checked = enforce_budget(result, policy=policy)
+record_run(checked, "agent-run.json")
 ```
 
-Public API:
-- `ContextBudgetEngine.plan(...)`
-- `ContextBudgetEngine.pack(...)`
-- `ContextBudgetEngine.report(...)`
-- `ContextBudgetEngine.evaluate_policy(...)`
-- `BudgetGuard.pack(...)`
+`LocalDemoAgentAdapter` is included as a local simulation of how an external tool can call the middleware without introducing any vendor API dependency.
 
-## Roadmap
+## Extension Points
 
-See [ROADMAP.md](ROADMAP.md). Current direction:
-- stronger drift analysis and benchmark coverage
-- richer extension hooks for external summarizers
-- deeper CI/agent integration patterns
-- optional cloud analytics via explicit telemetry sinks (local-first by default)
+ContextBudget stays deterministic by default but exposes explicit hooks for local extensions:
 
-## Contribution Guide
+- scorer plugins
+- compressor plugins
+- token-estimator plugins
+- summarizer adapters
+- telemetry sinks
+- agent adapters
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) and [AGENTS.md](AGENTS.md).
+Artifacts record active implementations under `implementations`, along with additive cache, summarizer, token-estimator, workspace, and middleware metadata when those features are active.
+
+## Migration Notes
+
+Recent additions are additive rather than disruptive:
+
+- existing single-repo CLI flows stay unchanged
+- multi-repo analysis is opt-in through `--workspace <workspace.toml>` or `workspace=...`
+- workspace TOML files can carry shared config plus `[[repos]]` entries
+- the public Python API now exports `ContextBudgetMiddleware`, `AgentTaskRequest`, `prepare_context(...)`, `enforce_budget(...)`, `record_run(...)`, and `LocalDemoAgentAdapter`
+- machine-readable artifacts can now include `workspace`, `scanned_repos`, `selected_repos`, `implementations`, `token_estimator`, `summarizer`, and `agent_middleware`
+
+Detailed upgrade notes: [docs/migration.md](docs/migration.md).
 
 ## Documentation
 
-See the docs index: [docs/index.md](docs/index.md).
+- [Getting Started](docs/getting-started.md)
+- [CLI Reference](docs/cli.md)
+- [Configuration](docs/configuration.md)
+- [Workspace](docs/workspace.md)
+- [Python API](docs/python-api.md)
+- [Agent Integration](docs/agent-integration.md)
+- [Plugins](docs/plugins.md)
+- [Architecture](docs/architecture.md)
+- [Migration Notes](docs/migration.md)
+
+Examples and sample outputs: [examples/README.md](examples/README.md).

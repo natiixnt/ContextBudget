@@ -20,6 +20,10 @@ Compare deterministic strategies for one task:
 - compressed pack
 - cache-assisted pack
 
+Benchmark artifacts also include:
+- the active token-estimator backend report
+- `estimator_samples`, a compact comparison of built-in estimators on local sample text
+
 ```bash
 contextbudget benchmark "add rate limiting to auth API" --repo .
 ```

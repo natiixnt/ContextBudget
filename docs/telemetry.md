@@ -24,16 +24,23 @@ Events are structured JSON objects:
 ```json
 {
   "name": "pack_completed",
+  "schema_version": "v1",
   "timestamp": "2026-03-12T20:00:00+00:00",
   "run_id": "f6b1...",
   "payload": {
     "command": "pack",
-    "task": "refactor auth middleware",
-    "repo": "/path/to/repo",
-    "estimated_input_tokens": 1240
+    "repository": {
+      "repository_id": "sha256:...",
+      "workspace_id": "sha256:..."
+    },
+    "tokens": {
+      "estimated_input_tokens": 1240
+    }
   }
 }
 ```
+
+Detailed event schemas are documented in [Analytics Events](analytics-events.md).
 
 ## Emitted Events
 
@@ -42,6 +49,7 @@ The pipeline currently emits:
 - `scan_completed`
 - `scoring_completed`
 - `pack_completed`
+- `benchmark_completed`
 - `policy_failed` (on failed policy evaluation)
 
 ## Configuration
@@ -65,3 +73,4 @@ Defaults:
 - No telemetry events are emitted unless users explicitly enable telemetry.
 - No HTTP clients or hosted collectors are included.
 - File sink writes only to local filesystem paths under user control.
+- Event payloads exclude raw file contents, raw repository paths, and task text.

@@ -1,0 +1,21 @@
+name = "two-service-backend"
+
+[scan]
+include_globs = ["**/*.py", "**/*.md"]
+ignore_globs = ["**/generated/**"]
+
+[budget]
+max_tokens = 28000
+top_files = 24
+
+[score]
+critical_path_keywords = ["auth", "session", "permissions"]
+
+[[repos]]
+label = "auth-service"
+path = "../../services/auth-service"
+
+[[repos]]
+label = "billing-service"
+path = "../../services/billing-service"
+ignore_globs = ["tests/fixtures/**"]

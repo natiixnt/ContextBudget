@@ -40,6 +40,28 @@ contextbudget diff examples/sample-outputs/small-feature-run.json examples/sampl
 contextbudget benchmark "add rate limiting to auth API" --repo examples/benchmark/repo --out-prefix examples/sample-outputs/benchmark-auth
 ```
 
+## Workspace examples
+
+Two-service backend:
+
+```bash
+contextbudget pack "update auth flow across services" --workspace examples/workspaces/two-service-backend.toml
+```
+
+App plus shared library:
+
+```bash
+contextbudget pack "update auth flow and shared types" --workspace examples/workspaces/app-shared-library.toml
+```
+
+## Watch mode
+
+```bash
+contextbudget watch --repo examples/small-feature/repo --once
+```
+
+Sample session: `examples/sample-outputs/watch-session.md`
+
 ## Strict policy check
 
 ```bash
