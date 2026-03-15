@@ -356,7 +356,16 @@
 
     /* ── CALCULATOR ───────────────────────── */
     #calculator {
-      background: linear-gradient(to bottom, #0f0020 0%, #080010 50%, #1a0018 100%);
+      position: relative;
+      background: linear-gradient(to bottom, #0f0020 0%, #080010 60%, #120015 100%);
+    }
+
+    #calculator::after {
+      content: '';
+      position: absolute; bottom: 0; left: 0; right: 0;
+      height: 220px;
+      background: linear-gradient(to bottom, transparent 0%, rgba(160,0,14,.55) 100%);
+      pointer-events: none;
     }
 
     .calc-wrap {
