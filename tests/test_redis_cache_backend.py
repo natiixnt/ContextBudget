@@ -264,3 +264,72 @@ def test_create_summary_cache_backend_redis(tmp_path: Path) -> None:
     assert isinstance(backend, RedisSummaryCacheBackend)
     assert backend.namespace == "myorg:myrepo"
     assert backend.ttl_seconds == 7200
+
+
+# ---------------------------------------------------------------------------
+# Edge cases
+# ---------------------------------------------------------------------------
+
+def test_connection_failure_degrades_gracefully() -> None:
+    """get_summary and put_summary must not raise on Redis connection errors."""
+
+    class _FailingRedis:
+        def get(self, key: str) -> None:
+            raise ConnectionError("simulated connection failure")
+
+        def exists(self, key: str) -> int:
+            raise ConnectionError("simulated connection failure")
+
+        def setex(self, key: str, ttl: int, value: bytes) -> None:
+            raise ConnectionError("simulated connection failure")
+
+        def set(self, key: str, value: bytes) -> None:
+            raise ConnectionError("simulated connection failure")
+
+    backend = RedisSummaryCacheBackend(namespace="test", ttl_seconds=3600)
+    backend._redis = _FailingRedis()
+
+    assert backend.get_summary("k") is None
+    assert backend.put_summary("k", "v") is False
+    assert backend.get_fragment("fk") is None
+    assert backend.put_fragment("fk", "ref") is False
+
+
+def test_ttl_zero_stores_without_expiry() -> None:
+    """When ttl_seconds=0, values are stored persistently (no EXPIRY set)."""
+    server = fakeredis.FakeServer()
+    backend = RedisSummaryCacheBackend(namespace="test", ttl_seconds=0)
+    backend._redis = fakeredis.FakeRedis(server=server)
+
+    backend.put_summary("persistent-key", "persistent-value")
+
+    # Value must still be readable on a fresh client connected to the same server
+    reader = fakeredis.FakeRedis(server=server)
+    raw = reader.get("test:s:persistent-key")
+    assert raw is not None, "Key must exist without TTL"
+    assert reader.ttl("test:s:persistent-key") == -1, "Key must have no expiry"
+
+
+def test_cross_instance_reuse_via_fake_server(tmp_path: Path) -> None:
+    """Two independent backend instances sharing a FakeServer reuse each other's entries."""
+    _write(tmp_path / "src" / "large.py", "\n".join(f"line {i}" for i in range(2000)) + "\n")
+
+    cfg = default_config()
+    files = run_scan_stage(tmp_path, cfg)
+    ranked = run_score_stage("cross-instance task", files, cfg)
+
+    server = fakeredis.FakeServer()
+
+    def _make_instance() -> RedisSummaryCacheBackend:
+        b = RedisSummaryCacheBackend(namespace="org:repo", ttl_seconds=3600)
+        b._redis = fakeredis.FakeRedis(server=server)
+        return b
+
+    first_cache = _make_instance()
+    first = run_pack_stage("cross-instance task", tmp_path, ranked, 500, first_cache, cfg)
+
+    second_cache = _make_instance()
+    second = run_pack_stage("cross-instance task", tmp_path, ranked, 500, second_cache, cfg)
+
+    assert first.cache.misses >= 1
+    assert second.cache.hits >= 1, "Second independent instance must hit entries from the first"
