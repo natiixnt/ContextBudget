@@ -356,16 +356,13 @@
 <!-- ── NAV ── -->
 <nav>
   <a href="#" class="logo" aria-label="Redcon">
-    <svg width="120" height="26" viewBox="0 0 120 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-      <!-- Three chevrons (>>> mark) -->
+    <!-- chevrons only — no SVG text so nothing clips -->
+    <svg width="52" height="26" viewBox="0 0 52 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <path d="M0 0 L9 0 L23 13 L9 26 L0 26 L14 13 Z" fill="white"/>
       <path d="M14 0 L23 0 L37 13 L23 26 L14 26 L28 13 Z" fill="white"/>
       <path d="M28 0 L37 0 L51 13 L37 26 L28 26 L42 13 Z" fill="white"/>
-      <!-- "redcon" wordmark -->
-      <text x="58" y="20"
-        font-family="Telegraf, Inter, system-ui, -apple-system, sans-serif"
-        font-weight="800" font-size="20" fill="white" letter-spacing="-0.5">redcon</text>
     </svg>
+    <span style="font-size:21px;font-weight:800;letter-spacing:-.03em;line-height:1">redcon</span>
   </a>
   <div class="nav-links" style="display:flex;gap:36px;align-items:center">
     <a href="#problem"   class="nav-link">Problem</a>
@@ -383,13 +380,13 @@
   <h1 class="hero-headline">
     save tokens.<br>
     save
-    <span class="chevron-mark" aria-hidden="true">
-      <svg width="96" height="0.82em" viewBox="0 0 96 64" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:inline-block;vertical-align:middle;position:relative;top:-0.06em">
-        <path d="M0 0 L20 0 L52 32 L20 64 L0 64 L32 32 Z" fill="white"/>
-        <path d="M22 0 L42 0 L74 32 L42 64 L22 64 L54 32 Z" fill="white"/>
-        <path d="M44 0 L64 0 L96 32 L64 64 L44 64 L76 32 Z" fill="white"/>
-      </svg>
-    </span>oney.
+    <!-- chevron SVG sized via CSS so em resolves against the headline font-size -->
+    <svg viewBox="0 0 96 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
+      style="display:inline-block;height:.82em;width:auto;vertical-align:-.1em">
+      <path d="M0 0 L20 0 L52 32 L20 64 L0 64 L32 32 Z" fill="white"/>
+      <path d="M22 0 L42 0 L74 32 L42 64 L22 64 L54 32 Z" fill="white"/>
+      <path d="M44 0 L64 0 L96 32 L64 64 L44 64 L76 32 Z" fill="white"/>
+    </svg>oney.
   </h1>
 
   <p class="hero-sub">
@@ -580,14 +577,12 @@
 <!-- ── FOOTER ── -->
 <footer>
   <div class="footer-left">
-    <svg width="80" height="18" viewBox="0 0 120 26" fill="none" aria-label="Redcon" style="height:18px;width:auto">
+    <svg width="38" height="18" viewBox="0 0 52 26" fill="none" aria-hidden="true">
       <path d="M0 0 L9 0 L23 13 L9 26 L0 26 L14 13 Z" fill="white"/>
       <path d="M14 0 L23 0 L37 13 L23 26 L14 26 L28 13 Z" fill="white"/>
       <path d="M28 0 L37 0 L51 13 L37 26 L28 26 L42 13 Z" fill="white"/>
-      <text x="58" y="20"
-        font-family="Telegraf, Inter, system-ui, -apple-system, sans-serif"
-        font-weight="800" font-size="20" fill="white" letter-spacing="-0.5">redcon</text>
     </svg>
+    <span style="font-size:16px;font-weight:800;letter-spacing:-.03em">redcon</span>
   </div>
   <p class="footer-right">v1.1.0 &nbsp;&mdash;&nbsp; &copy; 2026 Redcon</p>
 </footer>
