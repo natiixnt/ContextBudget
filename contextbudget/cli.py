@@ -3,6 +3,7 @@ from __future__ import annotations
 """CLI entrypoint for ContextBudget commands."""
 
 import argparse
+import json as _json_mod
 from pathlib import Path
 import time
 
@@ -34,6 +35,7 @@ from contextbudget.core.render import (
     render_profile_markdown,
     render_read_profile_markdown,
     render_report_markdown,
+    render_visualize_markdown,
     write_json,
 )
 from contextbudget.schemas.models import normalize_repo
@@ -469,6 +471,7 @@ def cmd_observe(args: argparse.Namespace) -> int:
 
     base_dir = Path(args.base_dir) if getattr(args, "base_dir", None) else run_path.parent
     no_store = getattr(args, "no_store", False)
+    fmt = getattr(args, "format", "human")
 
     data = engine.observe(run_path, store=not no_store, base_dir=base_dir)
     markdown = render_observe_markdown(data)
@@ -480,19 +483,23 @@ def cmd_observe(args: argparse.Namespace) -> int:
     write_json(json_path, data)
     md_path.write_text(markdown, encoding="utf-8")
 
-    print(markdown)
-    print(f"Wrote observe JSON:     {json_path}")
-    print(f"Wrote observe Markdown: {md_path}")
-    if not no_store:
-        store_path = base_dir / ".contextbudget" / "observe-history.json"
-        print(f"Metrics stored in:      {store_path}")
+    if fmt == "json":
+        print(_json_mod.dumps(data, indent=2, default=str))
+    else:
+        print(markdown)
+        print(f"Wrote observe JSON:     {json_path}")
+        print(f"Wrote observe Markdown: {md_path}")
+        if not no_store:
+            store_path = base_dir / ".contextbudget" / "observe-history.json"
+            print(f"Metrics stored in:      {store_path}")
 
     if getattr(args, "export_history", False):
         from contextbudget.telemetry.store import export_observe_history_json
         hist = export_observe_history_json(base_dir=base_dir)
         hist_path = Path(f"{prefix}-history.json")
         write_json(hist_path, hist)
-        print(f"Exported history JSON:  {hist_path}")
+        if fmt != "json":
+            print(f"Exported history JSON:  {hist_path}")
 
     return 0
 
@@ -500,10 +507,9 @@ def cmd_observe(args: argparse.Namespace) -> int:
 def cmd_read_profiler(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine()
     run_path = Path(args.run_json)
+    fmt = getattr(args, "format", "human")
     data = engine.read_profile(run_path)
     markdown = render_read_profile_markdown(data)
-
-    print(markdown)
 
     prefix = args.out_prefix or run_path.with_suffix("").name + "-read-profile"
     json_path = Path(f"{prefix}.json")
@@ -511,13 +517,17 @@ def cmd_read_profiler(args: argparse.Namespace) -> int:
     write_json(json_path, data)
     md_path.write_text(markdown, encoding="utf-8")
 
-    print(f"Unique files read:    {data.get('unique_files_read', 0)}")
-    print(f"Duplicate reads:      {data.get('duplicate_reads', 0)}")
-    print(f"Unnecessary reads:    {data.get('unnecessary_reads', 0)}")
-    print(f"High-cost reads:      {data.get('high_cost_reads', 0)}")
-    print(f"Tokens wasted total:  {data.get('tokens_wasted_total', 0)}")
-    print(f"Wrote read-profile JSON:     {json_path}")
-    print(f"Wrote read-profile Markdown: {md_path}")
+    if fmt == "json":
+        print(_json_mod.dumps(data, indent=2, default=str))
+    else:
+        print(markdown)
+        print(f"Unique files read:    {data.get('unique_files_read', 0)}")
+        print(f"Duplicate reads:      {data.get('duplicate_reads', 0)}")
+        print(f"Unnecessary reads:    {data.get('unnecessary_reads', 0)}")
+        print(f"High-cost reads:      {data.get('high_cost_reads', 0)}")
+        print(f"Tokens wasted total:  {data.get('tokens_wasted_total', 0)}")
+        print(f"Wrote read-profile JSON:     {json_path}")
+        print(f"Wrote read-profile Markdown: {md_path}")
     return 0
 
 def cmd_report(args: argparse.Namespace) -> int:
@@ -822,6 +832,7 @@ def cmd_heatmap(args: argparse.Namespace) -> int:
 def cmd_drift(args: argparse.Namespace) -> int:
     repo_path = normalize_repo(args.repo)
     engine = ContextBudgetEngine()
+    fmt = getattr(args, "format", "human")
     try:
         drift_data = engine.drift(
             repo=repo_path,
@@ -841,30 +852,34 @@ def cmd_drift(args: argparse.Namespace) -> int:
     md_path.write_text(markdown, encoding="utf-8")
 
     drift = drift_data.get("drift", {})
-    verdict = str(drift.get("verdict", "none") or "none")
     alert = bool(drift.get("alert", False))
-    token_drift_pct = float(drift.get("token_drift_pct", 0.0) or 0.0)
-    file_drift_pct = float(drift.get("file_drift_pct", 0.0) or 0.0)
-    dep_depth_drift_pct = float(drift.get("dep_depth_drift_pct", 0.0) or 0.0)
-    entries_analyzed = int(drift_data.get("entries_analyzed", 0) or 0)
 
-    if alert:
-        print(f"context drift detected [{verdict.upper()}]")
+    if fmt == "json":
+        print(_json_mod.dumps(drift_data, indent=2, default=str))
     else:
-        print("no significant context drift detected")
-    print(f"  Entries analyzed  : {entries_analyzed}")
-    direction = "increased" if token_drift_pct >= 0 else "decreased"
-    print(f"  token usage {direction} by {abs(token_drift_pct):.1f}%")
-    print(f"  File drift        : {file_drift_pct:+.1f}%")
-    print(f"  Dependency depth  : {dep_depth_drift_pct:+.1f}%")
-    contributors = drift_data.get("top_contributors", [])
-    if isinstance(contributors, list) and contributors:
-        print(f"  files contributing most to drift ({len(contributors)} file(s)):")
-        for c in contributors[:5]:
-            if isinstance(c, dict):
-                print(f"    {c.get('status', ''):10s} {c.get('file', '')}")
-    print(f"Wrote drift JSON: {json_path}")
-    print(f"Wrote drift Markdown: {md_path}")
+        verdict = str(drift.get("verdict", "none") or "none")
+        token_drift_pct = float(drift.get("token_drift_pct", 0.0) or 0.0)
+        file_drift_pct = float(drift.get("file_drift_pct", 0.0) or 0.0)
+        dep_depth_drift_pct = float(drift.get("dep_depth_drift_pct", 0.0) or 0.0)
+        entries_analyzed = int(drift_data.get("entries_analyzed", 0) or 0)
+
+        if alert:
+            print(f"context drift detected [{verdict.upper()}]")
+        else:
+            print("no significant context drift detected")
+        print(f"  Entries analyzed  : {entries_analyzed}")
+        direction = "increased" if token_drift_pct >= 0 else "decreased"
+        print(f"  token usage {direction} by {abs(token_drift_pct):.1f}%")
+        print(f"  File drift        : {file_drift_pct:+.1f}%")
+        print(f"  Dependency depth  : {dep_depth_drift_pct:+.1f}%")
+        contributors = drift_data.get("top_contributors", [])
+        if isinstance(contributors, list) and contributors:
+            print(f"  files contributing most to drift ({len(contributors)} file(s)):")
+            for c in contributors[:5]:
+                if isinstance(c, dict):
+                    print(f"    {c.get('status', ''):10s} {c.get('file', '')}")
+        print(f"Wrote drift JSON: {json_path}")
+        print(f"Wrote drift Markdown: {md_path}")
     return 2 if alert else 0
 
 
@@ -1040,6 +1055,18 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
         f"Rate: {s['savings_rate']:.1%}"
     )
     serve_dashboard(data, port=args.port, no_open=args.no_open)
+    return 0
+
+
+def cmd_control_plane(args: argparse.Namespace) -> int:
+    from contextbudget.control_plane.server import make_server
+
+    server = make_server(
+        db_path=args.db,
+        host=args.host,
+        port=args.port,
+    )
+    server.serve()
     return 0
 
 
@@ -1637,6 +1664,28 @@ def build_parser() -> argparse.ArgumentParser:
         help="Export the full metrics store history to a JSON file.",
     )
     observe.set_defaults(func=cmd_observe)
+
+    control_plane_cmd = sub.add_parser(
+        "control-plane",
+        help="Start the control plane HTTP API server for multi-team analytics",
+    )
+    control_plane_cmd.add_argument(
+        "--host",
+        default="127.0.0.1",
+        help="Host to bind the server to (default: 127.0.0.1).",
+    )
+    control_plane_cmd.add_argument(
+        "--port",
+        type=int,
+        default=7700,
+        help="Port for the control plane server (default: 7700).",
+    )
+    control_plane_cmd.add_argument(
+        "--db",
+        default=".contextbudget/control_plane.db",
+        help="Path to SQLite database file (default: .contextbudget/control_plane.db).",
+    )
+    control_plane_cmd.set_defaults(func=cmd_control_plane)
 
     return parser
 
