@@ -1220,3 +1220,407 @@ def render_profile_markdown(data: dict) -> str:
 
     lines.append("")
     return "\n".join(lines)
+
+
+def render_drift_markdown(data: dict) -> str:
+    """Render a context drift report to Markdown."""
+
+    repo = str(data.get("repo", "") or "")
+    task_filter = str(data.get("task_filter", "") or "")
+    window = int(data.get("window", 0) or 0)
+    threshold_pct = float(data.get("threshold_pct", 10.0) or 10.0)
+    entries_analyzed = int(data.get("entries_analyzed", 0) or 0)
+    generated_at = str(data.get("generated_at", "") or "")
+
+    baseline = data.get("baseline", {}) or {}
+    current = data.get("current", {}) or {}
+    drift = data.get("drift", {}) or {}
+
+    token_drift = float(drift.get("token_drift_pct", 0.0) or 0.0)
+    file_drift = float(drift.get("file_drift_pct", 0.0) or 0.0)
+    complexity_drift = float(drift.get("complexity_drift_pct", 0.0) or 0.0)
+    alert = bool(drift.get("alert", False))
+    verdict = str(drift.get("verdict", "none") or "none")
+
+    alert_badge = " **ALERT**" if alert else ""
+    verdict_label = verdict.upper()
+
+    lines = [
+        "# ContextBudget Drift Report",
+        "",
+        f"Generated at: {generated_at}",
+        f"Repository:   {repo}",
+    ]
+    if task_filter:
+        lines.append(f"Task filter:  {task_filter}")
+    lines += [
+        f"Window:       {window} entries (analyzed: {entries_analyzed})",
+        f"Threshold:    {threshold_pct:.1f}%",
+        "",
+        f"## Verdict: {verdict_label}{alert_badge}",
+        "",
+        "| Metric | Baseline | Current | Drift |",
+        "|--------|----------|---------|-------|",
+        (
+            f"| Token count "
+            f"| {int(baseline.get('token_count', 0) or 0):,} "
+            f"| {int(current.get('token_count', 0) or 0):,} "
+            f"| {token_drift:+.1f}% |"
+        ),
+        (
+            f"| File count "
+            f"| {int(baseline.get('file_count', 0) or 0)} "
+            f"| {int(current.get('file_count', 0) or 0)} "
+            f"| {file_drift:+.1f}% |"
+        ),
+        (
+            f"| Complexity (tok/file) "
+            f"| {float(baseline.get('complexity', 0.0) or 0.0):.1f} "
+            f"| {float(current.get('complexity', 0.0) or 0.0):.1f} "
+            f"| {complexity_drift:+.1f}% |"
+        ),
+        "",
+        f"Baseline run: `{baseline.get('generated_at', '')}` — {baseline.get('task', '')}",
+        f"Current run:  `{current.get('generated_at', '')}` — {current.get('task', '')}",
+        "",
+    ]
+
+    contributors = data.get("top_contributors", [])
+    if isinstance(contributors, list) and contributors:
+        lines += [
+            "## Top Contributors to Drift",
+            "",
+            "| File | Status | Baseline freq | Recent freq | Delta |",
+            "|------|--------|--------------|-------------|-------|",
+        ]
+        for c in contributors:
+            if not isinstance(c, dict):
+                continue
+            delta = float(c.get("frequency_delta", 0.0) or 0.0)
+            lines.append(
+                f"| `{c.get('file', '')}` "
+                f"| {c.get('status', '')} "
+                f"| {float(c.get('baseline_frequency', 0.0) or 0.0):.0%} "
+                f"| {float(c.get('recent_frequency', 0.0) or 0.0):.0%} "
+                f"| {delta:+.0%} |"
+            )
+        lines.append("")
+
+    trend = data.get("trend", [])
+    if isinstance(trend, list) and trend:
+        lines += [
+            "## Trend",
+            "",
+            "| # | Timestamp | Task | Tokens | Files | Complexity |",
+            "|---|-----------|------|--------|-------|------------|",
+        ]
+        for i, point in enumerate(trend, 1):
+            if not isinstance(point, dict):
+                continue
+            lines.append(
+                f"| {i} "
+                f"| {point.get('generated_at', '')[:19]} "
+                f"| {str(point.get('task', ''))[:40]} "
+                f"| {int(point.get('token_count', 0) or 0):,} "
+                f"| {int(point.get('file_count', 0) or 0)} "
+                f"| {float(point.get('complexity', 0.0) or 0.0):.1f} |"
+            )
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_pipeline_markdown(data: dict) -> str:
+    """Render a full pipeline trace artifact to Markdown."""
+
+    stages: list[dict] = data.get("stages") or []
+    total_saved = int(data.get("total_tokens_saved") or 0)
+    total_pct = float(data.get("total_reduction_pct") or 0.0)
+    final_tokens = int(data.get("final_tokens") or 0)
+    tokens_at_scan = int(data.get("tokens_at_scan") or 0)
+
+    lines = [
+        "# ContextBudget Pipeline Trace",
+        "",
+        f"Task: {data.get('task', '')}",
+        f"Repository: {data.get('repo', '')}",
+        f"Run artifact: {data.get('run_json', '')}",
+        f"Generated: {data.get('generated_at', '')}",
+        "",
+        "## Summary",
+        "",
+        "| Metric | Value |",
+        "| --- | --- |",
+        f"| Scanned files | {data.get('scanned_files', 0):,} |",
+        f"| Tokens at scan (ranked pool) | {tokens_at_scan:,} |",
+        f"| Tokens after ranking | {int(data.get('tokens_after_ranking') or 0):,} |",
+        f"| Tokens before pack | {int(data.get('tokens_before_pack') or 0):,} |",
+        f"| Tokens after pack | {int(data.get('tokens_after_pack') or 0):,} |",
+        f"| **Final context tokens** | **{final_tokens:,}** |",
+        f"| Total tokens saved | {total_saved:,} |",
+        f"| **Total reduction** | **{total_pct:.1f}%** |",
+        f"| Cache active | {'yes' if data.get('has_cache') else 'no'} |",
+        f"| Delta active | {'yes' if data.get('has_delta') else 'no'} |",
+        "",
+        "## Stage Breakdown",
+        "",
+        "| Stage | Files | Tokens In | Tokens Out | Saved | Reduction |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+
+    OPT_INDENT = "\u00a0\u00a0\u00a0\u00bb "
+
+    for stage in stages:
+        if not isinstance(stage, dict):
+            continue
+        label = stage.get("label", stage.get("name", ""))
+        is_opt = bool(stage.get("is_optimisation", False))
+        display_label = f"{OPT_INDENT}{label}" if is_opt else f"**{label}**"
+        files = int(stage.get("files_in") or 0)
+        t_in = int(stage.get("tokens_in") or 0)
+        t_out = int(stage.get("tokens_out") or 0)
+        t_saved = int(stage.get("tokens_saved") or 0)
+        pct = float(stage.get("reduction_pct") or 0.0)
+        pct_cell = f"{pct:.1f}%" if pct > 0 else "—"
+        saved_cell = f"{t_saved:,}" if t_saved > 0 else "—"
+        lines.append(
+            f"| {display_label} | {files:,} | {t_in:,} | {t_out:,} | {saved_cell} | {pct_cell} |"
+        )
+
+    notes_rows = [s for s in stages if isinstance(s, dict) and s.get("notes")]
+    if notes_rows:
+        lines.extend(["", "## Stage Notes", ""])
+        for stage in notes_rows:
+            label = stage.get("label", stage.get("name", ""))
+            lines.append(f"- **{label}**: {stage.get('notes', '')}")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_prepare_context_markdown(record: dict) -> str:
+    """Render a prepare-context middleware result to Markdown."""
+
+    pack_md = render_pack_markdown(record)
+    mw = record.get("agent_middleware", {})
+    if not isinstance(mw, dict):
+        return pack_md
+
+    meta = mw.get("metadata", {})
+    if not isinstance(meta, dict):
+        meta = {}
+
+    policy_block = record.get("policy", {})
+    lines = [
+        pack_md,
+        "",
+        "## Agent Middleware",
+        f"- Files included: {meta.get('files_included_count', 0)}",
+        f"- Files removed: {meta.get('files_removed_count', 0)}",
+        f"- Files skipped: {meta.get('files_skipped_count', 0)}",
+        f"- Estimated input tokens: {meta.get('estimated_input_tokens', 0)}",
+        f"- Estimated saved tokens: {meta.get('estimated_saved_tokens', 0)}",
+        f"- Quality risk: {meta.get('quality_risk_estimate', 'unknown')}",
+        f"- Delta enabled: {meta.get('delta_enabled', False)}",
+    ]
+
+    recorded = mw.get("recorded_path", "")
+    if recorded:
+        lines.append(f"- Recorded path: `{recorded}`")
+
+    adapter = mw.get("adapter", "")
+    if adapter:
+        lines.append(f"- Adapter: {adapter}")
+
+    if isinstance(policy_block, dict) and policy_block:
+        passed = bool(policy_block.get("passed", True))
+        lines.extend([
+            "",
+            "## Policy",
+            f"- Result: {'PASS' if passed else 'FAIL'}",
+        ])
+        for v in policy_block.get("violations", []):
+            lines.append(f"- Violation: {v}")
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_read_profile_markdown(data: dict) -> str:
+    """Render an agent read profile artifact to Markdown."""
+
+    run_json = str(data.get("run_json") or "")
+    lines = ["# ContextBudget Agent Read Profile", ""]
+    if run_json:
+        lines.append(f"Run artifact: {run_json}")
+    lines.extend(
+        [
+            f"Generated at: {data.get('generated_at', '')}",
+            "",
+            "## Summary",
+            "",
+            "| Metric | Value |",
+            "|--------|-------|",
+            f"| Files read (total)                | {data.get('total_files_read', 0)} |",
+            f"| Unique files read                 | {data.get('unique_files_read', 0)} |",
+            f"| Duplicate reads detected          | {data.get('duplicate_reads', 0)} |",
+            f"| Duplicate reads prevented (packer)| {data.get('duplicate_reads_prevented', 0)} |",
+            f"| Unnecessary reads                 | {data.get('unnecessary_reads', 0)} |",
+            f"| High token-cost reads             | {data.get('high_cost_reads', 0)} |",
+            f"| Tokens wasted (duplicates)        | {data.get('tokens_wasted_duplicates', 0)} |",
+            f"| Tokens wasted (unnecessary)       | {data.get('tokens_wasted_unnecessary', 0)} |",
+            f"| Total tokens wasted               | {data.get('tokens_wasted_total', 0)} |",
+            "",
+        ]
+    )
+
+    # --- duplicate reads ---
+    dup_files = data.get("duplicate_files", [])
+    if isinstance(dup_files, list) and dup_files:
+        lines.extend(
+            [
+                "## Duplicate Reads",
+                "",
+                "These files were read more than once in the same context pack.",
+                "",
+                "| File | Read Count | Tokens/Read | Tokens Wasted |",
+                "|------|-----------|------------|---------------|",
+            ]
+        )
+        for rec in dup_files:
+            if not isinstance(rec, dict):
+                continue
+            lines.append(
+                f"| `{rec.get('path', '')}` "
+                f"| {rec.get('read_count', 1)} "
+                f"| {rec.get('original_tokens', 0)} "
+                f"| {rec.get('waste_tokens', 0)} |"
+            )
+        lines.append("")
+
+    # --- unnecessary reads ---
+    unneeded = data.get("unnecessary_files", [])
+    if isinstance(unneeded, list) and unneeded:
+        lines.extend(
+            [
+                "## Unnecessary Reads",
+                "",
+                "Low-relevance files with significant token cost.",
+                "",
+                "| File | Relevance Score | Tokens | Strategy |",
+                "|------|----------------|--------|----------|",
+            ]
+        )
+        for rec in unneeded:
+            if not isinstance(rec, dict):
+                continue
+            chunk = str(rec.get("chunk_strategy") or rec.get("strategy") or "—")
+            lines.append(
+                f"| `{rec.get('path', '')}` "
+                f"| {float(rec.get('relevance_score', 0.0)):.2f} "
+                f"| {rec.get('original_tokens', 0)} "
+                f"| {chunk} |"
+            )
+        lines.append("")
+
+    # --- high-cost reads ---
+    high_cost = data.get("high_cost_files", [])
+    if isinstance(high_cost, list) and high_cost:
+        lines.extend(
+            [
+                "## High Token-Cost Reads",
+                "",
+                "Files that individually cost the most tokens.",
+                "",
+                "| File | Original Tokens | Compressed Tokens | Strategy |",
+                "|------|----------------|-------------------|----------|",
+            ]
+        )
+        for rec in high_cost:
+            if not isinstance(rec, dict):
+                continue
+            chunk = str(rec.get("chunk_strategy") or rec.get("strategy") or "—")
+            lines.append(
+                f"| `{rec.get('path', '')}` "
+                f"| {rec.get('original_tokens', 0)} "
+                f"| {rec.get('compressed_tokens', 0)} "
+                f"| {chunk} |"
+            )
+        lines.append("")
+
+    # --- all files ---
+    all_files = data.get("files", [])
+    if isinstance(all_files, list) and all_files:
+        lines.extend(
+            [
+                "## All Files Read",
+                "",
+                "| File | Original Tokens | Compressed Tokens | Score | Flags |",
+                "|------|----------------|-------------------|-------|-------|",
+            ]
+        )
+        for rec in all_files:
+            if not isinstance(rec, dict):
+                continue
+            flags = []
+            if rec.get("is_duplicate"):
+                flags.append("duplicate")
+            if rec.get("is_unnecessary"):
+                flags.append("unnecessary")
+            if rec.get("is_high_cost"):
+                flags.append("high-cost")
+            flag_str = ", ".join(flags) if flags else "—"
+            score = float(rec.get("relevance_score", 0.0) or 0.0)
+            score_str = f"{score:.2f}" if score > 0.0 else "—"
+            lines.append(
+                f"| `{rec.get('path', '')}` "
+                f"| {rec.get('original_tokens', 0)} "
+                f"| {rec.get('compressed_tokens', 0)} "
+                f"| {score_str} "
+                f"| {flag_str} |"
+            )
+        lines.append("")
+
+    return "\n".join(lines)
+
+
+def render_dataset_markdown(data: dict) -> str:
+    """Render a dataset report to Markdown."""
+
+    agg = data.get("aggregate", {})
+    entries = data.get("entries", [])
+
+    lines = [
+        "# ContextBudget Dataset Report",
+        "",
+        f"Repository: {data.get('repo', '')}",
+        f"Generated at: {data.get('generated_at', '')}",
+        f"Tasks: {data.get('task_count', 0)}",
+        "",
+        "## Aggregate",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| Total baseline tokens | {agg.get('total_baseline_tokens', 0)} |",
+        f"| Total optimized tokens | {agg.get('total_optimized_tokens', 0)} |",
+        f"| Avg baseline tokens | {agg.get('avg_baseline_tokens', 0)} |",
+        f"| Avg optimized tokens | {agg.get('avg_optimized_tokens', 0)} |",
+        f"| Avg reduction | {agg.get('avg_reduction_pct', 0):.1f}% |",
+        "",
+        "## Per-Task Results",
+        "| # | Task | Baseline tokens | Optimized tokens | Reduction |",
+        "|---|------|-----------------|------------------|-----------|",
+    ]
+
+    for idx, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            continue
+        label = entry.get("task_name") or entry.get("task", "")
+        lines.append(
+            f"| {idx} | {label} "
+            f"| {entry.get('baseline_tokens', 0)} "
+            f"| {entry.get('optimized_tokens', 0)} "
+            f"| {entry.get('reduction_pct', 0):.1f}% |"
+        )
+
+    lines.append("")
+    return "\n".join(lines)

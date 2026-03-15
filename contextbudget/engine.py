@@ -9,7 +9,9 @@ from typing import Any, Mapping, Sequence
 from contextbudget.cache import update_run_history_artifacts
 from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_config, load_workspace
 from contextbudget.core.advisor import advise_as_dict, run_advise
+from contextbudget.core.drift import run_drift
 from contextbudget.core.benchmark import run_benchmark
+from contextbudget.core.dataset import DatasetTask, dataset_as_dict, load_tasks_toml, run_dataset
 from contextbudget.core.delta import effective_pack_metrics
 from contextbudget.core.graph_visualizer import (
     build_repo_graph,
@@ -35,6 +37,8 @@ from contextbudget.core.policy import (
     policy_result_to_dict,
 )
 from contextbudget.core.profiler import build_savings_profile, savings_profile_as_dict
+from contextbudget.core.read_profiler import build_read_profile, read_profile_as_dict
+from contextbudget.core.pipeline_trace import build_pipeline_trace, pipeline_trace_as_dict
 from contextbudget.core.render import read_json
 from contextbudget.schemas.models import normalize_repo
 from contextbudget.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
@@ -437,6 +441,43 @@ class ContextBudgetEngine:
 
         return run_heatmap(history=history, limit=limit)
 
+    def drift(
+        self,
+        *,
+        repo: str | Path = ".",
+        task: str | None = None,
+        window: int = 20,
+        threshold_pct: float = 10.0,
+    ) -> dict[str, Any]:
+        """Detect context drift by comparing recent pack history.
+
+        Reads ``.contextbudget/history.json`` in *repo* and measures how
+        token usage, file count, and context complexity have changed over the
+        most recent *window* pack runs.
+
+        Parameters
+        ----------
+        repo:
+            Repository root.  History is loaded from
+            ``<repo>/.contextbudget/history.json``.
+        task:
+            Optional substring filter applied to history entry task fields.
+            When provided, only matching entries contribute to the analysis.
+        window:
+            Maximum number of recent history entries to include (default: 20).
+        threshold_pct:
+            Token drift percentage at or above which ``alert`` is set and the
+            verdict is elevated from ``"none"`` (default: 10.0).
+
+        Returns
+        -------
+        dict
+            JSON-serialisable drift report with ``drift``, ``trend``, and
+            ``top_contributors`` keys.
+        """
+        repo_path = normalize_repo(repo)
+        return run_drift(repo_path, task=task, window=window, threshold_pct=threshold_pct)
+
     def benchmark(
         self,
         *,
@@ -471,6 +512,57 @@ class ContextBudgetEngine:
             config=cfg,
             telemetry_sink=self._telemetry_sink,
         )
+
+    def dataset(
+        self,
+        *,
+        tasks_toml: str | Path,
+        repo: str | Path = ".",
+        max_tokens: int | None = None,
+        top_files: int | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Build a benchmark dataset from a TOML task list.
+
+        Runs ``benchmark`` for every task defined in *tasks_toml* and
+        aggregates the results into a single JSON-serialisable report that
+        captures baseline tokens, optimised tokens, and reduction percentage
+        per task, plus cross-task aggregate statistics.
+
+        Parameters
+        ----------
+        tasks_toml:
+            Path to a TOML file containing ``[[tasks]]`` entries.  Each entry
+            must have a ``description`` field and may have an optional ``name``.
+        repo:
+            Repository to benchmark against.
+        max_tokens:
+            Token budget forwarded to every benchmark run.
+        top_files:
+            Top-files limit forwarded to every benchmark run.
+        config_path:
+            Optional path to a ``contextbudget.toml`` config file.
+        """
+        repo_path = normalize_repo(repo)
+        tasks = load_tasks_toml(Path(tasks_toml))
+
+        def _run(*, task: str, repo: Path, max_tokens: int | None, top_files: int | None) -> dict[str, Any]:
+            return self.benchmark(
+                task=task,
+                repo=repo,
+                max_tokens=max_tokens,
+                top_files=top_files,
+                config_path=config_path,
+            )
+
+        report = run_dataset(
+            tasks,
+            repo_path,
+            run_benchmark_fn=_run,
+            max_tokens=max_tokens,
+            top_files=top_files,
+        )
+        return dataset_as_dict(report)
 
     def visualize(
         self,
@@ -589,6 +681,75 @@ class ContextBudgetEngine:
             run_json = str(run_path)
         profile = build_savings_profile(run_data, run_json=run_json)
         return savings_profile_as_dict(profile)
+
+    def pipeline_trace(self, run: RunArtifactInput) -> dict[str, Any]:
+        """Reconstruct the full context optimization pipeline from a pack run artifact.
+
+        Returns a stage-by-stage trace showing token counts, token reductions,
+        and final context size for each pipeline stage: repo scan, file ranking,
+        budget selection, cache reuse, symbol extraction, context slicing,
+        compression, snippet selection, delta context, and final context.
+
+        ``run`` may be a dict, a path string, or a Path to a run JSON file.
+        """
+        if isinstance(run, dict):
+            run_data = run
+            run_json = ""
+        else:
+            run_path = Path(run)
+            run_data = read_json(run_path)
+            run_json = str(run_path)
+        trace = build_pipeline_trace(run_data, run_json=run_json)
+        return pipeline_trace_as_dict(trace)
+
+    def read_profile(self, run: RunArtifactInput) -> dict[str, Any]:
+        """Analyze how a coding agent read repository files in a pack run.
+
+        Returns a report that identifies duplicate reads, unnecessary reads,
+        and high token-cost reads, along with total tokens wasted.
+
+        ``run`` may be a dict (already loaded), a path string, or a Path to a
+        run JSON file produced by :meth:`pack`.
+        """
+        if isinstance(run, dict):
+            run_data = run
+            run_json = ""
+        else:
+            run_path = Path(run)
+            run_data = read_json(run_path)
+            run_json = str(run_path)
+        report = build_read_profile(run_data, run_json=run_json)
+        return read_profile_as_dict(report)
+
+    def dashboard(
+        self,
+        paths: list[str | Path] | None = None,
+        port: int = 7842,
+        no_open: bool = False,
+    ) -> dict[str, Any]:
+        """Start a local web dashboard and return the aggregated data.
+
+        Scans ``paths`` (defaults to ``["."]``) for run artifacts produced by
+        ``pack``, ``benchmark``, and ``simulate-agent``, then starts a local
+        HTTP server at ``http://127.0.0.1:<port>/`` and opens the browser.
+
+        This call **blocks** until the user presses Ctrl-C.
+
+        Args:
+            paths: Directories or JSON artifact files to scan.
+            port:  Local port for the dashboard server (default: 7842).
+            no_open: When ``True``, the browser is not opened automatically.
+
+        Returns:
+            The aggregated dashboard data dict (summary, run_history, heatmap,
+            simulations, benchmarks, token_chart).
+        """
+        from contextbudget.core.dashboard import build_dashboard_data, serve_dashboard
+
+        resolved = [Path(p) for p in paths] if paths else [Path(".")]
+        data = build_dashboard_data(resolved)
+        serve_dashboard(data, port=port, no_open=no_open)
+        return data
 
 
 class BudgetGuard:
@@ -897,3 +1058,25 @@ class BudgetGuard:
         }
 
         return run_data
+
+    def read_profile(self, run: RunArtifactInput) -> dict[str, Any]:
+        """Analyze how a coding agent read repository files in a pack run.
+
+        Identifies duplicate reads, unnecessary reads (low relevance but high
+        token cost), and high token-cost reads, then quantifies tokens wasted.
+
+        ``run`` may be a dict (already loaded), a path string, or a Path to a
+        run JSON file produced by :meth:`pack`.
+
+        Example::
+
+            from contextbudget import BudgetGuard
+
+            guard = BudgetGuard(max_tokens=30000)
+            result = guard.pack_context(task="add caching", repo=".")
+            report = guard.read_profile(result)
+            print(f"Tokens wasted: {report['tokens_wasted_total']}")
+            for rec in report["duplicate_files"]:
+                print(f"  duplicate: {rec['path']} (read {rec['read_count']}x)")
+        """
+        return self.engine.read_profile(run)

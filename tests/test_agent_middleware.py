@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pytest
 
+import argparse
+
 from contextbudget import (
     AgentTaskRequest,
     BudgetPolicyViolationError,
@@ -15,6 +17,7 @@ from contextbudget import (
     prepare_context,
     record_run,
 )
+from contextbudget.cli import cmd_prepare_context
 from contextbudget.core.policy import PolicySpec
 
 
@@ -213,3 +216,64 @@ def test_enforce_budget_strict_raises_middleware_violation(tmp_path: Path) -> No
             PolicySpec(max_estimated_input_tokens=1),
             strict=True,
         )
+
+
+def test_cli_prepare_context_writes_json_and_middleware_block(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+
+    out_prefix = str(tmp_path / "ctx-run")
+    args = argparse.Namespace(
+        task="update auth flow",
+        repo=str(tmp_path),
+        workspace=None,
+        max_tokens=400,
+        top_files=None,
+        delta=None,
+        strict=False,
+        policy=None,
+        out_prefix=out_prefix,
+        config=None,
+    )
+    rc = cmd_prepare_context(args)
+
+    assert rc == 0
+    json_path = tmp_path / "ctx-run.json"
+    md_path = tmp_path / "ctx-run.md"
+    assert json_path.exists()
+    assert md_path.exists()
+
+    data = json.loads(json_path.read_text(encoding="utf-8"))
+    assert data["task"] == "update auth flow"
+    assert "agent_middleware" in data
+    mw = data["agent_middleware"]
+    assert mw["request"]["task"] == "update auth flow"
+    assert isinstance(mw["metadata"]["files_included_count"], int)
+    assert isinstance(mw["metadata"]["estimated_input_tokens"], int)
+
+    md = md_path.read_text(encoding="utf-8")
+    assert "Agent Middleware" in md
+
+
+def test_cli_prepare_context_strict_fails_on_policy_violation(tmp_path: Path) -> None:
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
+
+    args = argparse.Namespace(
+        task="update auth flow",
+        repo=str(tmp_path),
+        workspace=None,
+        max_tokens=400,
+        top_files=None,
+        delta=None,
+        strict=True,
+        policy=None,
+        out_prefix=str(tmp_path / "strict-run"),
+        config=None,
+    )
+    # max_tokens=400 but actual token count is low — policy will pass
+    # To force a failure we need a policy file with max_estimated_input_tokens=1
+    policy_toml = tmp_path / "policy.toml"
+    policy_toml.write_text("[policy]\nmax_estimated_input_tokens = 1\n", encoding="utf-8")
+
+    args.policy = str(policy_toml)
+    rc = cmd_prepare_context(args)
+    assert rc == 2

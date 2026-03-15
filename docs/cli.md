@@ -112,6 +112,35 @@ contextbudget pr-audit \
   --out-prefix contextbudget-pr
 ```
 
+### `contextbudget prepare-context <task> --repo <path> [--max-tokens N] [--top-files N]`
+
+Run the full middleware pipeline: pack context, optionally enforce a budget policy, and
+write a machine-readable artifact with an additive `agent_middleware` block.
+
+```bash
+contextbudget prepare-context "add caching to search API" --repo . --max-tokens 20000
+```
+
+**With delta mode:**
+
+```bash
+contextbudget prepare-context "add caching" --repo . --delta previous-run.json
+```
+
+**With strict policy enforcement:**
+
+```bash
+contextbudget prepare-context "large refactor" --repo . --strict --policy policy.toml
+```
+
+Returns non-zero when `--strict` is set and a policy violation is detected.
+
+The output artifact (`prepare-context-run.json`) includes the full pack artifact plus
+an `agent_middleware` block with file counts, token estimates, quality risk, cache stats,
+and the original request parameters. Use `--out-prefix` to control the output file name.
+
+---
+
 ### `contextbudget benchmark <task> --repo <path>`
 Compare deterministic strategies:
 - naive full-context
