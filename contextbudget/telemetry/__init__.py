@@ -51,6 +51,20 @@ class TelemetrySink(Protocol):
         """Consume a telemetry event."""
 
 
+class EventEmitter(Protocol):
+    """
+    Interface for the pipeline-facing emitter.
+
+    Pipeline stages call ``emit(name, **payload)`` without depending on a
+    concrete ``TelemetrySession``.  Any object that satisfies this protocol
+    can be injected in its place (e.g. a test double or a future cloud-backed
+    session).
+    """
+
+    def emit(self, name: str, **payload: Any) -> None:
+        """Emit a named event with keyword payload fields."""
+
+
 class NoOpTelemetrySink:
     """Default sink implementation that drops all events."""
 
@@ -134,6 +148,7 @@ def build_telemetry_sink(
 __all__ = [
     "ANALYTICS_EVENT_NAMES",
     "EVENT_SCHEMA_VERSIONS",
+    "EventEmitter",
     "TelemetryEvent",
     "TelemetrySink",
     "NoOpTelemetrySink",
