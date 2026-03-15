@@ -8,6 +8,7 @@ import asyncpg
 
 from app.models import IncomingEvent
 
+# org_id added at position $23 (before payload $24) so payload stays last
 _INSERT_SQL = """
 INSERT INTO events (
     name, schema_version, event_timestamp, run_id,
@@ -16,6 +17,7 @@ INSERT INTO events (
     scanned_files, ranked_files, included_files, skipped_files, top_files,
     cache_hits, tokens_saved_by_cache, cache_backend,
     policy_evaluated, policy_passed, violation_count,
+    org_id,
     payload
 ) VALUES (
     $1, $2, $3, $4,
@@ -24,7 +26,8 @@ INSERT INTO events (
     $12, $13, $14, $15, $16,
     $17, $18, $19,
     $20, $21, $22,
-    $23::jsonb
+    $23,
+    $24::jsonb
 ) RETURNING id
 """
 
@@ -51,7 +54,7 @@ def _str(value: Any) -> str | None:
     return s or None
 
 
-def _extract_params(event: IncomingEvent) -> tuple:
+def _extract_params(event: IncomingEvent, org_id: int | None = None) -> tuple:
     p = event.payload
     repo = p.get("repository") or {}
     tokens = p.get("tokens") or {}
@@ -86,15 +89,21 @@ def _extract_params(event: IncomingEvent) -> tuple:
         _bool(policy.get("evaluated")),
         _bool(policy.get("passed")),
         _int(policy.get("violation_count")),
-        json.dumps(p),
+        org_id,       # $23 — None for unauthenticated ingest
+        json.dumps(p),  # $24 — JSONB payload (always last)
     )
 
 
-async def insert_events_batch(pool: asyncpg.Pool, events: list[IncomingEvent]) -> list[int]:
+async def insert_events_batch(
+    pool: asyncpg.Pool,
+    events: list[IncomingEvent],
+    *,
+    org_id: int | None = None,
+) -> list[int]:
     async with pool.acquire() as conn:
         ids: list[int] = []
         async with conn.transaction():
             for event in events:
-                row = await conn.fetchrow(_INSERT_SQL, *_extract_params(event))
+                row = await conn.fetchrow(_INSERT_SQL, *_extract_params(event, org_id))
                 ids.append(row["id"])
         return ids

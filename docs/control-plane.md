@@ -231,6 +231,52 @@ When routing events to a centralized plane, cloud sink implementations should:
 
 ---
 
+## Multi-Tenant Data Model (v1.0-beta)
+
+The cloud service organises tenants into a three-level hierarchy backed by PostgreSQL.
+
+```
+Org
+ └── Project
+      └── Repository  ──  AgentRun (many)
+```
+
+### Bootstrap sequence
+
+```bash
+# 1. Create the org (unauthenticated — operator endpoint)
+curl -s -X POST http://localhost:8080/orgs \
+     -H "Content-Type: application/json" \
+     -d '{"slug": "acme", "display_name": "Acme Corp"}'
+# → {"id": 1, "slug": "acme", ...}
+
+# 2. Issue the first API key (unauthenticated bootstrap)
+curl -s -X POST http://localhost:8080/orgs/1/api-keys \
+     -H "Content-Type: application/json" \
+     -d '{"label": "ci"}'
+# → {"raw_key": "cbk_...", "id": 5, ...}   ← save this; it is shown once
+
+# 3. All further management uses the API key
+curl -s http://localhost:8080/orgs/1/projects \
+     -H "Authorization: Bearer cbk_..."
+```
+
+### Repository linking
+
+The `repository_id` on a `Repository` row should match the SHA-256 digest that the ContextBudget runtime includes in telemetry events.  This links control plane records to events in the `events` table.
+
+```python
+from contextbudget.telemetry.schemas import build_repository_identifiers
+ids = build_repository_identifiers("/path/to/repo")
+# Use ids.repository_id when creating the Repository via the API
+```
+
+### Agent runs
+
+Run outcome records are written by calling `cp_store.record_agent_run` from application code, or populated from incoming `pack_completed` events via custom integration.  The `task_hash` field stores a SHA-256 digest of the raw task text — the plaintext task is never stored.
+
+---
+
 ## Future Extension Points
 
 The following are the minimal hooks needed to support centralized governance without

@@ -41,7 +41,7 @@ def client():
 def test_health(client):
     r = client.get("/health")
     assert r.status_code == 200
-    assert r.json() == {"status": "ok"}
+    assert r.json()["status"] == "ok"
 
 
 def test_post_single_event_object(client):
@@ -111,3 +111,46 @@ def test_post_invalid_item_in_batch_reports_index(client):
     assert r.status_code == 422
     detail = r.json()["detail"]
     assert detail["index"] == 1
+
+
+def test_authenticated_ingest_passes_org_id(client):
+    """When a valid Bearer token is provided, org_id should be passed to insert_events_batch."""
+    with patch(
+        "app.main.auth.verify_api_key",
+        new_callable=AsyncMock,
+        return_value={"org_id": 7, "org_slug": "test-org", "key_id": 1},
+    ):
+        r = client.post(
+            "/events",
+            json=_VALID_EVENT,
+            headers={"Authorization": "Bearer cbk_validkey"},
+        )
+    assert r.status_code == 201
+    # Verify insert_events_batch was called with org_id=7
+    call_kwargs = client._mock_insert.call_args
+    assert call_kwargs.kwargs.get("org_id") == 7
+
+
+def test_unauthenticated_ingest_passes_no_org_id(client):
+    """Without auth header, org_id should be None (public ingest)."""
+    r = client.post("/events", json=_VALID_EVENT)
+    assert r.status_code == 201
+    call_kwargs = client._mock_insert.call_args
+    assert call_kwargs.kwargs.get("org_id") is None
+
+
+def test_ingest_with_invalid_token_still_accepts_event(client):
+    """Invalid token is silently ignored — event is stored without org binding."""
+    with patch(
+        "app.main.auth.verify_api_key",
+        new_callable=AsyncMock,
+        return_value=None,
+    ):
+        r = client.post(
+            "/events",
+            json=_VALID_EVENT,
+            headers={"Authorization": "Bearer bad_token"},
+        )
+    assert r.status_code == 201
+    call_kwargs = client._mock_insert.call_args
+    assert call_kwargs.kwargs.get("org_id") is None

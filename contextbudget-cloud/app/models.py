@@ -122,3 +122,282 @@ class DashboardHeatmap(BaseModel):
     avg_included_files: float | None
     avg_top_files: float | None
     note: str
+
+
+# ---------------------------------------------------------------------------
+# Control plane — orgs / projects / repos
+# ---------------------------------------------------------------------------
+
+class OrgCreate(BaseModel):
+    slug: str
+    display_name: str
+
+
+class OrgResponse(BaseModel):
+    id: int
+    slug: str
+    display_name: str
+    created_at: datetime
+
+
+class ProjectCreate(BaseModel):
+    slug: str
+    display_name: str
+
+
+class ProjectResponse(BaseModel):
+    id: int
+    org_id: int
+    slug: str
+    display_name: str
+    created_at: datetime
+
+
+class RepoCreate(BaseModel):
+    slug: str
+    display_name: str
+    # SHA-256 digest of the local repo path; links telemetry events to this record
+    repository_id: str | None = None
+
+
+class RepoResponse(BaseModel):
+    id: int
+    project_id: int
+    slug: str
+    display_name: str
+    repository_id: str | None
+    created_at: datetime
+
+
+# ---------------------------------------------------------------------------
+# API keys
+# ---------------------------------------------------------------------------
+
+class ApiKeyCreate(BaseModel):
+    label: str | None = None
+    expires_at: datetime | None = None
+
+
+class ApiKeyIssued(BaseModel):
+    """Returned once at creation. ``raw_key`` is never stored and cannot be recovered."""
+    id: int
+    org_id: int
+    key_prefix: str
+    label: str | None
+    raw_key: str
+    created_at: datetime
+    expires_at: datetime | None = None
+
+
+class ApiKeyResponse(BaseModel):
+    """Safe list view — no raw key."""
+    id: int
+    org_id: int
+    key_prefix: str
+    label: str | None
+    revoked: bool
+    created_at: datetime
+    revoked_at: datetime | None = None
+    expires_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Audit log
+# ---------------------------------------------------------------------------
+
+class AuditEntry(BaseModel):
+    id: int
+    org_id: int | None
+    repository_id: str | None
+    run_id: str | None
+    task_hash: str | None
+    endpoint: str
+    policy_version: str | None
+    tokens_used: int | None
+    tokens_saved: int | None
+    violation_count: int
+    policy_passed: bool | None
+    status_code: int | None
+    created_at: datetime
+
+
+class AuditLogResponse(BaseModel):
+    entries: list[AuditEntry]
+    total: int
+
+
+class AuditEntryCreate(BaseModel):
+    """Body for ``POST /orgs/{org_id}/audit-log`` — used by the gateway to push entries."""
+    endpoint: str
+    repository_id: str | None = None
+    run_id: str | None = None
+    task_hash: str | None = None
+    policy_version: str | None = None
+    tokens_used: int | None = None
+    tokens_saved: int | None = None
+    violation_count: int = 0
+    policy_passed: bool | None = None
+    status_code: int | None = None
+
+
+# ---------------------------------------------------------------------------
+# Policy versions
+# ---------------------------------------------------------------------------
+
+class PolicyVersionCreate(BaseModel):
+    version: str
+    # Fields mirror contextbudget.core.policy.PolicySpec
+    spec: dict[str, Any]
+    project_id: int | None = None
+    repo_id: int | None = None
+
+
+class PolicyVersionResponse(BaseModel):
+    id: int
+    org_id: int
+    project_id: int | None
+    repo_id: int | None
+    version: str
+    spec: dict[str, Any]
+    is_active: bool
+    created_at: datetime
+    activated_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Cost analytics
+# ---------------------------------------------------------------------------
+
+class CostSummaryResponse(BaseModel):
+    baseline_tokens: int
+    optimized_tokens: int
+    tokens_saved: int
+    savings_rate: float | None
+    run_count: int
+
+
+class CostByRepoRow(BaseModel):
+    repository_id: str
+    baseline_tokens: int
+    optimized_tokens: int
+    tokens_saved: int
+    savings_rate: float | None
+    run_count: int
+
+
+class CostByRepoResponse(BaseModel):
+    repositories: list[CostByRepoRow]
+
+
+class CostByDateRow(BaseModel):
+    date: str
+    baseline_tokens: int
+    optimized_tokens: int
+    tokens_saved: int
+    savings_rate: float | None
+    run_count: int
+
+
+class CostByDateResponse(BaseModel):
+    days: list[CostByDateRow]
+
+
+# ---------------------------------------------------------------------------
+# Agent runs
+# ---------------------------------------------------------------------------
+
+class AgentRunResponse(BaseModel):
+    id: int
+    repo_id: int
+    run_id: str
+    task_hash: str | None
+    status: str
+    tokens_used: int | None
+    tokens_saved: int | None
+    cache_hits: int | None
+    policy_version: str | None
+    started_at: datetime
+    completed_at: datetime | None = None
+
+
+# ---------------------------------------------------------------------------
+# Cost attribution — by run and by stage
+# ---------------------------------------------------------------------------
+
+class CostByRunRow(BaseModel):
+    run_id: str
+    repository_id: str | None
+    command: str | None
+    run_at: str | None
+    baseline_tokens: int
+    optimized_tokens: int
+    tokens_saved: int
+    savings_rate: float | None
+    cache_hits: int
+    tokens_saved_by_cache: int
+
+
+class CostByRunResponse(BaseModel):
+    runs: list[CostByRunRow]
+
+
+class StageDetail(BaseModel):
+    tokens_saved: int
+    savings_rate: float | None
+    description: str
+
+
+class CostByStageResponse(BaseModel):
+    run_count: int
+    total_baseline_tokens: int
+    total_optimized_tokens: int
+    total_tokens_saved: int
+    overall_savings_rate: float | None
+    stages: dict[str, StageDetail]
+
+
+# ---------------------------------------------------------------------------
+# ROI dashboard
+# ---------------------------------------------------------------------------
+
+class ROIRepoRow(BaseModel):
+    repository_id: str
+    tokens_used: int
+    tokens_saved: int
+    baseline_tokens: int
+    run_count: int
+    savings_rate: float | None
+    dollars_saved: float
+
+
+class DashboardROI(BaseModel):
+    total_tokens_used: int
+    total_tokens_saved: int
+    total_baseline_tokens: int
+    savings_rate: float | None
+    estimated_dollars_saved: float
+    cache_hit_rate_pct: float | None
+    total_runs: int
+    runs_with_cache_hits: int
+    price_per_1m_tokens: float
+    top_repos: list[ROIRepoRow]
+    note: str
+
+
+# ---------------------------------------------------------------------------
+# Webhooks
+# ---------------------------------------------------------------------------
+
+class WebhookCreate(BaseModel):
+    url: str
+    secret: str | None = None       # HMAC signing secret; stored hashed
+    events: list[str] = []          # e.g. ["policy_violation", "budget_overrun", "drift"]
+
+
+class WebhookResponse(BaseModel):
+    id: int
+    org_id: int
+    url: str
+    events: list[str]
+    active: bool
+    created_at: datetime

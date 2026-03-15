@@ -21,6 +21,9 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./migrations/001_create_events.sql:/docker-entrypoint-initdb.d/001_create_events.sql
+      - ./migrations/002_create_control_plane.sql:/docker-entrypoint-initdb.d/002_create_control_plane.sql
+      - ./migrations/003_org_scoped_events.sql:/docker-entrypoint-initdb.d/003_org_scoped_events.sql
+      - ./migrations/004_webhooks.sql:/docker-entrypoint-initdb.d/004_webhooks.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U contextbudget"]
       interval: 5s
