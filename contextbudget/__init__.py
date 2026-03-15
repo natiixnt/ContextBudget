@@ -1,5 +1,6 @@
 """ContextBudget package."""
 
+from contextbudget.sdk import ContextBudgetSDK
 from contextbudget.agents import (
     AgentAdapter,
     AgentAdapterRun,
@@ -36,6 +37,7 @@ from contextbudget.telemetry import (
 
 __all__ = [
     "__version__",
+    "ContextBudgetSDK",
     "AgentAdapter",
     "AgentAdapterRun",
     "AgentMiddlewareResult",
