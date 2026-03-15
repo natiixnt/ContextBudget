@@ -1,0 +1,300 @@
+# Agent integrations
+
+`contextbudget.integrations` provides production-ready wrappers that slot
+ContextBudget into the call path between a coding agent and the downstream LLM.
+
+Every wrapper:
+
+1. **Intercepts** the task description and repository path.
+2. **Optimises** context via the full ContextBudget pipeline (scan → rank →
+   compress → cache → delta).
+3. **Calls** the model API with the packed prompt.
+4. **Emits** run telemetry to `.contextbudget/observe-history.json`.
+
+---
+
+## OpenAIAgentWrapper
+
+Wraps the [OpenAI Chat Completions API](https://platform.openai.com/docs/api-reference/chat).
+
+**Install the optional dependency:**
+
+```bash
+pip install openai
+```
+
+### Basic usage
+
+```python
+from contextbudget.integrations import OpenAIAgentWrapper
+
+agent = OpenAIAgentWrapper(
+    model="gpt-4.1",
+    repo=".",
+)
+
+result = agent.run_task("add caching to API")
+print(result.llm_response)
+print(f"tokens used: {result.prepared_context.estimated_tokens}")
+print(f"tokens saved: {result.prepared_context.tokens_saved}")
+```
+
+### Constructor parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `model` | `str` | `"gpt-4.1"` | OpenAI model identifier |
+| `repo` | `str \| Path` | `"."` | Default repository path |
+| `max_tokens` | `int \| None` | `None` | Token budget for packed context |
+| `top_files` | `int \| None` | `None` | Max ranked files considered |
+| `max_completion_tokens` | `int` | `2048` | `max_tokens` forwarded to the API |
+| `system_prompt` | `str \| None` | `None` | Optional system message |
+| `policy` | `PolicySpec \| None` | `None` | Budget policy to enforce |
+| `strict` | `bool` | `False` | Raise on policy violations |
+| `delta` | `bool` | `True` | Enable incremental delta context |
+| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
+| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `openai_client` | `openai.OpenAI \| None` | `None` | Pre-constructed client |
+| `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
+
+### With a policy
+
+```python
+from contextbudget.integrations import OpenAIAgentWrapper
+from contextbudget.engine import ContextBudgetEngine
+
+agent = OpenAIAgentWrapper(
+    model="gpt-4.1",
+    repo=".",
+    max_tokens=32_000,
+    policy=ContextBudgetEngine.make_policy(
+        max_estimated_input_tokens=32_000,
+        max_quality_risk_level="medium",
+    ),
+    strict=True,
+)
+
+result = agent.run_task("refactor auth middleware")
+```
+
+### Multi-turn sessions
+
+```python
+agent = OpenAIAgentWrapper(model="gpt-4.1", repo=".", max_tokens=32_000)
+
+result1 = agent.run_task("add Redis caching to session store")
+result2 = agent.run_task("write unit tests for the new cache layer")
+
+print(agent.session_summary())
+# {"session_id": "...", "turns": 2, "cumulative_tokens": ...}
+```
+
+Delta context is enabled by default: on the second turn, only changed files
+are re-sent to the model.
+
+---
+
+## AnthropicAgentWrapper
+
+Wraps the [Anthropic Messages API](https://docs.anthropic.com/en/api/messages).
+
+**Install the optional dependency:**
+
+```bash
+pip install anthropic
+```
+
+### Basic usage
+
+```python
+from contextbudget.integrations import AnthropicAgentWrapper
+
+agent = AnthropicAgentWrapper(
+    model="claude-sonnet-4-6",
+    repo=".",
+)
+
+result = agent.run_task("add caching to API")
+print(result.llm_response)
+```
+
+### Constructor parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `model` | `str` | `"claude-sonnet-4-6"` | Anthropic model identifier |
+| `repo` | `str \| Path` | `"."` | Default repository path |
+| `max_tokens` | `int \| None` | `None` | Token budget for packed context |
+| `top_files` | `int \| None` | `None` | Max ranked files considered |
+| `max_completion_tokens` | `int` | `2048` | `max_tokens` forwarded to the API |
+| `system_prompt` | `str \| None` | `None` | Optional system prompt |
+| `policy` | `PolicySpec \| None` | `None` | Budget policy to enforce |
+| `strict` | `bool` | `False` | Raise on policy violations |
+| `delta` | `bool` | `True` | Enable incremental delta context |
+| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
+| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `anthropic_client` | `anthropic.Anthropic \| None` | `None` | Pre-constructed client |
+| `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
+
+### With a system prompt
+
+```python
+from contextbudget.integrations import AnthropicAgentWrapper
+
+agent = AnthropicAgentWrapper(
+    model="claude-opus-4-6",
+    repo=".",
+    max_tokens=64_000,
+    system_prompt=(
+        "You are an expert software engineer. "
+        "Answer concisely and include working code."
+    ),
+)
+
+result = agent.run_task("add input validation to the user registration endpoint")
+print(result.llm_response)
+```
+
+---
+
+## GenericAgentRunner
+
+A vendor-neutral runner that accepts any `(prompt: str) -> str` callable as
+the LLM backend.  Use this for local models, custom API wrappers, or any
+provider not covered by the first-party wrappers.
+
+### Basic usage
+
+```python
+from contextbudget.integrations import GenericAgentRunner
+
+def my_llm(prompt: str) -> str:
+    # call any model you like
+    return call_my_model(prompt)
+
+runner = GenericAgentRunner(llm_fn=my_llm, repo=".")
+result = runner.run_task("add caching to API")
+print(result.llm_response)
+```
+
+### Constructor parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `llm_fn` | `Callable[[str], str]` | *(required)* | Backend callable |
+| `repo` | `str \| Path` | `"."` | Default repository path |
+| `adapter_name` | `str` | `"generic"` | Label used in telemetry |
+| `max_tokens` | `int \| None` | `None` | Token budget for packed context |
+| `top_files` | `int \| None` | `None` | Max ranked files considered |
+| `policy` | `PolicySpec \| None` | `None` | Budget policy to enforce |
+| `strict` | `bool` | `False` | Raise on policy violations |
+| `delta` | `bool` | `True` | Enable incremental delta context |
+| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
+| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
+
+### Example: local Ollama model
+
+```python
+import requests
+from contextbudget.integrations import GenericAgentRunner
+
+def ollama_llm(prompt: str) -> str:
+    response = requests.post(
+        "http://localhost:11434/api/generate",
+        json={"model": "codellama", "prompt": prompt, "stream": False},
+        timeout=120,
+    )
+    return response.json()["response"]
+
+runner = GenericAgentRunner(
+    llm_fn=ollama_llm,
+    repo=".",
+    adapter_name="ollama-codellama",
+    max_tokens=8_000,
+)
+
+result = runner.run_task("add error handling to the payment module")
+print(result.llm_response)
+```
+
+---
+
+## run_task return value
+
+All three wrappers return a
+[`RuntimeResult`](python-api.md#runtimeresult) with the following fields:
+
+| Field | Type | Description |
+|---|---|---|
+| `prepared_context` | `PreparedContext` | Optimised context details |
+| `llm_response` | `str \| None` | Raw response from the model |
+| `turn_number` | `int` | 1-based turn index in the session |
+| `session_tokens` | `int` | Cumulative input tokens this session |
+| `session_id` | `str` | UUID identifying the current session |
+
+`prepared_context` exposes:
+
+| Field | Description |
+|---|---|
+| `prompt_text` | The assembled context string sent to the LLM |
+| `files_included` | Ordered list of packed file paths |
+| `estimated_tokens` | Estimated input token count |
+| `tokens_saved` | Tokens eliminated by compression and caching |
+| `quality_risk` | Compression risk level (`low`, `medium`, `high`) |
+| `policy_passed` | Policy evaluation result (`True`, `False`, or `None`) |
+| `delta_enabled` | Whether incremental delta was applied |
+| `cache_hits` | Number of context fragments served from cache |
+
+---
+
+## Telemetry
+
+Each `run_task` call appends an entry to `.contextbudget/observe-history.json`
+(capped at 500 entries).  The entry schema:
+
+```json
+{
+  "adapter": "openai",
+  "model": "gpt-4.1",
+  "task": "add caching to API",
+  "repo": "/path/to/repo",
+  "session_id": "uuid",
+  "turn_number": 1,
+  "session_tokens": 1850,
+  "estimated_tokens": 1850,
+  "tokens_saved": 3200,
+  "files_included": ["src/cache.py", "src/api.py"],
+  "quality_risk": "low",
+  "policy_passed": true,
+  "delta_enabled": false,
+  "cache_hits": 0,
+  "generated_at": "2026-03-15T12:00:00+00:00"
+}
+```
+
+Read history programmatically:
+
+```python
+from contextbudget.telemetry.store import load_observe_history
+
+entries = load_observe_history(base_dir=".")
+for entry in entries:
+    print(entry["adapter"], entry["tokens_saved"])
+```
+
+---
+
+## Compatibility with the runtime pipeline
+
+All wrappers delegate to
+[`AgentRuntime`](agent-runtime.md), which is the canonical
+`agent → ContextBudget → LLM` entry point.  Any feature supported by
+`AgentRuntime` — policies, delta context, custom engines, session replay — is
+available through the integration wrappers.
+
+To compose with the lower-level middleware directly, see
+[`ContextBudgetMiddleware`](agent-integration.md).
