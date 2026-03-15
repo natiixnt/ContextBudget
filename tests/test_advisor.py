@@ -101,7 +101,7 @@ def test_load_pack_artifacts_deduplicates(tmp_path: Path) -> None:
     artifact = _make_pack_artifact(["a.py"])
     p = tmp_path / "run.json"
     p.write_text(json.dumps(artifact), encoding="utf-8")
-    # Pass the same path twice — should only load once.
+    # Pass the same path twice - should only load once.
     result = _load_pack_artifacts([p, p])
     assert len(result) == 1
 
@@ -140,7 +140,7 @@ def test_compute_pack_frequency_counts_inclusion(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# run_advise — core logic
+# run_advise - core logic
 # ---------------------------------------------------------------------------
 
 
@@ -281,7 +281,7 @@ def test_run_advise_runs_analyzed_with_history(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI — contextbudget advise
+# CLI - contextbudget advise
 # ---------------------------------------------------------------------------
 
 

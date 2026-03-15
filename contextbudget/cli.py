@@ -18,10 +18,12 @@ from contextbudget.core.render import (
     render_agent_plan_markdown,
     render_agent_simulation_markdown,
     render_benchmark_markdown,
+    render_context_dataset_markdown,
     render_dataset_markdown,
     render_diff_markdown,
     render_drift_markdown,
     render_heatmap_markdown,
+    render_observe_markdown,
     render_pack_markdown,
     render_pipeline_markdown,
     render_plan_markdown,
@@ -360,14 +362,42 @@ def cmd_profile(args: argparse.Namespace) -> int:
     data = engine.profile(run_path)
     markdown = render_profile_markdown(data)
 
-    print(markdown)
+    tokens_before = int(data.get("tokens_before") or 0)
+    tokens_saved = int(data.get("tokens_saved") or 0)
+    savings_pct = float(data.get("savings_pct") or 0.0)
+
+    _STAGE_LABELS = {
+        "cache_reuse": "cache reuse",
+        "symbol_extraction": "symbol extraction",
+        "slicing": "slicing",
+        "compression": "compression",
+        "snippet": "snippet",
+        "delta": "delta mode",
+        "full": "full",
+    }
+
+    print("Token Savings Breakdown")
+    print()
+    by_stage = data.get("by_stage", {})
+    if isinstance(by_stage, dict) and tokens_before > 0:
+        for stage_key, stage_data in by_stage.items():
+            if not isinstance(stage_data, dict):
+                continue
+            stage_saved = int(stage_data.get("tokens_saved") or 0)
+            if stage_saved == 0:
+                continue
+            pct = round((stage_saved / tokens_before) * 100.0, 0)
+            label = _STAGE_LABELS.get(stage_key, stage_key.replace("_", " "))
+            print(f"{label}: -{int(pct)}%")
+    print()
+    print(f"total savings: -{savings_pct:.0f}%")
 
     prefix = args.out_prefix or run_path.with_suffix("").name + "-profile"
     json_path = Path(f"{prefix}.json")
     md_path = Path(f"{prefix}.md")
     write_json(json_path, data)
     md_path.write_text(markdown, encoding="utf-8")
-    print(f"Wrote profile JSON:     {json_path}")
+    print(f"\nWrote profile JSON:     {json_path}")
     print(f"Wrote profile Markdown: {md_path}")
     return 0
 
@@ -427,6 +457,43 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
     print()
     print(f"Wrote pipeline JSON:     {json_path}")
     print(f"Wrote pipeline Markdown: {md_path}")
+    return 0
+
+
+def cmd_observe(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine()
+    run_path = Path(args.run_json)
+    if not run_path.exists():
+        print(f"Error: run artifact not found: {run_path}")
+        return 2
+
+    base_dir = Path(args.base_dir) if getattr(args, "base_dir", None) else run_path.parent
+    no_store = getattr(args, "no_store", False)
+
+    data = engine.observe(run_path, store=not no_store, base_dir=base_dir)
+    markdown = render_observe_markdown(data)
+
+    prefix = args.out_prefix or run_path.with_suffix("").name + "-observe"
+    json_path = Path(f"{prefix}.json")
+    md_path = Path(f"{prefix}.md")
+
+    write_json(json_path, data)
+    md_path.write_text(markdown, encoding="utf-8")
+
+    print(markdown)
+    print(f"Wrote observe JSON:     {json_path}")
+    print(f"Wrote observe Markdown: {md_path}")
+    if not no_store:
+        store_path = base_dir / ".contextbudget" / "observe-history.json"
+        print(f"Metrics stored in:      {store_path}")
+
+    if getattr(args, "export_history", False):
+        from contextbudget.telemetry.store import export_observe_history_json
+        hist = export_observe_history_json(base_dir=base_dir)
+        hist_path = Path(f"{prefix}-history.json")
+        write_json(hist_path, hist)
+        print(f"Exported history JSON:  {hist_path}")
+
     return 0
 
 
@@ -645,6 +712,44 @@ def cmd_dataset(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_build_dataset(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine(config_path=args.config)
+    data = engine.build_dataset(
+        repo=args.repo,
+        tasks_toml=args.tasks_toml or None,
+        use_builtin=not args.no_builtin,
+        max_tokens=args.max_tokens,
+        top_files=args.top_files,
+    )
+
+    base = args.out_prefix or "contextbudget-context-dataset"
+    json_path = Path(f"{base}.json")
+    md_path = Path(f"{base}.md")
+    write_json(json_path, data)
+    md_path.write_text(render_context_dataset_markdown(data), encoding="utf-8")
+
+    agg = data.get("aggregate", {})
+    builtin_count = data.get("builtin_task_count", 0)
+    extra_count = data.get("extra_task_count", 0)
+    print(f"Tasks: {data.get('task_count', 0)} ({builtin_count} built-in, {extra_count} custom)")
+    print(
+        f"Avg baseline tokens: {agg.get('avg_baseline_tokens', 0)}  "
+        f"Avg optimized tokens: {agg.get('avg_optimized_tokens', 0)}  "
+        f"Avg reduction: {agg.get('avg_reduction_pct', 0):.1f}%"
+    )
+    for idx, entry in enumerate(data.get("entries", []), start=1):
+        label = entry.get("task_name") or entry.get("task", "")
+        print(
+            f"  {idx}. {label}  "
+            f"baseline={entry.get('baseline_tokens', 0)}  "
+            f"optimized={entry.get('optimized_tokens', 0)}  "
+            f"reduction={entry.get('reduction_pct', 0):.1f}%"
+        )
+    print(f"Wrote context dataset JSON: {json_path}")
+    print(f"Wrote context dataset Markdown: {md_path}")
+    return 0
+
+
 def _print_heatmap_section(title: str, items: list[dict], *, runs_analyzed: int) -> None:
     print(title)
     if not items:
@@ -740,15 +845,21 @@ def cmd_drift(args: argparse.Namespace) -> int:
     alert = bool(drift.get("alert", False))
     token_drift_pct = float(drift.get("token_drift_pct", 0.0) or 0.0)
     file_drift_pct = float(drift.get("file_drift_pct", 0.0) or 0.0)
+    dep_depth_drift_pct = float(drift.get("dep_depth_drift_pct", 0.0) or 0.0)
     entries_analyzed = int(drift_data.get("entries_analyzed", 0) or 0)
 
-    print(f"Drift report: {verdict.upper()}" + (" [ALERT]" if alert else ""))
-    print(f"  Entries analyzed : {entries_analyzed}")
-    print(f"  Token drift      : {token_drift_pct:+.1f}%")
-    print(f"  File drift       : {file_drift_pct:+.1f}%")
+    if alert:
+        print(f"context drift detected [{verdict.upper()}]")
+    else:
+        print("no significant context drift detected")
+    print(f"  Entries analyzed  : {entries_analyzed}")
+    direction = "increased" if token_drift_pct >= 0 else "decreased"
+    print(f"  token usage {direction} by {abs(token_drift_pct):.1f}%")
+    print(f"  File drift        : {file_drift_pct:+.1f}%")
+    print(f"  Dependency depth  : {dep_depth_drift_pct:+.1f}%")
     contributors = drift_data.get("top_contributors", [])
     if isinstance(contributors, list) and contributors:
-        print(f"  Top contributors : {len(contributors)} file(s)")
+        print(f"  files contributing most to drift ({len(contributors)} file(s)):")
         for c in contributors[:5]:
             if isinstance(c, dict):
                 print(f"    {c.get('status', ''):10s} {c.get('file', '')}")
@@ -1224,6 +1335,32 @@ def build_parser() -> argparse.ArgumentParser:
     dataset.add_argument("--out-prefix", default="contextbudget-dataset", help="Output file prefix for dataset JSON/Markdown")
     dataset.set_defaults(func=cmd_dataset)
 
+    build_dataset = sub.add_parser(
+        "build-dataset",
+        help="Build a token-reduction benchmark dataset using built-in tasks (no TOML required)",
+    )
+    build_dataset.add_argument("--repo", default=".", help="Repository path to benchmark against")
+    build_dataset.add_argument(
+        "--tasks-toml",
+        default=None,
+        help="Optional TOML file with extra [[tasks]] entries to append to the built-in list",
+    )
+    build_dataset.add_argument(
+        "--no-builtin",
+        action="store_true",
+        default=False,
+        help="Skip built-in tasks and use only those from --tasks-toml",
+    )
+    build_dataset.add_argument("--max-tokens", type=int, default=None, help="Token budget forwarded to each benchmark run")
+    build_dataset.add_argument("--top-files", type=int, default=None, help="Top-files limit forwarded to each benchmark run")
+    build_dataset.add_argument("--config", help="Optional path to config TOML (default: <repo>/contextbudget.toml)")
+    build_dataset.add_argument(
+        "--out-prefix",
+        default="contextbudget-context-dataset",
+        help="Output file prefix for context dataset JSON/Markdown",
+    )
+    build_dataset.set_defaults(func=cmd_build_dataset)
+
     heatmap = sub.add_parser("heatmap", help="Aggregate historical pack runs into token heatmaps")
     heatmap.add_argument(
         "history",
@@ -1468,6 +1605,38 @@ def build_parser() -> argparse.ArgumentParser:
     )
     drift.set_defaults(func=cmd_drift)
 
+    observe = sub.add_parser(
+        "observe",
+        help="Analyze an agent run artifact and record observability metrics",
+    )
+    observe.add_argument(
+        "run_json",
+        help="Path to a run artifact JSON file produced by 'contextbudget pack'.",
+    )
+    observe.add_argument(
+        "--out-prefix",
+        default="",
+        help="Output file prefix for observe JSON/Markdown (default: <run>-observe).",
+    )
+    observe.add_argument(
+        "--base-dir",
+        default="",
+        help=(
+            "Repository root used to resolve the metrics store path "
+            "(default: directory containing run_json)."
+        ),
+    )
+    observe.add_argument(
+        "--no-store",
+        action="store_true",
+        help="Do not persist the report to the local metrics store.",
+    )
+    observe.add_argument(
+        "--export-history",
+        action="store_true",
+        help="Export the full metrics store history to a JSON file.",
+    )
+    observe.set_defaults(func=cmd_observe)
 
     return parser
 

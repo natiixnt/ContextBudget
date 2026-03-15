@@ -11,6 +11,12 @@ from contextbudget.agents import (
     prepare_context,
     record_run,
 )
+from contextbudget.runtime import (
+    AgentRuntime,
+    PreparedContext,
+    RuntimeResult,
+    RuntimeSession,
+)
 from contextbudget.compressors import (
     DeterministicSummaryAdapter,
     ExternalSummaryAdapter,
@@ -33,8 +39,12 @@ __all__ = [
     "AgentAdapter",
     "AgentAdapterRun",
     "AgentMiddlewareResult",
+    "AgentRuntime",
     "AgentTaskRequest",
     "BudgetGuard",
+    "PreparedContext",
+    "RuntimeResult",
+    "RuntimeSession",
     "BudgetPolicyViolationError",
     "ContextBudgetMiddleware",
     "ContextBudgetEngine",

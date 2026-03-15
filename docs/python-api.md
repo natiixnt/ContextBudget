@@ -73,7 +73,7 @@ result = guard.pack_context(
 )
 ```
 
-#### Return value — pack artifact
+#### Return value - pack artifact
 
 | Field | Type | Description |
 |---|---|---|
@@ -169,7 +169,7 @@ plan = guard.simulate_agent(
 )
 ```
 
-#### Return value — simulation artifact
+#### Return value - simulation artifact
 
 | Field | Type | Description |
 |---|---|---|
@@ -264,7 +264,7 @@ with an additional `profile` key.
 | `elapsed_ms` | `int` | Wall-clock milliseconds for the pack operation |
 | `estimated_input_tokens` | `int` | Tokens sent to the model |
 | `estimated_saved_tokens` | `int` | Tokens removed by compression |
-| `compression_ratio` | `float` | `saved / (saved + input)`, range 0–1 |
+| `compression_ratio` | `float` | `saved / (saved + input)`, range 0-1 |
 | `files_included_count` | `int` | Number of files packed |
 | `files_skipped_count` | `int` | Number of files excluded by budget |
 | `quality_risk_estimate` | `str` | `"low"`, `"medium"`, or `"high"` |
@@ -369,8 +369,8 @@ guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=5)
 try:
     result = guard.pack_context(task="large refactor", repo=".")
 except BudgetPolicyViolationError as err:
-    # err.policy_result  — dict with "passed", "violations", "checks"
-    # err.run_artifact   — the pack artifact that triggered the violation
+    # err.policy_result  - dict with "passed", "violations", "checks"
+    # err.run_artifact   - the pack artifact that triggered the violation
     for violation in err.policy_result["violations"]:
         print(f"policy violation: {violation}")
     # Optionally inspect or log the artifact:
@@ -491,7 +491,7 @@ summary = engine.report(run)
 `engine.plan_agent(...)` returns a multi-step workflow plan with:
 
 - ordered `steps` with assigned `context` files and `estimated_tokens` per step
-- `shared_context` — files reused across multiple steps
+- `shared_context` - files reused across multiple steps
 - `total_estimated_tokens` across the whole workflow
 
 ### Architecture advisor
@@ -527,9 +527,9 @@ Plugin interfaces and registry helpers are exported from `contextbudget.plugins`
 
 Built-in cache backends live under `contextbudget.cache`.
 
-- `LocalFileSummaryCacheBackend` — default persistent backend used by CLI and API.
-- `SharedSummaryCacheBackendStub` — no-op shared-cache stub for future remote/team reuse.
-- `InMemorySummaryCacheBackend` — process-local backend for tests and advanced embeddings.
+- `LocalFileSummaryCacheBackend` - default persistent backend used by CLI and API.
+- `SharedSummaryCacheBackendStub` - no-op shared-cache stub for future remote/team reuse.
+- `InMemorySummaryCacheBackend` - process-local backend for tests and advanced embeddings.
 
 Pack artifacts and `engine.report(...)` include a `cache` block with backend
 name plus hit/miss/write counters.  Workspace artifacts also include `workspace`,

@@ -8,17 +8,17 @@ counts, tokens saved, and per-cent reductions.
 
 Stages modelled
 ---------------
-1. repo_scan              — files discovered in the repository
-2. file_ranking           — files scored and ranked against the task
-3. budget_selection       — top-N files selected to fit the token budget
-4. cache_reuse            — files served from the warm context cache
-5. symbol_extraction      — symbol-only views extracted for large files
-6. context_slicing        — language-aware slices pulled from files
-7. compression            — LLM / deterministic summarisation applied
-8. snippet_selection      — short snippet windows selected
-9. full_include           — files included verbatim (no reduction)
-10. delta_context         — incremental delta versus a previous run
-11. final_context         — resulting context delivered to the model
+1. repo_scan              - files discovered in the repository
+2. file_ranking           - files scored and ranked against the task
+3. budget_selection       - top-N files selected to fit the token budget
+4. cache_reuse            - files served from the warm context cache
+5. symbol_extraction      - symbol-only views extracted for large files
+6. context_slicing        - language-aware slices pulled from files
+7. compression            - LLM / deterministic summarisation applied
+8. snippet_selection      - short snippet windows selected
+9. full_include           - files included verbatim (no reduction)
+10. delta_context         - incremental delta versus a previous run
+11. final_context         - resulting context delivered to the model
 """
 
 from dataclasses import asdict, dataclass, field
@@ -193,7 +193,7 @@ def build_pipeline_trace(
         opt_stage_data[stage]["tokens_in"] += orig
         opt_stage_data[stage]["tokens_out"] += comp
 
-    # Delta stage is not a file-level entry — set separately
+    # Delta stage is not a file-level entry - set separately
     opt_stage_data[STAGE_DELTA]["tokens_in"] = delta_saved
     opt_stage_data[STAGE_DELTA]["tokens_out"] = 0
 
@@ -232,7 +232,7 @@ def build_pipeline_trace(
         notes=f"{len(files_included)} included, {len(files_skipped)} budget-skipped",
     ))
 
-    # 3. Budget Selection  (same checkpoint, different label — shows the gate)
+    # 3. Budget Selection  (same checkpoint, different label - shows the gate)
     n_selected = len(compressed_context)
     stages.append(PipelineStage(
         name="budget_selection",

@@ -210,7 +210,7 @@ def test_pack_context_non_strict_does_not_raise(strict_policy_repo: Path) -> Non
         max_tokens=30000,
         policy_path=strict_policy_repo / "policy.toml",
     )
-    # strict defaults to False — must not raise even though policy is violated
+    # strict defaults to False - must not raise even though policy is violated
     result = guard.pack_context(task="update auth", repo=strict_policy_repo)
     assert result["command"] == "pack"
 
@@ -430,7 +430,7 @@ def test_simulate_agent_call_overrides_top_files(caching_repo: Path) -> None:
 
 
 def test_simulate_agent_no_guard_top_files_uses_config_default(auth_repo: Path) -> None:
-    # Guard has no top_files — engine should fall back to the config default.
+    # Guard has no top_files - engine should fall back to the config default.
     guard = BudgetGuard()
     plan = guard.simulate_agent(task="update auth flow", repo=auth_repo)
 
@@ -603,3 +603,95 @@ def test_violation_error_is_runtime_error() -> None:
         run_artifact={},
     )
     assert isinstance(err, RuntimeError)
+
+
+# ---------------------------------------------------------------------------
+# read_profile: basic contract
+# ---------------------------------------------------------------------------
+
+
+def test_read_profile_returns_dict(caching_repo: Path) -> None:
+    guard = BudgetGuard(max_tokens=30000)
+    run = guard.pack_context(task="add caching", repo=caching_repo)
+    report = guard.read_profile(run)
+    assert isinstance(report, dict)
+
+
+def test_read_profile_required_keys_present(caching_repo: Path) -> None:
+    guard = BudgetGuard(max_tokens=30000)
+    run = guard.pack_context(task="add caching", repo=caching_repo)
+    report = guard.read_profile(run)
+
+    for key in (
+        "total_files_read",
+        "unique_files_read",
+        "duplicate_reads",
+        "unnecessary_reads",
+        "high_cost_reads",
+        "tokens_wasted_total",
+        "files",
+        "duplicate_files",
+        "unnecessary_files",
+        "high_cost_files",
+    ):
+        assert key in report, f"read_profile missing key: {key}"
+
+
+def test_read_profile_numeric_fields_nonnegative(caching_repo: Path) -> None:
+    guard = BudgetGuard(max_tokens=30000)
+    run = guard.pack_context(task="add caching", repo=caching_repo)
+    report = guard.read_profile(run)
+
+    for field in (
+        "total_files_read",
+        "unique_files_read",
+        "duplicate_reads",
+        "unnecessary_reads",
+        "high_cost_reads",
+        "tokens_wasted_total",
+    ):
+        assert report[field] >= 0, f"{field} should be non-negative"
+
+
+def test_read_profile_list_fields_are_lists(caching_repo: Path) -> None:
+    guard = BudgetGuard(max_tokens=30000)
+    run = guard.pack_context(task="add caching", repo=caching_repo)
+    report = guard.read_profile(run)
+
+    for field in ("files", "duplicate_files", "unnecessary_files", "high_cost_files"):
+        assert isinstance(report[field], list), f"{field} should be a list"
+
+
+def test_read_profile_file_records_have_required_fields(caching_repo: Path) -> None:
+    guard = BudgetGuard(max_tokens=30000)
+    run = guard.pack_context(task="add caching", repo=caching_repo)
+    report = guard.read_profile(run)
+
+    for rec in report["files"]:
+        for field in ("path", "original_tokens", "compressed_tokens",
+                      "read_count", "is_duplicate", "is_unnecessary", "is_high_cost"):
+            assert field in rec, f"FileReadRecord missing field: {field}"
+
+
+def test_read_profile_accepts_pack_artifact_dict(auth_repo: Path) -> None:
+    guard = BudgetGuard(max_tokens=30000)
+    run = guard.pack_context(task="tighten auth", repo=auth_repo)
+    report = guard.read_profile(run)
+    # total_files_read should equal len(compressed_context) since each entry is counted
+    assert report["total_files_read"] == len(run["compressed_context"])
+
+
+# ---------------------------------------------------------------------------
+# read_profile: integration workflow (pack_context → read_profile)
+# ---------------------------------------------------------------------------
+
+
+def test_pack_then_read_profile_workflow(caching_repo: Path) -> None:
+    guard = BudgetGuard(max_tokens=30000)
+    run = guard.pack_context(task="add caching", repo=caching_repo)
+    report = guard.read_profile(run)
+
+    # tokens_wasted_total = wasted_duplicates + wasted_unnecessary
+    wasted_dup = report.get("tokens_wasted_duplicates", 0)
+    wasted_unnec = report.get("tokens_wasted_unnecessary", 0)
+    assert report["tokens_wasted_total"] == wasted_dup + wasted_unnec

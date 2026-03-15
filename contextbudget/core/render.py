@@ -255,7 +255,7 @@ def render_agent_simulation_markdown(data: dict) -> str:
             f"| | Value |",
             f"|---|---|",
             f"| Model | {cost.get('model', '')} |",
-            f"| Provider | {cost.get('provider', '—')} |",
+            f"| Provider | {cost.get('provider', '-')} |",
             f"| Input price | ${cost.get('input_per_1m_usd', 0):.2f} / MTok |",
             f"| Output price | ${cost.get('output_per_1m_usd', 0):.2f} / MTok |",
             f"| Total input tokens | {cost.get('total_input_tokens', 0):,} |",
@@ -334,7 +334,7 @@ def render_agent_simulation_markdown(data: dict) -> str:
             )
     else:
         if has_cost:
-            lines.append("| - | No steps | 0 | 0 | 0 | 0 | 0 | — |")
+            lines.append("| - | No steps | 0 | 0 | 0 | 0 | 0 | - |")
         else:
             lines.append("| - | No steps | 0 | 0 | 0 | 0 | 0 |")
 
@@ -1044,7 +1044,7 @@ def render_advise_markdown(data: dict) -> str:
             signals = item.get("signals", [])
             signals_str = ", ".join(signals) if signals else "none"
             lines.extend([
-                f"### {idx}. `{item.get('path', '')}` — {item.get('suggestion', '')}",
+                f"### {idx}. `{item.get('path', '')}` - {item.get('suggestion', '')}",
                 f"- **Estimated token impact:** {item.get('estimated_token_impact', 0)}",
                 f"- **Signals:** {signals_str}",
                 f"- {item.get('reason', '')}",
@@ -1189,7 +1189,7 @@ def render_profile_markdown(data: dict) -> str:
             any_stage_data = True
 
     if not any_stage_data:
-        lines.append("| — | — | 0 | 0.0% |")
+        lines.append("| - | - | 0 | 0.0% |")
 
     per_file = data.get("per_file", [])
     if isinstance(per_file, list) and per_file:
@@ -1208,7 +1208,7 @@ def render_profile_markdown(data: dict) -> str:
             label = str(record.get("stage") or "").replace("_", " ").title()
             chunk_strategy = str(record.get("chunk_strategy") or "")
             cache_status = str(record.get("cache_status") or "")
-            strategy_cell = chunk_strategy or cache_status or "—"
+            strategy_cell = chunk_strategy or cache_status or "-"
             lines.append(
                 f"| `{record.get('path', '')}` "
                 f"| {label} "
@@ -1239,11 +1239,12 @@ def render_drift_markdown(data: dict) -> str:
     token_drift = float(drift.get("token_drift_pct", 0.0) or 0.0)
     file_drift = float(drift.get("file_drift_pct", 0.0) or 0.0)
     complexity_drift = float(drift.get("complexity_drift_pct", 0.0) or 0.0)
+    dep_depth_drift = float(drift.get("dep_depth_drift_pct", 0.0) or 0.0)
     alert = bool(drift.get("alert", False))
     verdict = str(drift.get("verdict", "none") or "none")
 
-    alert_badge = " **ALERT**" if alert else ""
     verdict_label = verdict.upper()
+    token_direction = "increased" if token_drift >= 0 else "decreased"
 
     lines = [
         "# ContextBudget Drift Report",
@@ -1257,8 +1258,20 @@ def render_drift_markdown(data: dict) -> str:
         f"Window:       {window} entries (analyzed: {entries_analyzed})",
         f"Threshold:    {threshold_pct:.1f}%",
         "",
-        f"## Verdict: {verdict_label}{alert_badge}",
-        "",
+    ]
+    if alert:
+        lines += [
+            f"**context drift detected [{verdict_label}]**",
+            "",
+            f"token usage {token_direction} by {abs(token_drift):.1f}%",
+            "",
+        ]
+    else:
+        lines += [
+            f"## Verdict: {verdict_label}",
+            "",
+        ]
+    lines += [
         "| Metric | Baseline | Current | Drift |",
         "|--------|----------|---------|-------|",
         (
@@ -1279,16 +1292,22 @@ def render_drift_markdown(data: dict) -> str:
             f"| {float(current.get('complexity', 0.0) or 0.0):.1f} "
             f"| {complexity_drift:+.1f}% |"
         ),
+        (
+            f"| Dependency depth (candidates) "
+            f"| {int(baseline.get('dep_depth', 0) or 0)} "
+            f"| {int(current.get('dep_depth', 0) or 0)} "
+            f"| {dep_depth_drift:+.1f}% |"
+        ),
         "",
-        f"Baseline run: `{baseline.get('generated_at', '')}` — {baseline.get('task', '')}",
-        f"Current run:  `{current.get('generated_at', '')}` — {current.get('task', '')}",
+        f"Baseline run: `{baseline.get('generated_at', '')}` - {baseline.get('task', '')}",
+        f"Current run:  `{current.get('generated_at', '')}` - {current.get('task', '')}",
         "",
     ]
 
     contributors = data.get("top_contributors", [])
     if isinstance(contributors, list) and contributors:
         lines += [
-            "## Top Contributors to Drift",
+            "## Files Contributing Most to Drift",
             "",
             "| File | Status | Baseline freq | Recent freq | Delta |",
             "|------|--------|--------------|-------------|-------|",
@@ -1381,8 +1400,8 @@ def render_pipeline_markdown(data: dict) -> str:
         t_out = int(stage.get("tokens_out") or 0)
         t_saved = int(stage.get("tokens_saved") or 0)
         pct = float(stage.get("reduction_pct") or 0.0)
-        pct_cell = f"{pct:.1f}%" if pct > 0 else "—"
-        saved_cell = f"{t_saved:,}" if t_saved > 0 else "—"
+        pct_cell = f"{pct:.1f}%" if pct > 0 else "-"
+        saved_cell = f"{t_saved:,}" if t_saved > 0 else "-"
         lines.append(
             f"| {display_label} | {files:,} | {t_in:,} | {t_out:,} | {saved_cell} | {pct_cell} |"
         )
@@ -1514,7 +1533,7 @@ def render_read_profile_markdown(data: dict) -> str:
         for rec in unneeded:
             if not isinstance(rec, dict):
                 continue
-            chunk = str(rec.get("chunk_strategy") or rec.get("strategy") or "—")
+            chunk = str(rec.get("chunk_strategy") or rec.get("strategy") or "-")
             lines.append(
                 f"| `{rec.get('path', '')}` "
                 f"| {float(rec.get('relevance_score', 0.0)):.2f} "
@@ -1539,7 +1558,7 @@ def render_read_profile_markdown(data: dict) -> str:
         for rec in high_cost:
             if not isinstance(rec, dict):
                 continue
-            chunk = str(rec.get("chunk_strategy") or rec.get("strategy") or "—")
+            chunk = str(rec.get("chunk_strategy") or rec.get("strategy") or "-")
             lines.append(
                 f"| `{rec.get('path', '')}` "
                 f"| {rec.get('original_tokens', 0)} "
@@ -1569,9 +1588,9 @@ def render_read_profile_markdown(data: dict) -> str:
                 flags.append("unnecessary")
             if rec.get("is_high_cost"):
                 flags.append("high-cost")
-            flag_str = ", ".join(flags) if flags else "—"
+            flag_str = ", ".join(flags) if flags else "-"
             score = float(rec.get("relevance_score", 0.0) or 0.0)
-            score_str = f"{score:.2f}" if score > 0.0 else "—"
+            score_str = f"{score:.2f}" if score > 0.0 else "-"
             lines.append(
                 f"| `{rec.get('path', '')}` "
                 f"| {rec.get('original_tokens', 0)} "
@@ -1581,6 +1600,80 @@ def render_read_profile_markdown(data: dict) -> str:
             )
         lines.append("")
 
+    return "\n".join(lines)
+
+
+def render_observe_markdown(data: dict) -> str:
+    """Render an agent observability report to Markdown."""
+
+    run_json = str(data.get("run_json") or "")
+    task = str(data.get("task") or "")
+    repo = str(data.get("repo") or "")
+    duration_ms = int(data.get("run_duration_ms") or 0)
+    duration_str = f"{duration_ms:,} ms" if duration_ms else "—"
+
+    lines = ["# Agent Run Summary", ""]
+    if task:
+        lines.append(f"Task: {task}")
+    if repo:
+        lines.append(f"Repository: {repo}")
+    if run_json:
+        lines.append(f"Run artifact: {run_json}")
+    lines.append(f"Generated at: {data.get('generated_at', '')}")
+    lines.extend([
+        "",
+        "## Token Metrics",
+        "",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| Total tokens used          | {data.get('total_tokens', 0):,} |",
+        f"| Baseline (unoptimised)     | {data.get('baseline_tokens', 0):,} |",
+        f"| Tokens saved by optimisation | {data.get('tokens_saved', 0):,} |",
+        f"| Token budget (max)         | {data.get('max_tokens', 0) or '—'} |",
+        "",
+        "## File Read Metrics",
+        "",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| Files read (total)                 | {data.get('files_read', 0)} |",
+        f"| Unique files read                  | {data.get('unique_files_read', 0)} |",
+        f"| Duplicate reads detected           | {data.get('duplicate_reads', 0)} |",
+        f"| Duplicate reads prevented (packer) | {data.get('duplicate_reads_prevented', 0)} |",
+        "",
+        "## Cache Metrics",
+        "",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| Cache hits          | {data.get('cache_hits', 0)} |",
+        f"| Tokens saved (cache)| {data.get('cache_tokens_saved', 0):,} |",
+        "",
+        "## Run Info",
+        "",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| Context size (files) | {data.get('context_size_files', 0)} |",
+        f"| Run duration         | {duration_str} |",
+    ])
+
+    files: list = data.get("files") or []
+    if files:
+        lines.extend(["", "## Top Files by Token Cost", ""])
+        lines.extend([
+            "| File | Original tokens | Compressed tokens | Read count |",
+            "|------|-----------------|-------------------|------------|",
+        ])
+        for f in files[:20]:
+            if not isinstance(f, dict):
+                continue
+            dup_flag = " ⚠" if f.get("is_duplicate") else ""
+            lines.append(
+                f"| {f.get('path', '')} "
+                f"| {f.get('original_tokens', 0):,} "
+                f"| {f.get('compressed_tokens', 0):,} "
+                f"| {f.get('read_count', 1)}{dup_flag} |"
+            )
+
+    lines.append("")
     return "\n".join(lines)
 
 
@@ -1596,6 +1689,57 @@ def render_dataset_markdown(data: dict) -> str:
         f"Repository: {data.get('repo', '')}",
         f"Generated at: {data.get('generated_at', '')}",
         f"Tasks: {data.get('task_count', 0)}",
+        "",
+        "## Aggregate",
+        "| Metric | Value |",
+        "|--------|-------|",
+        f"| Total baseline tokens | {agg.get('total_baseline_tokens', 0)} |",
+        f"| Total optimized tokens | {agg.get('total_optimized_tokens', 0)} |",
+        f"| Avg baseline tokens | {agg.get('avg_baseline_tokens', 0)} |",
+        f"| Avg optimized tokens | {agg.get('avg_optimized_tokens', 0)} |",
+        f"| Avg reduction | {agg.get('avg_reduction_pct', 0):.1f}% |",
+        "",
+        "## Per-Task Results",
+        "| # | Task | Baseline tokens | Optimized tokens | Reduction |",
+        "|---|------|-----------------|------------------|-----------|",
+    ]
+
+    for idx, entry in enumerate(entries, start=1):
+        if not isinstance(entry, dict):
+            continue
+        label = entry.get("task_name") or entry.get("task", "")
+        lines.append(
+            f"| {idx} | {label} "
+            f"| {entry.get('baseline_tokens', 0)} "
+            f"| {entry.get('optimized_tokens', 0)} "
+            f"| {entry.get('reduction_pct', 0):.1f}% |"
+        )
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_context_dataset_markdown(data: dict) -> str:
+    """Render a context dataset builder report to Markdown."""
+
+    agg = data.get("aggregate", {})
+    entries = data.get("entries", [])
+    builtin_count = int(data.get("builtin_task_count", 0) or 0)
+    extra_count = int(data.get("extra_task_count", 0) or 0)
+
+    if builtin_count and extra_count:
+        task_source = f"{builtin_count} built-in + {extra_count} custom"
+    elif extra_count:
+        task_source = f"{extra_count} custom"
+    else:
+        task_source = "built-in"
+
+    lines = [
+        "# ContextBudget Context Dataset Report",
+        "",
+        f"Repository: {data.get('repo', '')}",
+        f"Generated at: {data.get('generated_at', '')}",
+        f"Tasks: {data.get('task_count', 0)} ({task_source})",
         "",
         "## Aggregate",
         "| Metric | Value |",

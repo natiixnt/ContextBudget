@@ -11,6 +11,12 @@ from contextbudget.config import ContextBudgetConfig, WorkspaceDefinition, load_
 from contextbudget.core.advisor import advise_as_dict, run_advise
 from contextbudget.core.drift import run_drift
 from contextbudget.core.benchmark import run_benchmark
+from contextbudget.core.context_dataset_builder import (
+    BUILTIN_TASKS,
+    build_context_dataset,
+    context_dataset_as_dict,
+    load_extra_tasks_toml,
+)
 from contextbudget.core.dataset import DatasetTask, dataset_as_dict, load_tasks_toml, run_dataset
 from contextbudget.core.delta import effective_pack_metrics
 from contextbudget.core.graph_visualizer import (
@@ -36,6 +42,7 @@ from contextbudget.core.policy import (
     load_policy,
     policy_result_to_dict,
 )
+from contextbudget.core.observe import build_observe_report, observe_as_dict
 from contextbudget.core.profiler import build_savings_profile, savings_profile_as_dict
 from contextbudget.core.read_profiler import build_read_profile, read_profile_as_dict
 from contextbudget.core.pipeline_trace import build_pipeline_trace, pipeline_trace_as_dict
@@ -564,6 +571,70 @@ class ContextBudgetEngine:
         )
         return dataset_as_dict(report)
 
+    def build_dataset(
+        self,
+        *,
+        repo: str | Path = ".",
+        tasks_toml: str | Path | None = None,
+        use_builtin: bool = True,
+        max_tokens: int | None = None,
+        top_files: int | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Build a token-reduction benchmark dataset using built-in and/or custom tasks.
+
+        Unlike :meth:`dataset`, no TOML file is required — the built-in task
+        list is used by default, enabling reproducible benchmarks without any
+        external configuration.
+
+        Parameters
+        ----------
+        repo:
+            Repository to benchmark against.
+        tasks_toml:
+            Optional path to a TOML file with extra ``[[tasks]]`` entries.
+            When *use_builtin* is ``True`` these are appended after the built-in
+            tasks; when *use_builtin* is ``False`` only the TOML tasks are used.
+        use_builtin:
+            Include the built-in benchmark task list (default: ``True``).
+        max_tokens:
+            Token budget forwarded to every benchmark run.
+        top_files:
+            Top-files limit forwarded to every benchmark run.
+        config_path:
+            Optional path to a ``contextbudget.toml`` config file.
+        """
+        repo_path = normalize_repo(repo)
+
+        builtin_tasks = list(BUILTIN_TASKS) if use_builtin else []
+        extra_tasks: list[DatasetTask] = []
+        if tasks_toml is not None:
+            extra_tasks = load_extra_tasks_toml(Path(tasks_toml))
+
+        effective_tasks = builtin_tasks + extra_tasks
+
+        def _run(*, task: str, repo: Path, max_tokens: int | None, top_files: int | None) -> dict[str, Any]:
+            return self.benchmark(
+                task=task,
+                repo=repo,
+                max_tokens=max_tokens,
+                top_files=top_files,
+                config_path=config_path,
+            )
+
+        report = build_context_dataset(
+            repo_path,
+            run_benchmark_fn=_run,
+            tasks=effective_tasks,
+            max_tokens=max_tokens,
+            top_files=top_files,
+        )
+        return context_dataset_as_dict(
+            report,
+            builtin_task_count=len(builtin_tasks),
+            extra_task_count=len(extra_tasks),
+        )
+
     def visualize(
         self,
         *,
@@ -720,6 +791,56 @@ class ContextBudgetEngine:
             run_json = str(run_path)
         report = build_read_profile(run_data, run_json=run_json)
         return read_profile_as_dict(report)
+
+    def observe(
+        self,
+        run: RunArtifactInput,
+        *,
+        store: bool = True,
+        base_dir: str | Path = ".",
+    ) -> dict[str, Any]:
+        """Analyze an agent run artifact and record metrics in the local store.
+
+        Reads a pack run artifact produced by :meth:`pack` and computes an
+        Agent Run Summary covering token usage, file reads, duplicate reads,
+        cache hits, context size, and run duration.  When *store* is ``True``
+        (the default), the report is appended to the local metrics store at
+        ``<base_dir>/.contextbudget/observe-history.json``.
+
+        Parameters
+        ----------
+        run:
+            A run artifact dict, path string, or :class:`~pathlib.Path` to a
+            run JSON file produced by :meth:`pack`.
+        store:
+            When ``True`` (default) the report is persisted to the local
+            metrics store so it can be queried with future ``observe`` calls.
+        base_dir:
+            Repository root used to resolve the metrics store path.
+
+        Returns
+        -------
+        dict
+            JSON-serialisable agent run summary with keys ``total_tokens``,
+            ``tokens_saved``, ``duplicate_reads``, ``cache_hits``, etc.
+        """
+        from contextbudget.telemetry.store import append_observe_entry
+
+        if isinstance(run, dict):
+            run_data = run
+            run_json = ""
+        else:
+            run_path = Path(run)
+            run_data = read_json(run_path)
+            run_json = str(run_path)
+
+        report = build_observe_report(run_data, run_json=run_json)
+        data = observe_as_dict(report)
+
+        if store:
+            append_observe_entry(data, base_dir=base_dir)
+
+        return data
 
     def dashboard(
         self,
@@ -955,10 +1076,10 @@ class BudgetGuard:
 
         Artifact keys:
 
-        - ``steps`` – ordered workflow steps, each with token and USD cost fields
-        - ``total_tokens`` – sum across all steps
-        - ``cost_estimate`` – full USD breakdown keyed by model and pricing
-        - ``model`` – model used for pricing
+        - ``steps`` - ordered workflow steps, each with token and USD cost fields
+        - ``total_tokens`` - sum across all steps
+        - ``cost_estimate`` - full USD breakdown keyed by model and pricing
+        - ``model`` - model used for pricing
 
         Example::
 

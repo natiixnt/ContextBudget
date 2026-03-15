@@ -37,10 +37,10 @@ produced by `pack` and emits a `<prefix>.json` + `<prefix>.md` breakdown.
 
 The profile shows:
 
-- **tokens before optimization** — raw token count across all packed files
-- **tokens after optimization** — token count actually sent to the model
-- **savings per stage** — how much each optimization stage contributed
-- **total savings** — absolute tokens removed and percentage reduction
+- **tokens before optimization** - raw token count across all packed files
+- **tokens after optimization** - token count actually sent to the model
+- **savings per stage** - how much each optimization stage contributed
+- **total savings** - absolute tokens removed and percentage reduction
 
 **Stages tracked:**
 

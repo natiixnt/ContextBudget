@@ -5,7 +5,7 @@ from __future__ import annotations
 Maps model names to published input/output token prices and computes USD cost
 estimates for simulated agent runs.
 
-Prices are in **USD per 1 000 000 tokens** (i.e. per-MTok) — the standard
+Prices are in **USD per 1 000 000 tokens** (i.e. per-MTok) - the standard
 unit used by all major providers.  You can override any model's pricing or
 supply fully custom prices via the ``price_per_1m_input`` / ``price_per_1m_output``
 parameters of :func:`compute_step_cost` and :func:`compute_workflow_cost`.
