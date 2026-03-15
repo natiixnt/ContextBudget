@@ -22,6 +22,7 @@ from contextbudget.core.render import (
     render_policy_markdown,
     render_pr_audit_markdown,
     render_pr_comment_markdown,
+    render_profile_markdown,
     render_report_markdown,
     write_json,
 )
@@ -254,6 +255,24 @@ def cmd_pack(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_profile(args: argparse.Namespace) -> int:
+    engine = ContextBudgetEngine()
+    run_path = Path(args.run_json)
+    data = engine.profile(run_path)
+    markdown = render_profile_markdown(data)
+
+    print(markdown)
+
+    prefix = args.out_prefix or run_path.with_suffix("").name + "-profile"
+    json_path = Path(f"{prefix}.json")
+    md_path = Path(f"{prefix}.md")
+    write_json(json_path, data)
+    md_path.write_text(markdown, encoding="utf-8")
+    print(f"Wrote profile JSON:     {json_path}")
+    print(f"Wrote profile Markdown: {md_path}")
+    return 0
+
+
 def cmd_report(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine()
     run_path = Path(args.run_json)
@@ -480,6 +499,38 @@ def cmd_heatmap(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_enforce(args: argparse.Namespace) -> int:
+    policy_path = Path(args.policy_toml)
+    run_path = Path(args.run_json)
+
+    if not policy_path.exists():
+        print(f"Policy file not found: {policy_path}")
+        return 2
+    if not run_path.exists():
+        print(f"Run artifact not found: {run_path}")
+        return 2
+
+    policy = load_policy(policy_path)
+    engine = ContextBudgetEngine()
+    policy_result = engine.evaluate_policy(run_path, policy=policy)
+
+    if bool(policy_result.get("passed", False)):
+        print(f"Policy check: PASS ({run_path})")
+        checks = policy_result.get("checks", {})
+        for name, detail in checks.items():
+            print(f"  {name}: actual={detail.get('actual')} limit={detail.get('limit')} pass={detail.get('passed')}")
+        return 0
+    else:
+        print(f"Policy check: FAIL ({run_path})")
+        for violation in policy_result.get("violations", []):
+            print(f"  - {violation}")
+        checks = policy_result.get("checks", {})
+        for name, detail in checks.items():
+            status = "pass" if detail.get("passed") else "FAIL"
+            print(f"  {name}: actual={detail.get('actual')} limit={detail.get('limit')} [{status}]")
+        return 2
+
+
 def cmd_watch(args: argparse.Namespace) -> int:
     repo_path = normalize_repo(args.repo)
     config_path = _resolve_config_path(args.config)
@@ -601,6 +652,11 @@ def build_parser() -> argparse.ArgumentParser:
     )
     pack.set_defaults(func=cmd_pack)
 
+    profile = sub.add_parser("profile", help="Show token savings breakdown for a pack run")
+    profile.add_argument("run_json", help="Path to run JSON produced by pack")
+    profile.add_argument("--out-prefix", help="Output file prefix for profile JSON/Markdown")
+    profile.set_defaults(func=cmd_profile)
+
     report = sub.add_parser("report", help="Read a run JSON and produce a summary report")
     report.add_argument("run_json", help="Path to run JSON produced by pack")
     report.add_argument("--out", help="Path for markdown summary output")
@@ -662,6 +718,14 @@ def build_parser() -> argparse.ArgumentParser:
         default="contextbudget-heatmap",
     )
     heatmap.set_defaults(func=cmd_heatmap)
+
+    enforce = sub.add_parser(
+        "enforce",
+        help="Enforce a budget policy against a run artifact (exit non-zero on violations)",
+    )
+    enforce.add_argument("policy_toml", help="Path to policy TOML file")
+    enforce.add_argument("run_json", help="Path to run JSON artifact produced by pack")
+    enforce.set_defaults(func=cmd_enforce)
 
     watch = sub.add_parser("watch", help="Watch a repository and update scan state incrementally")
     watch.add_argument("--repo", default=".", help="Repository path")

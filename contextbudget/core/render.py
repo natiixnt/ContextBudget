@@ -832,6 +832,51 @@ def render_pr_audit_markdown(data: dict) -> str:
     return "\n".join(lines)
 
 
+def render_advise_markdown(data: dict) -> str:
+    """Render context architecture advice report to Markdown."""
+
+    summary = data.get("summary", {})
+    suggestions = data.get("suggestions", [])
+    lines = [
+        "# ContextBudget Architecture Advice",
+        "",
+        f"Repository: {data.get('repo', '')}",
+        f"Generated at: {data.get('generated_at', '')}",
+        f"Scanned files: {data.get('scanned_files', 0)}",
+        f"Runs analyzed: {data.get('runs_analyzed', 0)}",
+        f"Large-file token threshold: {data.get('large_file_token_threshold', 0)}",
+        f"High fan-in threshold: {data.get('high_fanin_threshold', 0)} importers",
+        f"High fan-out threshold: {data.get('high_fanout_threshold', 0)} dependencies",
+        "",
+        "## Summary",
+        f"- Total suggestions: {summary.get('total_suggestions', 0)}",
+        f"- Split file: {summary.get('split_file', 0)}",
+        f"- Extract module: {summary.get('extract_module', 0)}",
+        f"- Reduce dependencies: {summary.get('reduce_dependencies', 0)}",
+        "",
+        "## Suggestions (ranked by token impact)",
+    ]
+
+    if isinstance(suggestions, list) and suggestions:
+        for idx, item in enumerate(suggestions, start=1):
+            if not isinstance(item, dict):
+                continue
+            signals = item.get("signals", [])
+            signals_str = ", ".join(signals) if signals else "none"
+            lines.extend([
+                f"### {idx}. `{item.get('path', '')}` — {item.get('suggestion', '')}",
+                f"- **Estimated token impact:** {item.get('estimated_token_impact', 0)}",
+                f"- **Signals:** {signals_str}",
+                f"- {item.get('reason', '')}",
+                "",
+            ])
+    else:
+        lines.append("- No suggestions. Repository structure looks agent-friendly.")
+        lines.append("")
+
+    return "\n".join(lines)
+
+
 def render_benchmark_markdown(data: dict) -> str:
     """Render benchmark artifact to Markdown."""
 
@@ -911,6 +956,87 @@ def render_benchmark_markdown(data: dict) -> str:
                 if reason:
                     detail = f"{detail} reason={reason}"
                 lines.append(detail)
+
+    lines.append("")
+    return "\n".join(lines)
+
+
+def render_profile_markdown(data: dict) -> str:
+    """Render a token savings profile artifact to Markdown."""
+
+    tokens_before = int(data.get("tokens_before") or 0)
+    tokens_after = int(data.get("tokens_after") or 0)
+    tokens_saved = int(data.get("tokens_saved") or 0)
+    savings_pct = float(data.get("savings_pct") or 0.0)
+    run_json = str(data.get("run_json") or "")
+
+    lines = ["# ContextBudget Token Savings Profile", ""]
+    if run_json:
+        lines.append(f"Run artifact: {run_json}")
+    lines.extend(
+        [
+            f"Generated at: {data.get('generated_at', '')}",
+            "",
+            "## Summary",
+            "",
+            "| Metric | Tokens |",
+            "|--------|--------|",
+            f"| Tokens before optimization | {tokens_before} |",
+            f"| Tokens after optimization  | {tokens_after} |",
+            f"| Total tokens saved         | {tokens_saved} |",
+            f"| Savings                    | {savings_pct:.1f}% |",
+            "",
+            "## Savings by Stage",
+            "",
+            "| Stage | Files | Tokens Saved | % of Total Savings |",
+            "|-------|-------|-------------|---------------------|",
+        ]
+    )
+
+    by_stage = data.get("by_stage", {})
+    any_stage_data = False
+    if isinstance(by_stage, dict):
+        for stage_name, stage_data in by_stage.items():
+            if not isinstance(stage_data, dict):
+                continue
+            stage_saved = int(stage_data.get("tokens_saved") or 0)
+            file_count = int(stage_data.get("file_count") or 0)
+            if stage_saved == 0 and file_count == 0:
+                continue
+            pct_of_total = round((stage_saved / tokens_saved) * 100.0, 1) if tokens_saved > 0 else 0.0
+            label = stage_name.replace("_", " ").title()
+            lines.append(f"| {label} | {file_count} | {stage_saved} | {pct_of_total:.1f}% |")
+            any_stage_data = True
+
+    if not any_stage_data:
+        lines.append("| — | — | 0 | 0.0% |")
+
+    per_file = data.get("per_file", [])
+    if isinstance(per_file, list) and per_file:
+        lines.extend(
+            [
+                "",
+                "## Per-File Breakdown",
+                "",
+                "| File | Stage | Before | After | Saved | Strategy |",
+                "|------|-------|--------|-------|-------|----------|",
+            ]
+        )
+        for record in per_file:
+            if not isinstance(record, dict):
+                continue
+            label = str(record.get("stage") or "").replace("_", " ").title()
+            chunk_strategy = str(record.get("chunk_strategy") or "")
+            cache_status = str(record.get("cache_status") or "")
+            strategy_cell = chunk_strategy or cache_status or "—"
+            lines.append(
+                f"| `{record.get('path', '')}` "
+                f"| {label} "
+                f"| {record.get('tokens_before', 0)} "
+                f"| {record.get('tokens_after', 0)} "
+                f"| {record.get('tokens_saved', 0)} "
+                f"| {strategy_cell} |"
+            )
 
     lines.append("")
     return "\n".join(lines)

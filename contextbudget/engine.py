@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Public library API for ContextBudget workflows."""
 
+import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
 
@@ -26,6 +27,7 @@ from contextbudget.core.policy import (
     load_policy,
     policy_result_to_dict,
 )
+from contextbudget.core.profiler import build_savings_profile, savings_profile_as_dict
 from contextbudget.core.render import read_json
 from contextbudget.schemas.models import normalize_repo
 from contextbudget.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
@@ -130,6 +132,7 @@ class ContextBudgetEngine:
         max_files_included: int | None = None,
         max_quality_risk_level: str | None = None,
         min_estimated_savings_percentage: float | None = None,
+        max_context_size_bytes: int | None = None,
     ) -> PolicySpec:
         """Build a policy spec for programmatic policy checks."""
 
@@ -138,6 +141,7 @@ class ContextBudgetEngine:
             max_files_included=max_files_included,
             max_quality_risk_level=max_quality_risk_level,
             min_estimated_savings_percentage=min_estimated_savings_percentage,
+            max_context_size_bytes=max_context_size_bytes,
         )
 
     def plan(
@@ -313,8 +317,7 @@ class ContextBudgetEngine:
             effective_files = effective.get("files_included", [])
             if not isinstance(effective_files, list):
                 effective_files = []
-            telemetry.emit(
-                "policy_failed",
+            _policy_emit_kwargs: dict = dict(
                 violations=list(policy_result.get("violations", [])),
                 checks=policy_result.get("checks", {}),
                 max_tokens=run_data.get("max_tokens"),
@@ -328,6 +331,8 @@ class ContextBudgetEngine:
                 ),
                 quality_risk_estimate=budget.get("quality_risk_estimate") if isinstance(budget, dict) else None,
             )
+            telemetry.emit("policy_failed", **_policy_emit_kwargs)
+            telemetry.emit("policy_violation", **_policy_emit_kwargs)
         return policy_result
 
     def diff(
@@ -408,6 +413,22 @@ class ContextBudgetEngine:
             telemetry_sink=self._telemetry_sink,
         )
 
+    def profile(self, run: RunArtifactInput) -> dict[str, Any]:
+        """Build a token savings profile from a pack run artifact.
+
+        ``run`` may be a dict (already loaded), a path string, or a Path to a
+        run JSON file produced by :meth:`pack`.
+        """
+        if isinstance(run, dict):
+            run_data = run
+            run_json = ""
+        else:
+            run_path = Path(run)
+            run_data = read_json(run_path)
+            run_json = str(run_path)
+        profile = build_savings_profile(run_data, run_json=run_json)
+        return savings_profile_as_dict(profile)
+
 
 class BudgetGuard:
     """High-level helper for budgeted packing and strict policy enforcement."""
@@ -420,6 +441,7 @@ class BudgetGuard:
         max_files_included: int | None = None,
         max_quality_risk_level: str | None = None,
         min_estimated_savings_percentage: float | None = None,
+        max_context_size_bytes: int | None = None,
         policy_path: str | Path | None = None,
         strict: bool = False,
         config_path: str | Path | None = None,
@@ -430,6 +452,7 @@ class BudgetGuard:
         self.max_files_included = max_files_included
         self.max_quality_risk_level = max_quality_risk_level
         self.min_estimated_savings_percentage = min_estimated_savings_percentage
+        self.max_context_size_bytes = max_context_size_bytes
         self.policy_path = Path(policy_path).resolve() if policy_path is not None else None
         self.strict = strict
         self.engine = engine if engine is not None else ContextBudgetEngine(config_path=config_path)
@@ -458,6 +481,8 @@ class BudgetGuard:
             spec.max_quality_risk_level = self.max_quality_risk_level
         if self.min_estimated_savings_percentage is not None:
             spec.min_estimated_savings_percentage = self.min_estimated_savings_percentage
+        if self.max_context_size_bytes is not None:
+            spec.max_context_size_bytes = self.max_context_size_bytes
         return spec
 
     def pack(
@@ -510,6 +535,8 @@ class BudgetGuard:
                 policy_spec.max_quality_risk_level = self.max_quality_risk_level
             if self.min_estimated_savings_percentage is not None:
                 policy_spec.min_estimated_savings_percentage = self.min_estimated_savings_percentage
+            if self.max_context_size_bytes is not None:
+                policy_spec.max_context_size_bytes = self.max_context_size_bytes
         else:
             policy_spec = self._build_policy_spec(
                 fallback_max_tokens=fallback_max_tokens,
@@ -538,3 +565,171 @@ class BudgetGuard:
             run_data["policy"] = policy_result
             raise BudgetPolicyViolationError(policy_result=policy_result, run_artifact=run_data)
         return policy_result
+
+    # ------------------------------------------------------------------
+    # SDK interface methods for agent framework integration
+    # ------------------------------------------------------------------
+
+    def pack_context(
+        self,
+        *,
+        task: str,
+        repo: str | Path = ".",
+        workspace: str | Path | None = None,
+        max_tokens: int | None = None,
+        top_files: int | None = None,
+        delta_from: RunArtifactInput | None = None,
+        strict: bool | None = None,
+        policy_path: str | Path | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Pack repository context for a task, respecting the configured token budget.
+
+        Primary entry point for SDK consumers and agent frameworks.  Equivalent
+        to :meth:`pack` but named to align with the agent SDK interface pattern.
+
+        Returns the packed-context run artifact as a dictionary.  When *strict*
+        mode is active (or inherited from the guard), a
+        :class:`BudgetPolicyViolationError` is raised on policy violations.
+
+        Example::
+
+            from contextbudget import BudgetGuard
+
+            guard = BudgetGuard(max_tokens=30000)
+            result = guard.pack_context(task="add caching", repo=".")
+            print(result["budget"]["estimated_input_tokens"])
+        """
+
+        return self.pack(
+            task=task,
+            repo=repo,
+            workspace=workspace,
+            max_tokens=max_tokens,
+            top_files=top_files,
+            delta_from=delta_from,
+            strict=strict,
+            policy_path=policy_path,
+            config_path=config_path,
+        )
+
+    def simulate_agent(
+        self,
+        *,
+        task: str,
+        repo: str | Path = ".",
+        workspace: str | Path | None = None,
+        top_files: int | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Simulate a multi-step agent workflow for a task.
+
+        Returns a step-by-step workflow plan describing how context would be
+        distributed across lifecycle steps such as *inspect*, *implement*,
+        *test*, *validate*, and *document*.  Each step includes assigned context
+        files with token estimates so the caller can plan prompt budgets before
+        packing individual prompts.
+
+        Artifact keys:
+
+        - ``steps`` – ordered workflow steps, each with ``id``, ``context``, and
+          ``estimated_tokens``
+        - ``shared_context`` – files reused across multiple steps
+        - ``total_estimated_tokens`` – sum across all steps (including reuse)
+        - ``unique_context_tokens`` – tokens counted once per unique file
+        - ``reused_context_tokens`` – tokens attributed to shared context reuse
+
+        Example::
+
+            from contextbudget import BudgetGuard
+
+            guard = BudgetGuard(max_tokens=30000)
+            plan = guard.simulate_agent(task="refactor auth flow", repo=".")
+            for step in plan["steps"]:
+                print(step["id"], step["estimated_tokens"])
+        """
+
+        effective_top_files = top_files if top_files is not None else self.top_files
+        return self.engine.plan_agent(
+            task=task,
+            repo=repo,
+            workspace=workspace,
+            top_files=effective_top_files,
+            config_path=config_path,
+        )
+
+    def profile_run(
+        self,
+        *,
+        task: str,
+        repo: str | Path = ".",
+        workspace: str | Path | None = None,
+        max_tokens: int | None = None,
+        top_files: int | None = None,
+        config_path: str | Path | None = None,
+    ) -> dict[str, Any]:
+        """Pack context and return the run artifact augmented with profiling data.
+
+        Measures wall-clock time for the pack operation and derives compression
+        and budget metrics, making it easy for agent frameworks to log or display
+        a one-stop summary without navigating the full artifact structure.
+
+        The run artifact is returned with an additional ``profile`` block::
+
+            {
+                "elapsed_ms": 142,
+                "estimated_input_tokens": 8200,
+                "estimated_saved_tokens": 3100,
+                "compression_ratio": 0.2741,
+                "files_included_count": 6,
+                "files_skipped_count": 2,
+                "quality_risk_estimate": "low"
+            }
+
+        Example::
+
+            from contextbudget import BudgetGuard
+
+            guard = BudgetGuard(max_tokens=30000)
+            result = guard.profile_run(task="add caching", repo=".")
+            p = result["profile"]
+            print(f"packed in {p['elapsed_ms']} ms, ratio {p['compression_ratio']:.1%}")
+        """
+
+        effective_max_tokens = max_tokens if max_tokens is not None else self.max_tokens
+        effective_top_files = top_files if top_files is not None else self.top_files
+
+        t0 = time.perf_counter()
+        run_data = self.engine.pack(
+            task=task,
+            repo=repo,
+            workspace=workspace,
+            max_tokens=effective_max_tokens,
+            top_files=effective_top_files,
+            config_path=config_path,
+        )
+        elapsed_ms = round((time.perf_counter() - t0) * 1000)
+
+        budget = run_data.get("budget", {})
+        if not isinstance(budget, dict):
+            budget = {}
+
+        estimated_input = int(budget.get("estimated_input_tokens", 0) or 0)
+        estimated_saved = int(budget.get("estimated_saved_tokens", 0) or 0)
+        original_tokens = estimated_input + estimated_saved
+        compression_ratio = round(estimated_saved / original_tokens, 4) if original_tokens > 0 else 0.0
+
+        files_included = run_data.get("files_included", [])
+        files_skipped = run_data.get("files_skipped", [])
+
+        run_data["profile"] = {
+            "elapsed_ms": elapsed_ms,
+            "estimated_input_tokens": estimated_input,
+            "estimated_saved_tokens": estimated_saved,
+            "compression_ratio": compression_ratio,
+            "files_included_count": len(files_included) if isinstance(files_included, list) else 0,
+            "files_skipped_count": len(files_skipped) if isinstance(files_skipped, list) else 0,
+            "quality_risk_estimate": budget.get("quality_risk_estimate", "unknown"),
+        }
+
+        return run_data
