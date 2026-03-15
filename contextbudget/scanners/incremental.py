@@ -22,6 +22,13 @@ from contextbudget.schemas.models import (
 
 INDEX_FORMAT_VERSION = 1
 
+_VENV_PREFIXES = (".venv", "venv-")
+
+
+def _is_venv_dir(name: str) -> bool:
+    """Return True for venv-style directory names not covered by exact matches."""
+    return any(name.startswith(prefix) for prefix in _VENV_PREFIXES)
+
 
 @dataclass(slots=True)
 class FileClassification:
@@ -421,7 +428,10 @@ def refresh_scan_index(
     seen_paths: set[str] = set()
 
     for root, dirnames, filenames in os.walk(repo_path):
-        dirnames[:] = sorted(name for name in dirnames if name not in ignored_directories)
+        dirnames[:] = sorted(
+            name for name in dirnames
+            if name not in ignored_directories and not _is_venv_dir(name)
+        )
         for name in sorted(filenames):
             path = Path(root) / name
             if not path.is_file():
