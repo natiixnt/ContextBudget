@@ -82,7 +82,7 @@ export default function RepositoriesPage() {
           Workspace usage aggregated from run history.
           {!data.connected && !loading && (
             <span className="text-amber-600 font-medium ml-1">
-              Connect to live data via <code className="font-mono bg-amber-50 px-1 rounded">contextbudget dashboard</code>.
+              Connect to live data via <code className="font-mono bg-amber-50 px-1 rounded">redcon dashboard</code>.
             </span>
           )}
         </p>

@@ -1,10 +1,10 @@
-# ContextBudget Roadmap
+# Redcon Roadmap
 
 ## Near Term (v0.2)
 - Better language-aware chunking (Python, TS, Go)
 - Import graph signals in relevance scoring
 - More robust token estimation backends
-- Config file (`contextbudget.toml`)
+- Config file (`redcon.toml`)
 
 ## Mid Term (v0.3)
 - Incremental scan index and file watcher mode

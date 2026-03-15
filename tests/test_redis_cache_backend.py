@@ -12,14 +12,14 @@ import redis as _redis_module  # noqa: E402
 
 from pathlib import Path
 
-from contextbudget.cache.backends import (
+from redcon.cache.backends import (
     RedisSummaryCacheBackend,
     build_redis_cache_key,
     create_summary_cache_backend,
     normalize_cache_backend_name,
 )
-from contextbudget.config import default_config
-from contextbudget.stages.workflow import run_pack_stage, run_scan_stage, run_score_stage
+from redcon.config import default_config
+from redcon.stages.workflow import run_pack_stage, run_scan_stage, run_score_stage
 
 
 # ---------------------------------------------------------------------------

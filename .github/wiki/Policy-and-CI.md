@@ -2,7 +2,7 @@
 
 ## Policy Checks
 
-ContextBudget can gate on context quality metrics before returning a result. Supported checks:
+Redcon can gate on context quality metrics before returning a result. Supported checks:
 
 | Check | Parameter |
 |-------|-----------|
@@ -29,7 +29,7 @@ min_estimated_savings_percentage = 20.0
 ## Strict Mode CLI
 
 ```bash
-contextbudget pack "tighten auth middleware token validation" \
+redcon pack "tighten auth middleware token validation" \
   --repo . \
   --strict \
   --policy examples/policy.toml
@@ -42,7 +42,7 @@ Returns non-zero when `--strict` is set and a policy violation is detected. When
 ## Strict Mode Python API
 
 ```python
-from contextbudget import BudgetGuard, BudgetPolicyViolationError
+from redcon import BudgetGuard, BudgetPolicyViolationError
 
 guard = BudgetGuard(
     max_tokens=30000,
@@ -78,7 +78,7 @@ if not policy_result["passed"]:
 ### Example Workflow
 
 ```yaml
-name: ContextBudget
+name: Redcon
 
 on:
   pull_request:
@@ -100,33 +100,33 @@ jobs:
 
       - name: Pack context
         run: |
-          contextbudget pack "review changed code" \
+          redcon pack "review changed code" \
             --repo . \
             --strict \
-            --policy .github/contextbudget-policy.toml
+            --policy .github/redcon-policy.toml
 
       - name: PR audit
         run: |
-          contextbudget pr-audit \
+          redcon pr-audit \
             --repo . \
             --base "${{ github.event.pull_request.base.sha }}" \
             --head "${{ github.event.pull_request.head.sha }}" \
-            --out-prefix contextbudget-pr
+            --out-prefix redcon-pr
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: contextbudget-artifacts
+          name: redcon-artifacts
           path: |
             run.json
             run.md
-            contextbudget-pr.json
-            contextbudget-pr.md
-            contextbudget-pr.comment.md
+            redcon-pr.json
+            redcon-pr.md
+            redcon-pr.comment.md
 ```
 
-### Policy File (`.github/contextbudget-policy.toml`)
+### Policy File (`.github/redcon-policy.toml`)
 
 ```toml
 max_estimated_input_tokens = 28000
@@ -138,10 +138,10 @@ max_quality_risk_level = "medium"
 
 ## PR Audit Gate
 
-`contextbudget pr-audit` analyzes the PR diff directly from git, estimates changed-file token cost before and after the PR, flags files that grew, and detects newly introduced dependencies.
+`redcon pr-audit` analyzes the PR diff directly from git, estimates changed-file token cost before and after the PR, flags files that grew, and detects newly introduced dependencies.
 
 ```bash
-contextbudget pr-audit \
+redcon pr-audit \
   --repo . \
   --base "${{ github.event.pull_request.base.sha }}" \
   --head "${{ github.event.pull_request.head.sha }}" \

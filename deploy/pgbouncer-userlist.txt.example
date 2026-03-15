@@ -1,0 +1,11 @@
+# PgBouncer userlist — copy to pgbouncer-userlist.txt and fill in real hashes.
+# Never commit the real file to version control.
+#
+# Generate a scram-sha-256 password hash:
+#   docker run --rm -it postgres:16 psql -c "SELECT concat('\"contextbudget\" \"', :'PGPASSWORD', '\"');" --csv -t
+# Or use the helper script: scripts/gen_pgbouncer_hash.sh
+#
+# Format: "username" "password"    (plain-text — pgbouncer hashes on startup)
+#         "username" "SCRAM-SHA-256$<iter>:<salt>$<client-key>:<server-key>"
+
+"contextbudget" "CHANGE_ME_postgres_password"

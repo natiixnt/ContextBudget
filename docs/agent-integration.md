@@ -1,6 +1,6 @@
 # Agent Integration
 
-ContextBudget exposes a stable SDK for coding-agent frameworks via `BudgetGuard`.
+Redcon exposes a stable SDK for coding-agent frameworks via `BudgetGuard`.
 The three primary integration methods are:
 
 | Method | Purpose |
@@ -12,7 +12,7 @@ The three primary integration methods are:
 ## Quickstart
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 
@@ -61,7 +61,7 @@ for iteration in range(3):
 ## Strict policy enforcement
 
 ```python
-from contextbudget import BudgetGuard, BudgetPolicyViolationError
+from redcon import BudgetGuard, BudgetPolicyViolationError
 
 guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=10)
 
@@ -79,11 +79,11 @@ See [python-api.md](python-api.md) for the full `BudgetGuard` reference.
 
 ## Lower-level middleware
 
-ContextBudget also includes a lower-level middleware layer for deeper integration.
+Redcon also includes a lower-level middleware layer for deeper integration.
 The middleware wraps the same engine; it does not reimplement scanning, scoring,
 compression, or policy logic.
 
-Model-aware packing can be enabled directly in `contextbudget.toml`:
+Model-aware packing can be enabled directly in `redcon.toml`:
 
 ```toml
 model_profile = "gpt-4.1"
@@ -96,8 +96,8 @@ With a model profile selected, middleware-driven `pack(...)` runs automatically 
 The integration flow is:
 
 1. receive a task
-2. optionally plan the workflow through `ContextBudgetEngine.plan_agent(...)`
-3. prepare packed context through `ContextBudgetEngine.pack(...)`
+2. optionally plan the workflow through `RedconEngine.plan_agent(...)`
+3. prepare packed context through `RedconEngine.pack(...)`
 4. optionally enforce a budget policy
 5. return additive machine-readable metadata
 6. optionally record the combined artifact
@@ -107,9 +107,9 @@ The integration flow is:
 Use `plan_agent(...)` when an external agent loop needs to budget context across multiple steps before packing any single prompt:
 
 ```python
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 plan = engine.plan_agent(
     task="update auth flow across services",
     workspace="workspace.toml",
@@ -132,7 +132,7 @@ The workflow-planning artifact includes:
 The shortest path is the helper trio requested by the middleware layer:
 
 ```python
-from contextbudget import ContextBudgetEngine, enforce_budget, prepare_context, record_run
+from redcon import RedconEngine, enforce_budget, prepare_context, record_run
 
 result = prepare_context(
     "update auth flow across services",
@@ -142,7 +142,7 @@ result = prepare_context(
     metadata={"agent": "local-runner"},
 )
 
-policy = ContextBudgetEngine.make_policy(
+policy = RedconEngine.make_policy(
     max_estimated_input_tokens=28000,
     max_quality_risk_level="medium",
 )
@@ -159,12 +159,12 @@ These helpers return or operate on `AgentMiddlewareResult`, which contains:
 
 ## Typed Middleware API
 
-Use `ContextBudgetMiddleware` directly when an agent framework already has a request object or wants to share middleware state.
+Use `RedconMiddleware` directly when an agent framework already has a request object or wants to share middleware state.
 
 ```python
-from contextbudget import AgentTaskRequest, ContextBudgetMiddleware
+from redcon import AgentTaskRequest, RedconMiddleware
 
-middleware = ContextBudgetMiddleware()
+middleware = RedconMiddleware()
 request = AgentTaskRequest(
     task="update auth flow across services",
     workspace="workspace.toml",
@@ -194,7 +194,7 @@ For multi-step agent loops, pass `delta_from` to emit an incremental package aga
 the previous run artifact instead of resending the whole packed context:
 
 ```python
-from contextbudget import prepare_context
+from redcon import prepare_context
 
 result = prepare_context(
     "tighten auth checks",
@@ -213,14 +213,14 @@ package and token accounting for the current step.
 
 ## Adapter Abstraction
 
-`AgentAdapter` is the high-level abstraction for embedding ContextBudget into external agent tools while keeping transport and model calls outside this repository.
+`AgentAdapter` is the high-level abstraction for embedding Redcon into external agent tools while keeping transport and model calls outside this repository.
 
 `LocalDemoAgentAdapter` is included as a local simulation:
 
 ```python
-from contextbudget import AgentTaskRequest, ContextBudgetMiddleware, LocalDemoAgentAdapter
+from redcon import AgentTaskRequest, RedconMiddleware, LocalDemoAgentAdapter
 
-middleware = ContextBudgetMiddleware()
+middleware = RedconMiddleware()
 adapter = LocalDemoAgentAdapter()
 request = AgentTaskRequest(task="update auth flow", repo=".", max_tokens=400)
 
@@ -280,10 +280,10 @@ When `model_profile` is configured, the underlying run artifact also records:
 ## Integration Guidance
 
 - Use `prepare_context(...)` when you want a small helper-based integration.
-- Use `ContextBudgetMiddleware` when you want a reusable local integration boundary.
-- Use `AgentAdapter` when you are embedding ContextBudget into another agent tool.
+- Use `RedconMiddleware` when you want a reusable local integration boundary.
+- Use `AgentAdapter` when you are embedding Redcon into another agent tool.
 - Keep vendor-specific transport, inference, and authentication logic outside this repository.
 
 ## PR Audit Guard
 
-For CI, pair the runtime middleware with `contextbudget pr-audit` so pull requests that expand default agent context are caught before merge. The audit works directly from git refs, estimates changed-file tokens before vs. after the PR, highlights files that grew, reports newly introduced dependencies, and writes a ready-to-post `*.comment.md` artifact for PR discussions.
+For CI, pair the runtime middleware with `redcon pr-audit` so pull requests that expand default agent context are caught before merge. The audit works directly from git refs, estimates changed-file tokens before vs. after the PR, highlights files that grew, reports newly introduced dependencies, and writes a ready-to-post `*.comment.md` artifact for PR discussions.

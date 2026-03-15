@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget.cache import RunHistoryEntry
-from contextbudget.config import default_config
-from contextbudget.config import load_workspace
-from contextbudget.config import ScoreSettings
-from contextbudget.scanners.repository import scan_repository
-from contextbudget.scanners.workspace import scan_workspace
-from contextbudget.scorers.relevance import score_files
-from contextbudget.stages.workflow import run_score_stage
+from redcon.cache import RunHistoryEntry
+from redcon.config import default_config
+from redcon.config import load_workspace
+from redcon.config import ScoreSettings
+from redcon.scanners.repository import scan_repository
+from redcon.scanners.workspace import scan_workspace
+from redcon.scorers.relevance import score_files
+from redcon.stages.workflow import run_score_stage
 
 
 def _write(path: Path, content: str) -> None:
@@ -20,8 +20,8 @@ def _write(path: Path, content: str) -> None:
 def test_scan_repository_finds_text_files(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "auth.py", "def check_token():\n    return True\n")
     _write(tmp_path / "README.md", "Authentication module")
-    _write(tmp_path / ".contextbudget_cache.json", "{\"summaries\": {}}")
-    _write(tmp_path / ".contextbudget" / "history.json", "{\"entries\": [], \"version\": 1}")
+    _write(tmp_path / ".redcon_cache.json", "{\"summaries\": {}}")
+    _write(tmp_path / ".redcon" / "history.json", "{\"entries\": [], \"version\": 1}")
     (tmp_path / "image.png").write_bytes(b"\x89PNG\r\n\x1a\n")
 
     records = scan_repository(tmp_path)
@@ -30,9 +30,9 @@ def test_scan_repository_finds_text_files(tmp_path: Path) -> None:
     assert "src/auth.py" in paths
     assert "README.md" in paths
     assert "image.png" not in paths
-    assert ".contextbudget_cache.json" not in paths
-    assert ".contextbudget/history.json" not in paths
-    assert ".contextbudget/scan-index.json" not in paths
+    assert ".redcon_cache.json" not in paths
+    assert ".redcon/history.json" not in paths
+    assert ".redcon/scan-index.json" not in paths
 
 
 def test_score_files_ranks_keyword_matches(tmp_path: Path) -> None:
@@ -97,7 +97,7 @@ def test_run_score_stage_keeps_zero_history_when_history_file_is_missing(tmp_pat
 
     assert ranked
     assert all(item.historical_score == 0 for item in ranked)
-    assert not (tmp_path / ".contextbudget" / "history.json").exists()
+    assert not (tmp_path / ".redcon" / "history.json").exists()
 
 
 def test_scan_repository_respects_include_and_ignore_globs(tmp_path: Path) -> None:

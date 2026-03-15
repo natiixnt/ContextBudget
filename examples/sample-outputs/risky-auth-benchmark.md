@@ -1,7 +1,7 @@
-# ContextBudget Benchmark Report
+# Redcon Benchmark Report
 
 Task: add rate limiting to auth API
-Repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/risky-auth-change/repo
+Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/risky-auth-change/repo
 Baseline full-context tokens: 73
 Token budget: 30000
 Top files: 25
@@ -17,13 +17,13 @@ Top files: 25
 
 ## Strategy Details
 - `naive_full_context`: Send full readable repository context without selection or compression.
-- Files included (4): .contextbudget_cache.json, src/auth.py, src/middleware.py, src/permissions.py
+- Files included (4): .redcon_cache.json, src/auth.py, src/middleware.py, src/permissions.py
 - Files skipped (0): none
 - `top_k_selection`: Select top-ranked files and include full content without compression.
 - Notes: top_files=25
 - Files included (3): src/auth.py, src/middleware.py, src/permissions.py
-- Files skipped (1): .contextbudget_cache.json
-- `compressed_pack`: Use ContextBudget scoring + compression under configured token budget.
+- Files skipped (1): .redcon_cache.json
+- `compressed_pack`: Use Redcon scoring + compression under configured token budget.
 - Files included (3): src/auth.py, src/middleware.py, src/permissions.py
 - Files skipped (0): none
 - `cache_assisted_pack`: Repeat compressed pack on warm cache to measure cache-assisted behavior.

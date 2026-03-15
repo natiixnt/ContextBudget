@@ -1,4 +1,4 @@
-# ContextBudget Agent Observability Report
+# Redcon Agent Observability Report
 
 Run: `run.json`
 Generated at: 2026-03-15T10:22:00Z

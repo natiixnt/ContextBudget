@@ -1,16 +1,16 @@
 # Runtime Gateway
 
-The ContextBudget Runtime Gateway exposes the full context optimization pipeline as an authenticated HTTP service. Agent frameworks call it instead of embedding the SDK directly.
+The Redcon Runtime Gateway exposes the full context optimization pipeline as an authenticated HTTP service. Agent frameworks call it instead of embedding the SDK directly.
 
 ## Quick-start
 
 ```bash
 # Install gateway extras (FastAPI + Uvicorn)
-pip install 'contextbudget[gateway]'
+pip install 'redcon[gateway]'
 
 # Start with API key auth
-export CB_GATEWAY_API_KEY=my-secret-key
-contextbudget gateway --host 0.0.0.0 --port 8787 --api-key "$CB_GATEWAY_API_KEY"
+export RC_GATEWAY_API_KEY=my-secret-key
+redcon gateway --host 0.0.0.0 --port 8787 --api-key "$RC_GATEWAY_API_KEY"
 ```
 
 Without the extras, the gateway falls back to a stdlib HTTP implementation (single-threaded, suitable for development only).
@@ -109,7 +109,7 @@ Acknowledge that a run completed and record telemetry.
 
 ## Authentication
 
-Set `api_key` in config or `CB_GATEWAY_API_KEY` env var to enable Bearer token auth.
+Set `api_key` in config or `RC_GATEWAY_API_KEY` env var to enable Bearer token auth.
 
 ```bash
 # All requests must include:
@@ -129,20 +129,20 @@ All config fields can be set via CLI flags or environment variables:
 
 | Field | CLI flag | Env var | Default |
 |---|---|---|---|
-| `host` | `--host` | `CB_GATEWAY_HOST` | `127.0.0.1` |
-| `port` | `--port` | `CB_GATEWAY_PORT` | `8787` |
-| `api_key` | `--api-key` | `CB_GATEWAY_API_KEY` | `None` (disabled) |
-| `max_tokens` | `--max-tokens` | `CB_GATEWAY_MAX_TOKENS` | `128000` |
-| `max_files` | `--max-files` | `CB_GATEWAY_MAX_FILES` | `100` |
-| `request_timeout_seconds` | — | `CB_GATEWAY_TIMEOUT_SECONDS` | `30` |
-| `config_path` | `--config` | `CB_GATEWAY_CONFIG_PATH` | `None` |
-| `telemetry_enabled` | `--telemetry` | `CB_GATEWAY_TELEMETRY` | `false` |
-| `log_requests` | `--no-log-requests` | `CB_GATEWAY_LOG_REQUESTS` | `true` |
+| `host` | `--host` | `RC_GATEWAY_HOST` | `127.0.0.1` |
+| `port` | `--port` | `RC_GATEWAY_PORT` | `8787` |
+| `api_key` | `--api-key` | `RC_GATEWAY_API_KEY` | `None` (disabled) |
+| `max_tokens` | `--max-tokens` | `RC_GATEWAY_MAX_TOKENS` | `128000` |
+| `max_files` | `--max-files` | `RC_GATEWAY_MAX_FILES` | `100` |
+| `request_timeout_seconds` | — | `RC_GATEWAY_TIMEOUT_SECONDS` | `30` |
+| `config_path` | `--config` | `RC_GATEWAY_CONFIG_PATH` | `None` |
+| `telemetry_enabled` | `--telemetry` | `RC_GATEWAY_TELEMETRY` | `false` |
+| `log_requests` | `--no-log-requests` | `RC_GATEWAY_LOG_REQUESTS` | `true` |
 
 ## Python API
 
 ```python
-from contextbudget.gateway import GatewayConfig, GatewayServer
+from redcon.gateway import GatewayConfig, GatewayServer
 
 config = GatewayConfig(
     host="0.0.0.0",
@@ -166,14 +166,14 @@ server.stop()
 
 ```dockerfile
 FROM python:3.12-slim
-RUN pip install 'contextbudget[gateway]'
-ENV CB_GATEWAY_HOST=0.0.0.0
-ENV CB_GATEWAY_PORT=8787
-CMD ["contextbudget-gateway"]
+RUN pip install 'redcon[gateway]'
+ENV RC_GATEWAY_HOST=0.0.0.0
+ENV RC_GATEWAY_PORT=8787
+CMD ["redcon-gateway"]
 ```
 
 ```bash
-docker run -e CB_GATEWAY_API_KEY=secret -p 8787:8787 contextbudget-gateway
+docker run -e RC_GATEWAY_API_KEY=secret -p 8787:8787 redcon-gateway
 ```
 
 ## k8s Health Probes

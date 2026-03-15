@@ -1,8 +1,8 @@
 __pycache__/
 *.py[cod]
 .pytest_cache/
-.contextbudget/
-.contextbudget_cache.json
+.redcon/
+.redcon_cache.json
 .venv/
 *.egg-info/
 node_modules/

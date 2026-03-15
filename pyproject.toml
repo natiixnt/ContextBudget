@@ -3,13 +3,13 @@ requires = ["setuptools>=69", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "contextbudget"
-version = "1.0.0a1"
+name = "redcon"
+version = "1.1.0"
 description = "Deterministic context budgeting for coding-agent workflows"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
-authors = [{ name = "ContextBudget Contributors" }]
+authors = [{ name = "Redcon Contributors" }]
 dependencies = []
 
 [project.optional-dependencies]
@@ -19,14 +19,14 @@ redis = ["redis>=5.0"]
 gateway = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 
 [project.scripts]
-contextbudget = "contextbudget.cli:main"
-contextbudget-gateway = "contextbudget.gateway.server:run_gateway"
+redcon = "redcon.cli:main"
+redcon-gateway = "redcon.gateway.server:run_gateway"
 
 [tool.setuptools]
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["contextbudget*"]
+include = ["redcon*"]
 
 [tool.pytest.ini_options]
 pythonpath = ["."]

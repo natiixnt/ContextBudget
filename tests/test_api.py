@@ -4,7 +4,7 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget import BudgetGuard, BudgetPolicyViolationError, ContextBudgetEngine
+from redcon import BudgetGuard, BudgetPolicyViolationError, RedconEngine
 
 from tests.support_git import build_pr_audit_repo
 
@@ -18,7 +18,7 @@ def test_engine_plan_pack_report_flow(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "search_api.py", "def search(query: str) -> list[str]:\n    return [query]\n")
     _write(tmp_path / "src" / "cache.py", "def cache_get(key: str) -> str | None:\n    return None\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     plan_data = engine.plan(task="add caching to search api", repo=tmp_path, top_files=2)
     assert plan_data["task"] == "add caching to search api"
     assert len(plan_data["ranked_files"]) <= 2
@@ -44,7 +44,7 @@ def test_engine_plan_agent_returns_stepwise_context_estimates(tmp_path: Path) ->
     _write(tmp_path / "tests" / "test_auth.py", "from src.auth import login\n\n\ndef test_login() -> None:\n    assert login('prod_x')\n")
     _write(tmp_path / "README.md", "Authentication flow overview\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     plan = engine.plan_agent(task="update auth flow docs", repo=tmp_path, top_files=4)
 
     assert plan["command"] == "plan_agent"
@@ -66,7 +66,7 @@ def test_engine_plan_agent_returns_stepwise_context_estimates(tmp_path: Path) ->
 def test_engine_policy_evaluation_with_make_policy(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     pack_data = engine.pack(task="tighten auth checks", repo=tmp_path, max_tokens=800)
 
     policy = engine.make_policy(max_estimated_input_tokens=1)
@@ -122,7 +122,7 @@ path = "shared"
 """.strip(),
     )
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     pack_data = engine.pack(task="update auth flow", workspace=tmp_path / "workspace.toml", max_tokens=500)
 
     assert pack_data["workspace"].endswith("workspace.toml")
@@ -131,10 +131,10 @@ path = "shared"
 
 
 def test_engine_report_preserves_model_profile_assumptions(tmp_path: Path) -> None:
-    _write(tmp_path / "contextbudget.toml", 'model_profile = "gpt-4.1"\n')
+    _write(tmp_path / "redcon.toml", 'model_profile = "gpt-4.1"\n')
     _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     pack_data = engine.pack(task="update auth flow", repo=tmp_path)
     summary = engine.report(pack_data)
 
@@ -146,17 +146,17 @@ def test_engine_report_preserves_model_profile_assumptions(tmp_path: Path) -> No
 def test_engine_pr_audit_returns_comment_and_summary(tmp_path: Path) -> None:
     repo, base_commit, head_commit = build_pr_audit_repo(tmp_path)
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     data = engine.pr_audit(repo=repo, base_ref=base_commit, head_ref=head_commit)
 
     assert data["command"] == "pr-audit"
-    assert data["comment_markdown"].startswith("## ContextBudget Analysis")
+    assert data["comment_markdown"].startswith("## Redcon Analysis")
     assert data["summary"]["estimated_token_delta"] > 0
 
 
 def test_engine_pack_can_emit_delta_context_package(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1
@@ -167,7 +167,7 @@ snippet_total_line_limit = 40
     _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
     _write(tmp_path / "src" / "middleware.py", "def auth_middleware(token: str) -> bool:\n    return login(token)\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     first = engine.pack(task="update auth middleware", repo=tmp_path, max_tokens=500)
 
     (tmp_path / "src" / "middleware.py").unlink()
@@ -207,7 +207,7 @@ path = "shared"
 """.strip(),
     )
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     plan = engine.plan_agent(task="update auth flow across services", workspace=tmp_path / "workspace.toml", top_files=3)
 
     assert plan["workspace"].endswith("workspace.toml")
@@ -252,7 +252,7 @@ def test_engine_heatmap_aggregates_run_history(tmp_path: Path) -> None:
         encoding="utf-8",
     )
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     heatmap = engine.heatmap([history], limit=2)
 
     assert heatmap["runs_analyzed"] == 2

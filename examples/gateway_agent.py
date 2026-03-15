@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Example: agent integration with the ContextBudget Runtime Gateway.
+"""Example: agent integration with the Redcon Runtime Gateway.
 
-Demonstrates the agent → ContextBudget Gateway → LLM architecture using only
+Demonstrates the agent → Redcon Gateway → LLM architecture using only
 Python stdlib (no extra dependencies required).
 
 Architecture
@@ -9,7 +9,7 @@ Architecture
     agent (this script)
         │
         ▼  HTTP JSON
-    ContextBudget Gateway  (POST /prepare-context, /run-agent-step, /report-run)
+    Redcon Gateway  (POST /prepare-context, /run-agent-step, /report-run)
         │
         ▼  optimized prompt
     LLM API  (not called in this example — swap in your own client)
@@ -17,9 +17,9 @@ Architecture
 Usage
 -----
     # Terminal 1 — start the gateway
-    python -m contextbudget.gateway
+    python -m redcon.gateway
     # or with a custom port:
-    CB_GATEWAY_PORT=9000 python -m contextbudget.gateway
+    RC_GATEWAY_PORT=9000 python -m redcon.gateway
 
     # Terminal 2 — run this example against a local repo
     python examples/gateway_agent.py [/path/to/repo]
@@ -62,7 +62,7 @@ def _post(endpoint: str, body: dict[str, Any]) -> dict[str, Any]:
     except urllib.error.URLError as exc:
         print(
             f"[gateway] Cannot reach gateway at {GATEWAY_URL}: {exc.reason}\n"
-            "Start the gateway first:  python -m contextbudget.gateway",
+            "Start the gateway first:  python -m redcon.gateway",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -166,7 +166,7 @@ def _print_result(label: str, result: dict[str, Any]) -> None:
 def main() -> None:
     repo = sys.argv[1] if len(sys.argv) > 1 else "."
 
-    print("ContextBudget Gateway — Agent Integration Example")
+    print("Redcon Gateway — Agent Integration Example")
     print(f"  repo    : {repo}")
     print(f"  gateway : {GATEWAY_URL}")
 

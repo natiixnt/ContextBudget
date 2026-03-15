@@ -1,4 +1,4 @@
-# ContextBudget Diff Report
+# Redcon Diff Report
 
 Old run: examples/sample-outputs/risky-auth-run.json
 New run: examples/sample-outputs/language-aware-run.json

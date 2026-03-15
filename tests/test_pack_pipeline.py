@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextbudget.cache import load_run_history
-from contextbudget.core.pipeline import as_json_dict, run_pack
+from redcon.cache import load_run_history
+from redcon.core.pipeline import as_json_dict, run_pack
 
 
 def _write(path: Path, content: str) -> None:
@@ -56,7 +56,7 @@ def test_duplicate_reads_prevented_on_same_content(tmp_path: Path) -> None:
 
 def test_duplicate_hash_cache_can_be_disabled(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [cache]
 duplicate_hash_cache_enabled = false
@@ -90,7 +90,7 @@ def test_summary_cache_hits_on_second_run(tmp_path: Path) -> None:
 
 def test_fragment_cache_reuses_reference_on_second_run(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1000
@@ -102,7 +102,7 @@ snippet_score_threshold = 999
     first = as_json_dict(run_pack("update auth flow", repo=tmp_path, max_tokens=1000))
     second = as_json_dict(run_pack("update auth flow", repo=tmp_path, max_tokens=1000))
 
-    cache_file = json.loads((tmp_path / ".contextbudget_cache.json").read_text(encoding="utf-8"))
+    cache_file = json.loads((tmp_path / ".redcon_cache.json").read_text(encoding="utf-8"))
     first_entry = next(item for item in first["compressed_context"] if item["path"] == "src/auth.py")
     second_entry = next(item for item in second["compressed_context"] if item["path"] == "src/auth.py")
 
@@ -117,7 +117,7 @@ snippet_score_threshold = 999
 
 def test_fragment_cache_reuses_reference_across_repeated_tasks(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1000
@@ -139,7 +139,7 @@ snippet_score_threshold = 999
 
 def test_fragment_cache_reports_token_savings(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1000
@@ -165,7 +165,7 @@ snippet_score_threshold = 999
 
 def test_shared_stub_cache_backend_records_misses_without_persistence(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [cache]
 backend = "shared_stub"
@@ -189,7 +189,7 @@ backend = "shared_stub"
 
 def test_python_language_aware_chunk_selection(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1
@@ -231,7 +231,7 @@ def helper() -> None:
 
 def test_typescript_language_aware_chunk_selection(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1
@@ -271,7 +271,7 @@ export function validate(token: string): boolean {
 
 def test_unknown_extension_falls_back_to_keyword_window(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1
@@ -297,7 +297,7 @@ snippet_total_line_limit = 20
 
 def test_smart_slicing_uses_import_relationships_and_skips_unrelated_code(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1
@@ -364,7 +364,7 @@ def audit_everything(token: str) -> bool:
 
 def test_run_pack_can_emit_delta_context_package(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [compression]
 full_file_threshold_tokens = 1
@@ -427,7 +427,7 @@ def allow_auth(token: str) -> bool:
 
 def test_model_profile_expands_budget_and_records_assumptions(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         'model_profile = "gpt-4.1"\n',
     )
     _write(tmp_path / "src" / "notes.py", ("value = 'x' * 80\n" * 120))
@@ -448,7 +448,7 @@ def test_model_profile_expands_budget_and_records_assumptions(tmp_path: Path) ->
 
 def test_local_model_profile_uses_aggressive_compression_and_custom_overrides(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 model_profile = "local-llm"
 
@@ -474,7 +474,7 @@ recommended_compression_strategy = "aggressive"
 
 def test_model_profile_clamps_explicit_budget_to_context_window(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         'model_profile = "claude-sonnet-4"\n',
     )
     _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")

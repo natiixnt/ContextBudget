@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from contextbudget.core.diffing import diff_run_artifacts
+from redcon.core.diffing import diff_run_artifacts
 
 
 def _sample_run(

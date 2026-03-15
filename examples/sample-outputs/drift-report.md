@@ -1,4 +1,4 @@
-# ContextBudget Context Drift Report
+# Redcon Context Drift Report
 
 Repository: .
 Generated at: 2026-03-15T11:00:00Z

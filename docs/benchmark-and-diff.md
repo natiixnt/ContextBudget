@@ -1,6 +1,6 @@
 # Benchmark and Diff
 
-## `contextbudget diff`
+## `redcon diff`
 
 Compare two runs and inspect:
 - task differences
@@ -9,10 +9,10 @@ Compare two runs and inspect:
 - token/savings/risk/cache deltas
 
 ```bash
-contextbudget diff old-run.json new-run.json
+redcon diff old-run.json new-run.json
 ```
 
-## `contextbudget benchmark`
+## `redcon benchmark`
 
 Compare deterministic strategies for one task:
 - naive full-context
@@ -25,7 +25,7 @@ Benchmark artifacts also include:
 - `estimator_samples`, a compact comparison of built-in estimators on local sample text
 
 ```bash
-contextbudget benchmark "add rate limiting to auth API" --repo .
+redcon benchmark "add rate limiting to auth API" --repo .
 ```
 
 Outputs include terminal summary, JSON artifact, and Markdown report.
@@ -59,6 +59,6 @@ python benchmarks/run_benchmarks.py
 Or run a single task:
 
 ```bash
-contextbudget benchmark "Add Redis caching to task lookup endpoints" \
+redcon benchmark "Add Redis caching to task lookup endpoints" \
     --repo benchmarks/dataset --max-tokens 8000
 ```

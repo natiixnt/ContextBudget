@@ -2,7 +2,7 @@
 
 ## Purpose
 
-ContextBudget includes a telemetry abstraction so future integrations can route run metrics
+Redcon includes a telemetry abstraction so future integrations can route run metrics
 to different sinks without changing pipeline logic.
 
 Current behavior remains local-first:
@@ -12,7 +12,7 @@ Current behavior remains local-first:
 
 ## Components
 
-- `TelemetrySink` interface (`contextbudget.telemetry`)
+- `TelemetrySink` interface (`redcon.telemetry`)
 - `NoOpTelemetrySink` default implementation
 - `JsonlFileTelemetrySink` local development sink
 - `TelemetrySession` run-scoped emitter with shared context fields
@@ -54,19 +54,19 @@ The pipeline currently emits:
 
 ## Configuration
 
-Telemetry is configured via `contextbudget.toml`:
+Telemetry is configured via `redcon.toml`:
 
 ```toml
 [telemetry]
 enabled = true
 sink = "file"
-file_path = ".contextbudget/telemetry.jsonl"
+file_path = ".redcon/telemetry.jsonl"
 ```
 
 Defaults:
 - `enabled = false`
 - `sink = "noop"`
-- `file_path = ".contextbudget/telemetry.jsonl"`
+- `file_path = ".redcon/telemetry.jsonl"`
 
 ## Trust and Privacy
 

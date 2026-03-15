@@ -1,20 +1,20 @@
 /**
- * Anthropic agent integration with ContextBudget middleware (TypeScript).
+ * Anthropic agent integration with Redcon middleware (TypeScript).
  *
  * Architecture:
  *   agent task
- *     → ContextBudget (scan → rank → compress → cache → delta)
+ *     → Redcon (scan → rank → compress → cache → delta)
  *     → optimised prompt
  *     → Claude API
  *     → response
  *
- * ContextBudget sits transparently between the agent loop and the model.
+ * Redcon sits transparently between the agent loop and the model.
  * For each turn it builds the smallest context that fits under the token
  * budget and forwards the compressed prompt to Claude.  Delta mode ensures
  * subsequent turns only resend files that changed.
  *
  * Prerequisites:
- *   pip install contextbudget     (Python side)
+ *   pip install redcon     (Python side)
  *   npm install                   (from this directory)
  *   export ANTHROPIC_API_KEY=sk-ant-...
  *
@@ -23,7 +23,7 @@
  */
 
 import Anthropic from "@anthropic-ai/sdk";
-import { ContextBudgetSDK } from "./contextbudget-sdk";
+import { RedconSDK } from "./redcon-sdk";
 import type { PrepareContextResult } from "./types";
 
 // -----------------------------------------------------------------------
@@ -42,7 +42,7 @@ async function callClaude(prompt: string): Promise<string> {
 }
 
 // -----------------------------------------------------------------------
-// Middleware helper — agent → ContextBudget → model
+// Middleware helper — agent → Redcon → model
 // -----------------------------------------------------------------------
 
 /**
@@ -59,7 +59,7 @@ function buildPrompt(result: PrepareContextResult): string {
 // Agent loop
 // -----------------------------------------------------------------------
 
-const sdk = new ContextBudgetSDK({ maxTokens: 32_000 });
+const sdk = new RedconSDK({ maxTokens: 32_000 });
 const REPO = "examples/small-feature/repo";
 
 async function runAgentLoop(): Promise<void> {
@@ -74,7 +74,7 @@ async function runAgentLoop(): Promise<void> {
     const task = tasks[i];
     console.log(`\n[turn ${i + 1}] ${task}`);
 
-    // 1. Intercept the task — ContextBudget builds the optimised prompt
+    // 1. Intercept the task — Redcon builds the optimised prompt
     const result = sdk.prepareContext(task, REPO, {
       deltaFrom: previousRunJson, // only resend changed files on turn 2+
     });

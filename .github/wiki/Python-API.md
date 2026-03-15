@@ -1,13 +1,13 @@
 # Python API
 
-Use ContextBudget as a reusable library for local tools, CI wrappers, and agent integrations.
+Use Redcon as a reusable library for local tools, CI wrappers, and agent integrations.
 
 ---
 
 ## Quick Start
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 result = guard.pack_context(task="add caching", repo=".")
@@ -18,7 +18,7 @@ print(result["budget"]["estimated_input_tokens"], "tokens")
 
 ## BudgetGuard
 
-`BudgetGuard` is the stable SDK entry point. It wraps `ContextBudgetEngine` and adds opinionated defaults, policy enforcement, and profiling.
+`BudgetGuard` is the stable SDK entry point. It wraps `RedconEngine` and adds opinionated defaults, policy enforcement, and profiling.
 
 ### Constructor
 
@@ -33,7 +33,7 @@ BudgetGuard(
     policy_path: str | Path | None = None,
     strict: bool = False,
     config_path: str | Path | None = None,
-    engine: ContextBudgetEngine | None = None,
+    engine: RedconEngine | None = None,
 )
 ```
 
@@ -47,8 +47,8 @@ BudgetGuard(
 | `max_context_size_bytes` | `None` | Policy: maximum total byte size of context payload. |
 | `policy_path` | `None` | Path to a TOML policy file. |
 | `strict` | `False` | Raise `BudgetPolicyViolationError` on policy violations. |
-| `config_path` | `None` | Path to a `contextbudget.toml` config file. |
-| `engine` | `None` | Inject a pre-configured `ContextBudgetEngine`. |
+| `config_path` | `None` | Path to a `redcon.toml` config file. |
+| `engine` | `None` | Inject a pre-configured `RedconEngine`. |
 
 ---
 
@@ -122,7 +122,7 @@ result = guard.pack_context(task="quick fix", repo=".", max_tokens=8000)
 **Strict policy enforcement:**
 
 ```python
-from contextbudget import BudgetGuard, BudgetPolicyViolationError
+from redcon import BudgetGuard, BudgetPolicyViolationError
 
 guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=10)
 try:
@@ -284,14 +284,14 @@ if not policy_result["passed"]:
 
 ---
 
-## ContextBudgetEngine
+## RedconEngine
 
 Lower-level programmatic API. `BudgetGuard` wraps it and delegates to the same methods.
 
 ```python
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 plan = engine.plan(task="refactor auth middleware", repo=".")
 agent_plan = engine.plan_agent(task="refactor auth middleware", repo=".")
 run = engine.pack(task="refactor auth middleware", repo=".", max_tokens=24000)
@@ -326,7 +326,7 @@ policy_result = engine.evaluate_policy(run, policy=policy)
 Raised when `strict=True` and a policy is violated.
 
 ```python
-from contextbudget import BudgetGuard, BudgetPolicyViolationError
+from redcon import BudgetGuard, BudgetPolicyViolationError
 
 guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=5)
 
@@ -378,10 +378,10 @@ if estimated_cost < 0.50:
 ### Custom engine for tests
 
 ```python
-from contextbudget import BudgetGuard, ContextBudgetEngine
-from contextbudget.telemetry import NoOpTelemetrySink
+from redcon import BudgetGuard, RedconEngine
+from redcon.telemetry import NoOpTelemetrySink
 
-engine = ContextBudgetEngine(telemetry_sink=NoOpTelemetrySink())
+engine = RedconEngine(telemetry_sink=NoOpTelemetrySink())
 guard = BudgetGuard(max_tokens=30000, engine=engine)
 result = guard.pack_context(task="add caching", repo=".")
 ```
@@ -391,8 +391,8 @@ result = guard.pack_context(task="add caching", repo=".")
 ## Summarizer Adapters
 
 ```python
-from contextbudget import (
-    ContextBudgetEngine,
+from redcon import (
+    RedconEngine,
     ExternalSummaryAdapter,
     register_external_summarizer_adapter,
 )
@@ -407,7 +407,7 @@ class TeamSummaryAdapter(ExternalSummaryAdapter):
 
 register_external_summarizer_adapter("team-summary", TeamSummaryAdapter())
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 run = engine.pack(task="refactor auth middleware", repo=".")
 ```
 
@@ -419,4 +419,4 @@ backend = "external"
 adapter = "team-summary"
 ```
 
-If the adapter is unavailable or raises, ContextBudget falls back to deterministic summarization automatically.
+If the adapter is unavailable or raises, Redcon falls back to deterministic summarization automatically.

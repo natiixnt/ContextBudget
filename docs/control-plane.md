@@ -24,11 +24,11 @@ and governance layer while preserving the current local-first behavior.
 Pipeline stages
       │  emit(name, **payload)
       ▼
- EventEmitter          ← Protocol (contextbudget.telemetry.EventEmitter)
+ EventEmitter          ← Protocol (redcon.telemetry.EventEmitter)
       │                  satisfied by TelemetrySession
       │  TelemetryEvent(name, schema_version, timestamp, run_id, payload)
       ▼
- TelemetrySink         ← Protocol (contextbudget.telemetry.TelemetrySink)
+ TelemetrySink         ← Protocol (redcon.telemetry.TelemetrySink)
       │
       ├── NoOpTelemetrySink       (default — drops all events)
       └── JsonlFileTelemetrySink  (local development — appends JSONL to disk)
@@ -159,7 +159,7 @@ A cloud sink receives only the already-sanitized `TelemetryEvent` object.
 
 ## Schema Versioning
 
-- `EVENT_SCHEMA_VERSIONS` in `contextbudget/telemetry/schemas.py` maps every event
+- `EVENT_SCHEMA_VERSIONS` in `redcon/telemetry/schemas.py` maps every event
   name to its current version string.
 - All current events are at **`v1`**.
 - **Additive changes** (new nullable fields) do not require a version bump.
@@ -178,7 +178,7 @@ it via `build_telemetry_sink` or by constructing a `TelemetrySession` directly.
 ### Minimal example
 
 ```python
-from contextbudget.telemetry import TelemetryEvent
+from redcon.telemetry import TelemetryEvent
 
 class HttpControlPlaneSink:
     """POST events to a centralized analytics endpoint."""
@@ -206,7 +206,7 @@ class HttpControlPlaneSink:
 Wire it into `TelemetrySession`:
 
 ```python
-from contextbudget.telemetry import TelemetrySession
+from redcon.telemetry import TelemetrySession
 
 session = TelemetrySession(
     sink=HttpControlPlaneSink(endpoint="https://...", api_key="..."),
@@ -228,6 +228,52 @@ When routing events to a centralized plane, cloud sink implementations should:
 - **Respect `enabled = false`.** The `build_telemetry_sink` factory short-circuits to
   `NoOpTelemetrySink` before the cloud sink is ever constructed when telemetry is
   disabled. Cloud sinks should not need to check this themselves.
+
+---
+
+## Multi-Tenant Data Model (v1.0-beta)
+
+The cloud service organises tenants into a three-level hierarchy backed by PostgreSQL.
+
+```
+Org
+ └── Project
+      └── Repository  ──  AgentRun (many)
+```
+
+### Bootstrap sequence
+
+```bash
+# 1. Create the org (unauthenticated — operator endpoint)
+curl -s -X POST http://localhost:8080/orgs \
+     -H "Content-Type: application/json" \
+     -d '{"slug": "acme", "display_name": "Acme Corp"}'
+# → {"id": 1, "slug": "acme", ...}
+
+# 2. Issue the first API key (unauthenticated bootstrap)
+curl -s -X POST http://localhost:8080/orgs/1/api-keys \
+     -H "Content-Type: application/json" \
+     -d '{"label": "ci"}'
+# → {"raw_key": "rck_...", "id": 5, ...}   ← save this; it is shown once
+
+# 3. All further management uses the API key
+curl -s http://localhost:8080/orgs/1/projects \
+     -H "Authorization: Bearer rck_..."
+```
+
+### Repository linking
+
+The `repository_id` on a `Repository` row should match the SHA-256 digest that the Redcon runtime includes in telemetry events.  This links control plane records to events in the `events` table.
+
+```python
+from redcon.telemetry.schemas import build_repository_identifiers
+ids = build_repository_identifiers("/path/to/repo")
+# Use ids.repository_id when creating the Repository via the API
+```
+
+### Agent runs
+
+Run outcome records are written by calling `cp_store.record_agent_run` from application code, or populated from incoming `pack_completed` events via custom integration.  The `task_hash` field stores a SHA-256 digest of the raw task text — the plaintext task is never stored.
 
 ---
 

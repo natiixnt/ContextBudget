@@ -1,7 +1,7 @@
 {
-  "name": "contextbudget-sdk-typescript",
+  "name": "redcon-sdk-typescript",
   "version": "0.1.0",
-  "description": "TypeScript examples for the ContextBudget agent SDK",
+  "description": "TypeScript examples for the Redcon agent SDK",
   "private": true,
   "scripts": {
     "basic": "ts-node basic.ts",

@@ -1,10 +1,10 @@
 # Configuration
 
-ContextBudget loads `contextbudget.toml` from the repo root by default. Workspace runs load shared config directly from the workspace TOML unless `--config` overrides it.
+Redcon loads `redcon.toml` from the repo root by default. Workspace runs load shared config directly from the workspace TOML unless `--config` overrides it.
 
 **Precedence:**
 1. CLI flags
-2. `contextbudget.toml`
+2. `redcon.toml`
 3. Built-in defaults
 
 ---
@@ -61,13 +61,13 @@ options = { bonus = 8.0 }
 [cache]
 backend = "local_file"      # "local_file", "shared_stub", or "memory"
 summary_cache_enabled = true
-cache_file = ".contextbudget_cache.json"
+cache_file = ".redcon_cache.json"
 duplicate_hash_cache_enabled = true
 
 [telemetry]
 enabled = false
 sink = "file"
-file_path = ".contextbudget/telemetry.jsonl"
+file_path = ".redcon/telemetry.jsonl"
 ```
 
 ---
@@ -169,7 +169,7 @@ Available profiles:
 | `mistral-small` | Mistral models |
 | `local-llm` | Self-hosted LLMs (customize via `[model]`) |
 
-When a profile is active, ContextBudget automatically:
+When a profile is active, Redcon automatically:
 - selects a matching token-estimation backend
 - scales the default `max_tokens` to the model context window
 - clamps oversized budgets to the context window
@@ -201,7 +201,7 @@ output_reserve_tokens = 8192
 
 ## Incremental Scan Index
 
-ContextBudget automatically stores a scan index at `.contextbudget/scan-index.json`. The index records file path, size, mtime, content hash, and scan classification metadata so unchanged files can reuse prior scan results across `plan`, `pack`, `benchmark`, and `watch`. Deleted files are pruned on the next refresh.
+Redcon automatically stores a scan index at `.redcon/scan-index.json`. The index records file path, size, mtime, content hash, and scan classification metadata so unchanged files can reuse prior scan results across `plan`, `pack`, `benchmark`, and `watch`. Deleted files are pruned on the next refresh.
 
 ---
 

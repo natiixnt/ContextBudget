@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget.cli import main
-from contextbudget.core.advisor import (
+from redcon.cli import main
+from redcon.core.advisor import (
     SUGGESTION_EXTRACT_MODULE,
     SUGGESTION_REDUCE_DEPENDENCIES,
     SUGGESTION_SPLIT_FILE,
@@ -18,7 +18,7 @@ from contextbudget.core.advisor import (
     _load_pack_artifacts,
     run_advise,
 )
-from contextbudget.config import load_config
+from redcon.config import load_config
 
 
 def _write(path: Path, content: str) -> None:
@@ -114,7 +114,7 @@ def test_load_pack_artifacts_deduplicates(tmp_path: Path) -> None:
 def test_compute_pack_frequency_returns_empty_without_artifacts(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     cfg = load_config(repo)
-    from contextbudget.scanners.repository import scan_repository
+    from redcon.scanners.repository import scan_repository
     files = scan_repository(repo, max_file_size_bytes=cfg.scan.max_file_size_bytes)
     result = _compute_pack_frequency(files, [])
     assert result == {}
@@ -123,7 +123,7 @@ def test_compute_pack_frequency_returns_empty_without_artifacts(tmp_path: Path) 
 def test_compute_pack_frequency_counts_inclusion(tmp_path: Path) -> None:
     repo = _make_repo(tmp_path)
     cfg = load_config(repo)
-    from contextbudget.scanners.repository import scan_repository
+    from redcon.scanners.repository import scan_repository
     files = scan_repository(repo, max_file_size_bytes=cfg.scan.max_file_size_bytes)
 
     artifacts = [
@@ -281,7 +281,7 @@ def test_run_advise_runs_analyzed_with_history(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI - contextbudget advise
+# CLI - redcon advise
 # ---------------------------------------------------------------------------
 
 
@@ -290,7 +290,7 @@ def test_cli_advise_writes_json_and_markdown(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "advise", "--repo", str(repo), "--out-prefix", "adv"],
+        ["redcon", "advise", "--repo", str(repo), "--out-prefix", "adv"],
     )
     assert main() == 0
     assert (tmp_path / "adv.json").exists()
@@ -302,7 +302,7 @@ def test_cli_advise_json_has_required_keys(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "advise", "--repo", str(repo), "--out-prefix", "adv2"],
+        ["redcon", "advise", "--repo", str(repo), "--out-prefix", "adv2"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "adv2.json").read_text(encoding="utf-8"))
@@ -317,7 +317,7 @@ def test_cli_advise_markdown_contains_header(tmp_path: Path, monkeypatch) -> Non
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "advise",
+            "redcon", "advise",
             "--repo", str(repo),
             "--large-file-tokens", "5",
             "--out-prefix", "adv3",
@@ -325,7 +325,7 @@ def test_cli_advise_markdown_contains_header(tmp_path: Path, monkeypatch) -> Non
     )
     assert main() == 0
     md = (tmp_path / "adv3.md").read_text(encoding="utf-8")
-    assert "# ContextBudget Architecture Advice" in md
+    assert "# Redcon Architecture Advice" in md
 
 
 def test_cli_advise_large_file_tokens_flag(tmp_path: Path, monkeypatch, capsys) -> None:
@@ -334,7 +334,7 @@ def test_cli_advise_large_file_tokens_flag(tmp_path: Path, monkeypatch, capsys) 
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "advise",
+            "redcon", "advise",
             "--repo", str(repo),
             "--large-file-tokens", "5",
             "--high-fanin", "9999",
@@ -355,7 +355,7 @@ def test_cli_advise_high_fanin_flag(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "advise",
+            "redcon", "advise",
             "--repo", str(repo),
             "--large-file-tokens", "99999",
             "--high-fanin", "3",
@@ -378,7 +378,7 @@ def test_cli_advise_top_limits_output(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "advise",
+            "redcon", "advise",
             "--repo", str(repo),
             "--large-file-tokens", "5",
             "--top", "3",
@@ -401,7 +401,7 @@ def test_cli_advise_with_history(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "advise",
+            "redcon", "advise",
             "--repo", str(repo),
             "--history", str(runs_dir),
             "--out-prefix", "adv-hist",
@@ -420,7 +420,7 @@ def test_cli_advise_no_suggestions_prints_clean(tmp_path: Path, monkeypatch, cap
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget", "advise",
+            "redcon", "advise",
             "--repo", str(repo),
             "--large-file-tokens", "99999",
             "--high-fanin", "9999",

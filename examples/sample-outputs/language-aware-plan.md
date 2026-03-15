@@ -1,7 +1,7 @@
-# ContextBudget Plan
+# Redcon Plan
 
 Task: refactor auth exports
-Repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/language-aware/repo
+Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/language-aware/repo
 Scanned files: 3
 
 ## Ranked Relevant Files

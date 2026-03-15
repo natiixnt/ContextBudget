@@ -1,0 +1,32 @@
+{
+  "fragments": {
+    "fragment:README.md:ranges=full:1-49:f4c9ff56c250c19a715feb4c1e6b132ca2ac38e6fac1dc5b6bc678d9242501d8": "cb-frag:b0fd7e68115eb9dd",
+    "fragment:src/app.py:symbols=class:App,function:create_app:0bb9238b629b17e05cc5304125808d70e935b5b2d92bcdc695ce7cc039ee484c": "cb-frag:43056a28006e5ef6",
+    "fragment:src/app.py:symbols=function:__init__,function:create_app:6eea1aa4475857162a5d52348ca2b5d4f6921f79eb2b1009ddf2acb7d2ece9ab": "cb-frag:7e1e90f94bd02bba",
+    "fragment:src/config.py:ranges=full:1-38:f9fa8578697b0ad2639be30943855233a61728dcb1f14f9c8bb914902d2a92d9": "cb-frag:e7b47f64e3fc2b99",
+    "fragment:src/db/connection.py:symbols=function:configure,function:get_raw_connection,function:close_connection:da5ad1497cf7039a2e7450ce9b58181946df6361241fc94458fdd4a38e6535f6": "cb-frag:3ae6eb6b1583d5dc",
+    "fragment:src/db/connection.py:symbols=function:configure,function:get_raw_connection,function:get_connection,function:close_connection:db08e106a9a99cfc2175e8a0aa0cb8a05bd99a0f9183380d62ef79dd835ed37a": "cb-frag:3ab102a0f5c06be5",
+    "fragment:src/db/connection.py:symbols=function:configure,function:get_raw_connection,function:get_connection,function:initialize_schema:feb34c2b27897010fca50177faef4fb13cca7b4869a50b7dfb15cb36f51ecfe0": "cb-frag:660bc0dc3dccf7d0",
+    "fragment:src/db/repository.py:symbols=class:TaskRepository:52ff137ba7e3fd82976b93b63f5341be089bb829ac25853c9af6dbd1341aa18b": "cb-frag:363450a09821bd3d",
+    "fragment:src/db/repository.py:symbols=class:UserRepository:38b46fb11149ea7fbb7a4fc1c16b86b43d08ee8cc2d526a963e52c93d779c605": "cb-frag:c93aaf7db15b590c",
+    "fragment:src/db/repository.py:symbols=function:create,function:get_by_email,function:update,function:_row_to_user,function:list_by_owner:cf559b6a9f78afc2fd4358ed5c924615b8a64494cba1631dbe1c51feb44cb9bf": "cb-frag:8d793a7156c077d8",
+    "fragment:src/models/task.py:symbols=class:TaskStatus,class:TaskPriority,class:Task:eb484bc8ead1e22e2452cea6642bc53f82ba831f87f89bda18836827a50f6060": "cb-frag:6ef3f0ac09fc2783",
+    "fragment:src/models/task.py:symbols=class:TaskStatus,function:mark_done,function:assign,function:to_dict:1aedd6fb3d49cfe7f73b0173f7f12a8d465470523b47569696a21ca9db2b5612": "cb-frag:06fc4949ca2aa9d2",
+    "fragment:src/models/user.py:symbols=class:UserRole,class:User:62369a4e3a1bb8b837332d9946ccac16036e58f2729759a001fe96e8e4a4bbc3": "cb-frag:848045742792a7f4",
+    "fragment:src/models/user.py:symbols=class:UserRole,function:set_password,function:record_login,function:deactivate,function:from_dict:ceb432a4d1762e79e86006cb55936921bb87799312dddc46839e82931d39d095": "cb-frag:3d536066c459e4d3",
+    "fragment:src/routes/tasks.py:symbols=class:TaskRoutes:7bac03b4df7f22be75db799a62e34297010d3f607abe4e0ec2ce51906335f595": "cb-frag:4217ad28754d0f85",
+    "fragment:src/routes/tasks.py:symbols=function:__init__,function:list_tasks,function:update,function:delete:f7109e7f8c4c22aa73a8a354c51e8b4d51b7feeff0c5515094984bb275af443c": "cb-frag:3c9d3ffedd5cd3e2",
+    "fragment:src/routes/users.py:symbols=class:UserRoutes:776fb3715d64fc5e6972b9302f6c50686e245386a8b540cec3ede0241485c759": "cb-frag:dce7b35294599674",
+    "fragment:src/routes/users.py:symbols=function:__init__,function:login,function:get,function:deactivate:5360be0455e222aa7722d85c34ec1964d051ca1fefff3567dd4acf88302be137": "cb-frag:e5608916e2ab97f5",
+    "fragment:src/services/task_service.py:symbols=class:TaskNotFoundError,class:PermissionDeniedError,class:TaskService:e56b9b22af452ff17febc92c6cadf160722b13848e3411dd84b01db1e9dbf156": "cb-frag:8b66c23128e8f492",
+    "fragment:src/services/task_service.py:symbols=class:TaskNotFoundError,function:__init__,function:create_task,function:get_task,function:search_tasks,function:complete_task,function:get_task_summary:9118534a5fd89d020ea759f37974863194887d9595136ae295afd410b0ff5eab": "cb-frag:1d7c4837b298464e",
+    "fragment:src/services/user_service.py:ranges=full:1-77:f71561e30d77d54a080ac089582b7349e953c038d0d86d62fb2f4a78dd4f7bca": "cb-frag:b68e1ba1990287fb",
+    "fragment:src/utils/helpers.py:ranges=full:1-42:7cd5dfafe7763726b04555c918f80f3cd40fb557e88cb0c2327b721d5c345926": "cb-frag:44364193dd0eb8c8",
+    "fragment:src/utils/validators.py:ranges=full:1-33:598adfa6683f4e20e32e638bd0756b8ce5a3549aa9a0b4f3bf9f6966439d1fce": "cb-frag:d1e81329ae61a947",
+    "fragment:tests/test_tasks.py:symbols=function:_setup,function:test_complete_task,function:test_list_tasks_with_filter:adfea2b894e553e1e1967168aff45526782d07141afdab13141978629a41cc34": "cb-frag:9a104b77e7eede95",
+    "fragment:tests/test_tasks.py:symbols=function:test_create_and_get_task,function:test_complete_task,function:test_list_tasks_with_filter,function:test_task_summary:f7e1f81566f445c0cebebf8c0842bdbd050303c4a5127b37fbb83ece8a65c094": "cb-frag:ef60df21cdf47547",
+    "fragment:tests/test_tasks.py:symbols=function:test_create_and_get_task,function:test_complete_task,function:test_task_not_found,function:test_list_tasks_with_filter:0704282004b8a4370f869cd35c36dfedd8c916cc421e42dd25a4e196559765d1": "cb-frag:9778297569fa78d2",
+    "fragment:tests/test_users.py:ranges=full:1-71:137bcead26333ae1c459aa6fd98b82c285ef0ff668c87accd7c574032983a628": "cb-frag:ddd913496939a977"
+  },
+  "summaries": {}
+}

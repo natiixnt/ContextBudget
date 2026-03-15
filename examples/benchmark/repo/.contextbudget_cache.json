@@ -1,0 +1,6 @@
+{
+  "summaries": {
+    "src/notes.py:20973:6873d3bebcfeb7aa70b32f9d0b8c7089113e31eb": "# Summary: src/notes.py\n\"\"\"Large low-signal file used to demonstrate compression and cache behavior.\"\"\"\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\n...",
+    "src/notes.py:20973:6873d3bebcfeb7aa70b32f9d0b8c7089113e31eb:summary:deterministic:deterministic:lines=8": "# Summary: src/notes.py\n\"\"\"Large low-signal file used to demonstrate compression and cache behavior.\"\"\"\nline 1\nline 2\nline 3\nline 4\nline 5\nline 6\nline 7\n..."
+  }
+}

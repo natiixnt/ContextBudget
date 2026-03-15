@@ -1,11 +1,11 @@
 # Watch Session
 
 ```text
-$ contextbudget watch --repo examples/small-feature/repo --once
-Watching repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/small-feature/repo
+$ redcon watch --repo examples/small-feature/repo --once
+Watching repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/small-feature/repo
 Polling interval: 1.00s
-Scan index: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/small-feature/repo/.contextbudget/scan-index.json
-Initial scan: repo=/Users/naithai/Desktop/amogus/praca/ContextBudget/examples/small-feature/repo tracked=2 included=2 reused=0 added=2 updated=0 removed=0
+Scan index: /Users/naithai/Desktop/amogus/praca/Redcon/examples/small-feature/repo/.redcon/scan-index.json
+Initial scan: repo=/Users/naithai/Desktop/amogus/praca/Redcon/examples/small-feature/repo tracked=2 included=2 reused=0 added=2 updated=0 removed=0
 added[src/cache.py, src/search_api.py]
 ```
 

@@ -1,0 +1,38 @@
+{
+  "name": "@redcon/sdk",
+  "version": "1.0.0",
+  "description": "TypeScript/Node.js SDK for the Redcon Cloud API and Runtime Gateway",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "require": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./cloud": {
+      "import": "./dist/cloud.js",
+      "require": "./dist/cloud.js",
+      "types": "./dist/cloud.d.ts"
+    },
+    "./gateway": {
+      "import": "./dist/gateway.js",
+      "require": "./dist/gateway.js",
+      "types": "./dist/gateway.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "test": "node --test dist/test/*.test.js",
+    "lint": "eslint src --ext .ts"
+  },
+  "keywords": ["redcon", "llm", "token-budget", "ai", "cost-optimization"],
+  "license": "MIT",
+  "engines": {
+    "node": ">=18"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/node": "^20.0.0"
+  }
+}

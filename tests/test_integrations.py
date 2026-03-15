@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Tests for contextbudget.integrations — all four wrappers.
+"""Tests for redcon.integrations — all four wrappers.
 
 Tests use monkeypatching to avoid real LLM / subprocess calls:
 - OpenAIAgentWrapper  — patches _call_openai
@@ -15,13 +15,13 @@ from typing import Any
 
 import pytest
 
-from contextbudget.integrations import (
+from redcon.integrations import (
     AnthropicAgentWrapper,
     GenericAgentRunner,
     NodeJSAgentRunner,
     OpenAIAgentWrapper,
 )
-from contextbudget.runtime import RuntimeResult
+from redcon.runtime import RuntimeResult
 
 
 # ---------------------------------------------------------------------------
@@ -113,7 +113,7 @@ class TestOpenAIAgentWrapper:
         monkeypatch.setattr(agent._runtime, "_llm_fn", lambda prompt: "ok")
         agent.run_task("add caching", repo=simple_repo)
 
-        history_path = simple_repo / ".contextbudget" / "observe-history.json"
+        history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
         data = json.loads(history_path.read_text())
@@ -199,7 +199,7 @@ class TestAnthropicAgentWrapper:
         monkeypatch.setattr(agent._runtime, "_llm_fn", lambda prompt: "ok")
         agent.run_task("add caching", repo=simple_repo)
 
-        history_path = simple_repo / ".contextbudget" / "observe-history.json"
+        history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
         data = json.loads(history_path.read_text())
@@ -270,7 +270,7 @@ class TestGenericAgentRunner:
         )
         runner.run_task("add caching", repo=simple_repo)
 
-        history_path = simple_repo / ".contextbudget" / "observe-history.json"
+        history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
         data = json.loads(history_path.read_text())
@@ -380,7 +380,7 @@ class TestNodeJSAgentRunner:
         monkeypatch.setattr(runner._runtime, "_llm_fn", lambda prompt: "ok")
         runner.run_task("add caching", repo=simple_repo)
 
-        history_path = simple_repo / ".contextbudget" / "observe-history.json"
+        history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
         data = json.loads(history_path.read_text())

@@ -1,6 +1,6 @@
 # GitHub Action Integration
 
-ContextBudget can run in pull requests and CI using `.github/workflows/contextbudget.yml`.
+Redcon can run in pull requests and CI using `.github/workflows/redcon.yml`.
 
 ## What the workflow does
 
@@ -8,17 +8,17 @@ ContextBudget can run in pull requests and CI using `.github/workflows/contextbu
    - workflow input `task`, or
    - changed files (workflow input or git diff)
 2. Runs:
-   - `contextbudget pr-audit ...`
-   - `contextbudget pack ...`
-   - `contextbudget report contextbudget-ci.json ...`
+   - `redcon pr-audit ...`
+   - `redcon pack ...`
+   - `redcon report redcon-ci.json ...`
 3. Publishes the PR audit comment and pack/report Markdown to the GitHub Actions run summary.
 4. Uploads JSON/Markdown artifacts.
 5. Fails when strict mode or PR-audit gates are enabled and violated.
 
 ## Files
 
-- Workflow: `.github/workflows/contextbudget.yml`
-- CI policy example: `.github/contextbudget-policy.toml`
+- Workflow: `.github/workflows/redcon.yml`
+- CI policy example: `.github/redcon-policy.toml`
 
 ## Usage
 
@@ -54,29 +54,29 @@ Run the audit against explicit pull-request SHAs so CI does not depend on branch
 ```yaml
 - name: PR context audit
   run: |
-    contextbudget pr-audit \
+    redcon pr-audit \
       --repo . \
       --base "${{ github.event.pull_request.base.sha }}" \
       --head "${{ github.event.pull_request.head.sha }}" \
-      --out-prefix contextbudget-pr \
+      --out-prefix redcon-pr \
       --max-token-increase-pct 15
-    cat contextbudget-pr.comment.md >> "$GITHUB_STEP_SUMMARY"
+    cat redcon-pr.comment.md >> "$GITHUB_STEP_SUMMARY"
 ```
 
 The audit writes:
 
-- `contextbudget-pr.json`
-- `contextbudget-pr.md`
-- `contextbudget-pr.comment.md`
+- `redcon-pr.json`
+- `redcon-pr.md`
+- `redcon-pr.comment.md`
 
-`contextbudget-pr.comment.md` is formatted for direct PR commenting or step-summary publishing.
+`redcon-pr.comment.md` is formatted for direct PR commenting or step-summary publishing.
 
 ## Artifacts
 
-Uploaded artifact bundle `contextbudget-artifacts` includes:
-- `contextbudget-pr.json`
-- `contextbudget-pr.md`
-- `contextbudget-pr.comment.md`
-- `contextbudget-ci.json`
-- `contextbudget-ci.md`
-- `contextbudget-ci.report.md`
+Uploaded artifact bundle `redcon-artifacts` includes:
+- `redcon-pr.json`
+- `redcon-pr.md`
+- `redcon-pr.comment.md`
+- `redcon-ci.json`
+- `redcon-ci.md`
+- `redcon-ci.report.md`

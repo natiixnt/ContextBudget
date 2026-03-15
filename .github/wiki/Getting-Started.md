@@ -18,13 +18,13 @@ python3 -m pip install -e .[tokenizers]
 
 ```bash
 # 1. Rank relevant files for a task
-contextbudget plan "add caching to search API" --repo .
+redcon plan "add caching to search API" --repo .
 
 # 2. Pack context under a token budget
-contextbudget pack "add caching to search API" --repo . --max-tokens 30000
+redcon pack "add caching to search API" --repo . --max-tokens 30000
 
 # 3. Summarize the generated run artifact
-contextbudget report run.json
+redcon report run.json
 ```
 
 ---
@@ -33,16 +33,16 @@ contextbudget report run.json
 
 ```bash
 # Compare two run artifacts
-contextbudget diff old-run.json new-run.json
+redcon diff old-run.json new-run.json
 
 # Compare packing strategies side-by-side
-contextbudget benchmark "add rate limiting to auth API" --repo .
+redcon benchmark "add rate limiting to auth API" --repo .
 
 # Analyze token savings by compression stage
-contextbudget profile run.json
+redcon profile run.json
 
 # Detect duplicate or unnecessary file reads
-contextbudget read-profiler run.json
+redcon read-profiler run.json
 ```
 
 ---
@@ -51,7 +51,7 @@ contextbudget read-profiler run.json
 
 ```bash
 # Plan context usage across a multi-step agent workflow
-contextbudget plan-agent "refactor auth middleware" --repo .
+redcon plan-agent "refactor auth middleware" --repo .
 ```
 
 ---
@@ -82,7 +82,7 @@ path = "../billing-service"
 Then run across all repos:
 
 ```bash
-contextbudget pack "add caching" --workspace workspace.toml
+redcon pack "add caching" --workspace workspace.toml
 ```
 
 ---
@@ -99,7 +99,7 @@ Every `pack` run writes:
 ## Python API Quickstart
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 result = guard.pack_context(task="add caching", repo=".")
@@ -120,6 +120,6 @@ See [[Python API]] for the full reference.
 ## Next Steps
 
 - [[CLI Reference]] — complete command documentation
-- [[Configuration]] — `contextbudget.toml` settings
-- [[Agent Integration]] — embedding ContextBudget in agent loops
+- [[Configuration]] — `redcon.toml` settings
+- [[Agent Integration]] — embedding Redcon in agent loops
 - [[Benchmarking and Diff]] — strategy comparison

@@ -3,8 +3,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from contextbudget.scanners.incremental import load_scan_index, refresh_scan_index
-from contextbudget.schemas.models import SCAN_INDEX_FILE
+from redcon.scanners.incremental import load_scan_index, refresh_scan_index
+from redcon.schemas.models import SCAN_INDEX_FILE
 
 
 def _write(path: Path, content: str) -> None:
@@ -28,7 +28,7 @@ def test_incremental_scan_reuses_unchanged_file_metadata(tmp_path: Path, monkeyp
     def fail_if_rebuilt(*args, **kwargs):  # type: ignore[no-untyped-def]
         raise AssertionError("unchanged files should reuse cached scan metadata")
 
-    monkeypatch.setattr("contextbudget.scanners.incremental._build_file_record", fail_if_rebuilt)
+    monkeypatch.setattr("redcon.scanners.incremental._build_file_record", fail_if_rebuilt)
 
     second = refresh_scan_index(tmp_path)
 

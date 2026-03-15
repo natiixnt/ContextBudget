@@ -1,13 +1,13 @@
-"""Anthropic agent integration with ContextBudget middleware.
+"""Anthropic agent integration with Redcon middleware.
 
 Architecture:
     agent task
-        → ContextBudget (scan → rank → compress → cache → delta)
+        → Redcon (scan → rank → compress → cache → delta)
         → optimised prompt
         → Claude API
         → response
 
-ContextBudget sits transparently between the agent loop and the model.
+Redcon sits transparently between the agent loop and the model.
 On every turn it intercepts the task, builds the smallest possible context
 that fits under the token budget, and forwards the compressed prompt to Claude.
 Delta mode ensures subsequent turns only resend files that changed.
@@ -24,7 +24,7 @@ import os
 
 import anthropic
 
-from contextbudget.runtime import AgentRuntime
+from redcon.runtime import AgentRuntime
 
 # -----------------------------------------------------------------------
 # LLM callable — receives the optimised prompt, returns Claude's response
@@ -44,14 +44,14 @@ def call_claude(prompt: str) -> str:
 
 
 # -----------------------------------------------------------------------
-# Wire ContextBudget into the agent loop via AgentRuntime
+# Wire Redcon into the agent loop via AgentRuntime
 #
-#   agent → AgentRuntime (ContextBudget middleware) → Claude
+#   agent → AgentRuntime (Redcon middleware) → Claude
 # -----------------------------------------------------------------------
 
 runtime = AgentRuntime(
     max_tokens=32_000,
-    llm_fn=call_claude,   # ContextBudget assembles the prompt, Claude handles inference
+    llm_fn=call_claude,   # Redcon assembles the prompt, Claude handles inference
     delta=True,            # Only resend changed files on turns 2+
 )
 

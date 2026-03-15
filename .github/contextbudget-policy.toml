@@ -1,7 +1,0 @@
-# CI policy example for ContextBudget.
-
-[policy]
-max_estimated_input_tokens = 30000
-max_files_included = 12
-max_quality_risk_level = "medium"
-min_estimated_savings_percentage = 0.0

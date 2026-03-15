@@ -1,4 +1,4 @@
-# ContextBudget Launch Backlog (20 Issues)
+# Redcon Launch Backlog (20 Issues)
 
 This backlog is aligned with the current repository (CLI + Python API + examples + CI policy + telemetry abstraction) and near-term roadmap items.
 
@@ -9,7 +9,7 @@ This backlog is aligned with the current repository (CLI + Python API + examples
    - Add schema validation tests to protect contract stability for integrations.
    - Labels: `core`, `artifacts`, `api`.
 
-2. **Add `contextbudget validate <artifact.json>` command**
+2. **Add `redcon validate <artifact.json>` command**
    - Validate artifacts against JSON Schemas.
    - Return non-zero on invalid schema in CI.
    - Labels: `cli`, `artifacts`, `ci`.

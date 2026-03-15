@@ -27,7 +27,7 @@ def build_pr_audit_repo(root: Path) -> tuple[Path, str, str]:
     repo = root / "repo"
     repo.mkdir()
     run_git(repo, "init")
-    run_git(repo, "config", "user.name", "ContextBudget Tests")
+    run_git(repo, "config", "user.name", "Redcon Tests")
     run_git(repo, "config", "user.email", "tests@example.com")
     current_branch = run_git(repo, "branch", "--show-current")
     if current_branch != "main":

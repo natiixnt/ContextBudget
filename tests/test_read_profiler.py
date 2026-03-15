@@ -5,15 +5,15 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget import ContextBudgetEngine
-from contextbudget.core.read_profiler import (
+from redcon import RedconEngine
+from redcon.core.read_profiler import (
     HIGH_COST_READ_THRESHOLD,
     UNNECESSARY_READ_MIN_TOKENS,
     UNNECESSARY_READ_SCORE_THRESHOLD,
     build_read_profile,
     read_profile_as_dict,
 )
-from contextbudget.core.render import render_read_profile_markdown
+from redcon.core.render import render_read_profile_markdown
 
 
 # ---------------------------------------------------------------------------
@@ -284,7 +284,7 @@ def test_render_read_profile_markdown_contains_required_sections() -> None:
     d = read_profile_as_dict(report)
     md = render_read_profile_markdown(d)
 
-    assert "# ContextBudget Agent Read Profile" in md
+    assert "# Redcon Agent Read Profile" in md
     assert "## Summary" in md
     assert "## Duplicate Reads" in md
     assert "## High Token-Cost Reads" in md
@@ -319,7 +319,7 @@ def test_read_profile_from_real_pack_run(tmp_path: Path) -> None:
     ))
     _write(tmp_path / "src" / "tiny.py", "def ping(): return 'pong'\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="add auth to router", repo=tmp_path, max_tokens=800)
     report = engine.read_profile(run)
 
@@ -335,7 +335,7 @@ def test_read_profile_from_json_file(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "svc.py", "\n".join(
         [f"def op_{i}(): pass" for i in range(60)]
     ))
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="optimize service", repo=tmp_path, max_tokens=400)
 
     run_json_path = tmp_path / "run.json"
@@ -355,14 +355,14 @@ def test_cli_read_profiler_writes_json_and_markdown(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "router.py", "\n".join(
         [f"def route_{i}(req): return '{i}'" for i in range(70)]
     ))
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="add auth", repo=tmp_path, max_tokens=600)
 
     run_json_path = tmp_path / "run.json"
     run_json_path.write_text(json.dumps(run, default=str), encoding="utf-8")
 
     import os
-    from contextbudget.cli import build_parser
+    from redcon.cli import build_parser
 
     parser = build_parser()
     args = parser.parse_args([
@@ -387,5 +387,5 @@ def test_cli_read_profiler_writes_json_and_markdown(tmp_path: Path) -> None:
     assert "files" in out
 
     md = (tmp_path / "rp.md").read_text(encoding="utf-8")
-    assert "# ContextBudget Agent Read Profile" in md
+    assert "# Redcon Agent Read Profile" in md
     assert "## Summary" in md

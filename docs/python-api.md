@@ -1,12 +1,12 @@
 # Python API
 
-Use ContextBudget as a reusable library for local tools, CI wrappers, and agent
+Use Redcon as a reusable library for local tools, CI wrappers, and agent
 integrations.
 
 ## Quick start
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 result = guard.pack_context(task="add caching", repo=".")
@@ -18,7 +18,7 @@ print(result["budget"]["estimated_input_tokens"], "tokens")
 ## BudgetGuard
 
 `BudgetGuard` is the stable SDK entry point for agent frameworks.  It wraps
-`ContextBudgetEngine` and adds opinionated defaults, policy enforcement, and
+`RedconEngine` and adds opinionated defaults, policy enforcement, and
 profiling on top.
 
 ### Constructor
@@ -34,7 +34,7 @@ BudgetGuard(
     policy_path: str | Path | None = None,
     strict: bool = False,
     config_path: str | Path | None = None,
-    engine: ContextBudgetEngine | None = None,
+    engine: RedconEngine | None = None,
 )
 ```
 
@@ -48,8 +48,8 @@ BudgetGuard(
 | `max_context_size_bytes` | `None` | Policy constraint: maximum total byte size of the context payload. |
 | `policy_path` | `None` | Path to a TOML policy file.  Merged with any inline constraints above. |
 | `strict` | `False` | When `True`, all SDK pack methods raise `BudgetPolicyViolationError` on policy violations. |
-| `config_path` | `None` | Path to a `contextbudget.toml` config file.  Defaults to `<repo>/contextbudget.toml`. |
-| `engine` | `None` | Inject a pre-configured `ContextBudgetEngine` instance. Useful for tests and custom telemetry. |
+| `config_path` | `None` | Path to a `redcon.toml` config file.  Defaults to `<repo>/redcon.toml`. |
+| `engine` | `None` | Inject a pre-configured `RedconEngine` instance. Useful for tests and custom telemetry. |
 
 ---
 
@@ -103,7 +103,7 @@ result = guard.pack_context(
 #### Examples
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 result = guard.pack_context(task="add caching", repo=".")
@@ -127,7 +127,7 @@ result = guard.pack_context(task="quick fix", repo=".", max_tokens=8000)
 **Strict policy enforcement:**
 
 ```python
-from contextbudget import BudgetGuard, BudgetPolicyViolationError
+from redcon import BudgetGuard, BudgetPolicyViolationError
 
 guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=10)
 try:
@@ -206,7 +206,7 @@ plan = guard.simulate_agent(
 #### Examples
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 plan = guard.simulate_agent(task="refactor auth flow", repo=".")
@@ -272,7 +272,7 @@ with an additional `profile` key.
 #### Example
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 result = guard.profile_run(task="add caching", repo=".")
@@ -291,7 +291,7 @@ duplicate reads, unnecessary reads, and high token-cost reads, then quantifies
 tokens wasted.
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 run = guard.pack_context(task="add caching", repo=".")
@@ -362,7 +362,7 @@ Raised by `pack_context` and `pack` when `strict=True` and a configured policy
 is violated.  Also raised by `BudgetGuard.evaluate_policy(strict=True)`.
 
 ```python
-from contextbudget import BudgetGuard, BudgetPolicyViolationError
+from redcon import BudgetGuard, BudgetPolicyViolationError
 
 guard = BudgetGuard(max_tokens=30000, strict=True, max_files_included=5)
 
@@ -401,7 +401,7 @@ if not policy_result["passed"]:
 Re-pack only what changed between iterations:
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 previous_run = None
@@ -420,7 +420,7 @@ for iteration in range(3):
 ### Pre-flight cost check before packing
 
 ```python
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 
@@ -438,7 +438,7 @@ if estimated_cost < 0.50:
 
 ```python
 import logging
-from contextbudget import BudgetGuard
+from redcon import BudgetGuard
 
 guard = BudgetGuard(max_tokens=30000)
 
@@ -462,25 +462,25 @@ def run_with_telemetry(task: str, repo: str) -> dict:
 ### Using a custom engine (for tests)
 
 ```python
-from contextbudget import BudgetGuard, ContextBudgetEngine
-from contextbudget.telemetry import NoOpTelemetrySink
+from redcon import BudgetGuard, RedconEngine
+from redcon.telemetry import NoOpTelemetrySink
 
-engine = ContextBudgetEngine(telemetry_sink=NoOpTelemetrySink())
+engine = RedconEngine(telemetry_sink=NoOpTelemetrySink())
 guard = BudgetGuard(max_tokens=30000, engine=engine)
 result = guard.pack_context(task="add caching", repo=".")
 ```
 
 ---
 
-## ContextBudgetEngine
+## RedconEngine
 
-`ContextBudgetEngine` exposes the full programmatic API.  `BudgetGuard` wraps it
+`RedconEngine` exposes the full programmatic API.  `BudgetGuard` wraps it
 and delegates to the same underlying methods.
 
 ```python
-from contextbudget import ContextBudgetEngine
+from redcon import RedconEngine
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 plan = engine.plan(task="refactor auth middleware", repo=".")
 agent_plan = engine.plan_agent(task="refactor auth middleware", repo=".")
 run = engine.pack(task="refactor auth middleware", repo=".", max_tokens=24000)
@@ -518,14 +518,14 @@ policy = engine.make_policy(max_files_included=12, max_quality_risk_level="mediu
 policy_result = engine.evaluate_policy(run, policy=policy)
 ```
 
-Public types are exported from the `contextbudget` package root.
-Plugin interfaces and registry helpers are exported from `contextbudget.plugins`.
+Public types are exported from the `redcon` package root.
+Plugin interfaces and registry helpers are exported from `redcon.plugins`.
 
 ---
 
 ## Cache backends
 
-Built-in cache backends live under `contextbudget.cache`.
+Built-in cache backends live under `redcon.cache`.
 
 - `LocalFileSummaryCacheBackend` - default persistent backend used by CLI and API.
 - `SharedSummaryCacheBackendStub` - no-op shared-cache stub for future remote/team reuse.
@@ -543,8 +543,8 @@ External summarization uses an adapter interface rather than a built-in vendor
 client.
 
 ```python
-from contextbudget import (
-    ContextBudgetEngine,
+from redcon import (
+    RedconEngine,
     ExternalSummaryAdapter,
     register_external_summarizer_adapter,
 )
@@ -559,7 +559,7 @@ class TeamSummaryAdapter(ExternalSummaryAdapter):
 
 register_external_summarizer_adapter("team-summary", TeamSummaryAdapter())
 
-engine = ContextBudgetEngine()
+engine = RedconEngine()
 run = engine.pack(task="refactor auth middleware", repo=".")
 ```
 
@@ -571,5 +571,5 @@ backend = "external"
 adapter = "team-summary"
 ```
 
-If the adapter is unavailable or raises, ContextBudget falls back to
+If the adapter is unavailable or raises, Redcon falls back to
 deterministic summarization and records that fallback in the artifact.

@@ -8,14 +8,14 @@ from typing import Any
 
 import pytest
 
-from contextbudget.cli import main
-from contextbudget.core.dataset import (
+from redcon.cli import main
+from redcon.core.dataset import (
     DatasetTask,
     dataset_as_dict,
     load_tasks_toml,
     run_dataset,
 )
-from contextbudget.core.render import render_dataset_markdown
+from redcon.core.render import render_dataset_markdown
 
 
 # ---------------------------------------------------------------------------
@@ -280,7 +280,7 @@ def test_render_dataset_markdown_header(tmp_path: Path) -> None:
         "entries": [],
     }
     md = render_dataset_markdown(data)
-    assert "# ContextBudget Dataset Report" in md
+    assert "# Redcon Dataset Report" in md
 
 
 def test_render_dataset_markdown_includes_entries(tmp_path: Path) -> None:
@@ -308,7 +308,7 @@ def test_render_dataset_markdown_includes_entries(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI - contextbudget dataset (integration)
+# CLI - redcon dataset (integration)
 # ---------------------------------------------------------------------------
 
 
@@ -332,7 +332,7 @@ def test_cli_dataset_writes_json_and_markdown(tmp_path: Path, monkeypatch) -> No
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds"],
+        ["redcon", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds"],
     )
     assert main() == 0
     assert (tmp_path / "ds.json").exists()
@@ -349,7 +349,7 @@ def test_cli_dataset_json_has_required_keys(tmp_path: Path, monkeypatch) -> None
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds2"],
+        ["redcon", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds2"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "ds2.json").read_text(encoding="utf-8"))
@@ -370,7 +370,7 @@ def test_cli_dataset_entry_has_reduction_metrics(tmp_path: Path, monkeypatch) ->
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds3"],
+        ["redcon", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds3"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "ds3.json").read_text(encoding="utf-8"))
@@ -393,7 +393,7 @@ def test_cli_dataset_multiple_tasks(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds4"],
+        ["redcon", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds4"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "ds4.json").read_text(encoding="utf-8"))
@@ -408,11 +408,11 @@ def test_cli_dataset_markdown_contains_header(tmp_path: Path, monkeypatch) -> No
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds5"],
+        ["redcon", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds5"],
     )
     assert main() == 0
     md = (tmp_path / "ds5.md").read_text(encoding="utf-8")
-    assert "# ContextBudget Dataset Report" in md
+    assert "# Redcon Dataset Report" in md
 
 
 def test_cli_dataset_aggregate_in_json(tmp_path: Path, monkeypatch) -> None:
@@ -422,7 +422,7 @@ def test_cli_dataset_aggregate_in_json(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.chdir(tmp_path)
     monkeypatch.setattr(
         "sys.argv",
-        ["contextbudget", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds6"],
+        ["redcon", "dataset", str(toml_path), "--repo", str(repo), "--out-prefix", "ds6"],
     )
     assert main() == 0
     data = json.loads((tmp_path / "ds6.json").read_text(encoding="utf-8"))

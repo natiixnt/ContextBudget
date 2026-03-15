@@ -3,9 +3,9 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextbudget import ContextBudgetEngine
-from contextbudget.core.pipeline import run_pack
-from contextbudget.telemetry import EVENT_SCHEMA_VERSIONS
+from redcon import RedconEngine
+from redcon.core.pipeline import run_pack
+from redcon.telemetry import EVENT_SCHEMA_VERSIONS
 
 
 EVENT_KEYS = {"name", "schema_version", "timestamp", "run_id", "payload"}
@@ -61,17 +61,17 @@ def test_telemetry_disabled_by_default(tmp_path: Path) -> None:
 
     run_pack("add caching to search api", repo=tmp_path, max_tokens=500)
 
-    assert not (tmp_path / ".contextbudget" / "telemetry.jsonl").exists()
+    assert not (tmp_path / ".redcon" / "telemetry.jsonl").exists()
 
 
 def test_pack_emits_stage_events_to_local_file_sink(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [telemetry]
 enabled = true
 sink = "file"
-file_path = ".contextbudget/events.jsonl"
+file_path = ".redcon/events.jsonl"
 """.strip(),
     )
     _write(tmp_path / "src" / "search.py", "def search() -> list[str]:\n    return []\n")
@@ -79,7 +79,7 @@ file_path = ".contextbudget/events.jsonl"
 
     run_pack("add caching to search api", repo=tmp_path, max_tokens=500)
 
-    telemetry_path = tmp_path / ".contextbudget" / "events.jsonl"
+    telemetry_path = tmp_path / ".redcon" / "events.jsonl"
     assert telemetry_path.exists()
     events = _read_events(telemetry_path)
     assert [event["name"] for event in events] == [
@@ -105,23 +105,23 @@ file_path = ".contextbudget/events.jsonl"
 
 def test_policy_failed_event_emitted(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [telemetry]
 enabled = true
 sink = "file"
-file_path = ".contextbudget/events.jsonl"
+file_path = ".redcon/events.jsonl"
 """.strip(),
     )
     _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="tighten auth checks", repo=tmp_path, max_tokens=300)
     policy = engine.make_policy(max_estimated_input_tokens=1)
     result = engine.evaluate_policy(run, policy=policy)
 
     assert result["passed"] is False
-    events = _read_events(tmp_path / ".contextbudget" / "events.jsonl")
+    events = _read_events(tmp_path / ".redcon" / "events.jsonl")
     event_names = [e["name"] for e in events]
     assert "policy_failed" in event_names
     policy_event = next(e for e in events if e["name"] == "policy_failed")
@@ -134,22 +134,22 @@ file_path = ".contextbudget/events.jsonl"
 
 def test_benchmark_emits_schema_versioned_events_without_nested_pack_events(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [telemetry]
 enabled = true
 sink = "file"
-file_path = ".contextbudget/events.jsonl"
+file_path = ".redcon/events.jsonl"
 """.strip(),
     )
     _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
     _write(tmp_path / "src" / "cache.py", "CACHE_KEY = 'auth'\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     benchmark = engine.benchmark(task="benchmark auth context", repo=tmp_path, max_tokens=400)
 
     assert benchmark["command"] == "benchmark"
-    events = _read_events(tmp_path / ".contextbudget" / "events.jsonl")
+    events = _read_events(tmp_path / ".redcon" / "events.jsonl")
     assert [event["name"] for event in events] == [
         "run_started",
         "scan_completed",
@@ -172,24 +172,24 @@ file_path = ".contextbudget/events.jsonl"
 
 def test_delta_applied_event_emitted(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [telemetry]
 enabled = true
 sink = "file"
-file_path = ".contextbudget/events.jsonl"
+file_path = ".redcon/events.jsonl"
 """.strip(),
     )
     _write(tmp_path / "src" / "search.py", "def search() -> list[str]:\n    return []\n")
 
     first_run = run_pack("add caching to search api", repo=tmp_path, max_tokens=500)
-    from contextbudget.core.pipeline import as_json_dict
+    from redcon.core.pipeline import as_json_dict
     first_run_dict = as_json_dict(first_run)
 
     _write(tmp_path / "src" / "cache.py", "def cache() -> None:\n    pass\n")
     run_pack("add caching to search api", repo=tmp_path, max_tokens=500, delta_from=first_run_dict)
 
-    events = _read_events(tmp_path / ".contextbudget" / "events.jsonl")
+    events = _read_events(tmp_path / ".redcon" / "events.jsonl")
     event_names = [event["name"] for event in events]
     assert "delta_applied" in event_names
 
@@ -203,23 +203,23 @@ file_path = ".contextbudget/events.jsonl"
 
 def test_policy_violation_event_emitted(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [telemetry]
 enabled = true
 sink = "file"
-file_path = ".contextbudget/events.jsonl"
+file_path = ".redcon/events.jsonl"
 """.strip(),
     )
     _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n")
 
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     run = engine.pack(task="tighten auth checks", repo=tmp_path, max_tokens=300)
     policy = engine.make_policy(max_estimated_input_tokens=1)
     result = engine.evaluate_policy(run, policy=policy)
 
     assert result["passed"] is False
-    events = _read_events(tmp_path / ".contextbudget" / "events.jsonl")
+    events = _read_events(tmp_path / ".redcon" / "events.jsonl")
     violation_event = next((e for e in events if e["name"] == "policy_violation"), None)
     assert violation_event is not None, "policy_violation event not emitted"
     _assert_event_shape(violation_event)

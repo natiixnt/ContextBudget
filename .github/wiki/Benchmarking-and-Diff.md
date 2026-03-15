@@ -1,6 +1,6 @@
 # Benchmarking and Diff
 
-## `contextbudget benchmark`
+## `redcon benchmark`
 
 Compare deterministic packing strategies for one task:
 
@@ -12,8 +12,8 @@ Compare deterministic packing strategies for one task:
 | cache-assisted pack | Compressed with summary cache reuse |
 
 ```bash
-contextbudget benchmark "add rate limiting to auth API" --repo .
-contextbudget benchmark <task> --workspace <workspace.toml>
+redcon benchmark "add rate limiting to auth API" --repo .
+redcon benchmark <task> --workspace <workspace.toml>
 ```
 
 **Outputs:**
@@ -25,12 +25,12 @@ contextbudget benchmark <task> --workspace <workspace.toml>
 
 ---
 
-## `contextbudget diff`
+## `redcon diff`
 
 Compare two run artifacts and inspect what changed.
 
 ```bash
-contextbudget diff old-run.json new-run.json
+redcon diff old-run.json new-run.json
 ```
 
 **Inspects:**
@@ -79,7 +79,7 @@ python benchmarks/run_benchmarks.py
 Or run a single task:
 
 ```bash
-contextbudget benchmark "Add Redis caching to task lookup endpoints" \
+redcon benchmark "Add Redis caching to task lookup endpoints" \
     --repo benchmarks/dataset --max-tokens 8000
 ```
 
@@ -90,13 +90,13 @@ contextbudget benchmark "Add Redis caching to task lookup endpoints" \
 After two runs (e.g. before and after a code change), diff them to detect context regressions:
 
 ```bash
-contextbudget pack "add caching" --repo . --max-tokens 30000
+redcon pack "add caching" --repo . --max-tokens 30000
 mv run.json baseline-run.json
 
 # make changes to the repo...
 
-contextbudget pack "add caching" --repo . --max-tokens 30000
-contextbudget diff baseline-run.json run.json
+redcon pack "add caching" --repo . --max-tokens 30000
+redcon diff baseline-run.json run.json
 ```
 
-For PR-level diffing, see `contextbudget pr-audit` in the [[CLI Reference]].
+For PR-level diffing, see `redcon pr-audit` in the [[CLI Reference]].

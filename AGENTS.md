@@ -2,7 +2,7 @@
 
 ## Project Intent
 
-ContextBudget minimizes token waste in coding-agent workflows by selecting, compressing, caching, and budgeting repository context.
+Redcon minimizes token waste in coding-agent workflows by selecting, compressing, caching, and budgeting repository context.
 
 ## Agent Operating Rules
 

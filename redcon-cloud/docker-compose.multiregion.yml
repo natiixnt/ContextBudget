@@ -1,0 +1,200 @@
+version: "3.9"
+
+# Multi-region docker-compose for redcon-cloud.
+#
+# Architecture:
+#   Primary Postgres  ── WAL streaming ──▶  Replica Postgres
+#         │                                        │
+#   PgBouncer (writes)                   PgBouncer (reads)
+#         │                                        │
+#         └──────────── API (FastAPI) ─────────────┘
+#                       (write to primary,
+#                        read analytics from replica)
+#
+# Usage:
+#   cp .env.example .env
+#   docker compose -f docker-compose.multiregion.yml up -d
+#
+# In a real multi-region deployment, db-primary and db-replica run on separate
+# hosts / VMs in different availability zones.  This file uses two containers
+# on the same host for local testing of the failover wiring.
+#
+# Environment variables (add to .env):
+#   POSTGRES_PASSWORD        Password for redcon user
+#   POSTGRES_REPLICATOR_PWD  Password for the replication user
+#   READ_DATABASE_URL        Points at pgbouncer-replica (set automatically below)
+
+services:
+  # ── Primary Postgres ────────────────────────────────────────────────────────
+  db-primary:
+    image: postgres:16-alpine
+    restart: always
+    command: >
+      postgres
+        -c wal_level=replica
+        -c max_wal_senders=5
+        -c wal_keep_size=128MB
+        -c hot_standby=on
+        -c synchronous_commit=off
+    environment:
+      POSTGRES_USER: redcon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+      POSTGRES_DB: redcon
+      # Bootstrap: create the replication user on first start
+      POSTGRES_INITDB_ARGS: "--auth-host=scram-sha-256"
+    volumes:
+      - postgres_primary_data:/var/lib/postgresql/data
+      - ./migrations/001_create_events.sql:/docker-entrypoint-initdb.d/001_create_events.sql
+      - ./migrations/002_create_control_plane.sql:/docker-entrypoint-initdb.d/002_create_control_plane.sql
+      - ./migrations/003_org_scoped_events.sql:/docker-entrypoint-initdb.d/003_org_scoped_events.sql
+      - ./migrations/004_webhooks.sql:/docker-entrypoint-initdb.d/004_webhooks.sql
+      - ./migrations/005_quotas.sql:/docker-entrypoint-initdb.d/005_quotas.sql
+      - ./migrations/006_billing.sql:/docker-entrypoint-initdb.d/006_billing.sql
+      - ./init/create_replication_user.sql:/docker-entrypoint-initdb.d/099_replication_user.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redcon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - internal
+
+  # ── Streaming replica ────────────────────────────────────────────────────────
+  db-replica:
+    image: postgres:16-alpine
+    restart: always
+    command: >
+      bash -c "
+        until pg_basebackup -h db-primary -U replicator -D /var/lib/postgresql/data -Fp -Xs -P -R; do
+          echo 'Waiting for primary...'; sleep 3;
+        done &&
+        postgres
+          -c hot_standby=on
+          -c hot_standby_feedback=on
+          -c max_standby_streaming_delay=30s
+      "
+    environment:
+      PGPASSWORD: ${POSTGRES_REPLICATOR_PWD:?POSTGRES_REPLICATOR_PWD must be set}
+      POSTGRES_USER: redcon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_replica_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U redcon"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      db-primary:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # ── PgBouncer (write pool → primary) ─────────────────────────────────────────
+  pgbouncer-primary:
+    image: bitnami/pgbouncer:1.22.1
+    restart: always
+    environment:
+      POSTGRESQL_HOST: db-primary
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_DATABASE: redcon
+      POSTGRESQL_USERNAME: redcon
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_DEFAULT_POOL_SIZE: 20
+      PGBOUNCER_MAX_CLIENT_CONN: 200
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U redcon"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      db-primary:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # ── PgBouncer (read pool → replica) ──────────────────────────────────────────
+  pgbouncer-replica:
+    image: bitnami/pgbouncer:1.22.1
+    restart: always
+    environment:
+      POSTGRESQL_HOST: db-replica
+      POSTGRESQL_PORT: 5432
+      POSTGRESQL_DATABASE: redcon
+      POSTGRESQL_USERNAME: redcon
+      POSTGRESQL_PASSWORD: ${POSTGRES_PASSWORD}
+      PGBOUNCER_POOL_MODE: transaction
+      PGBOUNCER_DEFAULT_POOL_SIZE: 20
+      PGBOUNCER_MAX_CLIENT_CONN: 200
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h localhost -p 5432 -U redcon"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+    depends_on:
+      db-replica:
+        condition: service_healthy
+    networks:
+      - internal
+
+  # ── API ────────────────────────────────────────────────────────────────────────
+  api:
+    build: .
+    restart: always
+    environment:
+      # Writes go to primary
+      DATABASE_URL: postgresql://redcon:${POSTGRES_PASSWORD}@pgbouncer-primary:5432/redcon
+      # Analytics reads go to replica (optional — falls back to DATABASE_URL when unset)
+      READ_DATABASE_URL: postgresql://redcon:${POSTGRES_PASSWORD}@pgbouncer-replica:5432/redcon
+    env_file:
+      - .env
+    depends_on:
+      pgbouncer-primary:
+        condition: service_healthy
+      pgbouncer-replica:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\""]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    deploy:
+      resources:
+        limits:
+          cpus: "2"
+          memory: 1G
+    networks:
+      - internal
+      - proxy
+
+  nginx:
+    image: nginx:1.27-alpine
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ../deploy/nginx.conf:/etc/nginx/conf.d/redcon.conf:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api
+    networks:
+      - proxy
+
+volumes:
+  postgres_primary_data:
+    name: redcon_postgres_primary
+  postgres_replica_data:
+    name: redcon_postgres_replica
+  nginx_logs:
+    name: redcon_nginx_logs
+
+networks:
+  internal:
+    internal: true
+  proxy:

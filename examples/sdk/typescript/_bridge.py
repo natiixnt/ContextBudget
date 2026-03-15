@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""stdin → stdout JSON bridge for the ContextBudget TypeScript SDK.
+"""stdin → stdout JSON bridge for the Redcon TypeScript SDK.
 
 The TypeScript SDK spawns this script, writes a JSON request to stdin, and
 reads a JSON response from stdout.  All errors are written to stderr and
@@ -21,25 +21,25 @@ import json
 import sys
 
 # ---------------------------------------------------------------------------
-# Path bootstrap — ensures contextbudget is importable in both pip-installed
+# Path bootstrap — ensures redcon is importable in both pip-installed
 # and editable-install (development) environments.
 #
-# When contextbudget is installed via `pip install contextbudget` the package
+# When redcon is installed via `pip install redcon` the package
 # is in site-packages and needs no extra path manipulation.
 #
 # During development (pip install -e .) Python may not find the package when
 # the script is run directly (sys.path[0] is the script directory, not CWD).
-# We walk up from this file's location to find the contextbudget package root
+# We walk up from this file's location to find the redcon package root
 # and add it to sys.path.
 # ---------------------------------------------------------------------------
 try:
-    import contextbudget  # noqa: F401 — fast path: package already importable
+    import redcon  # noqa: F401 — fast path: package already importable
 except ModuleNotFoundError:
     from pathlib import Path as _Path
 
     _here = _Path(__file__).resolve().parent
     for _candidate in [_here, *_here.parents]:
-        if (_candidate / "contextbudget" / "__init__.py").exists():
+        if (_candidate / "redcon" / "__init__.py").exists():
             sys.path.insert(0, str(_candidate))
             break
 
@@ -56,7 +56,7 @@ def main() -> None:
 
     try:
         # Import here so startup cost is paid only when the bridge is invoked.
-        from contextbudget.sdk import prepare_context, profile_run, simulate_agent
+        from redcon.sdk import prepare_context, profile_run, simulate_agent
 
         if method == "prepareContext":
             result = prepare_context(

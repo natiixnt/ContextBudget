@@ -1,10 +1,10 @@
 # Cache
 
-ContextBudget is local-first by default. The open-source build ships cache backend abstractions so the pack pipeline can stay stable as teams add stricter trust boundaries or future shared cache integrations.
+Redcon is local-first by default. The open-source build ships cache backend abstractions so the pack pipeline can stay stable as teams add stricter trust boundaries or future shared cache integrations.
 
 ## Built-in Backends
 
-- `local_file`: default backend. Persists summary previews to `.contextbudget_cache.json` inside the repo.
+- `local_file`: default backend. Persists summary previews to `.redcon_cache.json` inside the repo.
 - `redis`: production-ready shared cache cluster backend. Stores compressed context entries in Redis with configurable TTL and namespace isolation.
 - `shared_stub`: no-op shared/remote backend stub. It exercises the shared-cache interface without making network calls or persisting hosted state.
 - `memory`: process-local backend intended for tests and advanced embedders.
@@ -17,7 +17,7 @@ The default backend stores summary previews on disk and reuses them on later run
 [cache]
 backend = "local_file"
 summary_cache_enabled = true
-cache_file = ".contextbudget_cache.json"
+cache_file = ".redcon_cache.json"
 duplicate_hash_cache_enabled = true
 ```
 
@@ -53,7 +53,7 @@ redis_ttl_seconds = 86400
 Install the extra dependency:
 
 ```
-pip install 'contextbudget[redis]'
+pip install 'redcon[redis]'
 ```
 
 ### Cache key structure
@@ -61,7 +61,7 @@ pip install 'contextbudget[redis]'
 Keys embed repository, file path, symbol, and content hash so that multiple agents working on the same codebase share entries without collisions:
 
 ```python
-from contextbudget.cache import build_redis_cache_key
+from redcon.cache import build_redis_cache_key
 
 key = build_redis_cache_key(
     org="myorg",
@@ -129,7 +129,7 @@ The `cache` block in `run.json` includes per-store counters:
 - no hosted service dependency
 - no implicit trust expansion
 
-Future team-level reuse can plug into the same backend interface under `contextbudget/cache/` without changing CLI contracts or the `run.json` artifact shape.
+Future team-level reuse can plug into the same backend interface under `redcon/cache/` without changing CLI contracts or the `run.json` artifact shape.
 
 ## Trust And Privacy
 

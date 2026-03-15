@@ -1,6 +1,6 @@
-# ContextBudget Docs
+# Redcon Docs
 
-ContextBudget is local-first infrastructure for deterministic context selection, compression, and budget enforcement in coding-agent workflows.
+Redcon is local-first infrastructure for deterministic context selection, compression, and budget enforcement in coding-agent workflows.
 
 ## Use It
 

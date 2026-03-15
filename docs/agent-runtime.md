@@ -1,6 +1,6 @@
 # Agent Runtime
 
-The ContextBudget Agent Runtime turns ContextBudget into infrastructure that
+The Redcon Agent Runtime turns Redcon into infrastructure that
 manages context for AI agents.  It sits between the coding agent and the
 downstream LLM, intercepting every task and applying the full optimisation
 pipeline before the prompt reaches the model.
@@ -21,7 +21,7 @@ agent  →  AgentRuntime  →  LLM
 ## Quick-start
 
 ```python
-from contextbudget.runtime import AgentRuntime
+from redcon.runtime import AgentRuntime
 
 # No LLM — just prepare and inspect context
 runtime = AgentRuntime(max_tokens=32_000)
@@ -74,7 +74,7 @@ runtime = AgentRuntime(delta=False)
 ### `AgentRuntime`
 
 ```python
-from contextbudget.runtime import AgentRuntime
+from redcon.runtime import AgentRuntime
 ```
 
 **Constructor parameters**
@@ -88,9 +88,9 @@ from contextbudget.runtime import AgentRuntime
 | `strict` | `bool` | `False` | Raise `BudgetPolicyViolationError` on policy failure |
 | `delta` | `bool` | `True` | Auto-pass previous run as delta context |
 | `llm_fn` | `Callable[[str], str] \| None` | `None` | LLM dispatch callable |
-| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `config_path` | `str \| Path \| None` | `None` | Path to `redcon.toml` |
 | `session` | `RuntimeSession \| None` | new session | Session to resume |
-| `engine` | `ContextBudgetEngine \| None` | new engine | Engine to reuse |
+| `engine` | `RedconEngine \| None` | new engine | Engine to reuse |
 
 **Methods**
 
@@ -187,7 +187,7 @@ Tracks multi-turn state.  Created automatically; access via `runtime.session`.
 
 ```python
 import anthropic
-from contextbudget.runtime import AgentRuntime
+from redcon.runtime import AgentRuntime
 
 client = anthropic.Anthropic()
 
@@ -207,7 +207,7 @@ print(result.llm_response)
 ### Token budget enforcement
 
 ```python
-from contextbudget.runtime import AgentRuntime
+from redcon.runtime import AgentRuntime
 
 # Hard budget + quality gate
 runtime = AgentRuntime(
@@ -229,7 +229,7 @@ min_estimated_savings_percentage = 10.0
 ```
 
 ```python
-from contextbudget.runtime import AgentRuntime
+from redcon.runtime import AgentRuntime
 
 runtime = AgentRuntime(policy_path="policy.toml", strict=True)
 result  = runtime.run("add caching layer", repo=".")
@@ -238,7 +238,7 @@ result  = runtime.run("add caching layer", repo=".")
 ### Multi-turn session
 
 ```python
-from contextbudget.runtime import AgentRuntime
+from redcon.runtime import AgentRuntime
 
 runtime = AgentRuntime(max_tokens=32_000, delta=True)
 
@@ -259,7 +259,7 @@ print(f"Total tokens   : {summary['cumulative_tokens']}")
 ### Resuming a session
 
 ```python
-from contextbudget.runtime import AgentRuntime, RuntimeSession
+from redcon.runtime import AgentRuntime, RuntimeSession
 
 # Restore a saved session
 previous_session = RuntimeSession(session_id="abc-123")
@@ -277,8 +277,8 @@ result = runtime.run("add caching", repo=".")
 artifact = result.prepared_context.run_artifact
 
 # Pipeline stages
-from contextbudget.runtime import AgentRuntime
-from contextbudget.core.pipeline_trace import build_pipeline_trace
+from redcon.runtime import AgentRuntime
+from redcon.core.pipeline_trace import build_pipeline_trace
 
 trace = build_pipeline_trace(artifact)
 for stage in trace.stages:
@@ -291,12 +291,12 @@ for stage in trace.stages:
 
 | API | Role |
 |-----|------|
-| `ContextBudgetEngine` | Low-level pack/plan/simulate engine |
-| `BudgetGuard` | Strict-policy wrapper around `ContextBudgetEngine` |
-| `ContextBudgetMiddleware` | One-shot context prep for agent integrations |
+| `RedconEngine` | Low-level pack/plan/simulate engine |
+| `BudgetGuard` | Strict-policy wrapper around `RedconEngine` |
+| `RedconMiddleware` | One-shot context prep for agent integrations |
 | **`AgentRuntime`** | **Stateful multi-turn runtime with LLM dispatch** |
 
-`AgentRuntime` builds on top of `ContextBudgetMiddleware` and adds session
+`AgentRuntime` builds on top of `RedconMiddleware` and adds session
 tracking, delta context across turns, and the `llm_fn` dispatch interface.
 It does **not** replace any existing API.
 

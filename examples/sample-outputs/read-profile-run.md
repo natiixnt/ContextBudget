@@ -1,4 +1,4 @@
-# ContextBudget Agent Read Profile
+# Redcon Agent Read Profile
 
 Run: `run.json`
 Generated at: 2026-03-15T12:00:00Z

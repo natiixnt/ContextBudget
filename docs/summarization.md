@@ -1,6 +1,6 @@
 # Summarization
 
-ContextBudget stays deterministic and local by default. Summary compression uses a built-in summarizer unless you explicitly select an external adapter.
+Redcon stays deterministic and local by default. Summary compression uses a built-in summarizer unless you explicitly select an external adapter.
 
 ## Default Behavior
 
@@ -21,7 +21,7 @@ adapter = "team-summary"
 An external adapter must be registered by wrapper code before `pack` runs:
 
 ```python
-from contextbudget import ExternalSummaryAdapter, register_external_summarizer_adapter
+from redcon import ExternalSummaryAdapter, register_external_summarizer_adapter
 
 
 class TeamSummaryAdapter(ExternalSummaryAdapter):
@@ -34,7 +34,7 @@ class TeamSummaryAdapter(ExternalSummaryAdapter):
 register_external_summarizer_adapter("team-summary", TeamSummaryAdapter())
 ```
 
-If the adapter is missing, fails, or returns unusable output, ContextBudget automatically falls back to deterministic summarization.
+If the adapter is missing, fails, or returns unusable output, Redcon automatically falls back to deterministic summarization.
 
 ## Artifact Signals
 
@@ -62,12 +62,12 @@ Markdown pack/report outputs include the same selection and fallback details.
 
 ## Trust Boundaries
 
-External summarization changes the trust boundary. Even if the rest of ContextBudget stays local-first, the summary text may now depend on software outside the deterministic core.
+External summarization changes the trust boundary. Even if the rest of Redcon stays local-first, the summary text may now depend on software outside the deterministic core.
 
 - Use deterministic summarization when repository content must stay fully local.
 - Only use an external adapter when the adapter operator is allowed to process the same source material as the developer or CI environment.
 - Treat summaries as code-adjacent data. They can expose implementation details even when compressed.
-- OSS ContextBudget includes no hidden telemetry and no built-in network summarizer.
+- OSS Redcon includes no hidden telemetry and no built-in network summarizer.
 
 ## Reproducibility Tradeoffs
 

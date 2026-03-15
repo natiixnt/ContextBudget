@@ -3,8 +3,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from contextbudget.cli import main
-from contextbudget.core.benchmark import run_benchmark
+from redcon.cli import main
+from redcon.core.benchmark import run_benchmark
 
 
 def _write(path: Path, content: str) -> None:
@@ -47,7 +47,7 @@ def test_cli_benchmark_writes_artifacts(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(
         "sys.argv",
         [
-            "contextbudget",
+            "redcon",
             "benchmark",
             "add rate limiting to auth API",
             "--repo",
@@ -88,7 +88,7 @@ path = "shared"
 """.strip(),
     )
 
-    from contextbudget.config import load_workspace
+    from redcon.config import load_workspace
 
     workspace = load_workspace(tmp_path / "workspace.toml")
     data = run_benchmark("update auth flow", repo=workspace.root, config=workspace.config, workspace=workspace)
@@ -99,7 +99,7 @@ path = "shared"
 
 def test_benchmark_records_model_profile_assumptions(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         'model_profile = "mistral-small"\n',
     )
     _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n" * 20)

@@ -15,7 +15,7 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget import BudgetGuard, BudgetPolicyViolationError, ContextBudgetEngine
+from redcon import BudgetGuard, BudgetPolicyViolationError, RedconEngine
 
 
 # ---------------------------------------------------------------------------
@@ -83,7 +83,7 @@ def test_budget_guard_default_constructor() -> None:
     assert guard.max_tokens is None
     assert guard.strict is False
     assert guard.top_files is None
-    assert isinstance(guard.engine, ContextBudgetEngine)
+    assert isinstance(guard.engine, RedconEngine)
 
 
 def test_budget_guard_stores_constructor_params() -> None:
@@ -103,7 +103,7 @@ def test_budget_guard_stores_constructor_params() -> None:
 
 
 def test_budget_guard_accepts_external_engine() -> None:
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     guard = BudgetGuard(engine=engine)
     assert guard.engine is engine
 
@@ -578,7 +578,7 @@ def test_violation_error_message_from_violations_list(tmp_path: Path) -> None:
     guard = BudgetGuard(max_tokens=30000)
     run = guard.pack_context(task="update auth", repo=tmp_path)
 
-    policy = ContextBudgetEngine.make_policy(max_files_included=0)
+    policy = RedconEngine.make_policy(max_files_included=0)
     policy_result = guard.engine.evaluate_policy(run, policy=policy)
 
     err = BudgetPolicyViolationError(policy_result=policy_result, run_artifact=run)

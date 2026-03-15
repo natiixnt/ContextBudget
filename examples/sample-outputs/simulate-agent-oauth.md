@@ -1,4 +1,4 @@
-# ContextBudget Agent Simulation Report
+# Redcon Agent Simulation Report
 
 Task: implement OAuth2 login flow
 Repository: .

@@ -54,7 +54,7 @@ export default function HeatmapTable({ files }: Props) {
   if (!files.length) {
     return (
       <p className="text-slate-400 text-sm py-10 text-center">
-        No pack artifacts found — run <code className="font-mono bg-slate-100 px-1 rounded">contextbudget pack</code> first.
+        No pack artifacts found — run <code className="font-mono bg-slate-100 px-1 rounded">redcon pack</code> first.
       </p>
     );
   }

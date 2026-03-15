@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget.core.policy import default_strict_policy, evaluate_policy, load_policy
+from redcon.core.policy import default_strict_policy, evaluate_policy, load_policy
 
 
 def _write(path: Path, content: str) -> None:

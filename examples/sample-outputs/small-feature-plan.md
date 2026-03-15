@@ -1,7 +1,7 @@
-# ContextBudget Plan
+# Redcon Plan
 
 Task: add caching to search API
-Repository: /Users/naithai/Desktop/amogus/praca/ContextBudget/examples/small-feature/repo
+Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/small-feature/repo
 Scanned files: 3
 
 ## Ranked Relevant Files

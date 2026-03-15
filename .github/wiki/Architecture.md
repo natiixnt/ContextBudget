@@ -1,6 +1,6 @@
 # Architecture
 
-ContextBudget is organized around a single engine and explicit stage boundaries. CLI commands, Python API calls, workspace runs, and agent middleware all route through the same scan, score, pack, render, and policy machinery.
+Redcon is organized around a single engine and explicit stage boundaries. CLI commands, Python API calls, workspace runs, and agent middleware all route through the same scan, score, pack, render, and policy machinery.
 
 ---
 
@@ -19,7 +19,7 @@ ContextBudget is organized around a single engine and explicit stage boundaries.
 ```
 ┌─────────────────────────────────────────────────────────┐
 │                      Entry Points                        │
-│  contextbudget/cli.py  │  engine.py  │  agents/          │
+│  redcon/cli.py  │  engine.py  │  agents/          │
 └────────────────────────┬────────────────────────────────┘
                          │ all delegate to
 ┌────────────────────────▼────────────────────────────────┐
@@ -45,9 +45,9 @@ ContextBudget is organized around a single engine and explicit stage boundaries.
 
 | Module | Role |
 |--------|------|
-| `contextbudget/cli.py` | Command-line interface |
-| `contextbudget/engine.py` | Public library API (`ContextBudgetEngine`, `BudgetGuard`) |
-| `contextbudget/agents/` | Middleware and adapter abstractions |
+| `redcon/cli.py` | Command-line interface |
+| `redcon/engine.py` | Public library API (`RedconEngine`, `BudgetGuard`) |
+| `redcon/agents/` | Middleware and adapter abstractions |
 
 These layers delegate into the same core pipeline rather than maintaining parallel implementations.
 
@@ -57,9 +57,9 @@ These layers delegate into the same core pipeline rather than maintaining parall
 
 ### Pipeline Orchestration
 
-`contextbudget/core/pipeline.py` is the compatibility facade for high-level callers.
+`redcon/core/pipeline.py` is the compatibility facade for high-level callers.
 
-`contextbudget/stages/workflow.py` defines the explicit stage boundaries:
+`redcon/stages/workflow.py` defines the explicit stage boundaries:
 
 1. **Scan Refresh** — Update incremental scan index
 2. **Scan** — Repository file traversal with metadata
@@ -75,17 +75,17 @@ This keeps orchestration separate from lower-level scanner, scorer, and compress
 
 ## Scanning
 
-`contextbudget/scanners/` handles repository traversal and scan-state reuse.
+`redcon/scanners/` handles repository traversal and scan-state reuse.
 
 - Respects include and ignore rules from config
-- Maintains `.contextbudget/scan-index.json` for incremental reuse
+- Maintains `.redcon/scan-index.json` for incremental reuse
 - Reuses unchanged file metadata on later runs
 - Supports workspace scans by iterating `[[repos]]` entries and tagging files with repo labels
 
 | Module | Role |
 |--------|------|
 | `scanners/repository.py` | Core file scanning |
-| `scanners/incremental.py` | Manages `.contextbudget/scan-index.json` |
+| `scanners/incremental.py` | Manages `.redcon/scan-index.json` |
 | `scanners/workspace.py` | Multi-repo scanning with repo labels |
 | `scanners/git_diff.py` | Git diff scanning for PR audits |
 
@@ -93,7 +93,7 @@ This keeps orchestration separate from lower-level scanner, scorer, and compress
 
 ## Scoring
 
-`contextbudget/scorers/` ranks `FileRecord` values against a task using deterministic relevance heuristics plus import-graph signals.
+`redcon/scorers/` ranks `FileRecord` values against a task using deterministic relevance heuristics plus import-graph signals.
 
 Workspace scoring is cross-repository at the ranking layer: all scanned files are scored together. Import-graph resolution stays repo-local so identical relative paths from different repos do not collide.
 
@@ -107,7 +107,7 @@ Workspace scoring is cross-repository at the ranking layer: all scanned files ar
 
 ## Compression
 
-`contextbudget/compressors/` reduces ranked files into packed context.
+`redcon/compressors/` reduces ranked files into packed context.
 
 Built-in strategies:
 - Full-file inclusion
@@ -195,7 +195,7 @@ Rendered plan and pack artifacts preserve repo provenance so downstream tools ca
 
 ## Agent Middleware Architecture
 
-`contextbudget/agents/middleware.py` adds an agent-facing boundary on top of `ContextBudgetEngine`.
+`redcon/agents/middleware.py` adds an agent-facing boundary on top of `RedconEngine`.
 
 **Responsibilities:**
 1. Accept a task or typed request
@@ -204,7 +204,7 @@ Rendered plan and pack artifacts preserve repo provenance so downstream tools ca
 4. Optionally enforce policy
 5. Optionally record a combined artifact
 
-`contextbudget/agents/adapters.py` defines the adapter abstraction for local integrations. `LocalDemoAgentAdapter` is a local simulation, not a vendor integration.
+`redcon/agents/adapters.py` defines the adapter abstraction for local integrations. `LocalDemoAgentAdapter` is a local simulation, not a vendor integration.
 
 ---
 

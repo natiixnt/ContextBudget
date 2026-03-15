@@ -1,0 +1,7 @@
+{
+  "fragments": {
+    "fragment:src/cache.py:ranges=full:1-7:22edfe123418e4b72c60350735e3e8e4c41770b1ac6dedbed88122bc02e6d8c2": "cb-frag:4d4cb7cdabdb673d",
+    "fragment:src/search_api.py:ranges=full:1-2:f20a3a74996447f53efa9b6e5d40aebbd83c9d68f436681b3afc6d894c92e413": "cb-frag:3ea05293dbcbefe3"
+  },
+  "summaries": {}
+}

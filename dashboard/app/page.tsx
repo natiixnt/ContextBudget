@@ -55,7 +55,7 @@ export default function OverviewPage() {
           Agent context infrastructure at a glance.{" "}
           {!data.connected && !loading && (
             <span className="text-amber-600 font-medium">
-              Not connected — run <code className="font-mono bg-amber-50 px-1 rounded">contextbudget dashboard</code> to load live data.
+              Not connected — run <code className="font-mono bg-amber-50 px-1 rounded">redcon dashboard</code> to load live data.
             </span>
           )}
         </p>

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget.cache import InMemorySummaryCacheBackend
-from contextbudget.config import default_config
-from contextbudget.stages.workflow import run_pack_stage, run_scan_stage, run_score_stage
+from redcon.cache import InMemorySummaryCacheBackend
+from redcon.config import default_config
+from redcon.stages.workflow import run_pack_stage, run_scan_stage, run_score_stage
 
 
 def _write(path: Path, content: str) -> None:

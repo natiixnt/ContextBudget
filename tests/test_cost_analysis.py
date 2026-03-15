@@ -3,9 +3,9 @@ from __future__ import annotations
 """Tests for cost analytics engine and pricing table.
 
 Covers:
-  - contextbudget.core.agent_cost: resolve_model_pricing, list_known_models, _tokens_to_usd
-  - contextbudget.core.cost_analysis: load_run_data, compute_cost_analysis
-  - CLI: contextbudget cost-analysis
+  - redcon.core.agent_cost: resolve_model_pricing, list_known_models, _tokens_to_usd
+  - redcon.core.cost_analysis: load_run_data, compute_cost_analysis
+  - CLI: redcon cost-analysis
 """
 
 import json
@@ -13,14 +13,14 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget.core.agent_cost import (
+from redcon.core.agent_cost import (
     BUILTIN_MODEL_PRICING,
     ModelPricing,
     _tokens_to_usd,
     list_known_models,
     resolve_model_pricing,
 )
-from contextbudget.core.cost_analysis import (
+from redcon.core.cost_analysis import (
     compute_cost_analysis,
     load_run_data,
 )
@@ -310,7 +310,7 @@ class TestComputeCostAnalysis:
 
 
 # ---------------------------------------------------------------------------
-# CLI: contextbudget cost-analysis
+# CLI: redcon cost-analysis
 # ---------------------------------------------------------------------------
 
 class TestCostAnalysisCli:
@@ -320,14 +320,14 @@ class TestCostAnalysisCli:
         return p
 
     def test_human_output_shows_costs(self, tmp_path: Path, monkeypatch, capsys) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         run = _make_run(input_tokens=18340, saved_tokens=31660)
         run_path = self._write_run(tmp_path, run)
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "cost-analysis", str(run_path), "--model", "gpt-4o"],
+            ["redcon", "cost-analysis", str(run_path), "--model", "gpt-4o"],
         )
         rc = main()
         assert rc == 0
@@ -337,7 +337,7 @@ class TestCostAnalysisCli:
         assert "Savings" in out
 
     def test_json_output_parseable(self, tmp_path: Path, monkeypatch, capsys) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         run = _make_run(input_tokens=18340, saved_tokens=31660)
         run_path = self._write_run(tmp_path, run)
@@ -345,7 +345,7 @@ class TestCostAnalysisCli:
         monkeypatch.setattr(
             "sys.argv",
             [
-                "contextbudget", "cost-analysis", str(run_path),
+                "redcon", "cost-analysis", str(run_path),
                 "--model", "gpt-4o",
                 "--format", "json",
             ],
@@ -358,12 +358,12 @@ class TestCostAnalysisCli:
         assert data["saved_cost_usd"] > 0
 
     def test_list_models_flag(self, tmp_path: Path, monkeypatch, capsys) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "cost-analysis", "--list-models"],
+            ["redcon", "cost-analysis", "--list-models"],
         )
         rc = main()
         assert rc == 0
@@ -372,12 +372,12 @@ class TestCostAnalysisCli:
         assert "anthropic" in out
 
     def test_list_models_json(self, tmp_path: Path, monkeypatch, capsys) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "cost-analysis", "--list-models", "--format", "json"],
+            ["redcon", "cost-analysis", "--list-models", "--format", "json"],
         )
         rc = main()
         assert rc == 0
@@ -386,25 +386,25 @@ class TestCostAnalysisCli:
         assert any(m["model"] == "gpt-4o" for m in models)
 
     def test_missing_file_exits_nonzero(self, tmp_path: Path, monkeypatch) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "cost-analysis", "nonexistent.json"],
+            ["redcon", "cost-analysis", "nonexistent.json"],
         )
         rc = main()
         assert rc != 0
 
     def test_writes_json_output_file(self, tmp_path: Path, monkeypatch) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         run = _make_run()
         run_path = self._write_run(tmp_path, run)
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "cost-analysis", str(run_path), "--model", "claude-sonnet-4-6"],
+            ["redcon", "cost-analysis", str(run_path), "--model", "claude-sonnet-4-6"],
         )
         rc = main()
         assert rc == 0
@@ -414,14 +414,14 @@ class TestCostAnalysisCli:
         assert data["provider"] == "anthropic"
 
     def test_writes_markdown_output_file(self, tmp_path: Path, monkeypatch) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         run = _make_run()
         run_path = self._write_run(tmp_path, run)
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "cost-analysis", str(run_path)],
+            ["redcon", "cost-analysis", str(run_path)],
         )
         rc = main()
         assert rc == 0
@@ -431,7 +431,7 @@ class TestCostAnalysisCli:
         assert "Cost Analysis" in md
 
     def test_custom_out_flag(self, tmp_path: Path, monkeypatch) -> None:
-        from contextbudget.cli import main
+        from redcon.cli import main
 
         run = _make_run()
         run_path = self._write_run(tmp_path, run)
@@ -439,7 +439,7 @@ class TestCostAnalysisCli:
         monkeypatch.chdir(tmp_path)
         monkeypatch.setattr(
             "sys.argv",
-            ["contextbudget", "cost-analysis", str(run_path), "--out", str(custom_out)],
+            ["redcon", "cost-analysis", str(run_path), "--out", str(custom_out)],
         )
         rc = main()
         assert rc == 0

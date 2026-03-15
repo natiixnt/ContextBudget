@@ -1,6 +1,6 @@
 # Agent Run Benchmark Dataset: Token Reduction Report
 
-Reproducible evidence of token savings when using ContextBudget's optimised context selection versus naive full-repository context across four canonical agent run scenarios.
+Reproducible evidence of token savings when using Redcon's optimised context selection versus naive full-repository context across four canonical agent run scenarios.
 
 ## Settings
 
@@ -8,7 +8,7 @@ Reproducible evidence of token savings when using ContextBudget's optimised cont
 |-----------|-------|
 | Token budget | 8,000 |
 | Top files | 20 |
-| Dataset repo | `/Users/naithai/Desktop/amogus/praca/ContextBudget/benchmarks/dataset` |
+| Dataset repo | `/Users/naithai/Desktop/amogus/praca/Redcon/benchmarks/dataset` |
 | Generated | 2026-03-15T11:35:09.251810+00:00 |
 
 ## Results
@@ -37,7 +37,7 @@ Reproducible evidence of token savings when using ContextBudget's optimised cont
 > Add Redis caching to task lookup endpoints to reduce database load and improve response times
 
 - **Baseline:** 12,230 tokens (full repo, no selection)
-- **Optimized:** 7,935 tokens (ContextBudget compressed pack)
+- **Optimized:** 7,935 tokens (Redcon compressed pack)
 - **Saved:** 4,295 tokens (35.1% reduction)
 
 ### Add Authentication
@@ -45,7 +45,7 @@ Reproducible evidence of token savings when using ContextBudget's optimised cont
 > Add JWT authentication middleware to protect task and user API routes and validate user sessions
 
 - **Baseline:** 12,230 tokens (full repo, no selection)
-- **Optimized:** 2,196 tokens (ContextBudget compressed pack)
+- **Optimized:** 2,196 tokens (Redcon compressed pack)
 - **Saved:** 10,034 tokens (82.0% reduction)
 
 ### Refactor Module
@@ -53,7 +53,7 @@ Reproducible evidence of token savings when using ContextBudget's optimised cont
 > Refactor the database repository layer to use connection pooling for better performance and separation of concerns
 
 - **Baseline:** 12,230 tokens (full repo, no selection)
-- **Optimized:** 2,484 tokens (ContextBudget compressed pack)
+- **Optimized:** 2,484 tokens (Redcon compressed pack)
 - **Saved:** 9,746 tokens (79.7% reduction)
 
 ### Add Rate Limiting
@@ -61,7 +61,7 @@ Reproducible evidence of token savings when using ContextBudget's optimised cont
 > Add rate limiting middleware to API endpoints to prevent abuse and ensure fair usage
 
 - **Baseline:** 12,230 tokens (full repo, no selection)
-- **Optimized:** 2,619 tokens (ContextBudget compressed pack)
+- **Optimized:** 2,619 tokens (Redcon compressed pack)
 - **Saved:** 9,611 tokens (78.6% reduction)
 
 ## How to reproduce

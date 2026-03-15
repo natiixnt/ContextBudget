@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from contextbudget.config import load_config, load_workspace
-from contextbudget.core.pipeline import as_json_dict, run_pack
+from redcon.config import load_config, load_workspace
+from redcon.core.pipeline import as_json_dict, run_pack
 
 
 def _write(path: Path, content: str) -> None:
@@ -19,7 +19,7 @@ def test_load_config_defaults_when_file_missing(tmp_path: Path) -> None:
     assert cfg.summarization.backend == "deterministic"
     assert cfg.cache.backend == "local_file"
     assert cfg.cache.run_history_enabled is True
-    assert cfg.cache.history_file == ".contextbudget/history.json"
+    assert cfg.cache.history_file == ".redcon/history.json"
     assert cfg.tokens.backend == "heuristic"
     assert cfg.tokens.model == "gpt-4o-mini"
     assert cfg.tokens.fallback_backend == "heuristic"
@@ -34,7 +34,7 @@ def test_load_config_defaults_when_file_missing(tmp_path: Path) -> None:
 
 def test_load_config_overrides_from_toml(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 model_profile = "gpt-4.1"
 
@@ -82,7 +82,7 @@ file_path = ".local/events.jsonl"
 scorer = "example.path_glob_bonus"
 
 [[plugins.registrations]]
-target = "contextbudget.plugins.examples:path_glob_bonus_scorer"
+target = "redcon.plugins.examples:path_glob_bonus_scorer"
 options = { path_patterns = ["docs/**"], bonus = 5.0 }
 """.strip(),
     )
@@ -115,13 +115,13 @@ options = { path_patterns = ["docs/**"], bonus = 5.0 }
     assert cfg.telemetry.file_path == ".local/events.jsonl"
     assert cfg.plugins.scorer == "example.path_glob_bonus"
     assert cfg.plugins.token_estimator == "builtin.model_aligned"
-    assert cfg.plugins.registrations[0].target == "contextbudget.plugins.examples:path_glob_bonus_scorer"
+    assert cfg.plugins.registrations[0].target == "redcon.plugins.examples:path_glob_bonus_scorer"
     assert cfg.plugins.registrations[0].options["bonus"] == 5.0
 
 
 def test_run_pack_uses_config_default_budget(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [budget]
 max_tokens = 80
@@ -135,7 +135,7 @@ max_tokens = 80
 
 def test_explicit_plugin_token_estimator_overrides_tokens_backend(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [tokens]
 backend = "model_aligned"
@@ -152,7 +152,7 @@ token_estimator = "builtin.exact_tiktoken"
 
 def test_run_pack_max_tokens_argument_overrides_config(tmp_path: Path) -> None:
     _write(
-        tmp_path / "contextbudget.toml",
+        tmp_path / "redcon.toml",
         """
 [budget]
 max_tokens = 200

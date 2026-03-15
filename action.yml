@@ -1,0 +1,227 @@
+name: "Redcon"
+description: "Optimize LLM context windows, enforce token budgets, and track cost savings across CI runs."
+author: "Redcon"
+
+branding:
+  icon: "zap"
+  color: "purple"
+
+inputs:
+  task:
+    description: >
+      Natural language description of the task the agent will perform.
+      Used to rank which files are most relevant to include in context.
+      Defaults to a generic evaluation task if omitted.
+    required: false
+    default: ""
+
+  repo:
+    description: "Path to the repository to analyze (default: current directory)."
+    required: false
+    default: "."
+
+  policy:
+    description: >
+      Path to a policy TOML file defining token budgets and quality constraints.
+      Example: .github/redcon-policy.toml
+    required: false
+    default: ""
+
+  max-tokens:
+    description: "Maximum token budget for the packed context (default: 128000)."
+    required: false
+    default: "128000"
+
+  top-files:
+    description: "Maximum number of files to include in the packed context (default: 100)."
+    required: false
+    default: "100"
+
+  strict:
+    description: "Fail the step (exit 1) when the policy check fails (default: false)."
+    required: false
+    default: "false"
+
+  upload-artifacts:
+    description: "Upload the JSON run artifact and Markdown report as GitHub Actions artifacts."
+    required: false
+    default: "true"
+
+  out-prefix:
+    description: "Output file prefix for JSON and Markdown artifacts (default: redcon-ci)."
+    required: false
+    default: "redcon-ci"
+
+  model:
+    description: >
+      Model name for cost-analysis pricing (default: gpt-4o).
+      Run 'redcon cost-analysis --list-models' to see all supported models.
+    required: false
+    default: "gpt-4o"
+
+  cloud-url:
+    description: "Redcon Cloud URL for sending telemetry events (optional)."
+    required: false
+    default: ""
+
+  cloud-api-key:
+    description: "API key for authenticating with Redcon Cloud (optional)."
+    required: false
+    default: ""
+
+outputs:
+  token-estimate:
+    description: "Estimated input tokens for the packed context."
+    value: ${{ steps.pack.outputs.token_estimate }}
+
+  tokens-saved:
+    description: "Tokens saved compared to the full context baseline."
+    value: ${{ steps.pack.outputs.tokens_saved }}
+
+  savings-rate:
+    description: "Percentage of tokens saved (0–100)."
+    value: ${{ steps.pack.outputs.savings_rate }}
+
+  policy-passed:
+    description: "'true' if all policy checks passed, 'false' otherwise."
+    value: ${{ steps.pack.outputs.policy_passed }}
+
+  dollars-saved:
+    description: "Estimated USD saved (based on --model pricing)."
+    value: ${{ steps.cost.outputs.dollars_saved }}
+
+  artifact-json:
+    description: "Path to the run artifact JSON file."
+    value: ${{ inputs.out-prefix }}.json
+
+  artifact-md:
+    description: "Path to the Markdown report."
+    value: ${{ inputs.out-prefix }}.md
+
+runs:
+  using: "composite"
+  steps:
+    - name: Install Redcon
+      shell: bash
+      run: |
+        python -m pip install --quiet --upgrade pip
+        python -m pip install --quiet redcon
+
+    - name: Run Redcon pack
+      id: pack
+      shell: bash
+      run: |
+        set -euo pipefail
+
+        TASK="${{ inputs.task }}"
+        if [[ -z "$TASK" ]]; then
+          TASK="evaluate repository context budget"
+        fi
+
+        ARGS=(pack "$TASK" --repo "${{ inputs.repo }}" --out-prefix "${{ inputs.out-prefix }}")
+        ARGS+=(--max-tokens "${{ inputs.max-tokens }}")
+        ARGS+=(--top-files "${{ inputs.top-files }}")
+
+        if [[ -n "${{ inputs.policy }}" && -f "${{ inputs.policy }}" ]]; then
+          ARGS+=(--policy "${{ inputs.policy }}")
+        fi
+
+        if [[ "${{ inputs.strict }}" == "true" ]]; then
+          ARGS+=(--strict)
+        fi
+
+        python -m redcon.cli "${ARGS[@]}" 2>&1 | tee /tmp/cb-pack-output.txt || true
+
+        # Parse key metrics from the JSON artifact
+        JSON="${{ inputs.out-prefix }}.json"
+        if [[ -f "$JSON" ]]; then
+          TOKEN_ESTIMATE=$(python3 -c "import json,sys; d=json.load(open('$JSON')); m=d.get('metadata',{}); print(m.get('estimated_input_tokens',0))" 2>/dev/null || echo "0")
+          TOKENS_SAVED=$(python3 -c "import json,sys; d=json.load(open('$JSON')); m=d.get('metadata',{}); print(m.get('estimated_saved_tokens',0))" 2>/dev/null || echo "0")
+          BASELINE=$(python3 -c "import json,sys; d=json.load(open('$JSON')); m=d.get('metadata',{}); print(m.get('baseline_full_context_tokens', int(m.get('estimated_input_tokens',0)) + int(m.get('estimated_saved_tokens',0))))" 2>/dev/null || echo "0")
+          if [[ "$BASELINE" -gt 0 ]]; then
+            SAVINGS_RATE=$(python3 -c "print(round(int('$TOKENS_SAVED')/int('$BASELINE')*100,1))" 2>/dev/null || echo "0")
+          else
+            SAVINGS_RATE="0"
+          fi
+          POLICY_PASSED=$(python3 -c "import json; d=json.load(open('$JSON')); pr=d.get('policy_result'); print('true' if (pr is None or pr.get('passed',True)) else 'false')" 2>/dev/null || echo "true")
+        else
+          TOKEN_ESTIMATE="0"; TOKENS_SAVED="0"; SAVINGS_RATE="0"; POLICY_PASSED="true"
+        fi
+
+        echo "token_estimate=$TOKEN_ESTIMATE" >> "$GITHUB_OUTPUT"
+        echo "tokens_saved=$TOKENS_SAVED"     >> "$GITHUB_OUTPUT"
+        echo "savings_rate=$SAVINGS_RATE"     >> "$GITHUB_OUTPUT"
+        echo "policy_passed=$POLICY_PASSED"   >> "$GITHUB_OUTPUT"
+
+    - name: Generate Markdown report
+      id: report
+      shell: bash
+      continue-on-error: true
+      run: |
+        set -euo pipefail
+        ARGS=(report "${{ inputs.out-prefix }}.json" --out "${{ inputs.out-prefix }}.report.md")
+        if [[ -n "${{ inputs.policy }}" && -f "${{ inputs.policy }}" ]]; then
+          ARGS+=(--policy "${{ inputs.policy }}")
+        fi
+        python -m redcon.cli "${ARGS[@]}"
+
+    - name: Compute cost savings
+      id: cost
+      shell: bash
+      continue-on-error: true
+      run: |
+        set -euo pipefail
+        if [[ -f "${{ inputs.out-prefix }}.json" ]]; then
+          RESULT=$(python -m redcon.cli cost-analysis "${{ inputs.out-prefix }}.json" \
+            --model "${{ inputs.model }}" --format json 2>/dev/null || echo '{}')
+          DOLLARS=$(python3 -c "import json; d=json.loads('$RESULT'); print(round(d.get('saved_cost_usd',0),4))" 2>/dev/null || echo "0")
+          echo "dollars_saved=$DOLLARS" >> "$GITHUB_OUTPUT"
+        else
+          echo "dollars_saved=0" >> "$GITHUB_OUTPUT"
+        fi
+
+    - name: Add GitHub Step Summary
+      if: always()
+      shell: bash
+      run: |
+        {
+          echo "## Redcon Results"
+          echo ""
+          echo "| Metric | Value |"
+          echo "|--------|-------|"
+          echo "| Token estimate | \`${{ steps.pack.outputs.token_estimate }}\` |"
+          echo "| Tokens saved | \`${{ steps.pack.outputs.tokens_saved }}\` |"
+          echo "| Savings rate | \`${{ steps.pack.outputs.savings_rate }}%\` |"
+          echo "| Estimated \$ saved | \`\$${{ steps.cost.outputs.dollars_saved }}\` |"
+          echo "| Policy passed | \`${{ steps.pack.outputs.policy_passed }}\` |"
+          echo ""
+
+          REPORT="${{ inputs.out-prefix }}.report.md"
+          if [[ -f "$REPORT" ]]; then
+            echo "---"
+            cat "$REPORT"
+          elif [[ -f "${{ inputs.out-prefix }}.md" ]]; then
+            echo "---"
+            cat "${{ inputs.out-prefix }}.md"
+          fi
+        } >> "$GITHUB_STEP_SUMMARY"
+
+    - name: Enforce policy result
+      if: inputs.strict == 'true'
+      shell: bash
+      run: |
+        if [[ "${{ steps.pack.outputs.policy_passed }}" != "true" ]]; then
+          echo "Redcon: policy check FAILED in strict mode."
+          exit 1
+        fi
+
+    - name: Upload artifacts
+      if: inputs.upload-artifacts == 'true'
+      uses: actions/upload-artifact@v4
+      with:
+        name: redcon-artifacts
+        path: |
+          ${{ inputs.out-prefix }}.json
+          ${{ inputs.out-prefix }}.md
+          ${{ inputs.out-prefix }}.report.md
+        if-no-files-found: warn

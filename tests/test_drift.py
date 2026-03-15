@@ -7,8 +7,8 @@ from pathlib import Path
 
 import pytest
 
-from contextbudget.cache.run_history import RunHistoryEntry, append_run_history_entry
-from contextbudget.core.drift import (
+from redcon.cache.run_history import RunHistoryEntry, append_run_history_entry
+from redcon.core.drift import (
     DriftReport,
     _compute_contributors,
     _file_frequency,
@@ -16,8 +16,8 @@ from contextbudget.core.drift import (
     _verdict,
     run_drift,
 )
-from contextbudget.core.render import render_drift_markdown
-from contextbudget.engine import ContextBudgetEngine
+from redcon.core.render import render_drift_markdown
+from redcon.engine import RedconEngine
 
 
 # ---------------------------------------------------------------------------
@@ -270,7 +270,7 @@ def test_render_drift_markdown_structure(tmp_path: Path):
     report = run_drift(repo)
     md = render_drift_markdown(report)
 
-    assert "# ContextBudget Drift Report" in md
+    assert "# Redcon Drift Report" in md
     assert "context drift detected" in md  # alert phrase when drift > threshold
     assert "## Trend" in md
     assert "+30.0%" in md  # token drift
@@ -307,7 +307,7 @@ def test_engine_drift(tmp_path: Path):
         _entry("2026-01-01T00:00:00+00:00", "t", 1000, ["a.py"]),
         _entry("2026-01-02T00:00:00+00:00", "t", 1200, ["a.py", "b.py"]),
     ])
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     report = engine.drift(repo=repo)
 
     assert report["command"] == "drift"
@@ -322,7 +322,7 @@ def test_engine_drift_with_task_filter(tmp_path: Path):
         _entry("2026-01-02T00:00:00+00:00", "add caching", 1000, ["a.py"]),
         _entry("2026-01-03T00:00:00+00:00", "add caching", 1200, ["a.py", "b.py"]),
     ])
-    engine = ContextBudgetEngine()
+    engine = RedconEngine()
     report = engine.drift(repo=repo, task="caching")
 
     assert report["entries_analyzed"] == 2
