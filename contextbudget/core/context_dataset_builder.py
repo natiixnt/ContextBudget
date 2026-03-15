@@ -39,6 +39,10 @@ BUILTIN_TASKS: list[DatasetTask] = [
         name="Add Error Handling",
         description="Add comprehensive error handling and input validation across API endpoints",
     ),
+    DatasetTask(
+        name="Add Rate Limiting",
+        description="Add rate limiting middleware to API endpoints to prevent abuse and ensure fair usage",
+    ),
 ]
 
 

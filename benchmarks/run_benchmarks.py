@@ -61,6 +61,14 @@ TASKS: list[dict] = [
             "the database connection module and its callers across services."
         ),
     },
+    {
+        "slug": "add-rate-limiting",
+        "task": "Add rate limiting middleware to API endpoints to prevent abuse and ensure fair usage",
+        "description": (
+            "Evaluates context selection for rate-limiting middleware "
+            "spanning route handlers, application bootstrap, and configuration."
+        ),
+    },
 ]
 
 MAX_TOKENS: int = int(os.getenv("BENCHMARK_MAX_TOKENS", "8000"))
