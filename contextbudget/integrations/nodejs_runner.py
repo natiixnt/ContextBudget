@@ -1,67 +1,100 @@
 from __future__ import annotations
 
-"""OpenAI agent wrapper for ContextBudget.
+"""Node.js agent loop runner for ContextBudget.
 
 Intercepts task requests, runs the full ContextBudget optimisation pipeline,
-calls the OpenAI Chat Completions API with the packed context, and emits run
+passes the packed context prompt to a Node.js script via stdin, and emits run
 telemetry to the local observe-history store.
 
-Requires the ``openai`` package::
-
-    pip install openai
+The Node.js script receives the optimised prompt on stdin and must write its
+response to stdout.  This lets any Node.js agent loop (LangChain.js, Vercel
+AI SDK, OpenAI Node SDK, custom scripts, …) benefit from ContextBudget
+without any Python knowledge.
 
 Quick-start
 -----------
 ::
 
-    from contextbudget.integrations import OpenAIAgentWrapper
+    from contextbudget.integrations import NodeJSAgentRunner
 
-    agent = OpenAIAgentWrapper(model="gpt-4.1", repo=".")
-    result = agent.run_task("add caching to API")
+    runner = NodeJSAgentRunner(script="./agent.js", repo=".")
+    result = runner.run_task("add caching")
     print(result.llm_response)
+
+Node.js script contract
+-----------------------
+The runner passes the optimised prompt to the Node.js process via **stdin**
+(UTF-8, terminated by EOF when the process input pipe closes).  The script
+must write its response to **stdout**.  stderr is forwarded to the Python
+process for debugging.
+
+Minimal example ``agent.js``::
+
+    import OpenAI from "openai";
+
+    const prompt = await new Promise((resolve) => {
+        let data = "";
+        process.stdin.on("data", (chunk) => (data += chunk));
+        process.stdin.on("end", () => resolve(data));
+    });
+
+    const client = new OpenAI();
+    const response = await client.chat.completions.create({
+        model: "gpt-4.1",
+        messages: [{ role: "user", content: prompt }],
+    });
+
+    process.stdout.write(response.choices[0].message.content);
 """
 
+import os
+import subprocess
+import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import TYPE_CHECKING, Any, Mapping
+from typing import Any, Mapping, Sequence
 
 from contextbudget.core.policy import PolicySpec
 from contextbudget.engine import ContextBudgetEngine
 from contextbudget.runtime import AgentRuntime, RuntimeResult, RuntimeSession
 from contextbudget.telemetry.store import append_observe_entry
 
-if TYPE_CHECKING:
-    pass
-
 _MISSING = object()
 
 
-class OpenAIAgentWrapper:
-    """ContextBudget-optimised wrapper around the OpenAI Chat Completions API.
+class NodeJSAgentRunner:
+    """ContextBudget-optimised runner that delegates to a Node.js agent script.
 
-    For every :meth:`run_task` call the wrapper:
+    For every :meth:`run_task` call the runner:
 
     1. Intercepts the task description and repository path.
     2. Runs the full ContextBudget pipeline (scan → rank → compress → cache →
        delta) to produce an optimised context prompt.
-    3. Sends the prompt to the configured OpenAI model.
+    3. Spawns the configured Node.js *script* (or *command*), writes the
+       assembled prompt to its **stdin**, and captures **stdout** as the
+       response.
     4. Emits a run telemetry entry to ``.contextbudget/observe-history.json``.
 
     Parameters
     ----------
-    model:
-        OpenAI model identifier, e.g. ``"gpt-4.1"`` or ``"gpt-4o"``.
+    script:
+        Path to a ``.js`` / ``.mjs`` / ``.cjs`` entry point, or any shell
+        command string that accepts a prompt on stdin and returns its response
+        on stdout.  When *command* is provided *script* is ignored.
     repo:
         Default repository path scanned for context.  Can be overridden per
         call in :meth:`run_task`.
+    command:
+        Full command list, e.g. ``["node", "--experimental-vm-modules",
+        "agent.js"]``.  Takes precedence over *script*.
+    node_executable:
+        Path (or name) of the Node.js executable.  Defaults to ``"node"``.
+    adapter_name:
+        Label used in telemetry entries to identify this runner.
     max_tokens:
         Token budget for the packed context (input side).
     top_files:
         Maximum number of ranked files the packer considers.
-    max_completion_tokens:
-        ``max_tokens`` forwarded to the OpenAI completion request.
-    system_prompt:
-        Optional system message prepended to each chat completion request.
     policy:
         :class:`~contextbudget.core.policy.PolicySpec` evaluated after each
         pack call.
@@ -72,6 +105,12 @@ class OpenAIAgentWrapper:
     delta:
         If ``True`` (default), pass the previous run artifact as delta
         context on subsequent turns.
+    timeout:
+        Seconds to wait for the Node.js process to complete.  ``None``
+        means wait indefinitely.
+    env:
+        Extra environment variables forwarded to the Node.js process.  Merged
+        on top of the current process environment.
     config_path:
         Path to a ``contextbudget.toml`` configuration file.
     session:
@@ -79,50 +118,52 @@ class OpenAIAgentWrapper:
     engine:
         An existing :class:`~contextbudget.engine.ContextBudgetEngine` to
         reuse.
-    openai_client:
-        A pre-constructed ``openai.OpenAI`` (or ``AsyncOpenAI``) client.
-        When ``None`` a new ``openai.OpenAI()`` instance is created on first
-        use.
     telemetry_base_dir:
         Base directory for the observe-history store.  Defaults to *repo*.
     """
 
-    name: str = "openai"
-
     def __init__(
         self,
         *,
-        model: str = "gpt-4.1",
+        script: str | Path | None = None,
         repo: str | Path = ".",
+        command: Sequence[str] | None = None,
+        node_executable: str = "node",
+        adapter_name: str = "nodejs",
         max_tokens: int | None = None,
         top_files: int | None = None,
-        max_completion_tokens: int = 2048,
-        system_prompt: str | None = None,
         policy: PolicySpec | None = None,
         strict: bool = False,
         delta: bool = True,
+        timeout: float | None = None,
+        env: dict[str, str] | None = None,
         config_path: str | Path | None = None,
         session: RuntimeSession | None = None,
         engine: ContextBudgetEngine | None = None,
-        openai_client: Any | None = None,
         telemetry_base_dir: str | Path | None = None,
     ) -> None:
-        self.model = model
+        if command is None and script is None:
+            raise ValueError("Either 'script' or 'command' must be provided.")
+
+        self.name = adapter_name
         self.default_repo = Path(repo)
-        self.max_completion_tokens = max_completion_tokens
-        self.system_prompt = system_prompt
+        self._timeout = timeout
+        self._env = env
         self._telemetry_base_dir = telemetry_base_dir
 
-        self._client = openai_client  # lazy-init if None
-        self._last_prompt_tokens = 0
-        self._last_completion_tokens = 0
+        # Build the subprocess command list
+        if command is not None:
+            self._command: list[str] = list(command)
+        else:
+            self._command = [node_executable, str(script)]
+
         self._runtime = AgentRuntime(
             max_tokens=max_tokens,
             top_files=top_files,
             policy=policy,
             strict=strict,
             delta=delta,
-            llm_fn=self._call_openai,
+            llm_fn=self._call_nodejs,
             config_path=config_path,
             session=session,
             engine=engine,
@@ -141,7 +182,7 @@ class OpenAIAgentWrapper:
         top_files: int | None = None,
         metadata: Mapping[str, Any] | None = None,
     ) -> RuntimeResult:
-        """Run one agent turn: optimise context, call OpenAI, emit telemetry.
+        """Run one agent turn: optimise context, call Node.js script, emit telemetry.
 
         Parameters
         ----------
@@ -160,7 +201,8 @@ class OpenAIAgentWrapper:
         -------
         RuntimeResult
             Contains the :class:`~contextbudget.runtime.PreparedContext`,
-            the raw LLM response string, and session tracking fields.
+            the stdout of the Node.js script as the LLM response, and session
+            tracking fields.
         """
         effective_repo = Path(repo) if repo is not None else self.default_repo
         result = self._runtime.run(
@@ -190,43 +232,59 @@ class OpenAIAgentWrapper:
     # Internal helpers
     # ------------------------------------------------------------------
 
-    def _get_client(self) -> Any:
-        if self._client is None:
-            try:
-                import openai  # type: ignore[import]
-            except ImportError as exc:
-                raise ImportError(
-                    "The 'openai' package is required for OpenAIAgentWrapper. "
-                    "Install it with: pip install openai"
-                ) from exc
-            self._client = openai.OpenAI()
-        return self._client
+    def _build_env(self) -> dict[str, str] | None:
+        """Merge extra env vars on top of the current process environment."""
+        if not self._env:
+            return None
+        merged = dict(os.environ)
+        merged.update(self._env)
+        return merged
 
-    def _call_openai(self, prompt: str) -> str:
-        """Send *prompt* to the OpenAI API and return the response text."""
-        client = self._get_client()
-        messages: list[dict[str, str]] = []
-        if self.system_prompt:
-            messages.append({"role": "system", "content": self.system_prompt})
-        messages.append({"role": "user", "content": prompt})
+    def _call_nodejs(self, prompt: str) -> str:
+        """Send *prompt* to the Node.js script via stdin and return stdout."""
+        try:
+            proc = subprocess.run(
+                self._command,
+                input=prompt,
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                timeout=self._timeout,
+                env=self._build_env(),
+            )
+        except FileNotFoundError as exc:
+            raise RuntimeError(
+                f"Node.js executable not found.  Ensure Node.js is installed "
+                f"and '{self._command[0]}' is on your PATH."
+            ) from exc
+        except subprocess.TimeoutExpired as exc:
+            stderr_hint = ""
+            if exc.stderr:
+                raw = exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else str(exc.stderr)
+                if raw.strip():
+                    stderr_hint = f"\nstderr: {raw.strip()}"
+            raise RuntimeError(
+                f"Node.js script timed out after {self._timeout}s.{stderr_hint}"
+            ) from exc
 
-        response = client.chat.completions.create(
-            model=self.model,
-            messages=messages,
-            max_tokens=self.max_completion_tokens,
-        )
-        # Capture actual token usage for telemetry
-        usage = getattr(response, "usage", None)
-        self._last_prompt_tokens = int(getattr(usage, "prompt_tokens", 0) or 0)
-        self._last_completion_tokens = int(getattr(usage, "completion_tokens", 0) or 0)
-        return str(response.choices[0].message.content or "")
+        # Forward stderr for visibility without raising on non-zero exit
+        if proc.stderr:
+            print(proc.stderr, end="", file=sys.stderr)
+
+        if proc.returncode != 0:
+            raise RuntimeError(
+                f"Node.js script exited with code {proc.returncode}."
+                + (f"\nstderr: {proc.stderr.strip()}" if proc.stderr else "")
+            )
+
+        return proc.stdout
 
     def _emit_telemetry(self, result: RuntimeResult, *, task: str) -> None:
         ctx = result.prepared_context
         base_dir = self._telemetry_base_dir if self._telemetry_base_dir is not None else ctx.repo
         entry: dict[str, Any] = {
             "adapter": self.name,
-            "model": self.model,
+            "command": self._command,
             "task": task,
             "repo": ctx.repo,
             "session_id": result.session_id,
@@ -241,8 +299,4 @@ class OpenAIAgentWrapper:
             "cache_hits": ctx.cache_hits,
             "generated_at": datetime.now(tz=timezone.utc).isoformat(),
         }
-        if self._last_prompt_tokens or self._last_completion_tokens:
-            entry["llm_prompt_tokens"] = self._last_prompt_tokens
-            entry["llm_completion_tokens"] = self._last_completion_tokens
-            entry["llm_total_tokens"] = self._last_prompt_tokens + self._last_completion_tokens
         append_observe_entry(entry, base_dir=base_dir)

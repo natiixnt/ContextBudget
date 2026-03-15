@@ -100,11 +100,25 @@ def load_run_history(
     *,
     enabled: bool = True,
     history_file: str = RUN_HISTORY_FILE,
+    history_db: str = ".contextbudget/history.db",
+    use_sqlite: bool = True,
 ) -> list[RunHistoryEntry]:
     """Load persisted run history for a repository or workspace root."""
 
     if not enabled:
         return []
+
+    if use_sqlite:
+        try:
+            from contextbudget.cache.run_history_sqlite import load_run_history_sqlite
+            return load_run_history_sqlite(
+                repo_path,
+                enabled=enabled,
+                history_db=history_db,
+            )
+        except Exception:
+            pass
+
     path = _history_path(repo_path.resolve(), history_file)
     document = _load_history_document(path)
 
@@ -138,12 +152,28 @@ def append_run_history_entry(
     *,
     enabled: bool = True,
     history_file: str = RUN_HISTORY_FILE,
+    history_db: str = ".contextbudget/history.db",
     max_entries: int = 200,
+    use_sqlite: bool = True,
 ) -> bool:
     """Append a run-history entry using stable JSON serialization."""
 
     if not enabled:
         return False
+
+    if use_sqlite:
+        try:
+            from contextbudget.cache.run_history_sqlite import append_run_history_entry_sqlite
+            return append_run_history_entry_sqlite(
+                repo_path,
+                entry,
+                enabled=enabled,
+                history_db=history_db,
+                max_entries=max_entries,
+            )
+        except Exception:
+            pass
+
     path = _history_path(repo_path.resolve(), history_file)
     document = _load_history_document(path)
     entries = list(document.get("entries", []))
@@ -166,11 +196,27 @@ def update_run_history_artifacts(
     result_artifacts: Mapping[str, str],
     enabled: bool = True,
     history_file: str = RUN_HISTORY_FILE,
+    history_db: str = ".contextbudget/history.db",
+    use_sqlite: bool = True,
 ) -> bool:
     """Merge artifact paths into the most recent matching history entry."""
 
     if not enabled:
         return False
+
+    if use_sqlite:
+        try:
+            from contextbudget.cache.run_history_sqlite import update_run_history_artifacts_sqlite
+            return update_run_history_artifacts_sqlite(
+                repo_path,
+                generated_at=generated_at,
+                result_artifacts=result_artifacts,
+                enabled=enabled,
+                history_db=history_db,
+            )
+        except Exception:
+            pass
+
     normalized_generated_at = str(generated_at or "").strip()
     if not normalized_generated_at:
         return False

@@ -24,6 +24,9 @@ class CacheStats:
     fragment_hits: int = 0
     fragment_misses: int = 0
     fragment_writes: int = 0
+    slice_hits: int = 0
+    slice_misses: int = 0
+    slice_writes: int = 0
 
 
 class SummaryCacheBackend(ABC):
@@ -82,6 +85,42 @@ class SummaryCacheBackend(ABC):
             return True
         return False
 
+    def get_slice(self, key: str) -> str | None:
+        """Lookup a cached context slice and update hit/miss counters."""
+
+        if not self.enabled:
+            return None
+        value = self._get_slice(key)
+        if value is None:
+            self.stats.misses += 1
+            self.stats.slice_misses += 1
+            return None
+        self.stats.hits += 1
+        self.stats.slice_hits += 1
+        return value
+
+    def put_slice(self, key: str, data: str) -> bool:
+        """Store a context slice if the backend accepts writes."""
+
+        if not self.enabled:
+            return False
+        if self._put_slice(key, data):
+            self.stats.writes += 1
+            self.stats.slice_writes += 1
+            return True
+        return False
+
+    def invalidate(self, key: str) -> bool:
+        """Remove all stored values associated with *key*.
+
+        Removes the key from summaries, fragments, and slices stores.
+        Returns ``True`` if at least one entry was actually removed.
+        """
+
+        if not self.enabled:
+            return False
+        return self._invalidate(key)
+
     def record_tokens_saved(self, tokens_saved: int) -> None:
         """Record prompt tokens saved by fragment reuse."""
 
@@ -109,6 +148,9 @@ class SummaryCacheBackend(ABC):
             fragment_hits=self.stats.fragment_hits,
             fragment_misses=self.stats.fragment_misses,
             fragment_writes=self.stats.fragment_writes,
+            slice_hits=self.stats.slice_hits,
+            slice_misses=self.stats.slice_misses,
+            slice_writes=self.stats.slice_writes,
         )
 
     @abstractmethod
@@ -127,6 +169,21 @@ class SummaryCacheBackend(ABC):
     def _put_fragment(self, key: str, reference: str) -> bool:
         """Persist ``reference`` and return ``True`` if it counted as a new write."""
 
+    @abstractmethod
+    def _get_slice(self, key: str) -> str | None:
+        """Return a cached context slice for ``key`` if available."""
+
+    @abstractmethod
+    def _put_slice(self, key: str, data: str) -> bool:
+        """Persist ``data`` and return ``True`` if it counted as a new write."""
+
+    @abstractmethod
+    def _invalidate(self, key: str) -> bool:
+        """Remove all stored values for ``key`` across summaries, fragments, and slices.
+
+        Return ``True`` if at least one entry was removed.
+        """
+
     def _save(self) -> None:
         """Optional persistence hook."""
 
@@ -140,7 +197,7 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
         super().__init__(enabled=enabled)
         self.repo_path = repo_path
         self.cache_path = repo_path / cache_file
-        self._data: dict[str, Any] = {"summaries": {}, "fragments": {}}
+        self._data: dict[str, Any] = {"summaries": {}, "fragments": {}, "slices": {}}
         self._load()
 
     def _load(self) -> None:
@@ -151,9 +208,9 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
         try:
             raw_data = json.loads(self.cache_path.read_text(encoding="utf-8"))
         except (OSError, json.JSONDecodeError):
-            self._data = {"summaries": {}, "fragments": {}}
+            self._data = {"summaries": {}, "fragments": {}, "slices": {}}
             return
-        self._data = raw_data if isinstance(raw_data, dict) else {"summaries": {}, "fragments": {}}
+        self._data = raw_data if isinstance(raw_data, dict) else {"summaries": {}, "fragments": {}, "slices": {}}
 
     def _store(self, name: str) -> dict[str, str]:
         raw = self._data.get(name)
@@ -187,6 +244,27 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
         fragments[key] = reference
         return is_new_key
 
+    def _get_slice(self, key: str) -> str | None:
+        slices = self._store("slices")
+        if key in slices:
+            return str(slices[key])
+        return None
+
+    def _put_slice(self, key: str, data: str) -> bool:
+        slices = self._store("slices")
+        is_new_key = key not in slices
+        slices[key] = data
+        return is_new_key
+
+    def _invalidate(self, key: str) -> bool:
+        removed = False
+        for store_name in ("summaries", "fragments", "slices"):
+            store = self._store(store_name)
+            if key in store:
+                del store[key]
+                removed = True
+        return removed
+
     def _save(self) -> None:
         try:
             self.cache_path.parent.mkdir(parents=True, exist_ok=True)
@@ -217,6 +295,15 @@ class SharedSummaryCacheBackendStub(SummaryCacheBackend):
         return None
 
     def _put_fragment(self, key: str, reference: str) -> bool:
+        return False
+
+    def _get_slice(self, key: str) -> str | None:
+        return None
+
+    def _put_slice(self, key: str, data: str) -> bool:
+        return False
+
+    def _invalidate(self, key: str) -> bool:
         return False
 
 
@@ -365,6 +452,51 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
     def _put_fragment(self, key: str, reference: str) -> bool:
         return self._redis_set(self._namespace_key("f", key), reference)
 
+    def _get_slice(self, key: str) -> str | None:
+        return self._redis_get(self._namespace_key("c", key))
+
+    def _put_slice(self, key: str, data: str) -> bool:
+        return self._redis_set(self._namespace_key("c", key), data)
+
+    def _invalidate(self, key: str) -> bool:
+        """Delete all stores (summary, fragment, slice) for *key* from Redis."""
+        keys = [
+            self._namespace_key("s", key),
+            self._namespace_key("f", key),
+            self._namespace_key("c", key),
+        ]
+        try:
+            deleted: int = self._client().delete(*keys)
+        except Exception:  # noqa: BLE001
+            return False
+        return deleted > 0
+
+    def invalidate_namespace(self) -> int:
+        """Delete all keys in this backend's namespace from Redis.
+
+        Uses ``SCAN`` to avoid blocking the server.  Returns the total number
+        of keys deleted.
+
+        Example::
+
+            backend = RedisSummaryCacheBackend(namespace="myorg:myrepo")
+            backend.invalidate_namespace()  # remove stale cache after a force-push
+        """
+        pattern = f"{self.namespace}:*"
+        deleted = 0
+        try:
+            client = self._client()
+            cursor = 0
+            while True:
+                cursor, batch = client.scan(cursor, match=pattern, count=200)
+                if batch:
+                    deleted += client.delete(*batch)
+                if cursor == 0:
+                    break
+        except Exception:  # noqa: BLE001
+            pass
+        return deleted
+
 
 class InMemorySummaryCacheBackend(SummaryCacheBackend):
     """Process-local cache backend primarily for tests."""
@@ -375,6 +507,7 @@ class InMemorySummaryCacheBackend(SummaryCacheBackend):
         super().__init__(enabled=enabled)
         self._summaries_store = dict(initial_summaries or {})
         self._fragments_store: dict[str, str] = {}
+        self._slices_store: dict[str, str] = {}
 
     def _get_summary(self, key: str) -> str | None:
         return self._summaries_store.get(key)
@@ -391,6 +524,22 @@ class InMemorySummaryCacheBackend(SummaryCacheBackend):
         is_new_key = key not in self._fragments_store
         self._fragments_store[key] = reference
         return is_new_key
+
+    def _get_slice(self, key: str) -> str | None:
+        return self._slices_store.get(key)
+
+    def _put_slice(self, key: str, data: str) -> bool:
+        is_new_key = key not in self._slices_store
+        self._slices_store[key] = data
+        return is_new_key
+
+    def _invalidate(self, key: str) -> bool:
+        removed = False
+        for store in (self._summaries_store, self._fragments_store, self._slices_store):
+            if key in store:
+                del store[key]
+                removed = True
+        return removed
 
 
 def normalize_cache_backend_name(backend: str | None) -> str:
@@ -461,6 +610,9 @@ def normalize_cache_report(data: Mapping[str, Any]) -> dict[str, Any]:
         fragment_hits_raw = raw_cache.get("fragment_hits", 0)
         fragment_misses_raw = raw_cache.get("fragment_misses", 0)
         fragment_writes_raw = raw_cache.get("fragment_writes", 0)
+        slice_hits_raw = raw_cache.get("slice_hits", 0)
+        slice_misses_raw = raw_cache.get("slice_misses", 0)
+        slice_writes_raw = raw_cache.get("slice_writes", 0)
     else:
         backend = "unknown"
         enabled = True
@@ -471,6 +623,9 @@ def normalize_cache_report(data: Mapping[str, Any]) -> dict[str, Any]:
         fragment_hits_raw = 0
         fragment_misses_raw = 0
         fragment_writes_raw = 0
+        slice_hits_raw = 0
+        slice_misses_raw = 0
+        slice_writes_raw = 0
 
     return {
         "backend": backend,
@@ -482,6 +637,9 @@ def normalize_cache_report(data: Mapping[str, Any]) -> dict[str, Any]:
         "fragment_hits": _to_int(fragment_hits_raw),
         "fragment_misses": _to_int(fragment_misses_raw),
         "fragment_writes": _to_int(fragment_writes_raw),
+        "slice_hits": _to_int(slice_hits_raw),
+        "slice_misses": _to_int(slice_misses_raw),
+        "slice_writes": _to_int(slice_writes_raw),
     }
 
 

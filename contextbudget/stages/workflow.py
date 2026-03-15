@@ -156,6 +156,7 @@ def run_score_stage(
             repo,
             enabled=config.cache.run_history_enabled,
             history_file=config.cache.history_file,
+            history_db=config.cache.history_db,
         )
     return resolved.scorer.score(
         task=task,

@@ -130,6 +130,7 @@ class CacheSettings:
     duplicate_hash_cache_enabled: bool = True
     run_history_enabled: bool = True
     history_file: str = RUN_HISTORY_FILE
+    history_db: str = ".contextbudget/history.db"
     history_max_entries: int = 200
     # Redis backend settings
     redis_url: str = "redis://localhost:6379/0"
@@ -399,6 +400,8 @@ def _apply_cache_overrides(settings: CacheSettings, data: Mapping[str, Any]) -> 
         settings.run_history_enabled = bool(data["run_history_enabled"])
     if "history_file" in data:
         settings.history_file = str(data["history_file"])
+    if "history_db" in data:
+        settings.history_db = str(data["history_db"])
     if "history_max_entries" in data:
         settings.history_max_entries = int(data["history_max_entries"])
     # Redis backend settings

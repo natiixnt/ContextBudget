@@ -28,12 +28,11 @@ from pathlib import Path
 from typing import Optional
 
 from contextbudget.core.agent_cost import (
-    BUILTIN_MODEL_PRICING,
     ModelPricing,
-    _tokens_to_usd,
     list_known_models,
     resolve_model_pricing,
 )
+from contextbudget.telemetry.pricing import tokens_to_usd as _tokens_to_usd
 
 
 # ---------------------------------------------------------------------------

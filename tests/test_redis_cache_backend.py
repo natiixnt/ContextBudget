@@ -333,3 +333,165 @@ def test_cross_instance_reuse_via_fake_server(tmp_path: Path) -> None:
 
     assert first.cache.misses >= 1
     assert second.cache.hits >= 1, "Second independent instance must hit entries from the first"
+
+
+# ---------------------------------------------------------------------------
+# Context slices
+# ---------------------------------------------------------------------------
+
+def test_slice_miss_on_empty_cache() -> None:
+    backend = _make_backend()
+    assert backend.get_slice("slice-key") is None
+    assert backend.stats.slice_misses == 1
+    assert backend.stats.misses == 1
+
+
+def test_slice_roundtrip() -> None:
+    backend = _make_backend()
+    backend.put_slice("slice-key", "context slice data")
+    result = backend.get_slice("slice-key")
+    assert result == "context slice data"
+    assert backend.stats.slice_hits == 1
+    assert backend.stats.slice_writes == 1
+
+
+def test_slice_write_returns_true_for_new_key() -> None:
+    backend = _make_backend()
+    assert backend.put_slice("new-slice", "data") is True
+
+
+def test_slice_write_returns_false_for_existing_key() -> None:
+    backend = _make_backend()
+    backend.put_slice("existing-slice", "v1")
+    assert backend.put_slice("existing-slice", "v2") is False
+
+
+def test_slice_uses_separate_key_namespace_from_summary() -> None:
+    """Slice and summary stores must not collide even when the logical key matches."""
+    backend = _make_backend()
+    backend.put_summary("shared-key", "summary value")
+    backend.put_slice("shared-key", "slice value")
+    assert backend.get_summary("shared-key") == "summary value"
+    assert backend.get_slice("shared-key") == "slice value"
+
+
+def test_slice_uses_separate_key_namespace_from_fragment() -> None:
+    backend = _make_backend()
+    backend.put_fragment("shared-key", "fragment ref")
+    backend.put_slice("shared-key", "slice value")
+    assert backend.get_fragment("shared-key") == "fragment ref"
+    assert backend.get_slice("shared-key") == "slice value"
+
+
+def test_snapshot_includes_slice_stats() -> None:
+    backend = _make_backend()
+    backend.put_slice("s1", "data")
+    backend.get_slice("s1")
+    backend.get_slice("missing-slice")
+    report = backend.snapshot()
+    assert report.slice_writes == 1
+    assert report.slice_hits == 1
+    assert report.slice_misses == 1
+
+
+def test_disabled_backend_does_not_store_slices() -> None:
+    backend = _make_backend()
+    backend.enabled = False
+    backend.put_slice("k", "v")
+    assert backend.get_slice("k") is None
+    assert backend.stats.slice_writes == 0
+
+
+# ---------------------------------------------------------------------------
+# Invalidation
+# ---------------------------------------------------------------------------
+
+def test_invalidate_removes_summary() -> None:
+    backend = _make_backend()
+    backend.put_summary("k", "v")
+    assert backend.invalidate("k") is True
+    assert backend.get_summary("k") is None
+
+
+def test_invalidate_removes_fragment() -> None:
+    backend = _make_backend()
+    backend.put_fragment("k", "ref")
+    assert backend.invalidate("k") is True
+    assert backend.get_fragment("k") is None
+
+
+def test_invalidate_removes_slice() -> None:
+    backend = _make_backend()
+    backend.put_slice("k", "data")
+    assert backend.invalidate("k") is True
+    assert backend.get_slice("k") is None
+
+
+def test_invalidate_removes_all_stores_for_key() -> None:
+    backend = _make_backend()
+    backend.put_summary("k", "summary")
+    backend.put_fragment("k", "fragment")
+    backend.put_slice("k", "slice")
+    assert backend.invalidate("k") is True
+    assert backend.get_summary("k") is None
+    assert backend.get_fragment("k") is None
+    assert backend.get_slice("k") is None
+
+
+def test_invalidate_returns_false_for_missing_key() -> None:
+    backend = _make_backend()
+    assert backend.invalidate("nonexistent") is False
+
+
+def test_invalidate_disabled_backend_returns_false() -> None:
+    backend = _make_backend()
+    backend.put_summary("k", "v")
+    backend.enabled = False
+    assert backend.invalidate("k") is False
+    # Re-enable and verify key is still present
+    backend.enabled = True
+    assert backend.get_summary("k") == "v"
+
+
+def test_invalidate_does_not_affect_other_keys() -> None:
+    backend = _make_backend()
+    backend.put_summary("keep", "value")
+    backend.put_summary("remove", "value")
+    backend.invalidate("remove")
+    assert backend.get_summary("keep") == "value"
+
+
+def test_invalidate_namespace_removes_all_namespace_keys() -> None:
+    server = fakeredis.FakeServer()
+    backend = RedisSummaryCacheBackend(namespace="ns-to-clear", ttl_seconds=3600)
+    backend._redis = fakeredis.FakeRedis(server=server)
+
+    backend.put_summary("k1", "v1")
+    backend.put_fragment("k2", "ref")
+    backend.put_slice("k3", "data")
+
+    deleted = backend.invalidate_namespace()
+    assert deleted == 3
+
+    # Verify entries are gone
+    assert backend.get_summary("k1") is None
+    assert backend.get_fragment("k2") is None
+    assert backend.get_slice("k3") is None
+
+
+def test_invalidate_namespace_does_not_affect_other_namespaces() -> None:
+    server = fakeredis.FakeServer()
+
+    a = RedisSummaryCacheBackend(namespace="ns-a", ttl_seconds=3600)
+    a._redis = fakeredis.FakeRedis(server=server)
+
+    b = RedisSummaryCacheBackend(namespace="ns-b", ttl_seconds=3600)
+    b._redis = fakeredis.FakeRedis(server=server)
+
+    a.put_summary("key", "from-a")
+    b.put_summary("key", "from-b")
+
+    a.invalidate_namespace()
+
+    assert a.get_summary("key") is None
+    assert b.get_summary("key") == "from-b"

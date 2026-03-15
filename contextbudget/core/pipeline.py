@@ -21,7 +21,7 @@ from contextbudget.plugins import ResolvedPlugins, resolve_plugins
 from contextbudget.schemas.models import DEFAULT_TOP_FILES, RunReport
 from contextbudget.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
 from contextbudget.stages.workflow import (
-    as_json_dict as stage_as_json_dict,
+    as_json_dict,
     build_agent_plan_result,
     build_plan_result,
     run_cache_stage,
@@ -31,6 +31,19 @@ from contextbudget.stages.workflow import (
     run_scan_workspace_stage,
     run_score_stage,
 )
+
+
+def _resolve_config(
+    config: ContextBudgetConfig | None,
+    repo: Path,
+    workspace: WorkspaceDefinition | None,
+    config_path: Path | None,
+) -> ContextBudgetConfig:
+    if config is not None:
+        return config
+    if workspace is not None:
+        return workspace.config
+    return load_config(repo, config_path=config_path)
 
 
 def _list_len_or_int(value: Any) -> int:
@@ -76,7 +89,7 @@ def run_plan(
 ) -> dict:
     """Run plan command pipeline and return serializable payload."""
 
-    cfg = config if config is not None else (workspace.config if workspace is not None else load_config(repo, config_path=config_path))
+    cfg = _resolve_config(config, repo, workspace, config_path)
     prepared_cfg, model_profile = prepare_config_for_model_profile(cfg)
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
     effective_top_n = top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
@@ -144,7 +157,7 @@ def run_plan_agent(
 ) -> dict:
     """Run agent workflow planning and return a serializable artifact."""
 
-    cfg = config if config is not None else (workspace.config if workspace is not None else load_config(repo, config_path=config_path))
+    cfg = _resolve_config(config, repo, workspace, config_path)
     prepared_cfg, model_profile = prepare_config_for_model_profile(cfg)
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
     effective_top_n = top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
@@ -211,7 +224,7 @@ def run_plan_agent(
         unique_context_tokens=report.unique_context_tokens,
         reused_context_tokens=report.reused_context_tokens,
     )
-    return stage_as_json_dict(report)
+    return as_json_dict(report)
 
 
 def run_simulate_agent(
@@ -234,7 +247,7 @@ def run_simulate_agent(
 
     from datetime import datetime, timezone
 
-    cfg = config if config is not None else (workspace.config if workspace is not None else load_config(repo, config_path=config_path))
+    cfg = _resolve_config(config, repo, workspace, config_path)
     prepared_cfg, model_profile = prepare_config_for_model_profile(cfg)
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
     effective_top_n = top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
@@ -335,7 +348,7 @@ def run_pack(
 ) -> RunReport:
     """Run pack command pipeline and return typed run report."""
 
-    cfg = config if config is not None else (workspace.config if workspace is not None else load_config(repo, config_path=config_path))
+    cfg = _resolve_config(config, repo, workspace, config_path)
     prepared_cfg, model_profile = prepare_config_for_model_profile(cfg, requested_max_tokens=max_tokens)
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
     effective_max_tokens = prepared_cfg.budget.max_tokens
@@ -550,7 +563,3 @@ def run_heatmap(history: Sequence[str | Path] | None = None, *, limit: int = 10)
     return heatmap_as_dict(report)
 
 
-def as_json_dict(report: RunReport) -> dict:
-    """Convert run report to JSON dict."""
-
-    return stage_as_json_dict(report)

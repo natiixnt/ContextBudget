@@ -45,6 +45,8 @@ class GatewayConfig:
     config_path: str | None = None
     telemetry_enabled: bool = False
     log_requests: bool = True
+    api_key: str | None = None          # Required Bearer token; None = auth disabled
+    request_timeout_seconds: int = 30   # Per-request processing timeout
 
     @classmethod
     def from_env(cls) -> GatewayConfig:
@@ -67,6 +69,8 @@ class GatewayConfig:
             log_requests=(
                 os.environ.get("CB_GATEWAY_LOG_REQUESTS", "true").lower() == "true"
             ),
+            api_key=os.environ.get("CB_GATEWAY_API_KEY") or None,
+            request_timeout_seconds=int(os.environ.get("CB_GATEWAY_TIMEOUT_SECONDS", "30")),
         )
 
     @classmethod
