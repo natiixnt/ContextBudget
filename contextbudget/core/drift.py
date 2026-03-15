@@ -31,6 +31,7 @@ class DriftSnapshot:
     token_count: int
     file_count: int
     complexity: float  # avg tokens per file
+    dep_depth: int = 0  # number of candidate files (proxy for dependency graph breadth)
 
 
 @dataclass(slots=True)
@@ -40,6 +41,7 @@ class DriftMetrics:
     token_drift_pct: float
     file_drift_pct: float
     complexity_drift_pct: float
+    dep_depth_drift_pct: float
     alert: bool
     verdict: str  # "none" | "low" | "moderate" | "significant" | "critical"
 
@@ -130,6 +132,7 @@ def _snapshot(entry: RunHistoryEntry) -> DriftSnapshot:
         token_count=tc,
         file_count=fc,
         complexity=_complexity(tc, fc),
+        dep_depth=len(entry.candidate_files),
     )
 
 
@@ -265,6 +268,7 @@ def run_drift(
     token_drift = _pct_change(baseline_snap.token_count, current_snap.token_count)
     file_drift = _pct_change(baseline_snap.file_count, current_snap.file_count)
     complexity_drift = _pct_change(baseline_snap.complexity, current_snap.complexity)
+    dep_depth_drift = _pct_change(baseline_snap.dep_depth, current_snap.dep_depth)
 
     verdict = _verdict(token_drift, threshold_pct)
     alert = verdict != "none"
@@ -273,6 +277,7 @@ def run_drift(
         token_drift_pct=token_drift,
         file_drift_pct=file_drift,
         complexity_drift_pct=complexity_drift,
+        dep_depth_drift_pct=dep_depth_drift,
         alert=alert,
         verdict=verdict,
     )

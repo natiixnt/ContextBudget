@@ -271,7 +271,7 @@ def test_render_drift_markdown_structure(tmp_path: Path):
     md = render_drift_markdown(report)
 
     assert "# ContextBudget Drift Report" in md
-    assert "## Verdict" in md
+    assert "context drift detected" in md  # alert phrase when drift > threshold
     assert "## Trend" in md
     assert "+30.0%" in md  # token drift
 
@@ -283,7 +283,7 @@ def test_render_drift_markdown_alert_badge(tmp_path: Path):
     ])
     report = run_drift(repo)
     md = render_drift_markdown(report)
-    assert "ALERT" in md
+    assert "context drift detected" in md
 
 
 def test_render_drift_markdown_no_alert(tmp_path: Path):
@@ -293,7 +293,7 @@ def test_render_drift_markdown_no_alert(tmp_path: Path):
     ])
     report = run_drift(repo)
     md = render_drift_markdown(report)
-    assert "ALERT" not in md
+    assert "context drift detected" not in md
     assert "NONE" in md
 
 
