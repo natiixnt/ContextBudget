@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-"""Token savings profiler — explains where savings come from in a pack run."""
+"""Token savings profiler - explains where savings come from in a pack run."""
 
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone

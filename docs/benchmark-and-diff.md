@@ -36,7 +36,7 @@ A realistic multi-file Python service (`benchmarks/dataset/`) ships with the
 repository so you can run reproducible benchmarks without an external project.
 
 The dataset is a task-manager API with models, services, a database layer, and
-route handlers — representative of a production codebase with meaningful
+route handlers - representative of a production codebase with meaningful
 cross-file dependencies.
 
 ### Pre-generated results

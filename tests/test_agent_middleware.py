@@ -269,7 +269,7 @@ def test_cli_prepare_context_strict_fails_on_policy_violation(tmp_path: Path) ->
         out_prefix=str(tmp_path / "strict-run"),
         config=None,
     )
-    # max_tokens=400 but actual token count is low — policy will pass
+    # max_tokens=400 but actual token count is low - policy will pass
     # To force a failure we need a policy file with max_estimated_input_tokens=1
     policy_toml = tmp_path / "policy.toml"
     policy_toml.write_text("[policy]\nmax_estimated_input_tokens = 1\n", encoding="utf-8")

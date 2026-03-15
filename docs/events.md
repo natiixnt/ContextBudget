@@ -22,10 +22,10 @@ file_path = ".contextbudget/telemetry.jsonl"
 
 All events enforce three invariants:
 
-1. **No raw paths** — repository and workspace paths are replaced by deterministic `sha256`
+1. **No raw paths** - repository and workspace paths are replaced by deterministic `sha256`
    digests (`repository.repository_id`, `repository.workspace_id`).
-2. **No file contents** — file bodies, task text, and summaries are never included.
-3. **Aggregated metrics only** — file counts, token totals, hit/miss ratios; never per-file
+2. **No file contents** - file bodies, task text, and summaries are never included.
+3. **Aggregated metrics only** - file counts, token totals, hit/miss ratios; never per-file
    breakdowns or path lists.
 
 ## Event Envelope
@@ -157,7 +157,7 @@ Emitted after compressed context is rendered. This is the primary pack-pipeline 
 ### `cache_hit`
 
 Emitted once per `pack` run when at least one cache hit occurred. Contains aggregate cache
-statistics for the run — individual hits are not surfaced.
+statistics for the run - individual hits are not surfaced.
 
 **Populated fields**
 
@@ -193,7 +193,7 @@ statistics for the run — individual hits are not surfaced.
 ### `delta_applied`
 
 Emitted when a delta pack is computed against a previous run artifact (`delta_from` is set).
-Contains only counts — no file paths or content.
+Contains only counts - no file paths or content.
 
 **Populated fields**
 
@@ -287,7 +287,7 @@ backwards compatibility and carries identical payload.
 
 ### `benchmark_completed`
 
-Emitted after a strategy benchmark run. Contains aggregate metrics across all strategies — no
+Emitted after a strategy benchmark run. Contains aggregate metrics across all strategies - no
 per-file breakdown.
 
 **Populated fields**

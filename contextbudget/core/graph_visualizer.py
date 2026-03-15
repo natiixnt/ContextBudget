@@ -232,7 +232,7 @@ _HTML_TEMPLATE = """\
 <html lang="en">
 <head>
 <meta charset="utf-8">
-<title>ContextBudget Graph — {repo}</title>
+<title>ContextBudget Graph - {repo}</title>
 <style>
 *{{box-sizing:border-box;margin:0;padding:0}}
 body{{font-family:system-ui,sans-serif;background:#0f1117;color:#e2e8f0;display:flex;height:100vh;overflow:hidden}}
@@ -331,7 +331,7 @@ function simulate() {{
   if (!simRunning) return;
   const n = nodes.length;
 
-  // repulsion (Barnes-Hut approximation skipped for simplicity — O(n²) capped)
+  // repulsion (Barnes-Hut approximation skipped for simplicity - O(n²) capped)
   const CAP = Math.min(n, 300);
   for (let i = 0; i < CAP; i++) {{
     for (let j = i + 1; j < CAP; j++) {{
@@ -485,7 +485,7 @@ function showDetail(nd) {{
   el.innerHTML = `
     <b>${{nd.id}}</b>
     Tokens: ${{nd.estimated_tokens.toLocaleString()}}<br>
-    Extension: ${{nd.extension || "—"}}<br>
+    Extension: ${{nd.extension || "-"}}<br>
     Imports: ${{nd.out_degree}}<br>
     Imported by: ${{nd.in_degree}}<br>
     Inclusions: ${{nd.inclusion_count}} (${{(nd.inclusion_rate * 100).toFixed(1)}}%)<br>

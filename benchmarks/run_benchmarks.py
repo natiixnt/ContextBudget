@@ -188,10 +188,10 @@ def _render_report(result: dict, task_meta: dict) -> str:
                 backend = est.get("backend", "")
                 tokens = est.get("estimated_tokens")
                 fallback = " *(fallback)*" if est.get("fallback_used") else ""
-                estimators[backend] = f"{tokens}{fallback}" if tokens is not None else "—"
-            h = estimators.get("heuristic", "—")
-            m = estimators.get("model_aligned", "—")
-            e = estimators.get("exact_tiktoken", "—")
+                estimators[backend] = f"{tokens}{fallback}" if tokens is not None else "-"
+            h = estimators.get("heuristic", "-")
+            m = estimators.get("model_aligned", "-")
+            e = estimators.get("exact_tiktoken", "-")
             lines.append(f"| {s['name']} | {h} | {m} | {e} |")
         lines.append("")
 
@@ -214,7 +214,7 @@ def _render_summary(all_results: list[tuple[dict, dict]]) -> str:
         compressed = next((s for s in strategies if s["strategy"] == "compressed_pack"), {})
         c_tokens = compressed.get("estimated_input_tokens", 0)
         c_saved = compressed.get("estimated_saved_tokens", 0)
-        c_risk = compressed.get("quality_risk_estimate", "—")
+        c_risk = compressed.get("quality_risk_estimate", "-")
         slug = meta["slug"]
         lines.append(
             f"| [{slug}](./{slug}.md) "
@@ -302,7 +302,7 @@ def main() -> None:
         compressed = next((s for s in strategies if s["strategy"] == "compressed_pack"), {})
         c_tokens = compressed.get("estimated_input_tokens", 0)
         c_saved = compressed.get("estimated_saved_tokens", 0)
-        risk = compressed.get("quality_risk_estimate", "—")
+        risk = compressed.get("quality_risk_estimate", "-")
 
         print(
             f"  baseline={baseline:,}  compressed={c_tokens:,}  "

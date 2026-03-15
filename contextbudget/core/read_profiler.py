@@ -1,12 +1,12 @@
 from __future__ import annotations
 
-"""Agent read profiler — analyzes how a coding agent read repository files.
+"""Agent read profiler - analyzes how a coding agent read repository files.
 
 Reads a pack run artifact (run.json) and identifies:
-- duplicate reads  — the same file path appears more than once in the context
-- unnecessary reads — low-relevance files that still cost significant tokens
-- high token-cost reads — individual files above a token-size threshold
-- tokens wasted — tokens consumed by duplicate or unnecessary reads
+- duplicate reads  - the same file path appears more than once in the context
+- unnecessary reads - low-relevance files that still cost significant tokens
+- high token-cost reads - individual files above a token-size threshold
+- tokens wasted - tokens consumed by duplicate or unnecessary reads
 """
 
 from dataclasses import asdict, dataclass, field
@@ -181,7 +181,7 @@ def build_read_profile(run_data: dict[str, Any], *, run_json: str = "") -> ReadP
         relevance_score = score_index.get(path, 0.0)
 
         if path in seen:
-            # Already fully accounted for in the first occurrence — skip.
+            # Already fully accounted for in the first occurrence - skip.
             continue
 
         is_duplicate = read_count > 1
@@ -202,7 +202,7 @@ def build_read_profile(run_data: dict[str, Any], *, run_json: str = "") -> ReadP
             tokens_wasted_duplicates += dup_waste
             duplicate_count += extra_reads
             reasons.append(
-                f"read {read_count}x — {extra_reads} extra read(s) waste {dup_waste} tokens"
+                f"read {read_count}x - {extra_reads} extra read(s) waste {dup_waste} tokens"
             )
 
         if is_unnecessary:

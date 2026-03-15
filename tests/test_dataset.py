@@ -128,7 +128,7 @@ def test_load_tasks_toml_multiple(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# run_dataset — core logic
+# run_dataset - core logic
 # ---------------------------------------------------------------------------
 
 
@@ -308,7 +308,7 @@ def test_render_dataset_markdown_includes_entries(tmp_path: Path) -> None:
 
 
 # ---------------------------------------------------------------------------
-# CLI — contextbudget dataset (integration)
+# CLI - contextbudget dataset (integration)
 # ---------------------------------------------------------------------------
 
 

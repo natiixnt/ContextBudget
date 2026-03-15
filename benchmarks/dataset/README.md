@@ -1,4 +1,4 @@
-# Benchmark Dataset — Task Manager API
+# Benchmark Dataset - Task Manager API
 
 A realistic multi-file Python service used as the target repository for
 ContextBudget token-reduction benchmarks.
@@ -37,7 +37,7 @@ The dataset is intentionally representative of a real-world service:
 - **Cross-file dependencies** exercising the import-graph scorer
 - **Keyword-rich names** (cache, auth, repository, connection) that
   match the benchmark tasks precisely
-- **Realistic size** — large enough that naive full-context would be
+- **Realistic size** - large enough that naive full-context would be
   expensive, small enough that results are reproducible
 
 ## Benchmark tasks
