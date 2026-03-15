@@ -1,6 +1,6 @@
 # Architecture
 
-ContextBudget is organized around a single engine and explicit stage boundaries. CLI commands, Python API calls, workspace runs, and agent middleware all route through the same scan, score, pack, render, and policy machinery.
+ContextBudget is organized around a single engine and explicit stage boundaries. CLI commands, Python API calls, workspace runs, agent middleware, and the runtime gateway all route through the same scan, score, pack, render, and policy machinery.
 
 ## Design Goals
 
@@ -12,29 +12,64 @@ ContextBudget is organized around a single engine and explicit stage boundaries.
 
 ## System Layers
 
+```
+┌─────────────────────────────────────────────────────┐
+│                 ENTRY POINTS                        │
+│  CLI (cli.py)  │  SDK (engine.py)  │  Gateway API  │
+└────────────────────────┬────────────────────────────┘
+                         │
+                         ▼
+┌─────────────────────────────────────────────────────┐
+│          CONTEXT OPTIMIZATION ENGINE                │
+│                                                     │
+│  core/pipeline.py  ──▶  stages/workflow.py          │
+│                                                     │
+│  Scan ▶ Score ▶ Cache ▶ Compress ▶ Render ▶ Policy │
+└──────────────┬────────────────────┬─────────────────┘
+               │                    │
+               ▼                    ▼
+┌─────────────────────┐  ┌──────────────────────────┐
+│   CACHE LAYER       │  │   AGENT RUNTIME LAYER    │
+│                     │  │                          │
+│  LocalFile / Redis  │  │  AgentRuntime            │
+│  SQLite history     │  │  AgentMiddleware         │
+│  Org-namespaced TTL │  │  LLM adapters            │
+└─────────────────────┘  └──────────────────────────┘
+               │
+               ▼
+┌─────────────────────────────────────────────────────┐
+│              RUNTIME GATEWAY (v1.0-alpha)           │
+│                                                     │
+│  FastAPI + Uvicorn  (falls back to stdlib HTTP)     │
+│  /prepare-context  /run-agent-step  /report-run     │
+│  Auth: Bearer API key  │  /health  │  /metrics      │
+└─────────────────────────────────────────────────────┘
+```
+
 ### Entry Points
 
-- `contextbudget/cli.py`: command-line interface
-- `contextbudget/engine.py`: public library API
+- `contextbudget/cli.py`: command-line interface (includes `init`, `pack`, `plan`, `gateway`, …)
+- `contextbudget/engine.py`: public library API (`ContextBudgetEngine`)
 - `contextbudget/agents/`: middleware and adapter abstractions
+- `contextbudget/gateway/`: HTTP gateway service for agent frameworks
 
 These layers delegate into the same core pipeline instead of maintaining parallel implementations.
 
 ### Core Pipeline
 
-`contextbudget/core/pipeline.py` is the compatibility facade for high-level callers.
+`contextbudget/core/pipeline.py` is the high-level orchestrator. It re-exports `as_json_dict` and the `run_*` functions used by the engine and CLI.
 
-`contextbudget/stages/workflow.py` defines the explicit stage boundaries:
+`contextbudget/stages/workflow.py` is the **canonical stage implementation** — this is the single source of truth for:
 
-- scan refresh
-- scan
-- workspace scan
-- score
-- cache
-- pack/compression
-- render
+- `run_scan_stage` / `run_scan_refresh_stage` / `run_scan_workspace_stage`
+- `run_score_stage`
+- `run_cache_stage`
+- `run_pack_stage`
+- `run_render_stage`
+- `build_plan_result` / `build_agent_plan_result`
+- `as_json_dict`
 
-This keeps orchestration separate from lower-level scanner, scorer, and compressor logic.
+`core/pipeline.py` imports these directly from `stages.workflow` and does **not** re-implement them. All new callers should import stage functions from `contextbudget.stages.workflow`.
 
 ### Scanning
 

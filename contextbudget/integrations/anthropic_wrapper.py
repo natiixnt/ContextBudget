@@ -112,6 +112,8 @@ class AnthropicAgentWrapper:
         self._telemetry_base_dir = telemetry_base_dir
 
         self._client = anthropic_client  # lazy-init if None
+        self._last_prompt_tokens = 0
+        self._last_completion_tokens = 0
         self._runtime = AgentRuntime(
             max_tokens=max_tokens,
             top_files=top_files,
@@ -210,6 +212,10 @@ class AnthropicAgentWrapper:
             kwargs["system"] = self.system_prompt
 
         response = client.messages.create(**kwargs)
+        # Capture actual token usage for telemetry
+        usage = getattr(response, "usage", None)
+        self._last_prompt_tokens = int(getattr(usage, "input_tokens", 0) or 0)
+        self._last_completion_tokens = int(getattr(usage, "output_tokens", 0) or 0)
         block = response.content[0] if response.content else None
         if block is None:
             return ""
@@ -235,4 +241,8 @@ class AnthropicAgentWrapper:
             "cache_hits": ctx.cache_hits,
             "generated_at": datetime.now(tz=timezone.utc).isoformat(),
         }
+        if self._last_prompt_tokens or self._last_completion_tokens:
+            entry["llm_prompt_tokens"] = self._last_prompt_tokens
+            entry["llm_completion_tokens"] = self._last_completion_tokens
+            entry["llm_total_tokens"] = self._last_prompt_tokens + self._last_completion_tokens
         append_observe_entry(entry, base_dir=base_dir)

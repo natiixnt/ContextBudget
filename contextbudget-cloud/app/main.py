@@ -36,7 +36,7 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title="ContextBudget Control Plane",
+    title="ContextBudget Cloud",
     version="0.1.0",
     lifespan=lifespan,
 )

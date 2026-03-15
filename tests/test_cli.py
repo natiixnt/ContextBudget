@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
+from contextbudget.cache.run_history import load_run_history
 from contextbudget.cli import main
 from tests.support_git import build_pr_audit_repo
 
@@ -27,11 +28,12 @@ def test_cli_pack_and_report(tmp_path: Path, monkeypatch) -> None:
     assert (tmp_path / "run.md").exists()
     run_data = json.loads((tmp_path / "run.json").read_text(encoding="utf-8"))
     assert {"score", "heuristic_score", "historical_score"}.issubset(run_data["ranked_files"][0])
-    history = json.loads((repo / ".contextbudget" / "history.json").read_text(encoding="utf-8"))
-    entry = history["entries"][-1]
-    assert entry["task"] == "add caching to search api"
-    assert entry["result_artifacts"]["run_json"] == str((tmp_path / "run.json").resolve())
-    assert entry["result_artifacts"]["run_markdown"] == str((tmp_path / "run.md").resolve())
+    entries = load_run_history(repo, enabled=True)
+    assert entries, "Expected at least one history entry in SQLite"
+    entry = entries[0]
+    assert entry.task == "add caching to search api"
+    assert entry.result_artifacts.get("run_json") == str((tmp_path / "run.json").resolve())
+    assert entry.result_artifacts.get("run_markdown") == str((tmp_path / "run.md").resolve())
 
     monkeypatch.setattr("sys.argv", ["contextbudget", "report", "run.json", "--out", "summary.md"])
     assert main() == 0

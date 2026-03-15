@@ -272,9 +272,14 @@ Each `run_task` call appends an entry to `.contextbudget/observe-history.json`
   "policy_passed": true,
   "delta_enabled": false,
   "cache_hits": 0,
+  "llm_prompt_tokens": 1850,
+  "llm_completion_tokens": 312,
+  "llm_total_tokens": 2162,
   "generated_at": "2026-03-15T12:00:00+00:00"
 }
 ```
+
+`llm_prompt_tokens`, `llm_completion_tokens`, and `llm_total_tokens` are populated from the LLM API response when the provider reports usage. They are omitted if the API does not return usage data (e.g. when using `GenericAgentRunner` or `NodeJSAgentRunner`).
 
 Read history programmatically:
 
@@ -284,6 +289,137 @@ from contextbudget.telemetry.store import load_observe_history
 entries = load_observe_history(base_dir=".")
 for entry in entries:
     print(entry["adapter"], entry["tokens_saved"])
+```
+
+---
+
+## NodeJSAgentRunner
+
+A runner that passes the optimised context prompt to a **Node.js script** via
+stdin and reads the LLM response from stdout.  Use this to plug ContextBudget
+into any Node.js agent loop — LangChain.js, Vercel AI SDK, OpenAI Node SDK,
+or custom scripts — without writing Python.
+
+### Node.js script contract
+
+The runner writes the assembled prompt to the script's **stdin** (UTF-8,
+closed at EOF) and reads the response from **stdout**.  stderr is forwarded
+to the Python process.
+
+Minimal `agent.js`:
+
+```js
+import OpenAI from "openai";
+
+const prompt = await new Promise((resolve) => {
+    let data = "";
+    process.stdin.on("data", (chunk) => (data += chunk));
+    process.stdin.on("end", () => resolve(data));
+});
+
+const client = new OpenAI();
+const response = await client.chat.completions.create({
+    model: "gpt-4.1",
+    messages: [{ role: "user", content: prompt }],
+});
+
+process.stdout.write(response.choices[0].message.content);
+```
+
+### Basic usage
+
+```python
+from contextbudget.integrations import NodeJSAgentRunner
+
+runner = NodeJSAgentRunner(
+    script="./agent.js",
+    repo=".",
+)
+
+result = runner.run_task("add caching")
+print(result.llm_response)
+print(f"tokens used: {result.prepared_context.estimated_tokens}")
+print(f"tokens saved: {result.prepared_context.tokens_saved}")
+```
+
+### Custom command
+
+```python
+runner = NodeJSAgentRunner(
+    command=["node", "--experimental-vm-modules", "agent.js"],
+    repo=".",
+    max_tokens=32_000,
+)
+
+result = runner.run_task("refactor auth middleware")
+```
+
+### Constructor parameters
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `script` | `str \| Path \| None` | `None` | Path to a `.js`/`.mjs` entry point |
+| `repo` | `str \| Path` | `"."` | Default repository path |
+| `command` | `Sequence[str] \| None` | `None` | Full command list (overrides `script`) |
+| `node_executable` | `str` | `"node"` | Node.js binary name or path |
+| `adapter_name` | `str` | `"nodejs"` | Label used in telemetry |
+| `max_tokens` | `int \| None` | `None` | Token budget for packed context |
+| `top_files` | `int \| None` | `None` | Max ranked files considered |
+| `policy` | `PolicySpec \| None` | `None` | Budget policy to enforce |
+| `strict` | `bool` | `False` | Raise on policy violations |
+| `delta` | `bool` | `True` | Enable incremental delta context |
+| `timeout` | `float \| None` | `None` | Seconds to wait for the script |
+| `env` | `dict[str, str] \| None` | `None` | Extra environment variables for the script |
+| `config_path` | `str \| Path \| None` | `None` | Path to `contextbudget.toml` |
+| `session` | `RuntimeSession \| None` | `None` | Resume an existing session |
+| `engine` | `ContextBudgetEngine \| None` | `None` | Reuse an existing engine |
+| `telemetry_base_dir` | `str \| Path \| None` | `None` | Base dir for observe-history |
+
+### Passing environment variables
+
+```python
+runner = NodeJSAgentRunner(
+    script="./agent.js",
+    repo=".",
+    env={"OPENAI_API_KEY": "sk-..."},
+    timeout=60.0,
+)
+
+result = runner.run_task("add input validation")
+```
+
+### Multi-turn sessions
+
+```python
+runner = NodeJSAgentRunner(script="./agent.js", repo=".", max_tokens=32_000)
+
+result1 = runner.run_task("add Redis caching to session store")
+result2 = runner.run_task("write unit tests for the new cache layer")
+
+print(runner.session_summary())
+```
+
+Delta context is enabled by default — on the second turn only changed files
+are re-sent to the Node.js script.
+
+### Vercel AI SDK example (`agent.js`)
+
+```js
+import { generateText } from "ai";
+import { openai } from "@ai-sdk/openai";
+
+const prompt = await new Promise((resolve) => {
+    let data = "";
+    process.stdin.on("data", (c) => (data += c));
+    process.stdin.on("end", () => resolve(data));
+});
+
+const { text } = await generateText({
+    model: openai("gpt-4.1"),
+    prompt,
+});
+
+process.stdout.write(text);
 ```
 
 ---

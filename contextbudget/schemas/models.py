@@ -80,6 +80,9 @@ class CacheReport:
     fragment_hits: int = 0
     fragment_misses: int = 0
     fragment_writes: int = 0
+    slice_hits: int = 0
+    slice_misses: int = 0
+    slice_writes: int = 0
 
 
 @dataclass(slots=True)

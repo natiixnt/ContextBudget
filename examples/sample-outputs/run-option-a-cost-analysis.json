@@ -1,0 +1,84 @@
+{
+  "model": "gpt-4o",
+  "provider": "openai",
+  "input_per_1m_usd": 2.5,
+  "baseline_tokens": 50000,
+  "optimized_tokens": 18340,
+  "saved_tokens": 31660,
+  "savings_pct": 63.32,
+  "baseline_cost_usd": 0.125,
+  "optimized_cost_usd": 0.04585,
+  "saved_cost_usd": 0.07915,
+  "per_file": [
+    {
+      "path": "src/auth/oauth2_provider.py",
+      "strategy": "symbols",
+      "original_tokens": 14800,
+      "compressed_tokens": 3120,
+      "saved_tokens": 11680,
+      "baseline_cost_usd": 0.037,
+      "optimized_cost_usd": 0.0078,
+      "saved_cost_usd": 0.0292
+    },
+    {
+      "path": "src/middleware/auth_middleware.py",
+      "strategy": "symbols",
+      "original_tokens": 9200,
+      "compressed_tokens": 2480,
+      "saved_tokens": 6720,
+      "baseline_cost_usd": 0.023,
+      "optimized_cost_usd": 0.0062,
+      "saved_cost_usd": 0.0168
+    },
+    {
+      "path": "src/auth/token_store.py",
+      "strategy": "full",
+      "original_tokens": 1840,
+      "compressed_tokens": 1840,
+      "saved_tokens": 0,
+      "baseline_cost_usd": 0.0046,
+      "optimized_cost_usd": 0.0046,
+      "saved_cost_usd": 0.0
+    },
+    {
+      "path": "tests/test_auth_middleware.py",
+      "strategy": "full",
+      "original_tokens": 4200,
+      "compressed_tokens": 4200,
+      "saved_tokens": 0,
+      "baseline_cost_usd": 0.0105,
+      "optimized_cost_usd": 0.0105,
+      "saved_cost_usd": 0.0
+    },
+    {
+      "path": "src/auth/permissions.py",
+      "strategy": "range",
+      "original_tokens": 9820,
+      "compressed_tokens": 4200,
+      "saved_tokens": 5620,
+      "baseline_cost_usd": 0.02455,
+      "optimized_cost_usd": 0.0105,
+      "saved_cost_usd": 0.01405
+    },
+    {
+      "path": "src/auth/session.py",
+      "strategy": "full",
+      "original_tokens": 2500,
+      "compressed_tokens": 2500,
+      "saved_tokens": 0,
+      "baseline_cost_usd": 0.00625,
+      "optimized_cost_usd": 0.00625,
+      "saved_cost_usd": 0.0
+    }
+  ],
+  "run_meta": {
+    "command": "pack",
+    "task": "refactor authentication middleware to support OAuth2 and add token refresh flow",
+    "repo": "examples/oauth2-auth-refactor/repo",
+    "max_tokens": 64000,
+    "generated_at": "2026-03-15T10:00:00.000000+00:00",
+    "files_included": 6,
+    "files_skipped": 4
+  },
+  "notes": []
+}

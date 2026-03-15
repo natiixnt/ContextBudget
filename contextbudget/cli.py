@@ -163,7 +163,7 @@ def cmd_plan_agent(args: argparse.Namespace) -> int:
 
 
 def cmd_simulate_agent(args: argparse.Namespace) -> int:
-    fmt = getattr(args, "format", "human")
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
     if getattr(args, "list_models", False):
         from contextbudget.core.agent_cost import list_known_models
         rows = list_known_models()
@@ -179,10 +179,32 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
                 )
         return 0
 
+    run_artifact_path = getattr(args, "run_artifact", None)
+    task = args.task or ""
+    repo = args.repo
+
+    if run_artifact_path:
+        run_artifact_file = Path(run_artifact_path)
+        if not run_artifact_file.exists():
+            print(f"Error: run artifact not found: {run_artifact_file}")
+            return 2
+        from contextbudget.core.render import read_json as _read_json
+        _run_data = _read_json(run_artifact_file)
+        if not task:
+            task = str(_run_data.get("task", "") or "")
+        if repo == ".":
+            _raw_repo = str(_run_data.get("repo", "") or "")
+            if _raw_repo:
+                repo = _raw_repo
+
+    if not task:
+        print("error: task is required (provide as argument or via --run-artifact)")
+        return 2
+
     engine = ContextBudgetEngine(config_path=args.config)
     data = engine.simulate_agent(
-        task=args.task,
-        repo=args.repo,
+        task=task,
+        repo=repo,
         workspace=args.workspace,
         top_files=args.top_files,
         prompt_overhead_per_step=args.prompt_overhead,
@@ -193,7 +215,7 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
         price_per_1m_output=args.price_output,
     )
 
-    base = args.out_prefix or f"contextbudget-simulate-{_base_name(args.task)}"
+    base = args.out_prefix or f"contextbudget-simulate-{_base_name(task)}"
     json_path = Path(f"{base}.json")
     md_path = Path(f"{base}.md")
 
@@ -479,7 +501,7 @@ def cmd_observe(args: argparse.Namespace) -> int:
 
     base_dir = Path(args.base_dir) if getattr(args, "base_dir", None) else run_path.parent
     no_store = getattr(args, "no_store", False)
-    fmt = getattr(args, "format", "human")
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
 
     data = engine.observe(run_path, store=not no_store, base_dir=base_dir)
     markdown = render_observe_markdown(data)
@@ -697,13 +719,21 @@ def cmd_benchmark(args: argparse.Namespace) -> int:
 
 def cmd_dataset(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
-    fmt = getattr(args, "format", "human")
-    data = engine.dataset(
-        tasks_toml=args.tasks_toml,
-        repo=args.repo,
-        max_tokens=args.max_tokens,
-        top_files=args.top_files,
-    )
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
+    runs = getattr(args, "runs", None) or []
+    if runs:
+        data = engine.dataset_from_runs(runs)
+    else:
+        tasks_toml = getattr(args, "tasks_toml", None) or ""
+        if not tasks_toml:
+            print("error: tasks_toml is required when --runs is not provided")
+            return 2
+        data = engine.dataset(
+            tasks_toml=tasks_toml,
+            repo=args.repo,
+            max_tokens=args.max_tokens,
+            top_files=args.top_files,
+        )
 
     base = args.out_prefix or "contextbudget-dataset"
     json_path = Path(f"{base}.json")
@@ -844,13 +874,15 @@ def cmd_heatmap(args: argparse.Namespace) -> int:
 def cmd_drift(args: argparse.Namespace) -> int:
     repo_path = normalize_repo(args.repo)
     engine = ContextBudgetEngine()
-    fmt = getattr(args, "format", "human")
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
+    explicit_runs = getattr(args, "runs", None) or []
     try:
         drift_data = engine.drift(
             repo=repo_path,
             task=args.task or None,
             window=args.window,
             threshold_pct=args.threshold,
+            runs=explicit_runs if explicit_runs else None,
         )
     except ValueError as exc:
         print(str(exc))
@@ -969,7 +1001,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
 
 def cmd_advise(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
-    fmt = getattr(args, "format", "human")
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
     data = engine.advise(
         repo=args.repo,
         history=args.history or None,
@@ -1012,7 +1044,7 @@ def cmd_advise(args: argparse.Namespace) -> int:
 def cmd_visualize(args: argparse.Namespace) -> int:
     engine = ContextBudgetEngine(config_path=args.config)
     history = args.history or []
-    fmt = getattr(args, "format", "human")
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
 
     graph_data = engine.visualize(
         repo=args.repo,
@@ -1117,8 +1149,125 @@ def cmd_gateway(args: argparse.Namespace) -> int:
         config_path=args.config or None,
         telemetry_enabled=args.telemetry,
         log_requests=not args.no_log_requests,
+        api_key=getattr(args, "api_key", None),
     )
     GatewayServer(config).start(block=True)
+    return 0
+
+
+def cmd_init(args: argparse.Namespace) -> int:
+    """Auto-detect repository language(s) and generate config files."""
+    import collections
+    import re
+
+    repo_path = Path(args.repo).resolve()
+    if not repo_path.is_dir():
+        print(f"Repository path does not exist: {repo_path}")
+        return 2
+
+    config_path = repo_path / "contextbudget.toml"
+    policy_path = repo_path / "policy.toml"
+
+    if config_path.exists() and not args.force:
+        print(f"contextbudget.toml already exists. Use --force to overwrite.")
+        return 1
+
+    # ── Detect languages ──────────────────────────────────────────────────────
+    ext_counts: dict[str, int] = collections.Counter()
+    code_extensions = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".rb", ".cpp", ".c", ".cs"}
+    ignore_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".contextbudget"}
+
+    for item in repo_path.rglob("*"):
+        if any(part in ignore_dirs for part in item.parts):
+            continue
+        if item.is_file() and item.suffix in code_extensions:
+            ext_counts[item.suffix] += 1
+
+    dominant_lang = ""
+    lang_hints = {}
+    if ext_counts:
+        dominant_ext = max(ext_counts, key=lambda e: ext_counts[e])
+        lang_map = {
+            ".py": "python", ".ts": "typescript", ".tsx": "typescript",
+            ".js": "javascript", ".jsx": "javascript", ".go": "go",
+            ".rs": "rust", ".java": "java", ".rb": "ruby",
+            ".cpp": "cpp", ".c": "c", ".cs": "csharp",
+        }
+        dominant_lang = lang_map.get(dominant_ext, "")
+        lang_hints["dominant"] = dominant_lang
+        lang_hints["file_counts"] = dict(sorted(ext_counts.items(), key=lambda x: -x[1])[:5])
+
+    total_files = sum(ext_counts.values())
+
+    # ── Estimate savings ──────────────────────────────────────────────────────
+    # Rough heuristic: 40-60% token savings is typical for well-structured repos
+    estimated_savings_pct = 55 if total_files > 50 else (40 if total_files > 10 else 25)
+    default_max_tokens = 64000
+    estimated_baseline = total_files * 300  # ~300 tokens avg per file
+    estimated_saved = int(estimated_baseline * estimated_savings_pct / 100)
+
+    # ── Generate contextbudget.toml ───────────────────────────────────────────
+    lang_comment = f"# Detected dominant language: {dominant_lang}\n" if dominant_lang else ""
+    config_content = f"""# ContextBudget configuration — generated by `contextbudget init`
+# See: https://github.com/contextbudget/contextbudget/docs/configuration.md
+{lang_comment}
+[budget]
+max_tokens = {default_max_tokens}
+# top_files = 100
+
+[scan]
+# ignore_globs = ["tests/**", "docs/**"]
+
+[score]
+enable_import_graph_signals = true
+history_selected_file_boost = 1.25
+
+[compression]
+full_file_threshold_tokens = 600
+symbol_extraction_enabled = true
+
+[cache]
+backend = "local_file"
+summary_cache_enabled = true
+run_history_enabled = true
+# Shared Redis cache (uncomment for team use):
+# backend = "redis"
+# redis_url = "redis://localhost:6379/0"
+# redis_namespace = "{repo_path.name}"
+# redis_ttl_seconds = 86400
+
+[telemetry]
+enabled = false
+# sink = "jsonl"
+"""
+
+    policy_content = f"""# ContextBudget policy — generated by `contextbudget init`
+# Enforced via: contextbudget policy run.json
+# CI: contextbudget enforce --policy policy.toml run.json
+
+[policy]
+max_estimated_input_tokens = {default_max_tokens}
+# max_files_included = 100
+# max_quality_risk = "medium"
+# min_savings_percentage = 10.0
+"""
+
+    config_path.write_text(config_content, encoding="utf-8")
+    policy_path.write_text(policy_content, encoding="utf-8")
+
+    # ── Print summary ─────────────────────────────────────────────────────────
+    print(f"Initialized ContextBudget for: {repo_path}")
+    print(f"  Created: contextbudget.toml")
+    print(f"  Created: policy.toml")
+    if dominant_lang:
+        lang_breakdown = ", ".join(f"{ext}={n}" for ext, n in list(lang_hints['file_counts'].items())[:3])
+        print(f"  Detected: {dominant_lang} ({lang_breakdown})")
+    print(f"  Code files found: {total_files}")
+    print(f"  Estimated savings: ~{estimated_savings_pct}%  (~{estimated_saved:,} tokens saved per run)")
+    print()
+    print("Next steps:")
+    print("  contextbudget pack 'describe your task' --repo .")
+    print("  contextbudget plan 'describe your task' --repo .")
     return 0
 
 
@@ -1317,7 +1466,12 @@ def build_parser() -> argparse.ArgumentParser:
         "simulate-agent",
         help="Estimate token costs and USD spend for a multi-step agent workflow before execution",
     )
-    simulate_agent.add_argument("task", help="Task description")
+    simulate_agent.add_argument(
+        "task",
+        nargs="?",
+        default="",
+        help="Task description (may be omitted when --run-artifact is provided).",
+    )
     simulate_agent.add_argument("--repo", default=".", help="Repository path")
     simulate_agent.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
     simulate_agent.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown")
@@ -1380,6 +1534,15 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print all models in the built-in pricing table and exit.",
     )
     simulate_agent.add_argument(
+        "--run-artifact",
+        dest="run_artifact",
+        default=None,
+        help=(
+            "Path to an existing pack or plan run artifact JSON. "
+            "When provided, task and repo are read from the artifact if not given explicitly."
+        ),
+    )
+    simulate_agent.add_argument(
         "--config",
         help="Optional path to config TOML (default: <repo>/contextbudget.toml).",
     )
@@ -1388,6 +1551,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["human", "json"],
         default="human",
         help="Output format: human (default) for readable summary, json to print raw JSON to stdout.",
+    )
+    simulate_agent.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
     )
     simulate_agent.set_defaults(func=cmd_simulate_agent)
 
@@ -1500,19 +1669,44 @@ def build_parser() -> argparse.ArgumentParser:
 
     dataset = sub.add_parser(
         "dataset",
-        help="Build a reproducible benchmark dataset from a TOML task list and export token reduction metrics",
+        help=(
+            "Build a reproducible benchmark dataset from a TOML task list and export token reduction metrics. "
+            "Accepts existing run artifacts via --runs to build a dataset without re-running benchmarks."
+        ),
     )
-    dataset.add_argument("tasks_toml", help="Path to TOML file containing [[tasks]] entries")
+    dataset.add_argument(
+        "tasks_toml",
+        nargs="?",
+        default="",
+        help="Path to TOML file containing [[tasks]] entries (omit when using --runs).",
+    )
     dataset.add_argument("--repo", default=".", help="Repository path to benchmark against")
     dataset.add_argument("--max-tokens", type=int, default=None, help="Token budget forwarded to each benchmark run")
     dataset.add_argument("--top-files", type=int, default=None, help="Top-files limit forwarded to each benchmark run")
     dataset.add_argument("--config", help="Optional path to config TOML (default: <repo>/contextbudget.toml)")
     dataset.add_argument("--out-prefix", default="contextbudget-dataset", help="Output file prefix for dataset JSON/Markdown")
     dataset.add_argument(
+        "--runs",
+        nargs="+",
+        default=None,
+        metavar="RUN_JSON",
+        help=(
+            "One or more existing pack or benchmark run artifact JSON files. "
+            "When provided, dataset entries are built from these artifacts without re-running benchmarks. "
+            "Mutually exclusive with tasks_toml."
+        ),
+    )
+    dataset.add_argument(
         "--format",
         choices=["human", "json"],
         default="human",
         help="Output format: human (default) for readable summary, json to print raw JSON to stdout.",
+    )
+    dataset.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
     )
     dataset.set_defaults(func=cmd_dataset)
 
@@ -1652,6 +1846,12 @@ def build_parser() -> argparse.ArgumentParser:
         default="human",
         help="Output format: human (default) for readable suggestions, json to print raw JSON to stdout.",
     )
+    advise.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
+    )
     advise.set_defaults(func=cmd_advise)
 
     visualize = sub.add_parser(
@@ -1690,6 +1890,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["human", "json"],
         default="human",
         help="Output format: human (default) for readable summary, json to print raw JSON to stdout.",
+    )
+    visualize.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
     )
     visualize.set_defaults(func=cmd_visualize)
 
@@ -1824,6 +2030,22 @@ def build_parser() -> argparse.ArgumentParser:
         default="human",
         help="Output format: human (default) for readable alert summary, json to print raw JSON to stdout.",
     )
+    drift.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
+    )
+    drift.add_argument(
+        "--runs",
+        nargs="+",
+        default=None,
+        metavar="RUN_JSON",
+        help=(
+            "Explicit pack run artifact JSON files to analyze for drift "
+            "(alternative to reading from <repo>/.contextbudget/history.json)."
+        ),
+    )
     drift.set_defaults(func=cmd_drift)
 
     observe = sub.add_parser(
@@ -1862,6 +2084,12 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["human", "json"],
         default="human",
         help="Output format: human (default) for readable metrics report, json to print raw JSON to stdout.",
+    )
+    observe.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
     )
     observe.set_defaults(func=cmd_observe)
 
@@ -1979,7 +2207,30 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Suppress per-request HTTP log lines.",
     )
+    gateway_cmd.add_argument(
+        "--api-key",
+        dest="api_key",
+        default=None,
+        help="Bearer token required for all gateway requests (env: CB_GATEWAY_API_KEY).",
+    )
     gateway_cmd.set_defaults(func=cmd_gateway)
+
+    init_cmd = sub.add_parser(
+        "init",
+        help="Auto-detect repository language and generate contextbudget.toml and policy.toml",
+    )
+    init_cmd.add_argument(
+        "--repo",
+        default=".",
+        help="Repository path to initialize (default: current directory).",
+    )
+    init_cmd.add_argument(
+        "--force",
+        action="store_true",
+        default=False,
+        help="Overwrite existing configuration files.",
+    )
+    init_cmd.set_defaults(func=cmd_init)
 
     return parser
 

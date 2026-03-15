@@ -204,6 +204,7 @@ def run_drift(
     window: int = 20,
     threshold_pct: float = 10.0,
     history_file: str = RUN_HISTORY_FILE,
+    entries: list[RunHistoryEntry] | None = None,
 ) -> dict[str, Any]:
     """Analyse context drift across recent pack history for *repo*.
 
@@ -235,7 +236,7 @@ def run_drift(
     if threshold_pct <= 0:
         raise ValueError("--threshold must be greater than 0")
 
-    all_entries = load_run_history(repo, history_file=history_file)
+    all_entries = entries if entries is not None else load_run_history(repo, history_file=history_file)
 
     # Filter by task substring if requested
     task_filter = (task or "").strip()

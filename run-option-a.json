@@ -1,0 +1,177 @@
+{
+  "budget": {
+    "duplicate_reads_prevented": 3,
+    "estimated_input_tokens": 18340,
+    "estimated_saved_tokens": 31660,
+    "quality_risk_estimate": "low",
+    "max_tokens": 64000
+  },
+  "cache": {
+    "hits": 4,
+    "misses": 3,
+    "tokens_saved": 12400,
+    "fragment_hits": 2,
+    "fragment_misses": 5
+  },
+  "cache_hits": 4,
+  "command": "pack",
+  "compressed_context": [
+    {
+      "chunk_reason": "symbols extracted: class definitions, public methods, type signatures",
+      "chunk_strategy": "symbol-extraction",
+      "compressed_tokens": 3120,
+      "original_tokens": 14800,
+      "path": "src/auth/oauth2_provider.py",
+      "selected_ranges": [
+        {"end_line": 42, "kind": "symbol", "start_line": 1},
+        {"end_line": 98, "kind": "symbol", "start_line": 60},
+        {"end_line": 210, "kind": "symbol", "start_line": 180}
+      ],
+      "strategy": "symbols",
+      "text": "# Symbols: src/auth/oauth2_provider.py\nclass OAuth2Provider:\n    def __init__(self, client_id: str, client_secret: str, ...) -> None: ...\n    def exchange_code(self, code: str) -> TokenPair: ...\n    def refresh_token(self, refresh: str) -> TokenPair: ...\n    def validate_token(self, token: str) -> TokenClaims: ...\n    def revoke_token(self, token: str) -> None: ...\n"
+    },
+    {
+      "chunk_reason": "symbols extracted: middleware interface and request hooks",
+      "chunk_strategy": "symbol-extraction",
+      "compressed_tokens": 2480,
+      "original_tokens": 9200,
+      "path": "src/middleware/auth_middleware.py",
+      "selected_ranges": [
+        {"end_line": 55, "kind": "symbol", "start_line": 1},
+        {"end_line": 130, "kind": "symbol", "start_line": 90}
+      ],
+      "strategy": "symbols",
+      "text": "# Symbols: src/middleware/auth_middleware.py\nclass AuthMiddleware:\n    def __init__(self, provider: OAuth2Provider, exempt_paths: list[str]) -> None: ...\n    def process_request(self, request: Request) -> Request | Response: ...\n    def _extract_bearer(self, request: Request) -> str | None: ...\n    def _is_exempt(self, path: str) -> bool: ...\n"
+    },
+    {
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 1840,
+      "original_tokens": 1840,
+      "path": "src/auth/token_store.py",
+      "selected_ranges": [
+        {"end_line": 88, "kind": "full", "start_line": 1}
+      ],
+      "strategy": "full",
+      "text": "# Full: src/auth/token_store.py\nfrom dataclasses import dataclass, field\nfrom datetime import datetime\nfrom typing import Optional\n\n@dataclass\nclass TokenPair:\n    access_token: str\n    refresh_token: str\n    expires_at: datetime\n    scopes: list[str] = field(default_factory=list)\n\n@dataclass\nclass TokenClaims:\n    subject: str\n    issuer: str\n    audience: list[str]\n    expires_at: datetime\n    scopes: list[str]\n"
+    },
+    {
+      "chunk_reason": "symbols extracted: test class and fixture definitions",
+      "chunk_strategy": "symbol-extraction",
+      "compressed_tokens": 4200,
+      "original_tokens": 4200,
+      "path": "tests/test_auth_middleware.py",
+      "selected_ranges": [
+        {"end_line": 200, "kind": "full", "start_line": 1}
+      ],
+      "strategy": "full",
+      "text": "# Full: tests/test_auth_middleware.py\nimport pytest\nfrom unittest.mock import MagicMock, patch\nfrom src.middleware.auth_middleware import AuthMiddleware\nfrom src.auth.oauth2_provider import OAuth2Provider\n"
+    },
+    {
+      "chunk_reason": "range selection: recent changes to permission model",
+      "chunk_strategy": "range-selection",
+      "compressed_tokens": 4200,
+      "original_tokens": 9820,
+      "path": "src/auth/permissions.py",
+      "selected_ranges": [
+        {"end_line": 80, "kind": "range", "start_line": 1},
+        {"end_line": 220, "kind": "range", "start_line": 160}
+      ],
+      "strategy": "range",
+      "text": "# Range: src/auth/permissions.py [1-80, 160-220]\nfrom enum import Enum\nfrom typing import Callable\n\nclass Permission(Enum):\n    READ = 'read'\n    WRITE = 'write'\n    ADMIN = 'admin'\n\ndef require_permission(permission: Permission) -> Callable: ...\n"
+    },
+    {
+      "chunk_reason": "file fits within full-file threshold",
+      "chunk_strategy": "full-file",
+      "compressed_tokens": 2500,
+      "original_tokens": 2500,
+      "path": "src/auth/session.py",
+      "selected_ranges": [
+        {"end_line": 120, "kind": "full", "start_line": 1}
+      ],
+      "strategy": "full",
+      "text": "# Full: src/auth/session.py\nfrom dataclasses import dataclass\nfrom datetime import datetime, timedelta\nimport secrets\n\n@dataclass\nclass Session:\n    session_id: str\n    user_id: str\n    created_at: datetime\n    expires_at: datetime\n    metadata: dict\n\ndef create_session(user_id: str, ttl: timedelta = timedelta(hours=24)) -> Session: ...\n"
+    }
+  ],
+  "files_included": [
+    "src/auth/oauth2_provider.py",
+    "src/middleware/auth_middleware.py",
+    "src/auth/token_store.py",
+    "tests/test_auth_middleware.py",
+    "src/auth/permissions.py",
+    "src/auth/session.py"
+  ],
+  "files_skipped": [
+    "src/auth/legacy_jwt.py",
+    "src/auth/deprecated_basic_auth.py",
+    "tests/test_legacy_auth.py",
+    "docs/auth_v1_migration.md"
+  ],
+  "generated_at": "2026-03-15T10:00:00.000000+00:00",
+  "implementations": {
+    "compressor": "builtin.symbol-extraction",
+    "scorer": "builtin.relevance",
+    "token_estimator": "builtin.char4"
+  },
+  "max_tokens": 64000,
+  "model_profile": {
+    "model": "claude-sonnet-4-6",
+    "provider": "anthropic",
+    "context_window": 200000
+  },
+  "policy": {
+    "checks": [
+      {"name": "token_budget", "passed": true, "detail": "18340 <= 64000"},
+      {"name": "quality_risk", "passed": true, "detail": "low <= medium"}
+    ],
+    "passed": true,
+    "violations": []
+  },
+  "ranked_files": [
+    {
+      "line_count": 310,
+      "path": "src/auth/oauth2_provider.py",
+      "reasons": ["path contains 'oauth2'", "content mentions 'OAuth2'", "content mentions 'token'"],
+      "score": 5.8
+    },
+    {
+      "line_count": 185,
+      "path": "src/middleware/auth_middleware.py",
+      "reasons": ["path contains 'auth'", "content mentions 'middleware'", "content mentions 'bearer'"],
+      "score": 5.2
+    },
+    {
+      "line_count": 88,
+      "path": "src/auth/token_store.py",
+      "reasons": ["path contains 'token'", "content mentions 'TokenPair'"],
+      "score": 4.6
+    },
+    {
+      "line_count": 200,
+      "path": "tests/test_auth_middleware.py",
+      "reasons": ["test proximity", "content mentions 'AuthMiddleware'"],
+      "score": 4.1
+    },
+    {
+      "line_count": 240,
+      "path": "src/auth/permissions.py",
+      "reasons": ["path contains 'auth'", "content mentions 'Permission'"],
+      "score": 3.9
+    },
+    {
+      "line_count": 120,
+      "path": "src/auth/session.py",
+      "reasons": ["path contains 'auth'", "content mentions 'session'"],
+      "score": 3.3
+    }
+  ],
+  "repo": "examples/oauth2-auth-refactor/repo",
+  "summarizer": {
+    "enabled": false
+  },
+  "task": "refactor authentication middleware to support OAuth2 and add token refresh flow",
+  "token_estimator": {
+    "method": "char4",
+    "total_estimated": 18340
+  }
+}

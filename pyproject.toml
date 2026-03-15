@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "contextbudget"
-version = "0.2.0"
+version = "1.0.0a1"
 description = "Deterministic context budgeting for coding-agent workflows"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -16,6 +16,7 @@ dependencies = []
 dev = ["pytest>=8.0", "fakeredis>=2.0", "redis>=5.0"]
 tokenizers = ["tiktoken>=0.7"]
 redis = ["redis>=5.0"]
+gateway = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 
 [project.scripts]
 contextbudget = "contextbudget.cli:main"

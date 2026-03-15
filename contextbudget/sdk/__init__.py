@@ -49,6 +49,7 @@ from contextbudget.agents.middleware import (
 )
 from contextbudget.core.policy import PolicySpec
 from contextbudget.engine import BudgetGuard, BudgetPolicyViolationError, ContextBudgetEngine
+from contextbudget.gateway import GatewayConfig, GatewayServer
 from contextbudget.runtime import AgentRuntime, PreparedContext, RuntimeResult
 
 
@@ -503,9 +504,79 @@ def profile_run(
     )
 
 
+def start_gateway(
+    host: str = "127.0.0.1",
+    port: int = 8787,
+    *,
+    max_tokens: int = 128_000,
+    max_files: int = 100,
+    config_path: str | Path | None = None,
+    telemetry_enabled: bool = False,
+    block: bool = True,
+) -> GatewayServer:
+    """Start the ContextBudget Runtime Gateway.
+
+    Convenience wrapper that builds a :class:`~contextbudget.gateway.GatewayConfig`,
+    creates a :class:`~contextbudget.gateway.GatewayServer`, starts it, and
+    returns the server object.
+
+    Parameters
+    ----------
+    host, port:
+        Bind address and TCP port.
+    max_tokens:
+        Default token budget for requests that omit ``max_tokens``.
+    max_files:
+        Default top-files cap for requests that omit ``max_files``.
+    config_path:
+        Path to a ``contextbudget.toml`` shared by all gateway requests.
+    telemetry_enabled:
+        Emit gateway-level telemetry events.
+    block:
+        If ``True`` (default) the call blocks until the server is interrupted
+        (Ctrl-C).  Pass ``False`` to run the gateway in a background daemon
+        thread and return the :class:`~contextbudget.gateway.GatewayServer`
+        immediately.
+
+    Returns
+    -------
+    GatewayServer
+        The running server instance.  Call :meth:`~contextbudget.gateway.GatewayServer.stop`
+        to shut it down when ``block=False``.
+
+    Example
+    -------
+    ::
+
+        from contextbudget.sdk import start_gateway
+
+        # Foreground (blocks until Ctrl-C)
+        start_gateway(port=8787, max_tokens=32_000)
+
+        # Background — useful in tests or embedded scenarios
+        server = start_gateway(port=8787, block=False)
+        # ... do work ...
+        server.stop()
+    """
+    config = GatewayConfig(
+        host=host,
+        port=port,
+        max_tokens=max_tokens,
+        max_files=max_files,
+        config_path=str(config_path) if config_path is not None else None,
+        telemetry_enabled=telemetry_enabled,
+    )
+    server = GatewayServer(config)
+    server.start(block=block)
+    return server
+
+
 __all__ = [
     "ContextBudgetSDK",
+    "GatewayConfig",
+    "GatewayServer",
     "prepare_context",
     "simulate_agent",
     "profile_run",
+    "start_gateway",
 ]
