@@ -313,9 +313,7 @@
     /* ── CTA ──────────────────────────────── */
     #cta {
       text-align: center; padding: 130px 64px;
-      background:
-        radial-gradient(ellipse 140% 100% at 50% -20%, #c80012 0%, transparent 60%),
-        linear-gradient(180deg, #1a0018 0%, var(--dark) 100%);
+      background: transparent;
     }
 
     #cta .h2 { max-width: 680px; margin: 0 auto 20px; }
@@ -363,17 +361,14 @@
     .footer-right { font-size: 13px; color: var(--w30); }
 
     /* ── CALCULATOR ───────────────────────── */
-    #calculator {
-      position: relative;
-      background: linear-gradient(to bottom, #0f0020 0%, #080010 60%, #120015 100%);
+    .red-zone {
+      background:
+        radial-gradient(ellipse 160% 50% at 50% 100%, #c20010 0%, transparent 55%),
+        linear-gradient(to bottom, #0f0020 0%, #080010 35%, #120015 65%, #1a0018 100%);
     }
 
-    #calculator::after {
-      content: '';
-      position: absolute; bottom: 0; left: 0; right: 0;
-      height: 220px;
-      background: linear-gradient(to bottom, transparent 0%, rgba(160,0,14,.55) 100%);
-      pointer-events: none;
+    #calculator {
+      background: transparent;
     }
 
     .calc-wrap {
@@ -692,7 +687,8 @@
 </section>
 
 
-<!-- ── CALCULATOR ── -->
+<!-- ── CALCULATOR + CTA — shared gradient wrapper ── -->
+<div class="red-zone">
 <section id="calculator">
   <p class="label">Savings calculator</p>
   <h2 class="h2">How much will<br>you save?</h2>
@@ -781,6 +777,7 @@
     </button>
   </form>
 </section>
+</div><!-- /red-zone -->
 
 
 <!-- ── FOOTER ── -->
