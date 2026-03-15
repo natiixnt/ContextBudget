@@ -78,3 +78,47 @@ class CacheHitRateRow(BaseModel):
     cache_hit_rate_pct: float | None
     total_cache_hits: int | None
     total_tokens_saved: int | None
+
+
+class DashboardOverview(BaseModel):
+    total_tokens_used: int
+    total_tokens_saved: int
+    savings_rate: float | None
+    cache_hit_rate_pct: float | None
+    total_runs: int
+    runs_with_cache_hits: int
+
+
+class RepositoryStats(BaseModel):
+    repository_id: str
+    total_tokens_used: int
+    total_tokens_saved: int
+    run_count: int
+    savings_rate: float | None
+
+
+class DashboardRepositories(BaseModel):
+    repositories: list[RepositoryStats]
+
+
+class CommandSavings(BaseModel):
+    command: str | None
+    tokens_used: int
+    tokens_saved: int
+    run_count: int
+    savings_rate: float | None
+
+
+class DashboardSavings(BaseModel):
+    total_tokens_used: int
+    total_tokens_saved: int
+    savings_rate: float | None
+    by_command: list[CommandSavings]
+
+
+class DashboardHeatmap(BaseModel):
+    total_runs: int
+    avg_scanned_files: float | None
+    avg_included_files: float | None
+    avg_top_files: float | None
+    note: str
