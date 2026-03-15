@@ -1,0 +1,19 @@
+{
+  "name": "contextbudget-sdk-typescript",
+  "version": "0.1.0",
+  "description": "TypeScript examples for the ContextBudget agent SDK",
+  "private": true,
+  "scripts": {
+    "basic": "ts-node basic.ts",
+    "middleware": "ts-node middleware_pattern.ts",
+    "anthropic-agent": "ts-node anthropic_agent.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.39.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.19.15",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.9.3"
+  }
+}

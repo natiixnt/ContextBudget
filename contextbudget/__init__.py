@@ -1,11 +1,5 @@
 """ContextBudget package."""
 
-from contextbudget.gateway import (
-    GatewayConfig,
-    GatewayHandlers,
-    GatewayServer,
-    run_gateway,
-)
 from contextbudget.sdk import ContextBudgetSDK
 from contextbudget.agents import (
     AgentAdapter,
@@ -43,10 +37,6 @@ from contextbudget.telemetry import (
 
 __all__ = [
     "__version__",
-    "GatewayConfig",
-    "GatewayHandlers",
-    "GatewayServer",
-    "run_gateway",
     "ContextBudgetSDK",
     "AgentAdapter",
     "AgentAdapterRun",
