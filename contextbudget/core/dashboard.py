@@ -49,6 +49,32 @@ def _scan_artifacts(paths: list[Path]) -> list[dict[str, Any]]:
     return sorted(found, key=lambda d: d.get("generated_at", ""), reverse=True)
 
 
+def _load_history_entries(paths: list[Path]) -> list[dict[str, Any]]:
+    """Load run entries from .contextbudget/history.json files in search paths."""
+    entries: list[dict[str, Any]] = []
+    seen: set[str] = set()
+    for path in paths:
+        root = path if path.is_dir() else path.parent
+        history_file = root / ".contextbudget" / "history.json"
+        if not history_file.exists():
+            continue
+        try:
+            data = json.loads(history_file.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        if not isinstance(data, dict):
+            continue
+        for entry in data.get("entries", []):
+            if not isinstance(entry, dict):
+                continue
+            ts = entry.get("generated_at", "")
+            if not ts or ts in seen:
+                continue
+            seen.add(ts)
+            entries.append(entry)
+    return sorted(entries, key=lambda e: e.get("generated_at", ""), reverse=True)
+
+
 # ---------------------------------------------------------------------------
 # Data aggregation
 # ---------------------------------------------------------------------------
@@ -60,12 +86,15 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
     sim_artifacts = [a for a in artifacts if a.get("command") == "simulate-agent"]
     bench_artifacts = [a for a in artifacts if a.get("command") == "benchmark"]
 
-    # ── run history ──────────────────────────────────────────────────────────
+    # ── run history from artifacts ────────────────────────────────────────────
+    artifact_timestamps: set[str] = set()
     run_history: list[dict[str, Any]] = []
     for a in artifacts:
         cmd = a.get("command", "")
         budget = a.get("budget", {}) or {}
         ce = a.get("cost_estimate", {}) or {}
+        ts = a.get("generated_at", "")
+        artifact_timestamps.add(ts)
 
         if cmd == "pack":
             input_tok = budget.get("estimated_input_tokens", 0)
@@ -100,29 +129,62 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
         entry: dict[str, Any] = {
             "command": cmd,
             "task": a.get("task", ""),
-            "generated_at": a.get("generated_at", ""),
+            "generated_at": ts,
             "artifact": a.get("_artifact_path", ""),
             "input_tokens": input_tok,
             "saved_tokens": saved_tok,
             "files": files,
             "risk": risk,
+            "source": "artifact",
         }
         if cost is not None:
             entry["cost_usd"] = cost
         run_history.append(entry)
 
+    # ── merge persistent history.json entries ─────────────────────────────────
+    history_entries = _load_history_entries(paths)
+    for h in history_entries:
+        ts = h.get("generated_at", "")
+        if ts in artifact_timestamps:
+            continue  # already represented by a scanned artifact
+        tu = h.get("token_usage", {}) or {}
+        run_history.append({
+            "command": "pack",
+            "task": h.get("task", ""),
+            "generated_at": ts,
+            "artifact": (h.get("result_artifacts") or {}).get("json", ""),
+            "input_tokens": int(tu.get("estimated_input_tokens", 0) or 0),
+            "saved_tokens": int(tu.get("estimated_saved_tokens", 0) or 0),
+            "files": len(h.get("selected_files", [])),
+            "risk": str(tu.get("quality_risk_estimate", "") or ""),
+            "source": "history",
+        })
+
+    # Sort merged history newest-first
+    run_history.sort(key=lambda r: r.get("generated_at", ""), reverse=True)
+
     # ── token chart (pack runs, chronological, up to 30) ─────────────────────
+    pack_history = [r for r in reversed(run_history) if r["command"] == "pack"][-30:]
     token_chart: list[dict[str, Any]] = []
-    for a in reversed(pack_artifacts[:30]):
-        budget = a.get("budget", {}) or {}
-        label = a.get("task", "")
+    for r in pack_history:
+        label = r.get("task", "")
         if len(label) > 28:
             label = label[:27] + "…"
-        date = (a.get("generated_at", "") or "")[:10]
+        date = (r.get("generated_at", "") or "")[:10]
         token_chart.append({
             "label": f"{label} ({date})" if date else label,
-            "input_tokens": budget.get("estimated_input_tokens", 0),
-            "saved_tokens": budget.get("estimated_saved_tokens", 0),
+            "input_tokens": r["input_tokens"],
+            "saved_tokens": r["saved_tokens"],
+        })
+
+    # ── run trend (all pack runs chronological for line chart) ────────────────
+    run_trend: list[dict[str, Any]] = []
+    for r in pack_history:
+        run_trend.append({
+            "date": (r.get("generated_at", "") or "")[:10],
+            "label": (r.get("task", "") or "")[:24],
+            "input_tokens": r["input_tokens"],
+            "saved_tokens": r["saved_tokens"],
         })
 
     # ── summary stats ────────────────────────────────────────────────────────
@@ -130,6 +192,19 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
     total_saved = sum(r["saved_tokens"] for r in run_history)
     denom = total_input + total_saved
     savings_rate = round(total_saved / denom, 4) if denom > 0 else 0.0
+
+    # ── savings breakdown by command ──────────────────────────────────────────
+    breakdown_map: dict[str, dict[str, int]] = {}
+    for r in run_history:
+        cmd = r["command"]
+        if cmd not in breakdown_map:
+            breakdown_map[cmd] = {"used": 0, "saved": 0}
+        breakdown_map[cmd]["used"] += r["input_tokens"]
+        breakdown_map[cmd]["saved"] += r["saved_tokens"]
+    savings_breakdown = [
+        {"label": cmd, "used": v["used"], "saved": v["saved"]}
+        for cmd, v in breakdown_map.items()
+    ]
 
     # ── heatmap ───────────────────────────────────────────────────────────────
     heatmap: dict[str, Any] = {}
@@ -179,8 +254,8 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
 
     return {
         "summary": {
-            "total_runs": len(artifacts),
-            "pack_runs": len(pack_artifacts),
+            "total_runs": len(run_history),
+            "pack_runs": len([r for r in run_history if r["command"] == "pack"]),
             "sim_runs": len(sim_artifacts),
             "benchmark_runs": len(bench_artifacts),
             "total_input_tokens": total_input,
@@ -189,6 +264,8 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
         },
         "run_history": run_history,
         "token_chart": token_chart,
+        "run_trend": run_trend,
+        "savings_breakdown": savings_breakdown,
         "heatmap": heatmap,
         "simulations": simulations,
         "benchmarks": benchmarks,
@@ -237,6 +314,12 @@ h2 { font-size: 15px; font-weight: 600; margin-bottom: 12px;
 .card .value.orange { color: var(--orange); }
 .chart-wrap { background: var(--surface); border: 1px solid var(--border);
               border-radius: 8px; padding: 20px; box-shadow: var(--card-shadow); }
+.chart-grid { display: grid; grid-template-columns: 1fr 2fr; gap: 16px; }
+@media (max-width: 860px) { .chart-grid { grid-template-columns: 1fr; } }
+.chart-wrap canvas { max-height: 300px; }
+.donut-wrap { display: flex; flex-direction: column; align-items: center;
+              justify-content: center; }
+.donut-wrap canvas { max-height: 260px; max-width: 260px; }
 canvas { max-height: 320px; }
 table { width: 100%; border-collapse: collapse; background: var(--surface);
         border-radius: 8px; overflow: hidden; box-shadow: var(--card-shadow); }
@@ -267,6 +350,9 @@ tr:hover td { background: #f8f9fa; }
                     border: 1px solid var(--border); border-radius: 6px;
                     font-size: 13px; background: var(--surface); }
 .filter-row input:focus { outline: 2px solid var(--accent); }
+.heat-cell { position: relative; }
+.heat-bar { position: absolute; left: 0; top: 0; bottom: 0;
+            opacity: .12; pointer-events: none; border-radius: 2px; }
 </style>
 </head>
 <body>
@@ -288,6 +374,21 @@ tr:hover td { background: #f8f9fa; }
 <section>
   <h2>Summary</h2>
   <div class="cards" id="cards"></div>
+</section>
+
+<!-- SAVINGS BREAKDOWN + RUN TREND -->
+<section id="sec-savings">
+  <h2>Savings Breakdown</h2>
+  <div class="chart-grid">
+    <div class="chart-wrap donut-wrap">
+      <canvas id="savingsDonut"></canvas>
+      <p class="empty" id="donut-empty" style="display:none">No token data yet.</p>
+    </div>
+    <div class="chart-wrap">
+      <canvas id="trendChart"></canvas>
+      <p class="empty" id="trend-empty" style="display:none">No pack run history yet.</p>
+    </div>
+  </div>
 </section>
 
 <!-- TOKEN USAGE CHART -->
@@ -368,10 +469,10 @@ tr:hover td { background: #f8f9fa; }
 const DATA = DASHBOARD_DATA_PLACEHOLDER;
 
 // ── helpers ────────────────────────────────────────────────────────────────
-const fmt = n => (n == null ? "—" : Number(n).toLocaleString());
-const pct = r => r == null ? "—" : (r * 100).toFixed(1) + "%";
-const usd = v => v == null ? "—" : "$" + Number(v).toFixed(4);
-const dateStr = s => s ? s.slice(0, 16).replace("T", " ") : "—";
+const fmt = n => (n == null ? "-" : Number(n).toLocaleString());
+const pct = r => r == null ? "-" : (r * 100).toFixed(1) + "%";
+const usd = v => v == null ? "-" : "$" + Number(v).toFixed(4);
+const dateStr = s => s ? s.slice(0, 16).replace("T", " ") : "-";
 const esc = s => String(s ?? "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
 
 function riskBadge(r) {
@@ -404,6 +505,85 @@ const cardDefs = [
 document.getElementById("cards").innerHTML = cardDefs.map(c =>
   `<div class="card"><div class="label">${c.label}</div><div class="value ${c.cls}">${c.value}</div></div>`
 ).join("");
+
+// ── savings donut chart ────────────────────────────────────────────────────
+const totalUsed = s.total_input_tokens;
+const totalSaved = s.total_saved_tokens;
+if (totalUsed + totalSaved === 0) {
+  document.getElementById("donut-empty").style.display = "";
+  document.getElementById("savingsDonut").style.display = "none";
+} else {
+  new Chart(document.getElementById("savingsDonut"), {
+    type: "doughnut",
+    data: {
+      labels: ["Tokens Used", "Tokens Saved"],
+      datasets: [{
+        data: [totalUsed, totalSaved],
+        backgroundColor: ["rgba(13,110,253,.75)", "rgba(32,201,151,.75)"],
+        borderWidth: 2,
+        borderColor: "#fff",
+      }],
+    },
+    options: {
+      responsive: true,
+      cutout: "60%",
+      plugins: {
+        legend: { position: "bottom", labels: { font: { size: 12 } } },
+        tooltip: {
+          callbacks: {
+            label: ctx => {
+              const v = ctx.parsed;
+              const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+              return ` ${ctx.label}: ${v.toLocaleString()} (${(v/total*100).toFixed(1)}%)`;
+            },
+          },
+        },
+      },
+    },
+  });
+}
+
+// ── run trend line chart ───────────────────────────────────────────────────
+const trend = DATA.run_trend || [];
+if (trend.length === 0) {
+  document.getElementById("trend-empty").style.display = "";
+  document.getElementById("trendChart").style.display = "none";
+} else {
+  new Chart(document.getElementById("trendChart"), {
+    type: "line",
+    data: {
+      labels: trend.map(r => r.date || r.label || ""),
+      datasets: [
+        {
+          label: "Input Tokens",
+          data: trend.map(r => r.input_tokens),
+          borderColor: "rgba(13,110,253,.9)",
+          backgroundColor: "rgba(13,110,253,.08)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+        },
+        {
+          label: "Tokens Saved",
+          data: trend.map(r => r.saved_tokens),
+          borderColor: "rgba(32,201,151,.9)",
+          backgroundColor: "rgba(32,201,151,.08)",
+          fill: true,
+          tension: 0.3,
+          pointRadius: 3,
+        },
+      ],
+    },
+    options: {
+      responsive: true,
+      plugins: { legend: { position: "top" } },
+      scales: {
+        x: { ticks: { maxRotation: 45, font: { size: 11 } } },
+        y: { beginAtZero: true, ticks: { font: { size: 11 } } },
+      },
+    },
+  });
+}
 
 // ── token usage chart ──────────────────────────────────────────────────────
 const tc = DATA.token_chart;
@@ -477,17 +657,22 @@ function makeSortable(tableId, rows, renderRow, filterInputId) {
   render();
 }
 
-// ── heatmap table ─────────────────────────────────────────────────────────
+// ── heatmap table with heat colors ────────────────────────────────────────
 const heatFiles = (DATA.heatmap.top_token_heavy_files || DATA.heatmap.files || []);
-makeSortable("heatmap-table", heatFiles, r => `
-  <tr>
-    <td>${esc(r.path)}</td>
+const maxTok = heatFiles.reduce((m, r) => Math.max(m, r.total_compressed_tokens || 0), 1);
+
+makeSortable("heatmap-table", heatFiles, r => {
+  const heat = Math.round((r.total_compressed_tokens || 0) / maxTok * 100);
+  const heatStyle = `style="background:linear-gradient(90deg,rgba(220,53,69,${heat/200}) ${heat}%,transparent ${heat}%)"`;
+  return `<tr>
+    <td ${heatStyle}>${esc(r.path)}</td>
     <td class="num">${fmt(r.total_compressed_tokens)}</td>
     <td class="num">${fmt(r.total_original_tokens)}</td>
     <td class="num">${fmt(r.total_saved_tokens)}</td>
     <td class="num">${fmt(r.inclusion_count)}</td>
     <td class="num">${pct(r.inclusion_rate)}</td>
-  </tr>`, "heatmap-filter");
+  </tr>`;
+}, "heatmap-filter");
 
 if (!heatFiles.length) {
   document.getElementById("sec-heatmap").querySelector("table").innerHTML =
