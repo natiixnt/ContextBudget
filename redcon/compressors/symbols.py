@@ -500,6 +500,43 @@ _TS_METHOD_RE = re.compile(
 )
 
 
+def _collapse_blank_lines(text: str) -> str:
+    """Collapse runs of 2+ consecutive blank lines to a single blank line."""
+    out: list[str] = []
+    blanks = 0
+    for line in text.splitlines():
+        if not line.strip():
+            blanks += 1
+            if blanks <= 1:
+                out.append(line)
+        else:
+            blanks = 0
+            out.append(line)
+    return "\n".join(out)
+
+
+def _condense_decorators(body_lines: list[str]) -> list[str]:
+    """Collapse multi-line Python decorators to their first line + ...)."""
+    result: list[str] = []
+    i = 0
+    while i < len(body_lines):
+        line = body_lines[i]
+        stripped = line.strip()
+        if stripped.startswith("@") and "(" in stripped:
+            depth = stripped.count("(") - stripped.count(")")
+            if depth > 0:
+                j = i + 1
+                while j < len(body_lines) and depth > 0:
+                    depth += body_lines[j].count("(") - body_lines[j].count(")")
+                    j += 1
+                result.append(line.rstrip() + " ...)")
+                i = j
+                continue
+        result.append(line)
+        i += 1
+    return result
+
+
 def _strip_python_docstring(body_lines: list[str]) -> list[str]:
     """Remove the first docstring (triple-quoted string) from a Python body.
 
@@ -602,6 +639,7 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
         else:
             body_lines = lines[symbol.start : symbol.end + 1]
             if is_py:
+                body_lines = _condense_decorators(body_lines)
                 body_lines = _strip_python_docstring(body_lines)
             if symbol.symbol_type == "class" and len(body_lines) > _MAX_CLASS_BODY_LINES:
                 body = _condense_class_body(body_lines, _MAX_CLASS_BODY_LINES, method_re)
@@ -610,7 +648,7 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
             else:
                 body = "\n".join(body_lines)
         parts.append(f"{header}\n{body}")
-    return "\n\n".join(parts)
+    return _collapse_blank_lines("\n\n".join(parts))
 
 
 def select_symbol_aware_chunks(
@@ -619,6 +657,7 @@ def select_symbol_aware_chunks(
     text: str,
     keywords: list[str],
     line_budget: int,
+    max_symbols: int = 4,
 ) -> SymbolExtraction | None:
     """Extract relevant symbols from supported source files under a line budget."""
 
@@ -646,7 +685,7 @@ def select_symbol_aware_chunks(
     if not language or not candidates:
         return None
 
-    selected = _select_symbol_candidates(candidates, line_budget=line_budget)
+    selected = _select_symbol_candidates(candidates, line_budget=line_budget, max_symbols=max_symbols)
     if not selected:
         return None
 

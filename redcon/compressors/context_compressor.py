@@ -316,14 +316,16 @@ def compress_ranked_files(
         symbols: list[dict[str, int | str | bool]] = []
         symbol_failure_reason = ""
 
-        # Scale extraction line budget by relevance: high-scoring files get more
-        # lines to work with so important symbols are not truncated prematurely.
+        # Scale extraction line budget and symbol count by relevance:
+        # high-scoring files get more lines and more symbols extracted.
         if cfg.adaptive_line_budget and cfg.snippet_score_threshold > 0:
             _score_ratio = relevance_score / cfg.snippet_score_threshold
             _factor = min(cfg.adaptive_line_budget_max_factor, max(0.5, _score_ratio))
             effective_line_budget = max(1, int(cfg.snippet_total_line_limit * _factor))
+            effective_max_symbols = max(2, min(8, round(4 * _factor)))
         else:
             effective_line_budget = cfg.snippet_total_line_limit
+            effective_max_symbols = 4
 
         symbol_selection = None
         if cfg.symbol_extraction_enabled:
@@ -333,6 +335,7 @@ def compress_ranked_files(
                     text=full_text,
                     keywords=keywords,
                     line_budget=effective_line_budget,
+                    max_symbols=effective_max_symbols,
                 )
             except Exception as exc:  # pragma: no cover - exercised via monkeypatch tests
                 symbol_failure_reason = f"symbol extraction failed: {exc}"
