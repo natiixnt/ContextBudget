@@ -490,7 +490,7 @@ _MAX_FUNC_BODY_LINES = 60    # standalone functions beyond this get a tail trunc
 
 _PY_METHOD_RE = re.compile(r"^(\s+)(async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 # Matches TS/JS method declarations indented at least 2 spaces inside a class body.
-# Intentionally loose — matches the start of any indented name followed by ( or <.
+# Intentionally loose - matches the start of any indented name followed by ( or <.
 _TS_METHOD_RE = re.compile(
     r"^\s{2,}"
     r"(?:(?:public|private|protected|static|async|override|abstract|readonly)\s+)*"
@@ -597,7 +597,7 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
             f"lines {symbol.start + 1}-{symbol.end + 1}"
         )
         if symbol.score < _STUB_SCORE_THRESHOLD and symbol.end > symbol.start:
-            # Low keyword relevance — include only the signature line to save tokens.
+            # Low keyword relevance - include only the signature line to save tokens.
             body = lines[symbol.start] + " ..."
         else:
             body_lines = lines[symbol.start : symbol.end + 1]
