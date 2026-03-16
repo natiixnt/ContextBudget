@@ -13,6 +13,19 @@ Redcon selects, compresses, and budgets repository context for coding-agent work
 - supports local multi-repo and monorepo-package workspaces
 - exposes an adapter-ready middleware layer for external agent tools
 
+## Benchmark
+
+Focused 4-task study on a 15-file Python FastAPI service (12,228 token baseline):
+
+| Scenario | Mean tokens | Mean reduction |
+|----------|-------------|----------------|
+| compressed_pack (cold start) | 7,749 | **37%** |
+| cache_assisted_pack (warm cache) | 919 | **92%** |
+
+Cold start: first run, no prior summaries. Warm cache: second run, per-file summaries reused.
+
+Full methodology, raw JSON, and the 1,000-task large-scale results: [`redcon-benchmarks/`](redcon-benchmarks/).
+
 ## Quickstart
 
 ```bash

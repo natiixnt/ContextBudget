@@ -41,24 +41,39 @@ cross-file dependencies.
 
 ### Pre-generated results
 
-See [`docs/benchmarks/`](benchmarks/) for results from the three canonical
-tasks:
+See [`docs/benchmarks/`](benchmarks/) for full results.
 
-| Task | Baseline | Compressed | Reduction |
-|------|----------|------------|-----------|
-| Add caching | 12,230 tok | 7,937 tok | 35 % |
-| Add authentication | 12,230 tok | 3,259 tok | 73 % |
-| Refactor module | 12,230 tok | 1,768 tok | 86 % |
+**Focused (4 tasks, Python microservice — 12,228 baseline tokens):**
+
+Each task was measured with a cold cache; `cache_assisted_pack` shows savings
+when summaries from the prior run are reused.
+
+| Task | Baseline | Cold (compressed_pack) | Reduction | Warm (cache_assisted) | Reduction |
+|------|----------|-----------------------|-----------|-----------------------|-----------|
+| Add Redis caching | 12,228 | 7,827 | 36% | 1,459 | 88% |
+| Add JWT authentication | 12,228 | 7,512 | 39% | 150 | 99% |
+| Refactor module | 12,228 | 7,831 | 36% | 610 | 95% |
+| Add rate limiting | 12,228 | 7,827 | 36% | 1,459 | 88% |
+| **Average** | | | **37%** | | **92%** |
+
+**Large-scale (1,000 tasks, Redcon codebase — 2.2 M baseline tokens):**
+
+| Metric | compressed_pack | cache_assisted_pack |
+|--------|----------------|---------------------|
+| Mean tokens | 2,565 | 496 |
+| Mean savings | 99.9% | 100.0% |
+| p10 savings | 99.7% | 100.0% |
+| Quality risk low | 99.8% | - |
+
+> The 2.2 M baseline includes all repo files (source, docs, wiki, examples).
 
 ### Reproduce locally
 
 ```bash
-python benchmarks/run_benchmarks.py
-```
+# 1,000-task benchmark
+python redcon-benchmarks/run_large_benchmark.py --sample 100
 
-Or run a single task:
-
-```bash
+# Single task
 redcon benchmark "Add Redis caching to task lookup endpoints" \
-    --repo benchmarks/dataset --max-tokens 8000
+    --repo . --max-tokens 32000
 ```

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Redcon - Context Control Plane for AI Coding Agents</title>
-  <meta name="description" content="Redcon cuts LLM agent costs by 69% by optimizing and compressing code context before every call.">
+  <meta name="description" content="Redcon reduces LLM agent context by 37-92% — 37% on cold start, up to 92% with session cache reuse — by compressing and budgeting repository context before every call.">
 
   <!--
     Telegraf by Pangram Pangram - https://pangrampangram.com/products/telegraf
@@ -258,14 +258,17 @@
         linear-gradient(to bottom, #080010 60%, #1a0018 100%);
       border-top: 1px solid var(--w10);
       justify-content: flex-start;
-      padding-top: 80px;
+      padding-top: 48px;
     }
+    #benchmark .label { margin-bottom: 12px; }
+    #benchmark .h2 { margin-bottom: 0; }
+    #benchmark .body-text { font-size: 15px; line-height: 1.5; }
 
     .big-num {
-      font-size: clamp(96px, 16vw, 200px);
+      font-size: clamp(72px, 11vw, 140px);
       font-weight: 800; line-height: .88;
       letter-spacing: -.05em;
-      margin: 36px 0 16px;
+      margin: 20px 0 10px;
     }
 
     .big-num sup {
@@ -276,7 +279,7 @@
     .bench-table {
       width: 100%; max-width: 780px;
       border-collapse: collapse;
-      margin-top: 48px; font-size: 15px;
+      margin-top: 28px; font-size: 15px;
     }
 
     .bench-table thead tr {
@@ -291,7 +294,7 @@
     }
 
     .bench-table td {
-      padding: 16px;
+      padding: 11px 16px;
       border-bottom: 1px solid var(--w10);
       color: rgba(255,255,255,.75);
     }
@@ -523,19 +526,19 @@
 
   <h1 class="hero-headline">
     save tokens.<br>
-    save
+    <span style="padding-left:60px">save
     <!-- narrower chevrons for headline: 40x26 viewBox (~1.5 ratio) -->
     <svg viewBox="0 0 30 26" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"
       style="display:inline-block;height:.55em;width:auto;vertical-align:-.03em">
       <path d="M0 0 L4 0 L14 13 L4 26 L0 26 L8 13 Z" fill="white"/>
       <path d="M8 0 L12 0 L22 13 L12 26 L8 26 L16 13 Z" fill="white"/>
       <path d="M16 0 L20 0 L30 13 L20 26 L16 26 L24 13 Z" fill="white"/>
-    </svg>oney.
+    </svg>oney.</span>
   </h1>
 
   <p class="hero-sub">
     Redcon intercepts your agent's context, compresses it to what matters,
-    and cuts LLM costs by 69% on average - with no code changes.
+    and reduces LLM context by 37-92% - 37% on cold start, up to 92% as session cache warms, with no code changes.
   </p>
 
   <a href="#cta" class="btn-primary">
@@ -616,17 +619,17 @@
     </div>
 
     <div class="code-block">
-      <div class="code-comment"># without Redcon</div>
-      <div class="code-bad">all 15 files &rarr; 12,230 tokens</div>
-      <div class="code-bad">every turn &nbsp;&rarr; same cost</div>
-      <div class="code-bad">no budget &nbsp;&nbsp;&rarr; runaway spend</div>
+      <div class="code-comment"># without Redcon (15-file service)</div>
+      <div class="code-bad">all files &rarr; 12,228 tokens / call</div>
+      <div class="code-bad">every turn &rarr; same cost</div>
+      <div class="code-bad">no budget &nbsp;&rarr; runaway spend</div>
       <div class="code-sep"></div>
       <div class="code-comment"># with Redcon</div>
-      <div class="code-good">&gt;&gt;&gt; ranked files &rarr;&nbsp;&nbsp;2,196 tokens</div>
-      <div class="code-good">&gt;&gt;&gt; warm cache &nbsp;&rarr;&nbsp;&nbsp;&nbsp;&nbsp;150 tokens</div>
+      <div class="code-good">&gt;&gt;&gt; cold start &nbsp;&rarr;&nbsp;&nbsp;7,749 tokens (-37%)</div>
+      <div class="code-good">&gt;&gt;&gt; warm cache &nbsp;&rarr;&nbsp;&nbsp;&nbsp;&nbsp;919 tokens (-92%)</div>
       <div class="code-good">&gt;&gt;&gt; hard budget &nbsp;&rarr; cost is fixed</div>
       <div class="code-sep"></div>
-      <div class="code-dim">scan runtime: 3–19 ms</div>
+      <div class="code-dim">scan runtime: ~10 ms</div>
       <div class="code-dim">quality risk: low</div>
     </div>
   </div>
@@ -637,10 +640,10 @@
 <section id="benchmark">
   <p class="label">Benchmark</p>
   <h2 class="h2">Real numbers.</h2>
-  <div class="big-num">-69<sup>%</sup></div>
+  <div class="big-num">-37<sup>%</sup></div>
   <p class="body-text">
-    Average token reduction across 4 real engineering tasks on a Python
-    microservice. First run, no warm cache.
+    Cold-start context reduction on a 15-file Python service — no prior cache needed.
+    Session cache reuse raises this to 92% on average as summaries are reused across tasks.
   </p>
 
   <table class="bench-table">
@@ -648,42 +651,48 @@
       <tr>
         <th>Task</th>
         <th>Baseline</th>
-        <th>Redcon</th>
-        <th>Reduction</th>
+        <th>Cold start</th>
+        <th>Warm cache</th>
       </tr>
     </thead>
     <tbody>
       <tr>
-        <td class="task">Add authentication</td>
-        <td>12,230</td>
-        <td>2,196</td>
-        <td class="save">-82%</td>
+        <td class="task">Add Redis caching</td>
+        <td>12,228</td>
+        <td>7,827 <span style="color:var(--w30);font-size:13px">(-36%)</span></td>
+        <td class="save">1,459 (-88%)</td>
+      </tr>
+      <tr>
+        <td class="task">Add JWT authentication</td>
+        <td>12,228</td>
+        <td>7,512 <span style="color:var(--w30);font-size:13px">(-39%)</span></td>
+        <td class="save">150 (-99%)</td>
       </tr>
       <tr>
         <td class="task">Refactor module</td>
-        <td>12,230</td>
-        <td>2,484</td>
-        <td class="save">-80%</td>
+        <td>12,228</td>
+        <td>7,831 <span style="color:var(--w30);font-size:13px">(-36%)</span></td>
+        <td class="save">610 (-95%)</td>
       </tr>
       <tr>
         <td class="task">Add rate limiting</td>
-        <td>12,230</td>
-        <td>2,619</td>
-        <td class="save">-79%</td>
+        <td>12,228</td>
+        <td>7,827 <span style="color:var(--w30);font-size:13px">(-36%)</span></td>
+        <td class="save">1,459 (-88%)</td>
       </tr>
       <tr>
-        <td class="task">Add caching layer</td>
-        <td>12,230</td>
-        <td>7,935</td>
-        <td class="save">-35%</td>
+        <td class="task" style="color:var(--w30)">Average</td>
+        <td style="color:var(--w30)">12,228</td>
+        <td style="color:var(--w30)">7,749 (-37%)</td>
+        <td class="save">919 (-92%)</td>
       </tr>
     </tbody>
   </table>
 
   <p class="bench-source">
-    Full methodology &amp; raw data &rarr;
-    <a href="https://github.com/natiixnt/redcon-benchmarks" target="_blank" rel="noopener">
-      github.com/natiixnt/redcon-benchmarks
+    15-file Python FastAPI service &bull; cold cache per task &bull; full methodology &amp; raw data &rarr;
+    <a href="https://github.com/natiixnt/ContextBudget/tree/main/redcon-benchmarks" target="_blank" rel="noopener">
+      github.com/natiixnt/ContextBudget/redcon-benchmarks
     </a>
   </p>
 </section>
@@ -799,7 +808,7 @@
 
 <script>
 // ── SAVINGS CALCULATOR ──────────────────────────────────────────────────────
-const REDUCTION = 0.69; // average from benchmarks
+const REDUCTION = 0.37; // cold-start average from benchmarks (37%); warm cache reaches 92%
 
 function fmt(n) {
   if (n >= 1000) return '$' + (n / 1000).toFixed(1).replace(/\.0$/, '') + 'k';

@@ -2,24 +2,93 @@
 
 > **How much context does your agent actually need?**
 >
-> Redcon runs every task against a real repository and measures token usage
-> across four strategies.  Numbers below are generated against a real Python
-> microservice with 15 source files and 12,230 baseline tokens.
+> Two benchmarks: a focused 4-task study on a small synthetic repo, and a
+> large-scale 1,000-task run on the Redcon codebase itself.  The focused study
+> measures cold-start vs warm-cache savings; the large-scale study shows
+> aggregate token efficiency across diverse engineering categories.
 
 ---
 
-## Summary
+## Large-scale benchmark — 1,000 tasks, 15 categories
 
-| Task | Baseline | Redcon (first run) | Reduction | Warm cache |
-|------|----------|--------------------|-----------|------------|
-| Add authentication | 12,230 | **2,196** | **82%** | 150 (−99%) |
-| Refactor module | 12,230 | **2,484** | **80%** | 150 (−99%) |
-| Add rate limiting | 12,230 | **2,619** | **79%** | 150 (−99%) |
-| Add caching layer | 12,230 | **7,935** | **35%** | 2,255 (−82%) |
-| **Average** | | | **−69%** | **−95%** |
+**Environment:** Redcon repository (Python, ~100 source files, 2.2 M baseline tokens)
+**Run:** 1,000 unique coding tasks across 15 categories — 0 errors, 859 s total
 
-Benchmark environment: Python FastAPI task-management API, 15 source files,
-12,230 tokens (heuristic estimator), token budget 8,000, scan runtime 3–19 ms.
+| Metric | compressed_pack | cache_assisted_pack |
+|--------|----------------|---------------------|
+| Mean tokens | 2,565 | 496 |
+| Median tokens | 1,283 | 300 |
+| **Mean savings** | **99.9%** | **100.0%** |
+| Median savings | 99.9% | 100.0% |
+| Baseline (avg) | 2,201,380 | 2,201,380 |
+| Mean runtime | 304 ms | 304 ms |
+
+### Savings percentiles — compressed_pack
+
+| p10 | p25 | p50 | p75 | p90 | p95 | p99 |
+|-----|-----|-----|-----|-----|-----|-----|
+| 99.7% | 99.9% | **99.9%** | 100.0% | 100.0% | 100.0% | 100.0% |
+
+*At p10, Redcon still saves 99.7% of tokens.  There is no task in the corpus
+where savings fall below 99%.*
+
+### Savings percentiles — cache_assisted_pack
+
+| p10 | p25 | p50 | p75 | p90 | p95 | p99 |
+|-----|-----|-----|-----|-----|-----|-----|
+| 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% | 100.0% |
+
+### Quality risk distribution — compressed_pack
+
+| low | medium | high |
+|-----|--------|------|
+| **99.8%** | 0.2% | 0.0% |
+
+99.8% of packs complete at **low** quality risk.  Only 2 of 1,000 tasks
+triggered a `medium` flag (a secondary file was elided).  No task reached
+`high` risk.
+
+### Results by category
+
+| Category | n | compressed savings | cache savings |
+|----------|---|--------------------|---------------|
+| events | 53 | 99.9% | 100.0% |
+| search | 55 | 99.9% | 100.0% |
+| docs | 72 | 99.9% | 100.0% |
+| api | 86 | 99.9% | 100.0% |
+| error_handling | 57 | 99.9% | 100.0% |
+| database | 75 | 99.9% | 100.0% |
+| security | 85 | 99.9% | 100.0% |
+| auth | 58 | 99.9% | 100.0% |
+| deployment | 54 | 99.9% | 100.0% |
+| logging | 69 | 99.9% | 99.9% |
+| caching | 69 | 99.9% | 100.0% |
+| performance | 77 | 99.9% | 100.0% |
+| multitenancy | 39 | 99.9% | 100.0% |
+| testing | 90 | 99.9% | 100.0% |
+| refactoring | 61 | 99.8% | 99.9% |
+
+Savings are consistent across every category — auth, database, security,
+testing, deployment — with no category below 99.8%.
+
+---
+
+## Focused benchmark — 4 tasks on a small microservice
+
+**Environment:** Python FastAPI task-management API — 15 source files, 12,228 baseline tokens,
+token budget 8,000, scan runtime 3–19 ms.
+
+Each task was measured with a **cold cache** (no prior summaries), then
+the `cache_assisted_pack` strategy shows savings when the prior run's
+summaries are reused.
+
+| Task | Baseline | compressed_pack (cold) | Reduction | cache_assisted (warm) | Reduction |
+|------|----------|-----------------------|-----------|-----------------------|-----------|
+| Add Redis caching | 12,228 | 7,827 | 36% | 1,459 | 88% |
+| Add JWT authentication | 12,228 | 7,512 | 39% | 150 | 99% |
+| Refactor module | 12,228 | 7,831 | 36% | 610 | 95% |
+| Add rate limiting | 12,228 | 7,827 | 36% | 1,459 | 88% |
+| **Average** | | | **37%** | | **92%** |
 
 ---
 
@@ -33,10 +102,15 @@ symbol-level representations, and returns only what the agent actually needs.
 ```
 Without Redcon                        With Redcon
 ──────────────────────────────        ──────────────────────────────
-all 15 files → 12,230 tokens          4–15 ranked files → 2,196 tokens
-every turn   → same cost              warm cache        →   150 tokens
-no budget    → runaway spend          hard token budget → cost is predictable
+all files → 2,201,380 tokens          relevant files →  2,565 tokens
+every turn → same cost                warm cache     →    496 tokens
+no budget  → runaway spend            hard token budget  → cost is predictable
 ```
+
+> **Note on baseline:** The 2.2 M token figure represents every readable file
+> in the Redcon repository (source, docs, wiki, examples, etc.).  In practice
+> an agent would scope its context to relevant files — the savings vs. a naïve
+> top-30 file selection (≈ 58 K tokens) are ~96 % for `compressed_pack`.
 
 ---
 
@@ -49,102 +123,31 @@ no budget    → runaway spend          hard token budget → cost is predictabl
 | `compressed_pack` | Import-graph ranking + symbol-level compression |
 | `cache_assisted_pack` | `compressed_pack` + per-file content cache (warm) |
 
-Only `compressed_pack` and `cache_assisted_pack` are unique to Redcon.
-The benchmark compares all four so you can see exactly where the savings come from.
-
----
-
-## Task results
-
-### 1. Add authentication
-
-> *Add JWT authentication middleware to protect task and user API routes*
-
-| Strategy | Tokens | Saved | Quality risk |
-|----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
-| compressed_pack | **2,196** | 10,034 (**82%**) | low |
-| cache_assisted_pack | **150** | 12,080 (**99%**) | low |
-
-Files selected: `app.py`, `config.py`, `routes/tasks.py`, `routes/users.py`,
-`services/task_service.py`, `services/user_service.py`, `models/user.py` + tests.
-
-The auth task pulls in both route layers and the user model — Redcon identifies
-all the right files and skips the unrelated ones (`db/connection.py` is already
-abstracted), keeping quality risk **low**.
-
-→ [Full report](tasks/add-authentication.md)
-
----
-
-### 2. Refactor module
-
-> *Refactor the database repository layer to use connection pooling*
-
-| Strategy | Tokens | Saved | Quality risk |
-|----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
-| compressed_pack | **2,484** | 9,746 (**80%**) | low |
-| cache_assisted_pack | **150** | 12,080 (**99%**) | low |
-
-Files selected: full repository minus unneeded test boilerplate.
-The import-graph scorer correctly surfaces `db/connection.py`,
-`db/repository.py`, and their service callers.
-
-→ [Full report](tasks/refactor-module.md)
-
----
-
-### 3. Add rate limiting
-
-> *Add rate limiting middleware to API endpoints to prevent abuse*
-
-| Strategy | Tokens | Saved | Quality risk |
-|----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
-| compressed_pack | **2,619** | 9,611 (**79%**) | low |
-| cache_assisted_pack | **150** | 12,080 (**99%**) | low |
-
-Files selected: `app.py` (bootstrap), `config.py`, route handlers.
-Middleware tasks are cross-cutting, yet Redcon fits them in 2,619 tokens
-with no quality degradation.
-
-→ [Full report](tasks/add-rate-limiting.md)
-
----
-
-### 4. Add caching layer
-
-> *Add Redis caching to task lookup endpoints to reduce database load*
-
-| Strategy | Tokens | Saved | Quality risk |
-|----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
-| compressed_pack | **7,935** | 4,295 (**35%**) | medium |
-| cache_assisted_pack | **2,255** | 9,975 (**82%**) | low |
-
-This task touches fewer files on the first scan (11 vs 15), so first-run
-savings are smaller.  The `medium` quality risk flag indicates the compressed
-pack omits the user service — intentional, since caching is task-scoped.
-On a warm cache the pack drops to 2,255 tokens at `low` risk.
-
-→ [Full report](tasks/add-caching.md)
-
 ---
 
 ## Cost model
 
-At **$3 / 1M input tokens** (Claude Sonnet 4.5):
+### Large repo (2.2 M baseline tokens) — gpt-4o at $5 / 1M input tokens
 
 | Scenario | Tokens/call | Cost/call | Cost/100 calls |
 |----------|-------------|-----------|----------------|
-| Baseline (no Redcon) | 12,230 | $0.037 | $3.67 |
-| Redcon first run (avg) | 3,809 | $0.011 | $1.14 |
-| Redcon warm cache (avg) | 676 | $0.002 | $0.20 |
+| Baseline (no Redcon) | 2,201,380 | $11.01 | $1,100 |
+| Redcon compressed_pack | 2,565 | $0.013 | $1.28 |
+| Redcon cache_assisted | 496 | $0.002 | $0.25 |
+
+An engineering team running **200 agent calls/day** against a large monorepo
+saves roughly **$65,000/month** at gpt-4o pricing.
+
+### Small microservice (12,228 baseline tokens) — Claude Sonnet at $3 / 1M input tokens
+
+| Scenario | Tokens/call | Cost/call | Cost/100 calls |
+|----------|-------------|-----------|----------------|
+| Baseline (no Redcon) | 12,228 | $0.037 | $3.67 |
+| Redcon cold start (avg) | 7,749 | $0.023 | $2.32 |
+| Redcon warm cache (avg) | 919 | $0.003 | $0.28 |
 
 An engineering team running **500 agent calls/day** saves roughly
-**$950/month** at Sonnet pricing — before accounting for reduced
-latency and fewer timeout errors from oversized prompts.
+**$530/month** cold-start, or **$1,700/month** with a warm cache, at Sonnet pricing.
 
 ---
 
@@ -154,12 +157,24 @@ latency and fewer timeout errors from oversized prompts.
 git clone https://github.com/natiixnt/ContextBudget
 cd ContextBudget
 pip install -e .
-python benchmarks/run_benchmarks.py
+
+# Generate the 1,000-task corpus (already committed, re-run to regenerate)
+python redcon-benchmarks/corpus/generate_tasks.py
+
+# Run the full 1,000-task benchmark against this repo (~14 min)
+python redcon-benchmarks/run_large_benchmark.py
+
+# Run a 100-task sample (~90 s)
+python redcon-benchmarks/run_large_benchmark.py --sample 100
+
+# Run only the 'security' category
+python redcon-benchmarks/run_large_benchmark.py --category security
+
+# Run against your own repo
+python redcon-benchmarks/run_large_benchmark.py --repo /path/to/your/repo
 ```
 
-Output written to `docs/benchmarks/` as `.json` + `.md` per task.
-
-Raw JSON data is in [`tasks/`](tasks/) in this repo.
+Results are written to `redcon-benchmarks/results/` as JSON + Markdown.
 
 ---
 
@@ -172,13 +187,18 @@ Raw JSON data is in [`tasks/`](tasks/) in this repo.
   symbol-compressed (docstrings stripped, bodies elided for off-path functions).
 - **cache_assisted_pack** — same selection, but file contents served from the
   per-session SHA256 content cache.  Only files that changed since the last
-  turn are re-sent in full.
+  turn are re-sent in full.  This represents the second-and-later runs on
+  the same codebase within a session; the cold-start cost is borne once.
 - **Quality risk** — `low` means all files that would be needed to complete the
   task are present in the pack; `medium` means one or more secondary files are
   elided (the agent can still complete the task but may need a follow-up fetch).
 - Token counts use the **heuristic estimator** (≈ chars/4), which matches
   tiktoken within ±15% and adds zero latency.
+- The 1,000-task corpus covers 15 categories: api, auth, caching, database,
+  deployment, docs, error_handling, events, logging, multitenancy, performance,
+  refactoring, search, security, testing.  Tasks were generated deterministically
+  (seed=42) — see [`corpus/generate_tasks.py`](corpus/generate_tasks.py).
 
 ---
 
-*Generated 2026-03-15 — Redcon v1.1.0*
+*Generated 2026-03-16 — Redcon v1.1.0*
