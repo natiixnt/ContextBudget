@@ -486,14 +486,53 @@ def _trim_candidate(candidate: _SymbolCandidate, budget: int) -> _SymbolCandidat
 
 _STUB_SCORE_THRESHOLD = 3.5  # symbols below this get signature-only stubs (no body)
 _MAX_CLASS_BODY_LINES = 40   # class bodies beyond this are condensed to method stubs
+_MAX_FUNC_BODY_LINES = 60    # standalone functions beyond this get a tail truncation
 
 _PY_METHOD_RE = re.compile(r"^(\s+)(async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+# Matches TS/JS method declarations indented at least 2 spaces inside a class body.
+# Intentionally loose — matches the start of any indented name followed by ( or <.
+_TS_METHOD_RE = re.compile(
+    r"^\s{2,}"
+    r"(?:(?:public|private|protected|static|async|override|abstract|readonly)\s+)*"
+    r"(?:get\s+|set\s+|async\s+)?"
+    r"(?!(?:if|for|while|switch|return|const|let|var|new|throw|import|export)\b)"
+    r"([A-Za-z_$][\w$]*)\s*[(<]"
+)
 
 
-def _condense_class_body(body_lines: list[str], max_lines: int) -> str:
+def _strip_python_docstring(body_lines: list[str]) -> list[str]:
+    """Remove the first docstring (triple-quoted string) from a Python body.
+
+    ``body_lines[0]`` is the ``def``/``class`` line.  Modifies nothing in-place;
+    returns a new list with the docstring lines removed.
+    """
+    if len(body_lines) < 2:
+        return body_lines
+    i = 1
+    while i < len(body_lines) and not body_lines[i].strip():
+        i += 1
+    if i >= len(body_lines):
+        return body_lines
+    first = body_lines[i].strip()
+    for delim in ('"""', "'''"):
+        if first.startswith(delim):
+            rest = first[len(delim):]
+            if rest.endswith(delim) and len(rest) >= len(delim):
+                # Single-line docstring
+                return body_lines[:i] + body_lines[i + 1:]
+            # Multi-line: scan for closing delimiter
+            j = i + 1
+            while j < len(body_lines):
+                if delim in body_lines[j]:
+                    return body_lines[:i] + body_lines[j + 1:]
+                j += 1
+            break
+    return body_lines
+
+
+def _condense_class_body(body_lines: list[str], max_lines: int, method_re: re.Pattern[str]) -> str:
     """Render first *max_lines* of a class, then stub remaining methods.
 
-    Preserves the class signature, docstring, and ``__init__`` fully.
     Remaining methods beyond the line cap are collapsed to their
     signature line + `` ...`` so the reader knows they exist.
     """
@@ -503,13 +542,20 @@ def _condense_class_body(body_lines: list[str], max_lines: int) -> str:
     kept = "\n".join(body_lines[:max_lines])
     stubs: list[str] = []
     for line in body_lines[max_lines:]:
-        m = _PY_METHOD_RE.match(line)
-        if m:
+        if method_re.match(line):
             stubs.append(line.rstrip() + " ...")
     if stubs:
         return kept + "\n    # --- remaining methods (signatures only) ---\n" + "\n".join(stubs)
     omitted = len(body_lines) - max_lines
     return kept + f"\n    # ... ({omitted} lines omitted)"
+
+
+def _condense_func_body(body_lines: list[str], max_lines: int) -> str:
+    """Truncate a long standalone function body and append a line-count note."""
+    if len(body_lines) <= max_lines:
+        return "\n".join(body_lines)
+    omitted = len(body_lines) - max_lines
+    return "\n".join(body_lines[:max_lines]) + f"\n    # ... ({omitted} lines omitted)"
 
 
 def _select_symbol_candidates(candidates: list[_SymbolCandidate], line_budget: int, max_symbols: int = 4) -> list[_SymbolCandidate]:
@@ -540,8 +586,10 @@ def _select_symbol_candidates(candidates: list[_SymbolCandidate], line_budget: i
     return selected
 
 
-def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate]) -> str:
+def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate], language: str) -> str:
     parts: list[str] = []
+    is_py = language == "python"
+    method_re = _TS_METHOD_RE if language in {"typescript", "javascript"} else _PY_METHOD_RE
     for symbol in selected:
         export_marker = " exported" if symbol.exported else ""
         header = (
@@ -553,8 +601,12 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate])
             body = lines[symbol.start] + " ..."
         else:
             body_lines = lines[symbol.start : symbol.end + 1]
+            if is_py:
+                body_lines = _strip_python_docstring(body_lines)
             if symbol.symbol_type == "class" and len(body_lines) > _MAX_CLASS_BODY_LINES:
-                body = _condense_class_body(body_lines, _MAX_CLASS_BODY_LINES)
+                body = _condense_class_body(body_lines, _MAX_CLASS_BODY_LINES, method_re)
+            elif symbol.symbol_type == "function" and len(body_lines) > _MAX_FUNC_BODY_LINES:
+                body = _condense_func_body(body_lines, _MAX_FUNC_BODY_LINES)
             else:
                 body = "\n".join(body_lines)
         parts.append(f"{header}\n{body}")
@@ -628,5 +680,5 @@ def select_symbol_aware_chunks(
         chunk_reason=f"symbol-aware {language} extraction ({reason_suffix})",
         selected_ranges=selected_ranges,
         symbols=symbols,
-        text=_render_selected_symbols(lines, selected),
+        text=_render_selected_symbols(lines, selected, language),
     )
