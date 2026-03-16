@@ -69,6 +69,68 @@ def _is_utility_file(path: str) -> bool:
     return any(pat in p for pat in _UTILITY_FILE_PATTERNS)
 
 
+def _strip_docstrings_in_text(text: str) -> str:
+    """Strip triple-quoted docstrings that follow def/class lines in arbitrary Python text.
+
+    Applied as a post-pass to slice and snippet output where per-symbol
+    docstring stripping has not already run.
+    """
+    lines = text.splitlines()
+    out: list[str] = []
+    i = 0
+    while i < len(lines):
+        line = lines[i]
+        stripped = line.strip()
+        if stripped.endswith(":") and any(
+            stripped.startswith(kw)
+            for kw in ("def ", "async def ", "class ", "):", "        ):")
+        ):
+            out.append(line)
+            i += 1
+            blank_start = i
+            while i < len(lines) and not lines[i].strip():
+                i += 1
+            if i >= len(lines):
+                out.extend(lines[blank_start:i])
+                break
+            first_body = lines[i].strip()
+            found = False
+            for delim in ('"""', "'''"):
+                if first_body.startswith(delim):
+                    rest = first_body[len(delim):]
+                    if rest.endswith(delim) and len(rest) >= len(delim):
+                        i += 1
+                        found = True
+                        break
+                    i += 1
+                    while i < len(lines) and delim not in lines[i]:
+                        i += 1
+                    i += 1
+                    found = True
+                    break
+            if not found:
+                out.extend(lines[blank_start:i])
+            continue
+        out.append(line)
+        i += 1
+    return "\n".join(out)
+
+
+def _collapse_blank_lines(text: str) -> str:
+    """Collapse runs of 2+ consecutive blank lines to a single blank line."""
+    out: list[str] = []
+    blanks = 0
+    for line in text.splitlines():
+        if not line.strip():
+            blanks += 1
+            if blanks <= 1:
+                out.append(line)
+        else:
+            blanks = 0
+            out.append(line)
+    return "\n".join(out)
+
+
 def _dedup_imports(text: str, seen_imports: set[str]) -> str:
     """Strip import lines already seen in earlier compressed files.
 
@@ -463,10 +525,17 @@ def compress_ranked_files(
                     else []
                 )
 
-        # Strip import lines already emitted in an earlier file - cross-file dedup.
-        # Applied before cache-key computation so deduped content is stored/looked up.
+        # Post-compression cleanup: strip docstrings and collapse blank lines.
+        # Applied to all non-full strategies so slice/snippet output gets the
+        # same cleanup that symbol extraction already applies internally.
+        is_py_file = file_record.extension == ".py"
         if strategy != "full":
+            if is_py_file:
+                compressed = _strip_docstrings_in_text(compressed)
+            compressed = _collapse_blank_lines(compressed)
             compressed = _dedup_imports(compressed, seen_imports)
+        else:
+            compressed = _collapse_blank_lines(compressed)
 
         fragment_cache_key = _fragment_cache_key(file_record.path, selected_ranges, compressed)
         fragment_reference = _fragment_reference_id(fragment_cache_key)
