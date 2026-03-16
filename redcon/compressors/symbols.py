@@ -646,6 +646,7 @@ def _condense_class_body(body_lines: list[str], max_lines: int, method_re: re.Pa
 
     Remaining methods beyond the line cap are collapsed to their
     signature line + `` ...`` so the reader knows they exist.
+    Multi-line Python signatures are joined into a single compact line.
     """
     if len(body_lines) <= max_lines:
         return "\n".join(body_lines)
@@ -653,10 +654,33 @@ def _condense_class_body(body_lines: list[str], max_lines: int, method_re: re.Pa
     kept = "\n".join(body_lines[:max_lines])
     stubs: list[str] = []
     is_py_method = method_re is _PY_METHOD_RE
-    for line in body_lines[max_lines:]:
+    i = max_lines
+    while i < len(body_lines):
+        line = body_lines[i]
         if method_re.match(line):
-            sig = _strip_py_annotations(line.rstrip()) if is_py_method else line.rstrip()
+            if is_py_method:
+                # Collect complete multi-line signature, then strip annotations.
+                indent = " " * (len(line) - len(line.lstrip()))
+                depth = line.count("(") - line.count(")")
+                parts = [line.strip()]
+                j = i + 1
+                while j < len(body_lines) and depth > 0:
+                    sl = body_lines[j].strip()
+                    depth += body_lines[j].count("(") - body_lines[j].count(")")
+                    parts.append(sl)
+                    j += 1
+                joined = " ".join(parts)
+                joined = re.sub(r"\(\s+", "(", joined)
+                joined = re.sub(r"\s+\)", ")", joined)
+                joined = re.sub(r",\s+", ", ", joined)
+                sig = _strip_py_annotations(indent + joined)
+                i = j
+            else:
+                sig = line.rstrip()
+                i += 1
             stubs.append(sig + " ...")
+        else:
+            i += 1
     if stubs:
         return kept + "\n    # --- remaining methods (signatures only) ---\n" + "\n".join(stubs)
     omitted = len(body_lines) - max_lines
@@ -742,7 +766,7 @@ def _collapse_multiline_py_signatures(body_lines: list[str]) -> list[str]:
     while i < len(body_lines):
         line = body_lines[i]
         stripped = line.strip()
-        if stripped.startswith(("def ", "async def ")) and "(" in stripped:
+        if stripped.startswith(("def ", "async def ")) and "(" in stripped and not stripped.endswith("..."):
             depth = stripped.count("(") - stripped.count(")")
             if depth > 0:
                 # Collect all lines of this multi-line signature.
