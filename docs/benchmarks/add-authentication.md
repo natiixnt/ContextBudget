@@ -1,6 +1,6 @@
-# Agent Run Benchmark: add-authentication
+# Benchmark: add-authentication
 
-> **Task:** Add JWT authentication middleware to protect task and user API routes and validate user sessions
+> **Task:** Add JWT authentication middleware to protect task and user API routes
 
 Evaluates context selection for an auth-focused change spanning route handlers, user model, and application bootstrap.
 
@@ -11,32 +11,32 @@ Evaluates context selection for an auth-focused change spanning route handlers, 
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 3 ms |
-| Generated | 2026-03-15T11:35:09.173424+00:00 |
+| Scan runtime | 6 ms |
+| Generated | 2026-03-16T20:13:35.200605+00:00 |
 
 ## Baseline
 
-Full repository context (no selection, no compression): **12,230 tokens**
+Full repository context (no selection, no compression): **13,538 tokens**
 
 ## Strategy comparison
 
 | Strategy | Input tokens | Saved tokens | Quality risk | Runtime |
 |----------|-------------|--------------|--------------|---------|
-| naive_full_context | 12,230 | 0 (0.0%) | low | 0 ms |
-| top_k_selection | 12,230 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,196 | 10,034 (82.0%) | low | 17 ms |
-| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 18 ms |
+| naive_full_context | 13,538 | 0 (0.0%) | low | 0 ms |
+| top_k_selection | 13,538 | 0 (0.0%) | low | 0 ms |
+| compressed_pack | 3,025 | 10,513 (77.7%) | low | 22 ms |
+| cache_assisted_pack | 160 | 13,378 (98.8%) | low | 22 ms |
 
 ## Compressed pack details
 
-- **Baseline tokens:** 12,230
-- **Optimized tokens:** 2,196 (18.0% of baseline)
-- **Saved tokens:** 10,034 (82.0% reduction)
+- **Input tokens:** 3,025 (22.3% of baseline)
+- **Saved tokens:** 10,513 (77.7% reduction)
 - **Quality risk:** low
-- **Files included:** 15
+- **Files included:** 16
 
 ### Files included in packed context
 
+- `.contextbudget_cache.json`
 - `README.md`
 - `src/app.py`
 - `src/config.py`
@@ -55,12 +55,12 @@ Full repository context (no selection, no compression): **12,230 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 18 ms
+Second run (warm cache): **160 tokens**, 17 cache hits, 22 ms
 
 ## Token estimator comparison
 
 | Sample | heuristic | model_aligned | exact_tiktoken |
 |--------|-----------|---------------|----------------|
-| task | 24 | 28 | 24 *(fallback)* |
-| top_ranked_file | 1025 | 1172 | 1025 *(fallback)* |
-| packed_context | 2202 | 2517 | 2202 *(fallback)* |
+| task | 18 | 20 | 18 *(fallback)* |
+| top_ranked_file | 616 | 704 | 616 *(fallback)* |
+| packed_context | 3029 | 3462 | 3029 *(fallback)* |

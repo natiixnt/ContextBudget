@@ -727,6 +727,43 @@ _DATA_OPEN_MAX_ENTRIES = 7
 _DATA_OPEN_KEEP = 3
 
 
+def _collapse_multiline_py_signatures(body_lines: list[str]) -> list[str]:
+    """Collapse multi-line Python ``def``/``class`` signatures to one line.
+
+    Signatures split across lines (e.g. long parameter lists) are joined and
+    their type annotations stripped via :func:`_strip_py_annotations`, turning
+    9-line signatures into a single compact line.
+    """
+    result: list[str] = []
+    i = 0
+    while i < len(body_lines):
+        line = body_lines[i]
+        stripped = line.strip()
+        if stripped.startswith(("def ", "async def ")) and "(" in stripped:
+            depth = stripped.count("(") - stripped.count(")")
+            if depth > 0:
+                # Collect all lines of this multi-line signature.
+                parts = [stripped]
+                j = i + 1
+                while j < len(body_lines) and depth > 0:
+                    sl = body_lines[j].strip()
+                    depth += sl.count("(") - sl.count(")")
+                    parts.append(sl)
+                    j += 1
+                indent = " " * (len(line) - len(line.lstrip()))
+                joined = " ".join(parts)
+                # Normalise internal spacing.
+                joined = re.sub(r"\(\s+", "(", joined)
+                joined = re.sub(r"\s+\)", ")", joined)
+                joined = re.sub(r",\s+", ", ", joined)
+                result.append(_strip_py_annotations(indent + joined))
+                i = j
+                continue
+        result.append(line)
+        i += 1
+    return result
+
+
 def _truncate_data_blocks(body_lines: list[str]) -> list[str]:
     """Collapse large inline data structures to first few entries.
 
@@ -832,6 +869,10 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
                 body = _condense_func_body(body_lines, _MAX_FUNC_BODY_LINES)
             else:
                 body = "\n".join(body_lines)
+            # Collapse any multi-line Python signatures AFTER body condensation so the
+            # size thresholds above still use the original line counts.
+            if is_py:
+                body = "\n".join(_collapse_multiline_py_signatures(body.splitlines()))
         parts.append(f"{header}\n{body}")
     return _collapse_blank_lines("\n\n".join(parts))
 

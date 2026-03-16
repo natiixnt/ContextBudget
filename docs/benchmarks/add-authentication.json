@@ -1,18 +1,19 @@
 {
   "command": "benchmark",
-  "task": "Add JWT authentication middleware to protect task and user API routes and validate user sessions",
-  "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/benchmarks/dataset",
+  "task": "Add JWT authentication middleware to protect task and user API routes",
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/benchmarks/dataset",
   "max_tokens": 8000,
   "top_files": 20,
-  "baseline_full_context_tokens": 12230,
-  "scan_runtime_ms": 3,
+  "baseline_full_context_tokens": 13538,
+  "scan_runtime_ms": 6,
   "strategies": [
     {
       "strategy": "naive_full_context",
       "description": "Send full readable repository context without selection or compression.",
-      "estimated_input_tokens": 12230,
+      "estimated_input_tokens": 13538,
       "estimated_saved_tokens": 0,
       "files_included": [
+        ".contextbudget_cache.json",
         "README.md",
         "src/app.py",
         "src/config.py",
@@ -38,14 +39,14 @@
     {
       "strategy": "top_k_selection",
       "description": "Select top-ranked files and include full content without compression.",
-      "estimated_input_tokens": 12230,
+      "estimated_input_tokens": 13538,
       "estimated_saved_tokens": 0,
       "files_included": [
-        "src/services/task_service.py",
         "tests/test_tasks.py",
+        "src/services/task_service.py",
         "src/routes/tasks.py",
-        "src/services/user_service.py",
         "src/routes/users.py",
+        "src/services/user_service.py",
         "src/db/repository.py",
         "src/app.py",
         "README.md",
@@ -55,7 +56,8 @@
         "src/utils/validators.py",
         "src/db/connection.py",
         "src/utils/helpers.py",
-        "src/config.py"
+        "src/config.py",
+        ".contextbudget_cache.json"
       ],
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
@@ -67,14 +69,14 @@
     {
       "strategy": "compressed_pack",
       "description": "Use Redcon scoring + compression under configured token budget.",
-      "estimated_input_tokens": 2196,
-      "estimated_saved_tokens": 10034,
+      "estimated_input_tokens": 3025,
+      "estimated_saved_tokens": 10513,
       "files_included": [
-        "src/services/task_service.py",
         "tests/test_tasks.py",
+        "src/services/task_service.py",
         "src/routes/tasks.py",
-        "src/services/user_service.py",
         "src/routes/users.py",
+        "src/services/user_service.py",
         "src/db/repository.py",
         "src/app.py",
         "README.md",
@@ -84,25 +86,26 @@
         "src/utils/validators.py",
         "src/db/connection.py",
         "src/utils/helpers.py",
-        "src/config.py"
+        "src/config.py",
+        ".contextbudget_cache.json"
       ],
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 12,
-      "runtime_ms": 17
+      "cache_hits": 8,
+      "runtime_ms": 22
     },
     {
       "strategy": "cache_assisted_pack",
       "description": "Repeat compressed pack on warm cache to measure cache-assisted behavior.",
-      "estimated_input_tokens": 150,
-      "estimated_saved_tokens": 12080,
+      "estimated_input_tokens": 160,
+      "estimated_saved_tokens": 13378,
       "files_included": [
-        "src/services/task_service.py",
         "tests/test_tasks.py",
+        "src/services/task_service.py",
         "src/routes/tasks.py",
-        "src/services/user_service.py",
         "src/routes/users.py",
+        "src/services/user_service.py",
         "src/db/repository.py",
         "src/app.py",
         "README.md",
@@ -112,13 +115,14 @@
         "src/utils/validators.py",
         "src/db/connection.py",
         "src/utils/helpers.py",
-        "src/config.py"
+        "src/config.py",
+        ".contextbudget_cache.json"
       ],
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 15,
-      "runtime_ms": 18,
+      "cache_hits": 17,
+      "runtime_ms": 22,
       "notes": "second run with warmed summary cache"
     }
   ],
@@ -139,19 +143,19 @@
   "estimator_samples": [
     {
       "name": "task",
-      "chars": 96,
+      "chars": 69,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 24,
+          "estimated_tokens": 18,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 28,
+          "estimated_tokens": 20,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -159,7 +163,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 24,
+          "estimated_tokens": 18,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -169,19 +173,19 @@
     },
     {
       "name": "top_ranked_file",
-      "chars": 4100,
+      "chars": 2461,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 1025,
+          "estimated_tokens": 616,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 1172,
+          "estimated_tokens": 704,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -189,30 +193,30 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 1025,
+          "estimated_tokens": 616,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
           "fallback_reason": "Optional dependency \"tiktoken\" is not installed."
         }
       ],
-      "path": "src/services/task_service.py"
+      "path": "tests/test_tasks.py"
     },
     {
       "name": "packed_context",
-      "chars": 8808,
+      "chars": 12115,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2202,
+          "estimated_tokens": 3029,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 2517,
+          "estimated_tokens": 3462,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +224,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2202,
+          "estimated_tokens": 3029,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +233,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-15T11:35:09.173424+00:00",
+  "generated_at": "2026-03-16T20:13:35.200605+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",

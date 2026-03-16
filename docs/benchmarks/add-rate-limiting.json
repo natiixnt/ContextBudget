@@ -1,18 +1,19 @@
 {
   "command": "benchmark",
   "task": "Add rate limiting middleware to API endpoints to prevent abuse and ensure fair usage",
-  "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/benchmarks/dataset",
+  "repo": "/Users/naithai/Desktop/amogus/praca/ContextBudget/benchmarks/dataset",
   "max_tokens": 8000,
   "top_files": 20,
-  "baseline_full_context_tokens": 12230,
-  "scan_runtime_ms": 3,
+  "baseline_full_context_tokens": 13538,
+  "scan_runtime_ms": 5,
   "strategies": [
     {
       "strategy": "naive_full_context",
       "description": "Send full readable repository context without selection or compression.",
-      "estimated_input_tokens": 12230,
+      "estimated_input_tokens": 13538,
       "estimated_saved_tokens": 0,
       "files_included": [
+        ".contextbudget_cache.json",
         "README.md",
         "src/app.py",
         "src/config.py",
@@ -38,8 +39,8 @@
     {
       "strategy": "top_k_selection",
       "description": "Select top-ranked files and include full content without compression.",
-      "estimated_input_tokens": 12230,
-      "estimated_saved_tokens": 0,
+      "estimated_input_tokens": 12228,
+      "estimated_saved_tokens": 1310,
       "files_included": [
         "README.md",
         "src/config.py",
@@ -57,7 +58,9 @@
         "src/utils/helpers.py",
         "src/utils/validators.py"
       ],
-      "files_skipped": [],
+      "files_skipped": [
+        ".contextbudget_cache.json"
+      ],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
       "cache_hits": 0,
@@ -67,8 +70,8 @@
     {
       "strategy": "compressed_pack",
       "description": "Use Redcon scoring + compression under configured token budget.",
-      "estimated_input_tokens": 2619,
-      "estimated_saved_tokens": 9611,
+      "estimated_input_tokens": 642,
+      "estimated_saved_tokens": 12896,
       "files_included": [
         "README.md",
         "src/config.py",
@@ -89,14 +92,14 @@
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 10,
-      "runtime_ms": 17
+      "cache_hits": 8,
+      "runtime_ms": 20
     },
     {
       "strategy": "cache_assisted_pack",
       "description": "Repeat compressed pack on warm cache to measure cache-assisted behavior.",
       "estimated_input_tokens": 150,
-      "estimated_saved_tokens": 12080,
+      "estimated_saved_tokens": 13388,
       "files_included": [
         "README.md",
         "src/config.py",
@@ -117,8 +120,8 @@
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 15,
-      "runtime_ms": 17,
+      "cache_hits": 16,
+      "runtime_ms": 19,
       "notes": "second run with warmed summary cache"
     }
   ],
@@ -169,19 +172,19 @@
     },
     {
       "name": "top_ranked_file",
-      "chars": 1875,
+      "chars": 1868,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 469,
+          "estimated_tokens": 467,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 536,
+          "estimated_tokens": 534,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -189,7 +192,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 469,
+          "estimated_tokens": 467,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -200,19 +203,19 @@
     },
     {
       "name": "packed_context",
-      "chars": 10500,
+      "chars": 2586,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2625,
+          "estimated_tokens": 647,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 3000,
+          "estimated_tokens": 739,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +223,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2625,
+          "estimated_tokens": 647,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +232,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-15T11:35:09.251093+00:00",
+  "generated_at": "2026-03-16T20:13:35.297099+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",
