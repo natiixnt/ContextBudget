@@ -595,24 +595,43 @@ def _condense_decorators(body_lines: list[str]) -> list[str]:
 def _strip_python_docstring(body_lines: list[str]) -> list[str]:
     """Remove the first docstring (triple-quoted string) from a Python body.
 
-    ``body_lines[0]`` is the ``def``/``class`` line.  Modifies nothing in-place;
-    returns a new list with the docstring lines removed.
+    Handles leading comment/decorator lines and multi-line signatures
+    (e.g. ``def foo(\\n    arg,\\n) -> str:``) by scanning for the actual
+    ``def``/``class`` header before searching for the docstring.
     """
     if len(body_lines) < 2:
         return body_lines
-    i = 1
+
+    # Find the def/class header (may be preceded by comments or decorators).
+    header_idx = 0
+    for idx, line in enumerate(body_lines):
+        stripped = line.strip()
+        if stripped.startswith(("def ", "async def ", "class ")):
+            header_idx = idx
+            break
+
+    # Skip past a multi-line signature by tracking open paren depth.
+    i = header_idx
+    paren_depth = body_lines[i].count("(") - body_lines[i].count(")")
+    i += 1
+    while i < len(body_lines) and paren_depth > 0:
+        paren_depth += body_lines[i].count("(") - body_lines[i].count(")")
+        i += 1
+
+    # Skip blank lines between signature end and body.
     while i < len(body_lines) and not body_lines[i].strip():
         i += 1
     if i >= len(body_lines):
         return body_lines
+
     first = body_lines[i].strip()
     for delim in ('"""', "'''"):
         if first.startswith(delim):
             rest = first[len(delim):]
             if rest.endswith(delim) and len(rest) >= len(delim):
-                # Single-line docstring
+                # Single-line docstring.
                 return body_lines[:i] + body_lines[i + 1:]
-            # Multi-line: scan for closing delimiter
+            # Multi-line: scan for closing delimiter.
             j = i + 1
             while j < len(body_lines):
                 if delim in body_lines[j]:

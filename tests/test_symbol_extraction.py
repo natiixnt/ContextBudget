@@ -15,7 +15,7 @@ def _write(path: Path, content: str) -> None:
     path.write_text(content, encoding="utf-8")
 
 
-def test_python_symbol_extraction_detects_symbols_and_docstrings() -> None:
+def test_python_symbol_extraction_detects_symbols_and_strips_docstrings() -> None:
     text = """
 # Handles auth checks.
 class AuthService:
@@ -41,7 +41,9 @@ def helper() -> None:
     assert {item["name"] for item in chunk.symbols} >= {"AuthService"}
     assert any(item["symbol_type"] == "class" for item in chunk.symbols)
     assert "# Handles auth checks." in chunk.text
-    assert '"""Auth service docs."""' in chunk.text
+    assert "class AuthService" in chunk.text
+    # Docstring is stripped for compression.
+    assert '"""Auth service docs."""' not in chunk.text
 
 
 def test_typescript_symbol_extraction_detects_exports_and_interfaces() -> None:
