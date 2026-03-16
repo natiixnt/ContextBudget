@@ -11,8 +11,8 @@ Evaluates context selection for an auth-focused change spanning route handlers, 
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 5 ms |
-| Generated | 2026-03-16T20:20:01.753544+00:00 |
+| Scan runtime | 6 ms |
+| Generated | 2026-03-16T20:27:45.652372+00:00 |
 
 ## Baseline
 
@@ -24,13 +24,13 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,845 | 9,383 (76.7%) | low | 22 ms |
+| compressed_pack | 3,009 | 9,219 (75.4%) | low | 23 ms |
 | cache_assisted_pack | 150 | 12,078 (98.8%) | low | 23 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 2,845 (23.3% of baseline)
-- **Saved tokens:** 9,383 (76.7% reduction)
+- **Input tokens:** 3,009 (24.6% of baseline)
+- **Saved tokens:** 9,219 (75.4% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -62,4 +62,4 @@ Second run (warm cache): **150 tokens**, 15 cache hits, 23 ms
 |--------|-----------|---------------|----------------|
 | task | 18 | 20 | 18 *(fallback)* |
 | top_ranked_file | 616 | 704 | 616 *(fallback)* |
-| packed_context | 2850 | 3257 | 2850 *(fallback)* |
+| packed_context | 3013 | 3443 | 3013 *(fallback)* |

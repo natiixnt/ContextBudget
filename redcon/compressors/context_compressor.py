@@ -14,7 +14,11 @@ from redcon.compressors.language_chunks import (
     SliceRelationshipContext,
     select_language_aware_chunks,
 )
-from redcon.compressors.symbols import select_symbol_aware_chunks, _truncate_data_blocks
+from redcon.compressors.symbols import (
+    select_symbol_aware_chunks,
+    _truncate_data_blocks,
+    _STUB_SCORE_THRESHOLD,
+)
 from redcon.compressors.summarizers import SummaryRequest, SummarizationService
 from redcon.core.text import task_keywords
 from redcon.core.tokens import estimate_tokens
@@ -398,6 +402,8 @@ def compress_ranked_files(
         symbols: list[dict[str, int | str | bool]] = []
         symbol_failure_reason = ""
 
+        is_test = _is_test_file(file_record.path)
+
         # Scale extraction line budget and symbol count by relevance:
         # high-scoring files get more lines and more symbols extracted.
         if cfg.adaptive_line_budget and cfg.snippet_score_threshold > 0:
@@ -409,6 +415,11 @@ def compress_ranked_files(
             effective_line_budget = cfg.snippet_total_line_limit
             effective_max_symbols = 4
 
+        # Test files use a higher stub score threshold so that test function
+        # bodies are stubbed out unless the function is highly keyword-relevant.
+        # This avoids spending tokens on generic test boilerplate.
+        effective_stub_threshold = 5.5 if is_test else _STUB_SCORE_THRESHOLD
+
         symbol_selection = None
         if cfg.symbol_extraction_enabled:
             try:
@@ -418,6 +429,7 @@ def compress_ranked_files(
                     keywords=keywords,
                     line_budget=effective_line_budget,
                     max_symbols=effective_max_symbols,
+                    stub_score_threshold=effective_stub_threshold,
                 )
             except Exception as exc:  # pragma: no cover - exercised via monkeypatch tests
                 symbol_failure_reason = f"symbol extraction failed: {exc}"
@@ -453,7 +465,6 @@ def compress_ranked_files(
             )
         )
 
-        is_test = _is_test_file(file_record.path)
         is_utility = _is_utility_file(file_record.path)
         # Test and utility files always get symbol/slice extraction regardless of
         # size - fixtures and boilerplate bodies waste tokens when sent verbatim.

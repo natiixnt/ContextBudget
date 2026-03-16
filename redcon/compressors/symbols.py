@@ -836,12 +836,17 @@ def _select_symbol_candidates(candidates: list[_SymbolCandidate], line_budget: i
     return selected
 
 
-def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate], language: str) -> str:
+def _render_selected_symbols(
+    lines: list[str],
+    selected: list[_SymbolCandidate],
+    language: str,
+    stub_score_threshold: float = _STUB_SCORE_THRESHOLD,
+) -> str:
     parts: list[str] = []
     is_py = language == "python"
     method_re = _TS_METHOD_RE if language in {"typescript", "javascript"} else _PY_METHOD_RE
     for symbol in selected:
-        if symbol.score < _STUB_SCORE_THRESHOLD and symbol.end > symbol.start:
+        if symbol.score < stub_score_threshold and symbol.end > symbol.start:
             # Low keyword relevance - minimal header + signature only.
             header = f"## {symbol.name}"
             # Find actual declaration line by skipping leading comments/decorators.
@@ -885,6 +890,7 @@ def select_symbol_aware_chunks(
     keywords: list[str],
     line_budget: int,
     max_symbols: int = 4,
+    stub_score_threshold: float = _STUB_SCORE_THRESHOLD,
 ) -> SymbolExtraction | None:
     """Extract relevant symbols from supported source files under a line budget."""
 
@@ -946,5 +952,5 @@ def select_symbol_aware_chunks(
         chunk_reason=f"symbol-aware {language} extraction ({reason_suffix})",
         selected_ranges=selected_ranges,
         symbols=symbols,
-        text=_render_selected_symbols(lines, selected, language),
+        text=_render_selected_symbols(lines, selected, language, stub_score_threshold),
     )

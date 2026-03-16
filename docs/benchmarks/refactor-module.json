@@ -5,7 +5,7 @@
   "max_tokens": 8000,
   "top_files": 20,
   "baseline_full_context_tokens": 12228,
-  "scan_runtime_ms": 5,
+  "scan_runtime_ms": 6,
   "strategies": [
     {
       "strategy": "naive_full_context",
@@ -67,8 +67,8 @@
     {
       "strategy": "compressed_pack",
       "description": "Use Redcon scoring + compression under configured token budget.",
-      "estimated_input_tokens": 2277,
-      "estimated_saved_tokens": 9951,
+      "estimated_input_tokens": 1767,
+      "estimated_saved_tokens": 10461,
       "files_included": [
         "src/db/connection.py",
         "src/db/repository.py",
@@ -89,8 +89,8 @@
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 4,
-      "runtime_ms": 21
+      "cache_hits": 5,
+      "runtime_ms": 20
     },
     {
       "strategy": "cache_assisted_pack",
@@ -118,7 +118,7 @@
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
       "cache_hits": 15,
-      "runtime_ms": 21,
+      "runtime_ms": 20,
       "notes": "second run with warmed summary cache"
     }
   ],
@@ -200,19 +200,19 @@
     },
     {
       "name": "packed_context",
-      "chars": 9119,
+      "chars": 7082,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2280,
+          "estimated_tokens": 1771,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 2606,
+          "estimated_tokens": 2024,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +220,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2280,
+          "estimated_tokens": 1771,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-16T20:20:01.801929+00:00",
+  "generated_at": "2026-03-16T20:27:45.700432+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",

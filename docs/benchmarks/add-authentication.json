@@ -5,7 +5,7 @@
   "max_tokens": 8000,
   "top_files": 20,
   "baseline_full_context_tokens": 12228,
-  "scan_runtime_ms": 5,
+  "scan_runtime_ms": 6,
   "strategies": [
     {
       "strategy": "naive_full_context",
@@ -67,8 +67,8 @@
     {
       "strategy": "compressed_pack",
       "description": "Use Redcon scoring + compression under configured token budget.",
-      "estimated_input_tokens": 2845,
-      "estimated_saved_tokens": 9383,
+      "estimated_input_tokens": 3009,
+      "estimated_saved_tokens": 9219,
       "files_included": [
         "tests/test_tasks.py",
         "src/services/task_service.py",
@@ -89,8 +89,8 @@
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 6,
-      "runtime_ms": 22
+      "cache_hits": 5,
+      "runtime_ms": 23
     },
     {
       "strategy": "cache_assisted_pack",
@@ -200,19 +200,19 @@
     },
     {
       "name": "packed_context",
-      "chars": 11397,
+      "chars": 12050,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2850,
+          "estimated_tokens": 3013,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 3257,
+          "estimated_tokens": 3443,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +220,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2850,
+          "estimated_tokens": 3013,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-16T20:20:01.753544+00:00",
+  "generated_at": "2026-03-16T20:27:45.652372+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",
