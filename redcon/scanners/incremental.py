@@ -20,6 +20,8 @@ from redcon.schemas.models import (
     SCAN_INDEX_FILE,
 )
 
+SCAN_INDEX_DB_FILE = ".redcon/scan-index.db"
+
 INDEX_FORMAT_VERSION = 1
 
 _VENV_PREFIXES = (".venv", "venv-")
@@ -242,6 +244,144 @@ def load_scan_index(path: Path) -> dict[str, Any]:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
+def _sqlite_connect(db_path: Path) -> Any:
+    import sqlite3
+
+    db_path.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(str(db_path), check_same_thread=False)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA synchronous=NORMAL")
+    conn.executescript(
+        "CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+        "CREATE TABLE IF NOT EXISTS entries ("
+        "  path TEXT PRIMARY KEY,"
+        "  size_bytes INTEGER NOT NULL,"
+        "  mtime_ns INTEGER NOT NULL,"
+        "  content_hash TEXT NOT NULL,"
+        "  kind TEXT NOT NULL,"
+        "  reason TEXT NOT NULL,"
+        "  extension TEXT NOT NULL,"
+        "  is_text INTEGER NOT NULL,"
+        "  record_json TEXT"
+        ");"
+    )
+    conn.commit()
+    return conn
+
+
+def _load_scan_index_sqlite(db_path: Path, *, settings_fingerprint: str) -> ScanIndexState | None:
+    """Load scan index from SQLite. Returns None if DB unavailable or fingerprint mismatch."""
+    if not db_path.exists():
+        return None
+    try:
+        conn = _sqlite_connect(db_path)
+    except Exception:  # noqa: BLE001
+        return None
+    try:
+        row = conn.execute("SELECT value FROM metadata WHERE key = 'fingerprint'").fetchone()
+        if not row or row[0] != settings_fingerprint:
+            return ScanIndexState(settings_fingerprint=settings_fingerprint)
+        entries: dict[str, ScanIndexEntry] = {}
+        for r in conn.execute("SELECT path, size_bytes, mtime_ns, content_hash, kind, reason, extension, is_text, record_json FROM entries").fetchall():
+            path_val, size_bytes, mtime_ns, content_hash, kind, reason, extension, is_text, record_json = r
+            record: FileRecord | None = None
+            if record_json:
+                try:
+                    rd = json.loads(record_json)
+                    record = FileRecord(
+                        path=str(rd.get("path", "")),
+                        absolute_path=str(rd.get("absolute_path", "")),
+                        extension=str(rd.get("extension", "")),
+                        size_bytes=int(rd.get("size_bytes", 0) or 0),
+                        line_count=int(rd.get("line_count", 0) or 0),
+                        content_hash=str(rd.get("content_hash", "")),
+                        content_preview=str(rd.get("content_preview", "")),
+                        relative_path=str(rd.get("relative_path", "")),
+                        repo_label=str(rd.get("repo_label", "")),
+                        repo_root=str(rd.get("repo_root", "")),
+                    )
+                except (TypeError, ValueError, KeyError):
+                    record = None
+            entries[path_val] = ScanIndexEntry(
+                path=path_val,
+                size_bytes=size_bytes,
+                mtime_ns=mtime_ns,
+                content_hash=content_hash,
+                classification=FileClassification(
+                    kind=kind, reason=reason, extension=extension, is_text=bool(is_text)
+                ),
+                record=record,
+            )
+        return ScanIndexState(settings_fingerprint=settings_fingerprint, entries=entries)
+    except Exception:  # noqa: BLE001
+        return None
+    finally:
+        conn.close()
+
+
+def _save_scan_index_sqlite(
+    db_path: Path,
+    state: ScanIndexState,
+    settings: dict[str, Any],
+    *,
+    seen_paths: set[str],
+) -> bool:
+    """Persist scan index to SQLite. Returns False on failure."""
+    try:
+        conn = _sqlite_connect(db_path)
+    except Exception:  # noqa: BLE001
+        return False
+    try:
+        with conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO metadata VALUES ('fingerprint', ?)",
+                (state.settings_fingerprint,),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO metadata VALUES ('settings', ?)",
+                (json.dumps(settings, sort_keys=True),),
+            )
+            conn.execute(
+                "INSERT OR REPLACE INTO metadata VALUES ('generated_at', ?)",
+                (datetime.now(timezone.utc).isoformat(),),
+            )
+            # Remove entries for paths that were deleted from disk
+            existing_paths = {row[0] for row in conn.execute("SELECT path FROM entries").fetchall()}
+            for removed in existing_paths - seen_paths:
+                conn.execute("DELETE FROM entries WHERE path = ?", (removed,))
+            # Upsert current entries
+            for entry in state.entries.values():
+                record_json = json.dumps(asdict(entry.record)) if entry.record else None
+                conn.execute(
+                    "INSERT OR REPLACE INTO entries VALUES (?,?,?,?,?,?,?,?,?)",
+                    (
+                        entry.path,
+                        entry.size_bytes,
+                        entry.mtime_ns,
+                        entry.content_hash,
+                        entry.classification.kind,
+                        entry.classification.reason,
+                        entry.classification.extension,
+                        int(entry.classification.is_text),
+                        record_json,
+                    ),
+                )
+        return True
+    except Exception:  # noqa: BLE001
+        return False
+    finally:
+        conn.close()
+
+
+def _migrate_scan_index_json_to_sqlite(json_path: Path, db_path: Path, *, settings_fingerprint: str) -> None:
+    """One-time migration of an existing JSON scan index into SQLite."""
+    if not json_path.exists() or db_path.exists():
+        return
+    state = _load_scan_index(json_path, settings_fingerprint=settings_fingerprint)
+    seen = set(state.entries.keys())
+    _save_scan_index_sqlite(db_path, state, {}, seen_paths=seen)
+
+
 def _save_scan_index(path: Path, state: ScanIndexState, settings: dict[str, Any]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     data = {
@@ -397,6 +537,7 @@ def refresh_scan_index(
     scan_index_file: str = SCAN_INDEX_FILE,
     internal_paths: set[str] | None = None,
     repo_label: str | None = None,
+    use_sqlite: bool = True,
 ) -> ScanRefreshResult:
     """Refresh the on-disk scan index and reuse unchanged file metadata."""
 
@@ -419,7 +560,13 @@ def refresh_scan_index(
         internal_paths=normalized_internal_paths,
     )
     index_path = _resolve_index_path(repo_path, scan_index_file)
-    previous = _load_scan_index(index_path, settings_fingerprint=settings_fingerprint)
+    db_path = repo_path / SCAN_INDEX_DB_FILE if use_sqlite else None
+    if db_path is not None:
+        _migrate_scan_index_json_to_sqlite(index_path, db_path, settings_fingerprint=settings_fingerprint)
+        sqlite_state = _load_scan_index_sqlite(db_path, settings_fingerprint=settings_fingerprint)
+        previous = sqlite_state if sqlite_state is not None else _load_scan_index(index_path, settings_fingerprint=settings_fingerprint)
+    else:
+        previous = _load_scan_index(index_path, settings_fingerprint=settings_fingerprint)
     current_entries: dict[str, ScanIndexEntry] = {}
     records: list[FileRecord] = []
     reused_paths: list[str] = []
@@ -480,6 +627,8 @@ def refresh_scan_index(
     removed_paths = sorted(set(previous.entries) - seen_paths)
     state = ScanIndexState(settings_fingerprint=settings_fingerprint, entries=current_entries)
     _save_scan_index(index_path, state, settings_payload)
+    if db_path is not None:
+        _save_scan_index_sqlite(db_path, state, settings_payload, seen_paths=seen_paths)
 
     records.sort(key=lambda record: record.path)
     summary = ScanRefreshSummary(
