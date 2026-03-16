@@ -650,6 +650,94 @@ def _condense_func_body(body_lines: list[str], max_lines: int) -> str:
     return "\n".join(body_lines[:max_lines]) + f"\n    # ... ({omitted} lines omitted)"
 
 
+def _strip_leading_comments(body_lines: list[str], language: str) -> list[str]:
+    """Strip leading doc-comments from a symbol body.
+
+    For TypeScript/JavaScript: removes leading ``//`` lines and ``/** ... */``
+    JSDoc blocks.  For Go: removes leading ``//`` comment lines.
+    Returns *body_lines* unchanged for other languages.
+    """
+    if not body_lines:
+        return body_lines
+
+    i = 0
+    if language in {"typescript", "javascript"}:
+        while i < len(body_lines):
+            stripped = body_lines[i].strip()
+            if not stripped:
+                i += 1
+                continue
+            if stripped.startswith("//"):
+                i += 1
+                continue
+            if stripped.startswith("/*"):
+                while i < len(body_lines) and "*/" not in body_lines[i]:
+                    i += 1
+                i += 1
+                continue
+            if stripped.startswith("*"):
+                i += 1
+                continue
+            break
+    elif language == "go":
+        while i < len(body_lines):
+            stripped = body_lines[i].strip()
+            if not stripped or stripped.startswith("//"):
+                i += 1
+                continue
+            break
+
+    return body_lines[i:] if i < len(body_lines) else body_lines
+
+
+_DATA_OPEN_RE = re.compile(r"^\s*[\w.]+\s*=\s*([{[(])\s*$")
+_DATA_OPEN_MAX_ENTRIES = 10
+_DATA_OPEN_KEEP = 4
+
+
+def _truncate_data_blocks(body_lines: list[str]) -> list[str]:
+    """Collapse large inline data structures to first few entries.
+
+    Detects assignment patterns like ``x = {`` or ``DATA = [`` with more than
+    ``_DATA_OPEN_MAX_ENTRIES`` interior lines and replaces the middle with a
+    count comment, keeping only the first ``_DATA_OPEN_KEEP`` entries.
+    """
+    result: list[str] = []
+    i = 0
+    while i < len(body_lines):
+        line = body_lines[i]
+        m = _DATA_OPEN_RE.match(line)
+        if m:
+            open_ch = m.group(1)
+            close_ch = {"[": "]", "{": "}", "(": ")"}[open_ch]
+            j = i + 1
+            depth = 1
+            while j < len(body_lines) and depth > 0:
+                for ch in body_lines[j]:
+                    if ch == open_ch:
+                        depth += 1
+                    elif ch == close_ch:
+                        depth -= 1
+                        if depth == 0:
+                            break
+                j += 1
+            # body_lines[i] = open, body_lines[i+1..j-2] = interior, body_lines[j-1] = close
+            interior = (j - 1) - (i + 1)
+            if interior > _DATA_OPEN_MAX_ENTRIES:
+                result.append(line)
+                result.extend(body_lines[i + 1 : i + 1 + _DATA_OPEN_KEEP])
+                omitted = interior - _DATA_OPEN_KEEP
+                inner = body_lines[i + 1] if i + 1 < j else ""
+                indent = " " * (len(inner) - len(inner.lstrip())) if inner.strip() else "    "
+                result.append(f"{indent}# ... ({omitted} more entries)")
+                result.append(body_lines[j - 1])
+                i = j
+                continue
+        result.append(line)
+        i += 1
+    return result
+
+
 def _select_symbol_candidates(candidates: list[_SymbolCandidate], line_budget: int, max_symbols: int = 4) -> list[_SymbolCandidate]:
     if not candidates:
         return []
@@ -686,7 +774,11 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
         if symbol.score < _STUB_SCORE_THRESHOLD and symbol.end > symbol.start:
             # Low keyword relevance - minimal header + signature only.
             header = f"## {symbol.name}"
-            sig = lines[symbol.start]
+            # Find actual declaration line by skipping leading comments/decorators.
+            stub_lines = lines[symbol.start : symbol.end + 1]
+            if language in {"typescript", "javascript", "go"}:
+                stub_lines = _strip_leading_comments(stub_lines, language)
+            sig = stub_lines[0] if stub_lines else lines[symbol.start]
             if is_py:
                 sig = _strip_py_annotations(sig)
             body = sig + " ..."
@@ -700,6 +792,9 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
             if is_py:
                 body_lines = _condense_decorators(body_lines)
                 body_lines = _strip_python_docstring(body_lines)
+            elif language in {"typescript", "javascript", "go"}:
+                body_lines = _strip_leading_comments(body_lines, language)
+            body_lines = _truncate_data_blocks(body_lines)
             if symbol.symbol_type == "class" and len(body_lines) > _MAX_CLASS_BODY_LINES:
                 body = _condense_class_body(body_lines, _MAX_CLASS_BODY_LINES, method_re)
             elif symbol.symbol_type == "function" and len(body_lines) > _MAX_FUNC_BODY_LINES:

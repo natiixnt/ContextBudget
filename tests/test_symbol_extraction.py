@@ -73,7 +73,7 @@ export function validate(token: string): boolean {
     assert chunk.chunk_strategy == "symbol-extract-typescript"
     assert {item["name"] for item in chunk.symbols} >= {"AuthConfig", "AuthClient", "validate"}
     assert any(item["symbol_type"] == "interface" for item in chunk.symbols)
-    assert "// Exported auth contract." in chunk.text
+    assert "export interface AuthConfig" in chunk.text
 
 
 def test_go_symbol_extraction_detects_exported_symbols() -> None:
@@ -104,7 +104,7 @@ func helper() bool {
     assert chunk.chunk_strategy == "symbol-extract-go"
     assert {item["name"] for item in chunk.symbols} >= {"AuthChecker", "Login"}
     assert any(item["symbol_type"] == "interface" for item in chunk.symbols)
-    assert "// AuthChecker validates tokens." in chunk.text
+    assert "type AuthChecker interface" in chunk.text
 
 
 def test_pack_records_symbol_metadata_when_extraction_succeeds(tmp_path: Path) -> None:
