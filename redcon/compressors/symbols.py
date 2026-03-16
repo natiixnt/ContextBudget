@@ -705,6 +705,14 @@ def _strip_leading_comments(body_lines: list[str], language: str) -> list[str]:
                 i += 1
                 continue
             break
+    elif language == "python":
+        # Skip leading # comments and decorator lines so stubs show the def/class line.
+        while i < len(body_lines):
+            stripped = body_lines[i].strip()
+            if not stripped or stripped.startswith("#") or stripped.startswith("@"):
+                i += 1
+                continue
+            break
 
     return body_lines[i:] if i < len(body_lines) else body_lines
 
@@ -795,8 +803,7 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
             header = f"## {symbol.name}"
             # Find actual declaration line by skipping leading comments/decorators.
             stub_lines = lines[symbol.start : symbol.end + 1]
-            if language in {"typescript", "javascript", "go"}:
-                stub_lines = _strip_leading_comments(stub_lines, language)
+            stub_lines = _strip_leading_comments(stub_lines, language)
             sig = stub_lines[0] if stub_lines else lines[symbol.start]
             if is_py:
                 sig = _strip_py_annotations(sig)
