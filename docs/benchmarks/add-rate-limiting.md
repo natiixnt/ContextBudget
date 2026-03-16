@@ -12,7 +12,7 @@ Evaluates context selection for rate-limiting middleware spanning route handlers
 | Top files | 20 |
 | Token estimator | heuristic |
 | Scan runtime | 6 ms |
-| Generated | 2026-03-16T20:16:31.170208+00:00 |
+| Generated | 2026-03-16T20:20:01.848196+00:00 |
 
 ## Baseline
 
@@ -24,8 +24,8 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 642 | 11,586 (94.7%) | low | 22 ms |
-| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 22 ms |
+| compressed_pack | 642 | 11,586 (94.7%) | low | 19 ms |
+| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 20 ms |
 
 ## Compressed pack details
 
@@ -54,7 +54,7 @@ Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 16 cache hits, 22 ms
+Second run (warm cache): **150 tokens**, 16 cache hits, 20 ms
 
 ## Token estimator comparison
 

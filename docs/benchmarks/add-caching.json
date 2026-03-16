@@ -67,8 +67,8 @@
     {
       "strategy": "compressed_pack",
       "description": "Use Redcon scoring + compression under configured token budget.",
-      "estimated_input_tokens": 4025,
-      "estimated_saved_tokens": 8203,
+      "estimated_input_tokens": 3445,
+      "estimated_saved_tokens": 8783,
       "files_included": [
         "src/routes/tasks.py",
         "src/services/task_service.py",
@@ -118,7 +118,7 @@
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
       "cache_hits": 15,
-      "runtime_ms": 24,
+      "runtime_ms": 23,
       "notes": "second run with warmed summary cache"
     }
   ],
@@ -200,19 +200,19 @@
     },
     {
       "name": "packed_context",
-      "chars": 16108,
+      "chars": 13791,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 4027,
+          "estimated_tokens": 3448,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 4603,
+          "estimated_tokens": 3941,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +220,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 4027,
+          "estimated_tokens": 3448,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-16T20:16:31.016661+00:00",
+  "generated_at": "2026-03-16T20:20:01.702057+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",

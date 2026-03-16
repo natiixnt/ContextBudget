@@ -717,11 +717,12 @@ def _strip_leading_comments(body_lines: list[str], language: str) -> list[str]:
     return body_lines[i:] if i < len(body_lines) else body_lines
 
 
-# Matches lines that open a multi-entry data structure, including:
-#   assignments: ``x = {``, ``items = [``, ``task = Task(``, ``cfg = Config(``
-#   bare brackets: ``(`` or ``[`` or ``{`` alone on an indented line (function args).
+# Matches lines that open a multi-entry data structure or call, including:
+#   assignments:    ``x = {``, ``items = [``, ``task = Task(``
+#   method calls:   ``conn.executescript(``, ``cursor.execute(``
+#   bare brackets:  ``(`` or ``[`` or ``{`` alone on an indented line.
 _DATA_OPEN_RE = re.compile(
-    r"^\s*(?:[\w.]+\s*=\s*(?:[A-Za-z_][\w.]*\s*)?)?([{[(])\s*$"
+    r"^\s*(?:[\w.]+(?:\s*=\s*(?:[A-Za-z_][\w.]*\s*)?)?\s*)?([{[(])\s*$"
 )
 _DATA_OPEN_MAX_ENTRIES = 7
 _DATA_OPEN_KEEP = 3

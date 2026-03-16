@@ -12,7 +12,7 @@ Evaluates selection accuracy when the primary change targets the database connec
 | Top files | 20 |
 | Token estimator | heuristic |
 | Scan runtime | 5 ms |
-| Generated | 2026-03-16T20:16:31.119448+00:00 |
+| Generated | 2026-03-16T20:20:01.801929+00:00 |
 
 ## Baseline
 
@@ -24,13 +24,13 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,579 | 9,649 (78.9%) | low | 21 ms |
+| compressed_pack | 2,277 | 9,951 (81.4%) | low | 21 ms |
 | cache_assisted_pack | 150 | 12,078 (98.8%) | low | 21 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 2,579 (21.1% of baseline)
-- **Saved tokens:** 9,649 (78.9% reduction)
+- **Input tokens:** 2,277 (18.6% of baseline)
+- **Saved tokens:** 9,951 (81.4% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -62,4 +62,4 @@ Second run (warm cache): **150 tokens**, 15 cache hits, 21 ms
 |--------|-----------|---------------|----------------|
 | task | 15 | 18 | 15 *(fallback)* |
 | top_ranked_file | 753 | 861 | 753 *(fallback)* |
-| packed_context | 2583 | 2952 | 2583 *(fallback)* |
+| packed_context | 2280 | 2606 | 2280 *(fallback)* |
