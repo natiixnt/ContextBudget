@@ -485,6 +485,31 @@ def _trim_candidate(candidate: _SymbolCandidate, budget: int) -> _SymbolCandidat
 
 
 _STUB_SCORE_THRESHOLD = 3.5  # symbols below this get signature-only stubs (no body)
+_MAX_CLASS_BODY_LINES = 40   # class bodies beyond this are condensed to method stubs
+
+_PY_METHOD_RE = re.compile(r"^(\s+)(async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
+
+
+def _condense_class_body(body_lines: list[str], max_lines: int) -> str:
+    """Render first *max_lines* of a class, then stub remaining methods.
+
+    Preserves the class signature, docstring, and ``__init__`` fully.
+    Remaining methods beyond the line cap are collapsed to their
+    signature line + `` ...`` so the reader knows they exist.
+    """
+    if len(body_lines) <= max_lines:
+        return "\n".join(body_lines)
+
+    kept = "\n".join(body_lines[:max_lines])
+    stubs: list[str] = []
+    for line in body_lines[max_lines:]:
+        m = _PY_METHOD_RE.match(line)
+        if m:
+            stubs.append(line.rstrip() + " ...")
+    if stubs:
+        return kept + "\n    # --- remaining methods (signatures only) ---\n" + "\n".join(stubs)
+    omitted = len(body_lines) - max_lines
+    return kept + f"\n    # ... ({omitted} lines omitted)"
 
 
 def _select_symbol_candidates(candidates: list[_SymbolCandidate], line_budget: int, max_symbols: int = 4) -> list[_SymbolCandidate]:
@@ -527,7 +552,11 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate])
             # Low keyword relevance — include only the signature line to save tokens.
             body = lines[symbol.start] + " ..."
         else:
-            body = "\n".join(lines[symbol.start : symbol.end + 1])
+            body_lines = lines[symbol.start : symbol.end + 1]
+            if symbol.symbol_type == "class" and len(body_lines) > _MAX_CLASS_BODY_LINES:
+                body = _condense_class_body(body_lines, _MAX_CLASS_BODY_LINES)
+            else:
+                body = "\n".join(body_lines)
         parts.append(f"{header}\n{body}")
     return "\n\n".join(parts)
 
