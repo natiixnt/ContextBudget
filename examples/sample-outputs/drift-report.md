@@ -31,4 +31,4 @@ Threshold: 10.0%
 | 2026-03-01 | 14,900 | 9.1 |
 | 2026-03-15 | 16,200 | 9.8 |
 
-> Exit code: 2 (alert triggered — token drift exceeds threshold)
+> Exit code: 2 (alert triggered - token drift exceeds threshold)

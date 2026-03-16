@@ -295,7 +295,7 @@ Accepts an existing run artifact via `--run-artifact` to seed task and repo with
 | Mode | Description |
 |------|-------------|
 | `isolated` | Each workflow step has independent context (default) |
-| `rolling` | Two-step sliding window — context from the previous step carries forward |
+| `rolling` | Two-step sliding window - context from the previous step carries forward |
 | `full` | Context grows across all steps (cumulative) |
 
 **Key flags:**
@@ -306,11 +306,11 @@ Accepts an existing run artifact via `--run-artifact` to seed task and repo with
 | `--model` | `gpt-4o` | Model for cost estimation |
 | `--prompt-overhead` | `800` | Estimated system + user prompt tokens per step |
 | `--output-tokens` | `600` | Estimated model output tokens per step |
-| `--price-input` | — | Custom input price (USD / 1M tokens), overrides built-in model table |
-| `--price-output` | — | Custom output price (USD / 1M tokens) |
-| `--list-models` | — | Print all supported models and exit |
-| `--run-artifact` | — | Path to existing pack/plan artifact; overrides task and repo if not given |
-| `--json` | — | Print raw JSON to stdout (shorthand for `--format json`) |
+| `--price-input` | - | Custom input price (USD / 1M tokens), overrides built-in model table |
+| `--price-output` | - | Custom output price (USD / 1M tokens) |
+| `--list-models` | - | Print all supported models and exit |
+| `--run-artifact` | - | Path to existing pack/plan artifact; overrides task and repo if not given |
+| `--json` | - | Print raw JSON to stdout (shorthand for `--format json`) |
 | `--format human\|json` | `human` | `json` prints raw JSON to stdout |
 
 **Example:**
@@ -359,10 +359,10 @@ Returns **exit code 2** when drift exceeds the threshold (useful in CI).
 |------|---------|-------------|
 | `--window` | `20` | Number of recent history entries to analyze |
 | `--threshold` | `10.0` | Drift % that triggers an alert |
-| `--task` | — | Filter history by task substring |
-| `--runs` | — | Explicit run artifact JSON files (alternative to repo history) |
+| `--task` | - | Filter history by task substring |
+| `--runs` | - | Explicit run artifact JSON files (alternative to repo history) |
 | `--out-prefix` | `redcon-drift` | Output file prefix |
-| `--json` | — | Print raw JSON to stdout (shorthand for `--format json`) |
+| `--json` | - | Print raw JSON to stdout (shorthand for `--format json`) |
 | `--format human\|json` | `human` | `json` prints raw JSON to stdout |
 
 **Example:**
@@ -406,13 +406,13 @@ Each suggestion includes an `estimated_token_impact` showing how many tokens cou
 
 | Flag | Default | Description |
 |------|---------|-------------|
-| `--history` | — | Pack run JSON files to compute inclusion-frequency signals |
+| `--history` | - | Pack run JSON files to compute inclusion-frequency signals |
 | `--large-file-tokens` | `500` | Token threshold for "large file" |
 | `--high-fanin` | `5` | Min importer count for fan-in flag |
 | `--high-fanout` | `10` | Min outgoing imports for fan-out flag |
-| `--high-frequency-rate` | `0.5` | Min pack inclusion rate (0–1) for frequency flag |
+| `--high-frequency-rate` | `0.5` | Min pack inclusion rate (0-1) for frequency flag |
 | `--top` | `25` | Max suggestions to emit |
-| `--json` | — | Print raw JSON to stdout (shorthand for `--format json`) |
+| `--json` | - | Print raw JSON to stdout (shorthand for `--format json`) |
 | `--format human\|json` | `human` | `json` prints raw JSON to stdout |
 
 **Example:**
@@ -438,10 +438,10 @@ redcon advise --repo . --json \
 Build and export a repository dependency graph annotated with token counts and historical inclusion frequency.
 
 Each graph node carries:
-- `estimated_tokens` — token cost of the file
-- `inclusion_count` / `inclusion_rate` — how often this file appears in pack runs
-- `in_degree` / `out_degree` — import graph connectivity
-- `is_entrypoint` — whether the file is a module root
+- `estimated_tokens` - token cost of the file
+- `inclusion_count` / `inclusion_rate` - how often this file appears in pack runs
+- `in_degree` / `out_degree` - import graph connectivity
+- `is_entrypoint` - whether the file is a module root
 
 **Flags:**
 

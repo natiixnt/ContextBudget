@@ -21,7 +21,7 @@ Content-Type: application/json
 {"label": "ci-pipeline"}
 ```
 
-Response (returned **once** — store it immediately):
+Response (returned **once** - store it immediately):
 
 ```json
 {
@@ -73,7 +73,7 @@ GET /orgs/{org_id}/api-keys
 Authorization: Bearer rck_...
 ```
 
-Response lists active and revoked keys. The `raw_key` field is never returned in list responses — only `key_prefix` (the first 12 characters) is shown for identification.
+Response lists active and revoked keys. The `raw_key` field is never returned in list responses - only `key_prefix` (the first 12 characters) is shown for identification.
 
 ```json
 [
@@ -96,7 +96,7 @@ DELETE /orgs/{org_id}/api-keys/{key_id}
 Authorization: Bearer rck_...
 ```
 
-Returns `204 No Content` on success. The row is marked `revoked = true` and `revoked_at` is set. Revoked keys are rejected immediately on the next request — no propagation delay.
+Returns `204 No Content` on success. The row is marked `revoked = true` and `revoked_at` is set. Revoked keys are rejected immediately on the next request - no propagation delay.
 
 ## Rotation
 

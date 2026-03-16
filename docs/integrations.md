@@ -297,8 +297,8 @@ for entry in entries:
 
 A runner that passes the optimised context prompt to a **Node.js script** via
 stdin and reads the LLM response from stdout.  Use this to plug Redcon
-into any Node.js agent loop — LangChain.js, Vercel AI SDK, OpenAI Node SDK,
-or custom scripts — without writing Python.
+into any Node.js agent loop - LangChain.js, Vercel AI SDK, OpenAI Node SDK,
+or custom scripts - without writing Python.
 
 ### Node.js script contract
 
@@ -399,7 +399,7 @@ result2 = runner.run_task("write unit tests for the new cache layer")
 print(runner.session_summary())
 ```
 
-Delta context is enabled by default — on the second turn only changed files
+Delta context is enabled by default - on the second turn only changed files
 are re-sent to the Node.js script.
 
 ### Vercel AI SDK example (`agent.js`)
@@ -429,7 +429,7 @@ process.stdout.write(text);
 All wrappers delegate to
 [`AgentRuntime`](agent-runtime.md), which is the canonical
 `agent → Redcon → LLM` entry point.  Any feature supported by
-`AgentRuntime` — policies, delta context, custom engines, session replay — is
+`AgentRuntime` - policies, delta context, custom engines, session replay - is
 available through the integration wrappers.
 
 To compose with the lower-level middleware directly, see

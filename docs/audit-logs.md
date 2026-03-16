@@ -65,7 +65,7 @@ To record gateway activity (token usage, policy enforcement results per request)
 ## Privacy
 
 - `repository_id` and `task_hash` store SHA-256 digests. Raw paths and task text are never stored.
-- Audit entries are immutable — there are no update or delete endpoints.
+- Audit entries are immutable - there are no update or delete endpoints.
 
 ## Pagination
 

@@ -23,7 +23,7 @@ agent  →  AgentRuntime  →  LLM
 ```python
 from redcon.runtime import AgentRuntime
 
-# No LLM — just prepare and inspect context
+# No LLM - just prepare and inspect context
 runtime = AgentRuntime(max_tokens=32_000)
 result  = runtime.run("add Redis caching to the session store", repo=".")
 
@@ -44,14 +44,14 @@ print(ctx.prompt_text[:800])
 `AgentRuntime` is the interception layer.  For every agent turn it:
 
 1. **Intercepts** the task description and repository path.
-2. **Runs the pipeline** — scan, rank, symbol-extract, slice, compress, cache,
+2. **Runs the pipeline** - scan, rank, symbol-extract, slice, compress, cache,
    delta.
-3. **Enforces constraints** — token budget, quality-risk policy, file-count
+3. **Enforces constraints** - token budget, quality-risk policy, file-count
    limits.
-4. **Assembles the prompt** — serialises the optimised context into a plain
+4. **Assembles the prompt** - serialises the optimised context into a plain
    text `prompt_text` string.
-5. **Dispatches (optional)** — calls the registered `llm_fn` with the prompt.
-6. **Records the turn** — appends metrics to the `RuntimeSession` for
+5. **Dispatches (optional)** - calls the registered `llm_fn` with the prompt.
+6. **Records the turn** - appends metrics to the `RuntimeSession` for
    cumulative tracking.
 
 ### Delta context
@@ -242,11 +242,11 @@ from redcon.runtime import AgentRuntime
 
 runtime = AgentRuntime(max_tokens=32_000, delta=True)
 
-# Turn 1 — full context pack
+# Turn 1 - full context pack
 r1 = runtime.run("scaffold the new payments module", repo=".")
 print(f"Turn 1: {r1.prepared_context.estimated_tokens} tokens")
 
-# Turn 2 — delta: only changed files are re-sent
+# Turn 2 - delta: only changed files are re-sent
 r2 = runtime.run("add error handling to the payments module", repo=".")
 print(f"Turn 2: {r2.prepared_context.estimated_tokens} tokens (delta)")
 

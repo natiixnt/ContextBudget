@@ -56,7 +56,7 @@ try:
 except BudgetPolicyViolationError as err:
     for v in err.policy_result["violations"]:
         print(f"violation: {v}")
-    # err.run_artifact — the pack result that triggered the violation
+    # err.run_artifact - the pack result that triggered the violation
 ```
 
 ### Evaluate policy without raising

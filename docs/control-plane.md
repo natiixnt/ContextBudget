@@ -30,8 +30,8 @@ Pipeline stages
       ▼
  TelemetrySink         ← Protocol (redcon.telemetry.TelemetrySink)
       │
-      ├── NoOpTelemetrySink       (default — drops all events)
-      └── JsonlFileTelemetrySink  (local development — appends JSONL to disk)
+      ├── NoOpTelemetrySink       (default - drops all events)
+      └── JsonlFileTelemetrySink  (local development - appends JSONL to disk)
 ```
 
 ### Interfaces
@@ -244,7 +244,7 @@ Org
 ### Bootstrap sequence
 
 ```bash
-# 1. Create the org (unauthenticated — operator endpoint)
+# 1. Create the org (unauthenticated - operator endpoint)
 curl -s -X POST http://localhost:8080/orgs \
      -H "Content-Type: application/json" \
      -d '{"slug": "acme", "display_name": "Acme Corp"}'
@@ -273,7 +273,7 @@ ids = build_repository_identifiers("/path/to/repo")
 
 ### Agent runs
 
-Run outcome records are written by calling `cp_store.record_agent_run` from application code, or populated from incoming `pack_completed` events via custom integration.  The `task_hash` field stores a SHA-256 digest of the raw task text — the plaintext task is never stored.
+Run outcome records are written by calling `cp_store.record_agent_run` from application code, or populated from incoming `pack_completed` events via custom integration.  The `task_hash` field stores a SHA-256 digest of the raw task text - the plaintext task is never stored.
 
 ---
 

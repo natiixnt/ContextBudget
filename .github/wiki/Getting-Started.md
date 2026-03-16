@@ -91,8 +91,8 @@ redcon pack "add caching" --workspace workspace.toml
 
 Every `pack` run writes:
 
-- `run.json` — machine-readable artifact with ranked files, compressed context, budget stats, cache info
-- `run.md` — human-readable Markdown summary
+- `run.json` - machine-readable artifact with ranked files, compressed context, budget stats, cache info
+- `run.md` - human-readable Markdown summary
 
 ---
 
@@ -119,7 +119,7 @@ See [[Python API]] for the full reference.
 
 ## Next Steps
 
-- [[CLI Reference]] — complete command documentation
-- [[Configuration]] — `redcon.toml` settings
-- [[Agent Integration]] — embedding Redcon in agent loops
-- [[Benchmarking and Diff]] — strategy comparison
+- [[CLI Reference]] - complete command documentation
+- [[Configuration]] - `redcon.toml` settings
+- [[Agent Integration]] - embedding Redcon in agent loops
+- [[Benchmarking and Diff]] - strategy comparison

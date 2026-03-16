@@ -29,7 +29,7 @@ redcon simulate-agent --run-artifact runs/caching-run.json \
 
 ---
 
-## observe — extract run metrics
+## observe - extract run metrics
 
 ```bash
 # Human-readable metrics report
@@ -62,7 +62,7 @@ redcon observe run.json --no-store --json
 
 ---
 
-## simulate-agent — pre-flight cost estimate
+## simulate-agent - pre-flight cost estimate
 
 ```bash
 # Fresh simulation from a task description
@@ -91,7 +91,7 @@ redcon simulate-agent --list-models
 
 ---
 
-## drift — detect token growth
+## drift - detect token growth
 
 ```bash
 # Alert when token usage grew > 10% over last 20 runs
@@ -121,7 +121,7 @@ redcon drift --repo . --json | jq '{
 
 ---
 
-## advise — architecture suggestions
+## advise - architecture suggestions
 
 ```bash
 # Basic import graph analysis
@@ -148,7 +148,7 @@ redcon advise --repo . --json \
 
 ---
 
-## visualize — dependency graph
+## visualize - dependency graph
 
 ```bash
 # Export graph as JSON and Markdown
@@ -171,7 +171,7 @@ redcon visualize --repo . --json \
 
 ---
 
-## dataset — reproducible benchmarks
+## dataset - reproducible benchmarks
 
 ```bash
 # Build a dataset from a TOML task list (runs fresh benchmarks)

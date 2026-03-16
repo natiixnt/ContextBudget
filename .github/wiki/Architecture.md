@@ -7,7 +7,7 @@ Redcon is organized around a single engine and explicit stage boundaries. CLI co
 ## Design Goals
 
 - **Deterministic heuristics** over opaque model decisions
-- **Stable machine-readable artifacts** — `run.json` with additive metadata blocks
+- **Stable machine-readable artifacts** - `run.json` with additive metadata blocks
 - **Local-first** operation with no required network services
 - **Explicit extension points** for plugins, summarizers, telemetry sinks, and agent adapters
 - **Additive feature growth** without breaking single-repo flows
@@ -61,13 +61,13 @@ These layers delegate into the same core pipeline rather than maintaining parall
 
 `redcon/stages/workflow.py` defines the explicit stage boundaries:
 
-1. **Scan Refresh** — Update incremental scan index
-2. **Scan** — Repository file traversal with metadata
-3. **Workspace Scan** — Multi-repo scanning with repo labels
-4. **Score** — Deterministic file relevance ranking
-5. **Cache** — Summary cache reuse and duplicate tracking
-6. **Pack / Compression** — Reduce ranked files into context
-7. **Render** — Output JSON and Markdown artifacts
+1. **Scan Refresh** - Update incremental scan index
+2. **Scan** - Repository file traversal with metadata
+3. **Workspace Scan** - Multi-repo scanning with repo labels
+4. **Score** - Deterministic file relevance ranking
+5. **Cache** - Summary cache reuse and duplicate tracking
+6. **Pack / Compression** - Reduce ranked files into context
+7. **Render** - Output JSON and Markdown artifacts
 
 This keeps orchestration separate from lower-level scanner, scorer, and compressor logic.
 

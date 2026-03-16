@@ -25,7 +25,7 @@ Redcon has two independently deployable tiers.
 └──────────────────────────────────────────────────────────┘
 ```
 
-The two tiers are **decoupled** — the agent tier runs without the control plane. The control plane is optional for local development and becomes useful when multiple agents or teams share infrastructure.
+The two tiers are **decoupled** - the agent tier runs without the control plane. The control plane is optional for local development and becomes useful when multiple agents or teams share infrastructure.
 
 ---
 
@@ -103,8 +103,8 @@ docker-compose up -d
 ```
 
 Services:
-- `db` — PostgreSQL 15 on port 5432
-- `app` — Redcon Cloud on port 8080
+- `db` - PostgreSQL 15 on port 5432
+- `app` - Redcon Cloud on port 8080
 
 ---
 

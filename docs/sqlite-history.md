@@ -4,10 +4,10 @@ Starting with v1.0-alpha, Redcon uses a SQLite database to store run history ins
 
 ## Why SQLite
 
-- **Indexed queries** — history lookups for scoring are O(log n) instead of full-file scans
-- **Concurrent writes** — SQLite handles concurrent appends from parallel agents without corruption
-- **No size limit** — avoids the memory and parse cost of loading large JSON arrays on every run
-- **Inspectable** — any SQLite viewer works (`sqlite3 .redcon/history.db .tables`)
+- **Indexed queries** - history lookups for scoring are O(log n) instead of full-file scans
+- **Concurrent writes** - SQLite handles concurrent appends from parallel agents without corruption
+- **No size limit** - avoids the memory and parse cost of loading large JSON arrays on every run
+- **Inspectable** - any SQLite viewer works (`sqlite3 .redcon/history.db .tables`)
 
 ## Default paths
 
@@ -25,7 +25,7 @@ On first access after upgrading to v1.0-alpha, Redcon automatically:
 2. Imports all entries into `history.db`
 3. Renames `history.json` to `history.json.migrated`
 
-No manual steps are required. The migration is idempotent — if `history.db` already exists, the JSON file is not touched.
+No manual steps are required. The migration is idempotent - if `history.db` already exists, the JSON file is not touched.
 
 ## Configuration
 

@@ -59,7 +59,7 @@ These layers delegate into the same core pipeline instead of maintaining paralle
 
 `redcon/core/pipeline.py` is the high-level orchestrator. It re-exports `as_json_dict` and the `run_*` functions used by the engine and CLI.
 
-`redcon/stages/workflow.py` is the **canonical stage implementation** — this is the single source of truth for:
+`redcon/stages/workflow.py` is the **canonical stage implementation** - this is the single source of truth for:
 
 - `run_scan_stage` / `run_scan_refresh_stage` / `run_scan_workspace_stage`
 - `run_score_stage`

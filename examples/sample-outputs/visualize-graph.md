@@ -15,15 +15,15 @@ Generated at: 2026-03-15T11:30:00Z
 
 ## Top Token-Heavy Files
 
-- `src/auth/middleware.py` — 1,240 tokens
-- `src/api/routes.py` — 980 tokens
-- `src/config.py` — 820 tokens
+- `src/auth/middleware.py` - 1,240 tokens
+- `src/api/routes.py` - 980 tokens
+- `src/config.py` - 820 tokens
 
 ## Most Imported Files
 
-- `src/utils/helpers.py` — imported by 9 files
-- `src/models/base.py` — imported by 7 files
-- `src/config.py` — imported by 9 files
+- `src/utils/helpers.py` - imported by 9 files
+- `src/models/base.py` - imported by 7 files
+- `src/config.py` - imported by 9 files
 
 ## Node Details
 

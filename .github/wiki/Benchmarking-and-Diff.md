@@ -21,7 +21,7 @@ redcon benchmark <task> --workspace <workspace.toml>
 - JSON artifact with strategy comparisons
 - Markdown report
 - Active token-estimator backend report
-- `estimator_samples` — compact comparison of built-in estimators on local sample text
+- `estimator_samples` - compact comparison of built-in estimators on local sample text
 
 ---
 

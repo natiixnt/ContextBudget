@@ -19,7 +19,7 @@
 | **Average** | | | **−69%** | **−95%** |
 
 Benchmark environment: Python FastAPI task-management API, 15 source files,
-12,230 tokens (heuristic estimator), token budget 8,000, scan runtime 3–19 ms.
+12,230 tokens (heuristic estimator), token budget 8,000, scan runtime 3-19 ms.
 
 ---
 
@@ -33,7 +33,7 @@ symbol-level representations, and returns only what the agent actually needs.
 ```
 Without Redcon                        With Redcon
 ──────────────────────────────        ──────────────────────────────
-all 15 files → 12,230 tokens          4–15 ranked files → 2,196 tokens
+all 15 files → 12,230 tokens          4-15 ranked files → 2,196 tokens
 every turn   → same cost              warm cache        →   150 tokens
 no budget    → runaway spend          hard token budget → cost is predictable
 ```
@@ -62,14 +62,14 @@ The benchmark compares all four so you can see exactly where the savings come fr
 
 | Strategy | Tokens | Saved | Quality risk |
 |----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
+| naive_full_context | 12,230 | - | low |
 | compressed_pack | **2,196** | 10,034 (**82%**) | low |
 | cache_assisted_pack | **150** | 12,080 (**99%**) | low |
 
 Files selected: `app.py`, `config.py`, `routes/tasks.py`, `routes/users.py`,
 `services/task_service.py`, `services/user_service.py`, `models/user.py` + tests.
 
-The auth task pulls in both route layers and the user model — Redcon identifies
+The auth task pulls in both route layers and the user model - Redcon identifies
 all the right files and skips the unrelated ones (`db/connection.py` is already
 abstracted), keeping quality risk **low**.
 
@@ -83,7 +83,7 @@ abstracted), keeping quality risk **low**.
 
 | Strategy | Tokens | Saved | Quality risk |
 |----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
+| naive_full_context | 12,230 | - | low |
 | compressed_pack | **2,484** | 9,746 (**80%**) | low |
 | cache_assisted_pack | **150** | 12,080 (**99%**) | low |
 
@@ -101,7 +101,7 @@ The import-graph scorer correctly surfaces `db/connection.py`,
 
 | Strategy | Tokens | Saved | Quality risk |
 |----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
+| naive_full_context | 12,230 | - | low |
 | compressed_pack | **2,619** | 9,611 (**79%**) | low |
 | cache_assisted_pack | **150** | 12,080 (**99%**) | low |
 
@@ -119,13 +119,13 @@ with no quality degradation.
 
 | Strategy | Tokens | Saved | Quality risk |
 |----------|--------|-------|--------------|
-| naive_full_context | 12,230 | — | low |
+| naive_full_context | 12,230 | - | low |
 | compressed_pack | **7,935** | 4,295 (**35%**) | medium |
 | cache_assisted_pack | **2,255** | 9,975 (**82%**) | low |
 
 This task touches fewer files on the first scan (11 vs 15), so first-run
 savings are smaller.  The `medium` quality risk flag indicates the compressed
-pack omits the user service — intentional, since caching is task-scoped.
+pack omits the user service - intentional, since caching is task-scoped.
 On a warm cache the pack drops to 2,255 tokens at `low` risk.
 
 → [Full report](tasks/add-caching.md)
@@ -143,7 +143,7 @@ At **$3 / 1M input tokens** (Claude Sonnet 4.5):
 | Redcon warm cache (avg) | 676 | $0.002 | $0.20 |
 
 An engineering team running **500 agent calls/day** saves roughly
-**$950/month** at Sonnet pricing — before accounting for reduced
+**$950/month** at Sonnet pricing - before accounting for reduced
 latency and fewer timeout errors from oversized prompts.
 
 ---
@@ -165,15 +165,15 @@ Raw JSON data is in [`tasks/`](tasks/) in this repo.
 
 ## Methodology
 
-- **Baseline** — full repository, no file selection, no compression.
+- **Baseline** - full repository, no file selection, no compression.
   The agent would receive exactly this context without Redcon.
-- **compressed_pack** — Redcon scores files using an import-graph walk,
+- **compressed_pack** - Redcon scores files using an import-graph walk,
   recency, and BM25 proximity to the task string; the top-ranked files are
   symbol-compressed (docstrings stripped, bodies elided for off-path functions).
-- **cache_assisted_pack** — same selection, but file contents served from the
+- **cache_assisted_pack** - same selection, but file contents served from the
   per-session SHA256 content cache.  Only files that changed since the last
   turn are re-sent in full.
-- **Quality risk** — `low` means all files that would be needed to complete the
+- **Quality risk** - `low` means all files that would be needed to complete the
   task are present in the pack; `medium` means one or more secondary files are
   elided (the agent can still complete the task but may need a follow-up fetch).
 - Token counts use the **heuristic estimator** (≈ chars/4), which matches
@@ -181,4 +181,4 @@ Raw JSON data is in [`tasks/`](tasks/) in this repo.
 
 ---
 
-*Generated 2026-03-15 — Redcon v1.1.0*
+*Generated 2026-03-15 - Redcon v1.1.0*

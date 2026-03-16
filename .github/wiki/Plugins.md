@@ -37,10 +37,10 @@ options = { preview_lines = 3 }
 ```
 
 **Selection rules:**
-- `[plugins].scorer` — chooses the active scorer
-- `[plugins].compressor` — chooses the active compressor
-- `[plugins].token_estimator` — chooses the active token estimator
-- `[[plugins.registrations]]` — provides the import target plus plugin-specific `options`
+- `[plugins].scorer` - chooses the active scorer
+- `[plugins].compressor` - chooses the active compressor
+- `[plugins].token_estimator` - chooses the active token estimator
+- `[[plugins.registrations]]` - provides the import target plus plugin-specific `options`
 - `[tokens]` can auto-select the matching built-in token estimator when `[plugins].token_estimator` is not set explicitly
 
 ---
@@ -52,10 +52,10 @@ from redcon.plugins import ScorerPlugin
 
 
 def score_custom(*, task, files, settings, options, estimate_tokens):
-    # task: str — the natural-language task
-    # files: list[FileRecord] — scanned files
+    # task: str - the natural-language task
+    # files: list[FileRecord] - scanned files
     # settings: ScoreSettings
-    # options: dict — from [[plugins.registrations]] options
+    # options: dict - from [[plugins.registrations]] options
     # estimate_tokens: callable
     # Returns: list[RankedFile]
     ...
@@ -92,7 +92,7 @@ def compress_custom(
     duplicate_hash_cache_enabled,
 ):
     # ranked_files: list[RankedFile]
-    # max_tokens: int — token budget
+    # max_tokens: int - token budget
     # cache: summary cache backend
     # settings: CompressionSettings
     # summarization_settings: SummarizationSettings
@@ -136,8 +136,8 @@ Token estimators can optionally expose a `describe(...)` callable so artifacts i
 
 Redcon ships two minimal reference plugins in `redcon.plugins.examples`:
 
-- `path_glob_bonus_scorer` — adds a score bonus to files matching specified path patterns
-- `leading_summary_compressor` — compresses files to their leading N lines
+- `path_glob_bonus_scorer` - adds a score bonus to files matching specified path patterns
+- `leading_summary_compressor` - compresses files to their leading N lines
 
 These are intended as examples of the contract, not recommended production defaults.
 

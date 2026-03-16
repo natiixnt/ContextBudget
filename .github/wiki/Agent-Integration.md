@@ -151,7 +151,7 @@ print(plan["steps"][0]["context"])
 ```
 
 The workflow-planning artifact includes:
-- `steps`: ordered lifecycle steps — `inspect`, `implement`, `test`, `validate`, `document`
+- `steps`: ordered lifecycle steps - `inspect`, `implement`, `test`, `validate`, `document`
 - `shared_context`: files reused across multiple steps
 - `estimated_tokens` per step
 - `total_estimated_tokens`, `unique_context_tokens`, `reused_context_tokens`

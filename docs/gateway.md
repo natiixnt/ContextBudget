@@ -41,7 +41,7 @@ Returns basic runtime statistics.
 
 ### `POST /prepare-context`
 
-Stateless — runs the full pipeline once and returns compressed context.
+Stateless - runs the full pipeline once and returns compressed context.
 
 **Request:**
 ```json
@@ -73,7 +73,7 @@ Stateless — runs the full pipeline once and returns compressed context.
 
 ### `POST /run-agent-step`
 
-Stateful — subsequent calls with the same `session_id` apply automatic delta context (only changed files are re-sent between turns).
+Stateful - subsequent calls with the same `session_id` apply automatic delta context (only changed files are re-sent between turns).
 
 **Request:**
 ```json
@@ -134,7 +134,7 @@ All config fields can be set via CLI flags or environment variables:
 | `api_key` | `--api-key` | `RC_GATEWAY_API_KEY` | `None` (disabled) |
 | `max_tokens` | `--max-tokens` | `RC_GATEWAY_MAX_TOKENS` | `128000` |
 | `max_files` | `--max-files` | `RC_GATEWAY_MAX_FILES` | `100` |
-| `request_timeout_seconds` | — | `RC_GATEWAY_TIMEOUT_SECONDS` | `30` |
+| `request_timeout_seconds` | - | `RC_GATEWAY_TIMEOUT_SECONDS` | `30` |
 | `config_path` | `--config` | `RC_GATEWAY_CONFIG_PATH` | `None` |
 | `telemetry_enabled` | `--telemetry` | `RC_GATEWAY_TELEMETRY` | `false` |
 | `log_requests` | `--no-log-requests` | `RC_GATEWAY_LOG_REQUESTS` | `true` |

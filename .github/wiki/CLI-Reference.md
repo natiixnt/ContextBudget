@@ -51,7 +51,7 @@ Build a compressed context package and write `run.json` + `run.md`.
 redcon pack <task> --repo <path> [--max-tokens N] [--top-files N]
 ```
 
-**Incremental (delta) mode** — only changed context is emitted:
+**Incremental (delta) mode** - only changed context is emitted:
 
 ```bash
 redcon pack <task> --repo <path> --delta <previous-run.json>
@@ -154,7 +154,7 @@ redcon pr-audit --repo <path> [--base <ref>] [--head <ref>]
 Outputs:
 - `<prefix>.json`
 - `<prefix>.md`
-- `<prefix>.comment.md` — ready-to-post PR comment
+- `<prefix>.comment.md` - ready-to-post PR comment
 
 Estimates changed-file token cost before and after the PR, flags files that grew, detects newly introduced dependencies, highlights context-complexity increases.
 

@@ -1,4 +1,4 @@
-# Redcon — Pilot Readiness
+# Redcon - Pilot Readiness
 
 > Last updated: 2026-03-15
 > Version: v1.1
@@ -73,13 +73,13 @@ This document describes what is production-ready, what is in beta, known limitat
 | `docker-compose.prod.yml` | ✅ Production | Resource limits + nginx |
 | nginx reverse proxy config | ✅ Production | TLS + rate limiting |
 | Environment variable templates | ✅ Production | `.env.example` for both services |
-| Database migrations (001–004) | ✅ Production | Incremental; idempotent |
+| Database migrations (001-004) | ✅ Production | Incremental; idempotent |
 
 ---
 
 ## What is Alpha / Beta
 
-### Alpha — Not Recommended for Production Use
+### Alpha - Not Recommended for Production Use
 | Feature | Status | Why |
 |---------|--------|-----|
 | Redis cache backend | ⚠️ Alpha | Limited production validation; no cluster support |
@@ -88,7 +88,7 @@ This document describes what is production-ready, what is in beta, known limitat
 | Node.js runner integration | ⚠️ Alpha | Wrapper only; limited testing |
 | Plugin system | ⚠️ Alpha | API may change between minor versions |
 
-### Beta — Functional but Not Load-Tested
+### Beta - Functional but Not Load-Tested
 | Feature | Status | Why |
 |---------|--------|-----|
 | Multi-turn agent runtime | 🔶 Beta | Session isolation under concurrent load not fully validated |
@@ -126,7 +126,7 @@ This document describes what is production-ready, what is in beta, known limitat
 
 ## Recommended Deployment Model for Pilot Customers
 
-### Smallest viable pilot (1–3 teams)
+### Smallest viable pilot (1-3 teams)
 
 ```
 [Developer Machine / CI]
@@ -167,15 +167,15 @@ All items below have been implemented and are included in v1.1.0.
 
 | Priority | Item | Status | Notes |
 |----------|------|--------|-------|
-| P0 | Prometheus `/metrics` endpoint on cloud service | ✅ Done | `GET /metrics` — standard text exposition; `app/metrics.py` |
+| P0 | Prometheus `/metrics` endpoint on cloud service | ✅ Done | `GET /metrics` - standard text exposition; `app/metrics.py` |
 | P0 | Rate limiting per API key on event ingestion | ✅ Done | Sliding window; `RC_CLOUD_EVENTS_RATE_LIMIT` / `_RATE_WINDOW`; `app/rate_limit.py` |
 | P0 | Block `POST /orgs` by default (require admin token) | ✅ Done | `RC_CLOUD_ADMIN_TOKEN` Bearer required; 403 when unset |
 | P1 | Horizontal gateway scaling (Redis session store) | ✅ Done | `RC_GATEWAY_REDIS_URL`; `redcon/gateway/session_store.py`; in-memory fallback |
-| P1 | PgBouncer connection pooling for >50 req/s | ✅ Done | `docker-compose.prod.yml` — `pgbouncer` service (bitnami/pgbouncer); `deploy/pgbouncer.ini`; transaction pool mode; 20 connections per node |
+| P1 | PgBouncer connection pooling for >50 req/s | ✅ Done | `docker-compose.prod.yml` - `pgbouncer` service (bitnami/pgbouncer); `deploy/pgbouncer.ini`; transaction pool mode; 20 connections per node |
 | P1 | Usage quotas + per-org token allowances | ✅ Done | `app/quotas.py`; `GET|PUT /orgs/{id}/quota`; migration 005 |
-| P1 | TypeScript/Node.js SDK | ✅ Done | `sdk/nodejs/` — `CloudClient` + `GatewayClient`; no runtime deps |
+| P1 | TypeScript/Node.js SDK | ✅ Done | `sdk/nodejs/` - `CloudClient` + `GatewayClient`; no runtime deps |
 | P2 | SSO (OIDC) for the cloud control plane | ✅ Done | `app/oidc.py`; `RC_CLOUD_OIDC_*` env vars; `GET /auth/oidc/config` |
 | P2 | Slack + PagerDuty webhook adapters | ✅ Done | `app/webhook_adapters.py`; `RC_CLOUD_SLACK_WEBHOOK_URL` / `RC_CLOUD_PAGERDUTY_ROUTING_KEY` |
-| P2 | Multi-region Postgres replication | ✅ Done | `docker-compose.multiregion.yml` — primary + streaming replica + two PgBouncer pools; `READ_DATABASE_URL` routes analytics reads to replica; `deploy/postgres-primary.conf` / `postgres-replica.conf` |
+| P2 | Multi-region Postgres replication | ✅ Done | `docker-compose.multiregion.yml` - primary + streaming replica + two PgBouncer pools; `READ_DATABASE_URL` routes analytics reads to replica; `deploy/postgres-primary.conf` / `postgres-replica.conf` |
 | P3 | Billing meter integration (Stripe) | ✅ Done | `app/billing.py`; `RC_CLOUD_STRIPE_*` env vars; migration 006; `GET /orgs/{id}/billing` |
-| P3 | Self-service onboarding UI | ✅ Done | `dashboard/app/onboarding/` — 5-step wizard; connects to cloud, creates org, issues key |
+| P3 | Self-service onboarding UI | ✅ Done | `dashboard/app/onboarding/` - 5-step wizard; connects to cloud, creates org, issues key |

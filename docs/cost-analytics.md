@@ -141,5 +141,5 @@ print(costs)
 ## Notes on data freshness
 
 - The `events` table is populated in real time as agents push events via `POST /events`.
-- There is no aggregation lag — analytics queries run directly on the `events` table.
+- There is no aggregation lag - analytics queries run directly on the `events` table.
 - The `baseline_full_context_tokens` field is populated only when the runtime computes a full-context baseline estimate. It may be `null` for some events; those rows contribute `0` to the `baseline_tokens` aggregate.

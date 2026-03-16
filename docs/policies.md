@@ -9,7 +9,7 @@ The control plane stores versioned `PolicySpec` objects. Gateways fetch the acti
 | `max_estimated_input_tokens` | `int \| null` | Hard token budget per request |
 | `max_files_included` | `int \| null` | Maximum files in packed context |
 | `max_quality_risk_level` | `"low" \| "medium" \| "high" \| null` | Reject runs above this compression risk |
-| `min_estimated_savings_percentage` | `float \| null` | Minimum compression ratio required (0–100) |
+| `min_estimated_savings_percentage` | `float \| null` | Minimum compression ratio required (0-100) |
 | `max_context_size_bytes` | `int \| null` | Maximum raw context size |
 
 All fields are optional. An empty `spec` object `{}` creates a version that passes all checks.
