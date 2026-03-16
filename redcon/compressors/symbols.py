@@ -683,18 +683,19 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
     is_py = language == "python"
     method_re = _TS_METHOD_RE if language in {"typescript", "javascript"} else _PY_METHOD_RE
     for symbol in selected:
-        export_marker = " exported" if symbol.exported else ""
-        header = (
-            f"## {symbol.symbol_type} {symbol.name}{export_marker} "
-            f"lines {symbol.start + 1}-{symbol.end + 1}"
-        )
         if symbol.score < _STUB_SCORE_THRESHOLD and symbol.end > symbol.start:
-            # Low keyword relevance - signature only; strip type annotations for brevity.
+            # Low keyword relevance - minimal header + signature only.
+            header = f"## {symbol.name}"
             sig = lines[symbol.start]
             if is_py:
                 sig = _strip_py_annotations(sig)
             body = sig + " ..."
         else:
+            export_marker = " exported" if symbol.exported else ""
+            header = (
+                f"## {symbol.symbol_type} {symbol.name}{export_marker} "
+                f"lines {symbol.start + 1}-{symbol.end + 1}"
+            )
             body_lines = lines[symbol.start : symbol.end + 1]
             if is_py:
                 body_lines = _condense_decorators(body_lines)
