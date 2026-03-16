@@ -11,8 +11,8 @@ Evaluates how well Redcon selects the task service, route handlers, and reposito
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 10 ms |
-| Generated | 2026-03-16T20:27:45.597681+00:00 |
+| Scan runtime | 12 ms |
+| Generated | 2026-03-16T20:29:58.331504+00:00 |
 
 ## Baseline
 

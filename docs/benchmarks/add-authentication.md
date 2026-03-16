@@ -12,7 +12,7 @@ Evaluates context selection for an auth-focused change spanning route handlers, 
 | Top files | 20 |
 | Token estimator | heuristic |
 | Scan runtime | 6 ms |
-| Generated | 2026-03-16T20:27:45.652372+00:00 |
+| Generated | 2026-03-16T20:29:58.390902+00:00 |
 
 ## Baseline
 
@@ -24,13 +24,13 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 3,009 | 9,219 (75.4%) | low | 23 ms |
-| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 23 ms |
+| compressed_pack | 2,499 | 9,729 (79.6%) | low | 22 ms |
+| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 28 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 3,009 (24.6% of baseline)
-- **Saved tokens:** 9,219 (75.4% reduction)
+- **Input tokens:** 2,499 (20.4% of baseline)
+- **Saved tokens:** 9,729 (79.6% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -54,7 +54,7 @@ Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 23 ms
+Second run (warm cache): **150 tokens**, 15 cache hits, 28 ms
 
 ## Token estimator comparison
 
@@ -62,4 +62,4 @@ Second run (warm cache): **150 tokens**, 15 cache hits, 23 ms
 |--------|-----------|---------------|----------------|
 | task | 18 | 20 | 18 *(fallback)* |
 | top_ranked_file | 616 | 704 | 616 *(fallback)* |
-| packed_context | 3013 | 3443 | 3013 *(fallback)* |
+| packed_context | 2504 | 2861 | 2504 *(fallback)* |

@@ -5,7 +5,7 @@
   "max_tokens": 8000,
   "top_files": 20,
   "baseline_full_context_tokens": 12228,
-  "scan_runtime_ms": 10,
+  "scan_runtime_ms": 12,
   "strategies": [
     {
       "strategy": "naive_full_context",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-16T20:27:45.597681+00:00",
+  "generated_at": "2026-03-16T20:29:58.331504+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",

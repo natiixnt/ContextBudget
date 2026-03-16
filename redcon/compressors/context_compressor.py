@@ -418,7 +418,7 @@ def compress_ranked_files(
         # Test files use a higher stub score threshold so that test function
         # bodies are stubbed out unless the function is highly keyword-relevant.
         # This avoids spending tokens on generic test boilerplate.
-        effective_stub_threshold = 5.5 if is_test else _STUB_SCORE_THRESHOLD
+        effective_stub_threshold = 7.0 if is_test else _STUB_SCORE_THRESHOLD
 
         symbol_selection = None
         if cfg.symbol_extraction_enabled:
