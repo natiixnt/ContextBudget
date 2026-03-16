@@ -14,7 +14,7 @@ from redcon.compressors.language_chunks import (
     SliceRelationshipContext,
     select_language_aware_chunks,
 )
-from redcon.compressors.symbols import select_symbol_aware_chunks
+from redcon.compressors.symbols import select_symbol_aware_chunks, _truncate_data_blocks
 from redcon.compressors.summarizers import SummaryRequest, SummarizationService
 from redcon.core.text import task_keywords
 from redcon.core.tokens import estimate_tokens
@@ -133,6 +133,11 @@ def _collapse_blank_lines(text: str) -> str:
 
 
 _DIVIDER_RE = re.compile(r"^\s*#\s*[-=*#_]{15,}\s*$")
+
+
+def _truncate_data_blocks_in_text(text: str) -> str:
+    """Apply _truncate_data_blocks to arbitrary source text."""
+    return "\n".join(_truncate_data_blocks(text.splitlines()))
 
 
 def _strip_decorative_dividers(text: str) -> str:
@@ -560,6 +565,7 @@ def compress_ranked_files(
         if strategy != "full":
             if is_py_file:
                 compressed = _strip_docstrings_in_text(compressed)
+                compressed = _truncate_data_blocks_in_text(compressed)
             compressed = _strip_decorative_dividers(compressed)
             compressed = _collapse_blank_lines(compressed)
             compressed = _dedup_imports(compressed, seen_imports)

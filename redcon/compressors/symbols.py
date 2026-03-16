@@ -717,9 +717,14 @@ def _strip_leading_comments(body_lines: list[str], language: str) -> list[str]:
     return body_lines[i:] if i < len(body_lines) else body_lines
 
 
-_DATA_OPEN_RE = re.compile(r"^\s*[\w.]+\s*=\s*([{[(])\s*$")
-_DATA_OPEN_MAX_ENTRIES = 10
-_DATA_OPEN_KEEP = 4
+# Matches lines that open a multi-entry data structure, including:
+#   assignments: ``x = {``, ``items = [``, ``task = Task(``, ``cfg = Config(``
+#   bare brackets: ``(`` or ``[`` or ``{`` alone on an indented line (function args).
+_DATA_OPEN_RE = re.compile(
+    r"^\s*(?:[\w.]+\s*=\s*(?:[A-Za-z_][\w.]*\s*)?)?([{[(])\s*$"
+)
+_DATA_OPEN_MAX_ENTRIES = 7
+_DATA_OPEN_KEEP = 3
 
 
 def _truncate_data_blocks(body_lines: list[str]) -> list[str]:
