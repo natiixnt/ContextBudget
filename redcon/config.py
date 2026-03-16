@@ -108,6 +108,8 @@ class CompressionSettings:
     snippet_total_line_limit: int = 120
     snippet_fallback_lines: int = 60
     summary_preview_lines: int = 8
+    adaptive_line_budget: bool = True
+    adaptive_line_budget_max_factor: float = 3.0
     risk_skip_weight: float = 0.55
     risk_compression_weight: float = 0.45
 

@@ -63,7 +63,7 @@ def _is_utility_file(path: str) -> bool:
     """Return True if the file is a utility/config/helper module.
 
     Utility files rarely contain task-specific logic so their bodies are
-    stubbed — only imports and signatures are retained, saving 40-60%.
+    stubbed - only imports and signatures are retained, saving 40-60%.
     """
     p = path.lower().replace("\\", "/")
     return any(pat in p for pat in _UTILITY_FILE_PATTERNS)
@@ -316,6 +316,15 @@ def compress_ranked_files(
         symbols: list[dict[str, int | str | bool]] = []
         symbol_failure_reason = ""
 
+        # Scale extraction line budget by relevance: high-scoring files get more
+        # lines to work with so important symbols are not truncated prematurely.
+        if cfg.adaptive_line_budget and cfg.snippet_score_threshold > 0:
+            _score_ratio = relevance_score / cfg.snippet_score_threshold
+            _factor = min(cfg.adaptive_line_budget_max_factor, max(0.5, _score_ratio))
+            effective_line_budget = max(1, int(cfg.snippet_total_line_limit * _factor))
+        else:
+            effective_line_budget = cfg.snippet_total_line_limit
+
         symbol_selection = None
         if cfg.symbol_extraction_enabled:
             try:
@@ -323,7 +332,7 @@ def compress_ranked_files(
                     file_path=file_record.path,
                     text=full_text,
                     keywords=keywords,
-                    line_budget=cfg.snippet_total_line_limit,
+                    line_budget=effective_line_budget,
                 )
             except Exception as exc:  # pragma: no cover - exercised via monkeypatch tests
                 symbol_failure_reason = f"symbol extraction failed: {exc}"
@@ -333,7 +342,7 @@ def compress_ranked_files(
             file_path=file_record.path,
             text=full_text,
             keywords=keywords,
-            line_budget=cfg.snippet_total_line_limit,
+            line_budget=effective_line_budget,
             relationship_context=relationship_context,
             surrounding_lines=min(1, max(0, cfg.snippet_context_lines)),
         )
@@ -362,7 +371,7 @@ def compress_ranked_files(
         is_test = _is_test_file(file_record.path)
         is_utility = _is_utility_file(file_record.path)
         # Test and utility files always get symbol/slice extraction regardless of
-        # size — fixtures and boilerplate bodies waste tokens when sent verbatim.
+        # size - fixtures and boilerplate bodies waste tokens when sent verbatim.
         force_compress = (is_test or is_utility) and symbol_selection is not None
 
         if raw_tokens <= cfg.full_file_threshold_tokens and not force_compress:
@@ -451,7 +460,7 @@ def compress_ranked_files(
                     else []
                 )
 
-        # Strip import lines already emitted in an earlier file — cross-file dedup.
+        # Strip import lines already emitted in an earlier file - cross-file dedup.
         # Applied before cache-key computation so deduped content is stored/looked up.
         if strategy != "full":
             compressed = _dedup_imports(compressed, seen_imports)
