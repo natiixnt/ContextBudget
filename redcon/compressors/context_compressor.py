@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Pack/compression stage for budgeted context generation."""
 
+import re
 from dataclasses import dataclass
 from hashlib import sha256
 from pathlib import Path
@@ -129,6 +130,20 @@ def _collapse_blank_lines(text: str) -> str:
             blanks = 0
             out.append(line)
     return "\n".join(out)
+
+
+_DIVIDER_RE = re.compile(r"^\s*#\s*[-=*#_]{15,}\s*$")
+
+
+def _strip_decorative_dividers(text: str) -> str:
+    """Remove banner-style comment dividers that carry no semantic content.
+
+    Strips lines whose entire content (after ``#``) is 15+ repeated
+    non-alphanumeric characters, e.g. ``# --------`` or ``# ========``.
+    """
+    return "\n".join(
+        line for line in text.splitlines() if not _DIVIDER_RE.match(line)
+    )
 
 
 def _dedup_imports(text: str, seen_imports: set[str]) -> str:
@@ -532,6 +547,7 @@ def compress_ranked_files(
         if strategy != "full":
             if is_py_file:
                 compressed = _strip_docstrings_in_text(compressed)
+            compressed = _strip_decorative_dividers(compressed)
             compressed = _collapse_blank_lines(compressed)
             compressed = _dedup_imports(compressed, seen_imports)
         else:
