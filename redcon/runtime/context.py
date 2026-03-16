@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
+# Copyright (c) 2026 nai. All rights reserved.
+# See LICENSE-COMMERCIAL for terms.
+
 from __future__ import annotations
 
 """Runtime context dataclasses.

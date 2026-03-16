@@ -1,0 +1,24 @@
+Redcon Commercial License
+Copyright (c) 2026 nai. All rights reserved.
+
+The following components of this repository are NOT covered by the MIT License
+and are proprietary to Redcon:
+
+  redcon/gateway/
+  redcon/control_plane/
+  redcon/agents/
+  redcon/integrations/
+  redcon/runtime/
+  redcon/telemetry/
+
+These components may not be used, copied, modified, merged, published,
+distributed, sublicensed, or sold without a valid commercial license from
+Redcon.
+
+For commercial licensing, contact: natjiks@gmail.com
+
+The remaining components of this repository (redcon/core/, redcon/compressors/,
+redcon/scanners/, redcon/scorers/, redcon/stages/, redcon/schemas/,
+redcon/plugins/, redcon/cache/, redcon/sdk/, redcon/engine.py, redcon/cli.py,
+benchmarks/, and the CLI) are available under the MIT License as stated in the
+LICENSE file.

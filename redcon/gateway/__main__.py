@@ -1,3 +1,7 @@
+# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
+# Copyright (c) 2026 nai. All rights reserved.
+# See LICENSE-COMMERCIAL for terms.
+
 """Entry point for ``python -m redcon.gateway``.
 
 Reads configuration from ``RC_GATEWAY_*`` environment variables and starts

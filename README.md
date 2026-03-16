@@ -162,3 +162,22 @@ Detailed upgrade notes: [docs/migration.md](docs/migration.md).
 - [Migration Notes](docs/migration.md)
 
 Examples and sample outputs: [examples/README.md](examples/README.md).
+
+## License
+
+Redcon uses a dual-license model:
+
+| Component | License |
+|-----------|---------|
+| Core engine (`redcon/core/`, `redcon/compressors/`, `redcon/scanners/`, `redcon/scorers/`, `redcon/stages/`, `redcon/schemas/`, `redcon/plugins/`, `redcon/cache/`, `redcon/sdk/`, `redcon/cli.py`, `redcon/engine.py`) | [MIT](LICENSE) |
+| CLI and benchmark framework | [MIT](LICENSE) |
+| Gateway server (`redcon/gateway/`) | [Proprietary](LICENSE-COMMERCIAL) |
+| Control plane (`redcon/control_plane/`) | [Proprietary](LICENSE-COMMERCIAL) |
+| Agent middleware (`redcon/agents/`) | [Proprietary](LICENSE-COMMERCIAL) |
+| LLM integrations (`redcon/integrations/`) | [Proprietary](LICENSE-COMMERCIAL) |
+| Runtime and telemetry (`redcon/runtime/`, `redcon/telemetry/`) | [Proprietary](LICENSE-COMMERCIAL) |
+
+The open-source core builds community adoption and developer trust.
+The commercial layer is what powers Redcon Cloud and enterprise deployments.
+
+For commercial licensing: natjiks@gmail.com
