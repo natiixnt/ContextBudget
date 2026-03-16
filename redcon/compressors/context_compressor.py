@@ -454,6 +454,17 @@ def compress_ranked_files(
         # size - fixtures and boilerplate bodies waste tokens when sent verbatim.
         force_compress = (is_test or is_utility) and symbol_selection is not None
 
+        # When a relationship-driven file has symbol extraction available, compare
+        # symbol vs slice token counts and prefer whichever is smaller.
+        symbol_text = f"# {file_record.path}\n{symbol_selection.text}" if symbol_selection is not None else ""
+        symbol_tokens = token_estimator(symbol_text) if symbol_text else 0
+        symbol_beats_slice = bool(
+            symbol_selection is not None
+            and relationship_driven
+            and slice_supported
+            and symbol_tokens < slice_tokens
+        )
+
         if raw_tokens <= cfg.full_file_threshold_tokens and not force_compress:
             strategy = "full"
             compressed = f"# Full: {file_record.path}\n{full_text}"
@@ -471,9 +482,11 @@ def compress_ranked_files(
                 if line_count > 0
                 else []
             )
-        elif symbol_selection is not None and (relevance_score >= cfg.snippet_score_threshold or force_compress):
+        elif symbol_selection is not None and (
+            relevance_score >= cfg.snippet_score_threshold or force_compress or symbol_beats_slice
+        ):
             strategy = "symbol"
-            compressed = f"# {file_record.path}\n{symbol_selection.text}"
+            compressed = symbol_text
             chunk_strategy = symbol_selection.chunk_strategy
             chunk_reason = symbol_selection.chunk_reason
             selected_ranges = _selected_ranges_with_reason(symbol_selection.selected_ranges, chunk_reason)
