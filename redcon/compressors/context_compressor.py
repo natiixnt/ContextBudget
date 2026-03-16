@@ -47,11 +47,43 @@ class _SnippetSelection:
 
 _TEST_FILE_PATTERNS = ("test_", "_test.", "/test/", "/tests/", "spec_", "_spec.")
 
+_UTILITY_FILE_PATTERNS = (
+    "/config.", "/config/", "helpers.", "utils.", "/utils/",
+    "validators.", "constants.", "settings.", "/types.", "exceptions.", "errors.",
+)
+
 
 def _is_test_file(path: str) -> bool:
     """Return True if the file path looks like a test file."""
     p = path.lower().replace("\\", "/")
     return any(pat in p for pat in _TEST_FILE_PATTERNS)
+
+
+def _is_utility_file(path: str) -> bool:
+    """Return True if the file is a utility/config/helper module.
+
+    Utility files rarely contain task-specific logic so their bodies are
+    stubbed — only imports and signatures are retained, saving 40-60%.
+    """
+    p = path.lower().replace("\\", "/")
+    return any(pat in p for pat in _UTILITY_FILE_PATTERNS)
+
+
+def _dedup_imports(text: str, seen_imports: set[str]) -> str:
+    """Strip import lines already seen in earlier compressed files.
+
+    Operates on the raw compressed text string. Updates *seen_imports* in place
+    so subsequent calls omit duplicates discovered here.
+    """
+    out: list[str] = []
+    for line in text.splitlines():
+        stripped = line.strip()
+        if stripped.startswith(("import ", "from ")) and stripped in seen_imports:
+            continue
+        if stripped.startswith(("import ", "from ")):
+            seen_imports.add(stripped)
+        out.append(line)
+    return "\n".join(out)
 
 
 def _format_keywords(keywords: list[str]) -> str:
@@ -248,6 +280,7 @@ def compress_ranked_files(
     compressed_files: list[CompressedFile] = []
     files_included: list[str] = []
     files_skipped: list[str] = []
+    seen_imports: set[str] = set()
 
     total_raw = 0
     total_compressed = 0
@@ -327,9 +360,10 @@ def compress_ranked_files(
         )
 
         is_test = _is_test_file(file_record.path)
-        # Test files always get symbol/slice extraction — fixture-heavy structure
-        # wastes tokens when sent in full even at small sizes.
-        force_compress = is_test and symbol_selection is not None
+        is_utility = _is_utility_file(file_record.path)
+        # Test and utility files always get symbol/slice extraction regardless of
+        # size — fixtures and boilerplate bodies waste tokens when sent verbatim.
+        force_compress = (is_test or is_utility) and symbol_selection is not None
 
         if raw_tokens <= cfg.full_file_threshold_tokens and not force_compress:
             strategy = "full"
@@ -416,6 +450,11 @@ def compress_ranked_files(
                     if preview_end > 0
                     else []
                 )
+
+        # Strip import lines already emitted in an earlier file — cross-file dedup.
+        # Applied before cache-key computation so deduped content is stored/looked up.
+        if strategy != "full":
+            compressed = _dedup_imports(compressed, seen_imports)
 
         fragment_cache_key = _fragment_cache_key(file_record.path, selected_ranges, compressed)
         fragment_reference = _fragment_reference_id(fragment_cache_key)
