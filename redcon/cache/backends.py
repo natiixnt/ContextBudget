@@ -276,6 +276,142 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
             return
 
 
+class SQLiteSummaryCacheBackend(SummaryCacheBackend):
+    """Persistent local summary cache backed by SQLite.
+
+    Faster than :class:`LocalFileSummaryCacheBackend` for large caches: reads
+    are targeted ``SELECT`` queries instead of parsing a full JSON file on
+    startup.  Uses WAL mode so concurrent agent processes can read/write
+    without blocking each other.
+
+    On first use it automatically imports any existing JSON cache file so
+    existing cached summaries are not lost when switching backends.
+
+    Configuration example::
+
+        [cache]
+        backend = "sqlite"
+    """
+
+    backend_name = "sqlite"
+    _DB_FILENAME = ".redcon_cache.db"
+
+    def __init__(self, repo_path: Path, cache_file: str = CACHE_FILE, *, enabled: bool = True) -> None:
+        super().__init__(enabled=enabled)
+        self.repo_path = repo_path
+        self.db_path = repo_path / self._DB_FILENAME
+        self._conn: Any = None
+        if self.enabled:
+            try:
+                self._ensure_schema()
+                self._migrate_from_json(repo_path / cache_file)
+            except Exception:  # noqa: BLE001 - degrade silently if SQLite unavailable
+                self.enabled = False
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _connect(self) -> Any:
+        if self._conn is None:
+            import sqlite3  # stdlib - always available
+
+            conn = sqlite3.connect(str(self.db_path), check_same_thread=False)
+            conn.execute("PRAGMA journal_mode=WAL")
+            conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn = conn
+        return self._conn
+
+    def _ensure_schema(self) -> None:
+        conn = self._connect()
+        conn.executescript(
+            "CREATE TABLE IF NOT EXISTS summaries (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+            "CREATE TABLE IF NOT EXISTS fragments (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+            "CREATE TABLE IF NOT EXISTS slices    (key TEXT PRIMARY KEY, value TEXT NOT NULL);"
+        )
+        conn.commit()
+
+    def _migrate_from_json(self, json_path: Path) -> None:
+        """One-time import of an existing JSON cache file into SQLite."""
+        if not json_path.exists():
+            return
+        conn = self._connect()
+        already_populated = conn.execute("SELECT COUNT(*) FROM summaries").fetchone()
+        if already_populated and already_populated[0] > 0:
+            return
+        try:
+            raw = json.loads(json_path.read_text(encoding="utf-8"))
+        except (OSError, json.JSONDecodeError):
+            return
+        if not isinstance(raw, dict):
+            return
+        with conn:
+            for key, value in raw.get("summaries", {}).items():
+                conn.execute("INSERT OR IGNORE INTO summaries VALUES (?, ?)", (key, str(value)))
+            for key, value in raw.get("fragments", {}).items():
+                conn.execute("INSERT OR IGNORE INTO fragments VALUES (?, ?)", (key, str(value)))
+            for key, value in raw.get("slices", {}).items():
+                conn.execute("INSERT OR IGNORE INTO slices VALUES (?, ?)", (key, str(value)))
+
+    def _db_get(self, table: str, key: str) -> str | None:
+        try:
+            row = self._connect().execute(f"SELECT value FROM {table} WHERE key = ?", (key,)).fetchone()  # noqa: S608
+        except Exception:  # noqa: BLE001
+            return None
+        return row[0] if row else None
+
+    def _db_put(self, table: str, key: str, value: str) -> bool:
+        conn = self._connect()
+        try:
+            existing = conn.execute(f"SELECT 1 FROM {table} WHERE key = ?", (key,)).fetchone()  # noqa: S608
+            conn.execute(f"INSERT OR REPLACE INTO {table} VALUES (?, ?)", (key, value))  # noqa: S608
+            conn.commit()
+        except Exception:  # noqa: BLE001
+            return False
+        return existing is None
+
+    # ------------------------------------------------------------------
+    # SummaryCacheBackend protocol
+    # ------------------------------------------------------------------
+
+    def _get_summary(self, key: str) -> str | None:
+        return self._db_get("summaries", key)
+
+    def _put_summary(self, key: str, summary: str) -> bool:
+        return self._db_put("summaries", key, summary)
+
+    def _get_fragment(self, key: str) -> str | None:
+        return self._db_get("fragments", key)
+
+    def _put_fragment(self, key: str, reference: str) -> bool:
+        return self._db_put("fragments", key, reference)
+
+    def _get_slice(self, key: str) -> str | None:
+        return self._db_get("slices", key)
+
+    def _put_slice(self, key: str, data: str) -> bool:
+        return self._db_put("slices", key, data)
+
+    def _invalidate(self, key: str) -> bool:
+        conn = self._connect()
+        deleted = 0
+        try:
+            for table in ("summaries", "fragments", "slices"):
+                cursor = conn.execute(f"DELETE FROM {table} WHERE key = ?", (key,))  # noqa: S608
+                deleted += cursor.rowcount
+            conn.commit()
+        except Exception:  # noqa: BLE001
+            return False
+        return deleted > 0
+
+    def __del__(self) -> None:
+        if self._conn is not None:
+            try:
+                self._conn.close()
+            except Exception:  # noqa: BLE001
+                pass
+
+
 class SharedSummaryCacheBackendStub(SummaryCacheBackend):
     """No-op shared-cache stub for future remote/team-level integrations."""
 
@@ -413,7 +549,7 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
     def _redis_get(self, redis_key: str) -> str | None:
         try:
             raw = self._client().get(redis_key)
-        except Exception:  # noqa: BLE001 – connection failures degrade gracefully
+        except Exception:  # noqa: BLE001 - connection failures degrade gracefully
             return None
         if raw is None:
             return None
@@ -550,6 +686,7 @@ def normalize_cache_backend_name(backend: str | None) -> str:
         "file": LocalFileSummaryCacheBackend.backend_name,
         "local": LocalFileSummaryCacheBackend.backend_name,
         "local_file": LocalFileSummaryCacheBackend.backend_name,
+        "sqlite": SQLiteSummaryCacheBackend.backend_name,
         "in_memory": InMemorySummaryCacheBackend.backend_name,
         "memory": InMemorySummaryCacheBackend.backend_name,
         "remote": SharedSummaryCacheBackendStub.backend_name,
@@ -562,7 +699,7 @@ def normalize_cache_backend_name(backend: str | None) -> str:
     if normalized is None:
         raise ValueError(
             "Unsupported cache backend "
-            f"{backend!r}. Expected one of: local_file, redis, shared_stub, memory."
+            f"{backend!r}. Expected one of: local_file, sqlite, redis, shared_stub, memory."
         )
     return normalized
 
@@ -582,6 +719,8 @@ def create_summary_cache_backend(
     backend_name = normalize_cache_backend_name(backend)
     if backend_name == LocalFileSummaryCacheBackend.backend_name:
         return LocalFileSummaryCacheBackend(repo_path=repo_path, cache_file=cache_file, enabled=enabled)
+    if backend_name == SQLiteSummaryCacheBackend.backend_name:
+        return SQLiteSummaryCacheBackend(repo_path=repo_path, cache_file=cache_file, enabled=enabled)
     if backend_name == SharedSummaryCacheBackendStub.backend_name:
         return SharedSummaryCacheBackendStub(namespace=repo_path.name or "default", enabled=enabled)
     if backend_name == InMemorySummaryCacheBackend.backend_name:
