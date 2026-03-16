@@ -11,32 +11,31 @@ Evaluates how well Redcon selects the task service, route handlers, and reposito
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 12 ms |
-| Generated | 2026-03-16T20:13:35.148681+00:00 |
+| Scan runtime | 10 ms |
+| Generated | 2026-03-16T20:16:31.016661+00:00 |
 
 ## Baseline
 
-Full repository context (no selection, no compression): **13,538 tokens**
+Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Strategy comparison
 
 | Strategy | Input tokens | Saved tokens | Quality risk | Runtime |
 |----------|-------------|--------------|--------------|---------|
-| naive_full_context | 13,538 | 0 (0.0%) | low | 0 ms |
-| top_k_selection | 13,538 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 4,295 | 9,243 (68.3%) | low | 24 ms |
-| cache_assisted_pack | 160 | 13,378 (98.8%) | low | 21 ms |
+| naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
+| top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
+| compressed_pack | 4,025 | 8,203 (67.1%) | low | 24 ms |
+| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 24 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 4,295 (31.7% of baseline)
-- **Saved tokens:** 9,243 (68.3% reduction)
+- **Input tokens:** 4,025 (32.9% of baseline)
+- **Saved tokens:** 8,203 (67.1% reduction)
 - **Quality risk:** low
-- **Files included:** 16
+- **Files included:** 15
 
 ### Files included in packed context
 
-- `.contextbudget_cache.json`
 - `README.md`
 - `src/app.py`
 - `src/config.py`
@@ -55,7 +54,7 @@ Full repository context (no selection, no compression): **13,538 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **160 tokens**, 17 cache hits, 21 ms
+Second run (warm cache): **150 tokens**, 15 cache hits, 24 ms
 
 ## Token estimator comparison
 
@@ -63,4 +62,4 @@ Second run (warm cache): **160 tokens**, 17 cache hits, 21 ms
 |--------|-----------|---------------|----------------|
 | task | 17 | 19 | 17 *(fallback)* |
 | top_ranked_file | 1615 | 1845 | 1615 *(fallback)* |
-| packed_context | 4298 | 4912 | 4298 *(fallback)* |
+| packed_context | 4027 | 4603 | 4027 *(fallback)* |

@@ -4,10 +4,10 @@ Results from running Redcon against the included dataset (token budget: 8,000, t
 
 | Task | Baseline tokens | Compressed tokens | Reduction | Quality risk |
 |------|----------------|-------------------|-----------|--------------|
-| [add-caching](./add-caching.md) | 13,538 | 4,295 | 68.3% | low |
-| [add-authentication](./add-authentication.md) | 13,538 | 3,025 | 77.7% | low |
-| [refactor-module](./refactor-module.md) | 13,538 | 2,976 | 78.0% | low |
-| [add-rate-limiting](./add-rate-limiting.md) | 13,538 | 642 | 95.3% | low |
+| [add-caching](./add-caching.md) | 12,228 | 4,025 | 67.1% | low |
+| [add-authentication](./add-authentication.md) | 12,228 | 3,015 | 75.3% | low |
+| [refactor-module](./refactor-module.md) | 12,228 | 2,579 | 78.9% | low |
+| [add-rate-limiting](./add-rate-limiting.md) | 12,228 | 642 | 94.7% | low |
 
 ## How to reproduce
 

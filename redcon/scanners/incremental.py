@@ -114,8 +114,13 @@ def _scoped_path(relative_path: str, repo_label: str | None = None) -> str:
     return relative_path
 
 
+_LEGACY_CACHE_FILES = {
+    ".contextbudget_cache.json",  # pre-rename cache artifact
+}
+
+
 def _default_internal_paths() -> set[str]:
-    return {CACHE_FILE, RUN_HISTORY_FILE, SCAN_INDEX_FILE}
+    return {CACHE_FILE, RUN_HISTORY_FILE, SCAN_INDEX_FILE} | _LEGACY_CACHE_FILES
 
 
 def _normalize_relative_path(path: Path, repo_path: Path) -> str | None:

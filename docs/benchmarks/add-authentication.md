@@ -12,31 +12,30 @@ Evaluates context selection for an auth-focused change spanning route handlers, 
 | Top files | 20 |
 | Token estimator | heuristic |
 | Scan runtime | 6 ms |
-| Generated | 2026-03-16T20:13:35.200605+00:00 |
+| Generated | 2026-03-16T20:16:31.070262+00:00 |
 
 ## Baseline
 
-Full repository context (no selection, no compression): **13,538 tokens**
+Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Strategy comparison
 
 | Strategy | Input tokens | Saved tokens | Quality risk | Runtime |
 |----------|-------------|--------------|--------------|---------|
-| naive_full_context | 13,538 | 0 (0.0%) | low | 0 ms |
-| top_k_selection | 13,538 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 3,025 | 10,513 (77.7%) | low | 22 ms |
-| cache_assisted_pack | 160 | 13,378 (98.8%) | low | 22 ms |
+| naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
+| top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
+| compressed_pack | 3,015 | 9,213 (75.3%) | low | 23 ms |
+| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 23 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 3,025 (22.3% of baseline)
-- **Saved tokens:** 10,513 (77.7% reduction)
+- **Input tokens:** 3,015 (24.7% of baseline)
+- **Saved tokens:** 9,213 (75.3% reduction)
 - **Quality risk:** low
-- **Files included:** 16
+- **Files included:** 15
 
 ### Files included in packed context
 
-- `.contextbudget_cache.json`
 - `README.md`
 - `src/app.py`
 - `src/config.py`
@@ -55,7 +54,7 @@ Full repository context (no selection, no compression): **13,538 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **160 tokens**, 17 cache hits, 22 ms
+Second run (warm cache): **150 tokens**, 15 cache hits, 23 ms
 
 ## Token estimator comparison
 
@@ -63,4 +62,4 @@ Second run (warm cache): **160 tokens**, 17 cache hits, 22 ms
 |--------|-----------|---------------|----------------|
 | task | 18 | 20 | 18 *(fallback)* |
 | top_ranked_file | 616 | 704 | 616 *(fallback)* |
-| packed_context | 3029 | 3462 | 3029 *(fallback)* |
+| packed_context | 3019 | 3450 | 3019 *(fallback)* |
