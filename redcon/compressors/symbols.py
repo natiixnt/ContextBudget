@@ -500,6 +500,61 @@ _TS_METHOD_RE = re.compile(
 )
 
 
+def _strip_py_annotations(sig_line: str) -> str:
+    """Strip type annotations from a single-line Python def signature.
+
+    Only applied to single-line signatures (those containing a closing paren
+    on the same line as ``def``).  Multi-line signatures are left unchanged.
+    Returns the original line on any parse failure.
+    """
+    stripped = sig_line.strip()
+    # Only handle single-line defs (closing paren present on the same line)
+    if not (stripped.startswith(("def ", "async def ")) and ")" in stripped):
+        return sig_line
+    parse_src = stripped if stripped.endswith(":") else stripped + ":"
+    try:
+        tree = ast.parse(parse_src + "\n    pass", mode="exec")
+    except SyntaxError:
+        return sig_line
+    for node in ast.walk(tree):
+        if not isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef)):
+            continue
+        a = node.args
+        params: list[str] = []
+        # Positional-only args (before /)
+        n_posonly = len(a.posonlyargs)
+        n_regular = len(a.args)
+        total_positional = n_posonly + n_regular
+        total_defaults = len(a.defaults)
+        default_start = total_positional - total_defaults
+        for idx, arg in enumerate(a.posonlyargs):
+            if idx >= default_start:
+                params.append(f"{arg.arg}={ast.unparse(a.defaults[idx - default_start])}")
+            else:
+                params.append(arg.arg)
+        if n_posonly:
+            params.append("/")
+        for idx, arg in enumerate(a.args):
+            actual = n_posonly + idx
+            if actual >= default_start:
+                params.append(f"{arg.arg}={ast.unparse(a.defaults[actual - default_start])}")
+            else:
+                params.append(arg.arg)
+        if a.vararg:
+            params.append(f"*{a.vararg.arg}")
+        elif a.kwonlyargs:
+            params.append("*")
+        for idx, arg in enumerate(a.kwonlyargs):
+            kd = a.kw_defaults[idx]
+            params.append(f"{arg.arg}={ast.unparse(kd)}" if kd is not None else arg.arg)
+        if a.kwarg:
+            params.append(f"**{a.kwarg.arg}")
+        indent = " " * (len(sig_line) - len(sig_line.lstrip()))
+        prefix = "async def " if isinstance(node, ast.AsyncFunctionDef) else "def "
+        return indent + prefix + node.name + "(" + ", ".join(params) + "):"
+    return sig_line
+
+
 def _collapse_blank_lines(text: str) -> str:
     """Collapse runs of 2+ consecutive blank lines to a single blank line."""
     out: list[str] = []
@@ -634,8 +689,11 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate],
             f"lines {symbol.start + 1}-{symbol.end + 1}"
         )
         if symbol.score < _STUB_SCORE_THRESHOLD and symbol.end > symbol.start:
-            # Low keyword relevance - include only the signature line to save tokens.
-            body = lines[symbol.start] + " ..."
+            # Low keyword relevance - signature only; strip type annotations for brevity.
+            sig = lines[symbol.start]
+            if is_py:
+                sig = _strip_py_annotations(sig)
+            body = sig + " ..."
         else:
             body_lines = lines[symbol.start : symbol.end + 1]
             if is_py:
