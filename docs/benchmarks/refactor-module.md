@@ -11,8 +11,8 @@ Evaluates selection accuracy when the primary change targets the database connec
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 6 ms |
-| Generated | 2026-03-16T20:29:58.441562+00:00 |
+| Scan runtime | 7 ms |
+| Generated | 2026-03-16T20:32:40.134423+00:00 |
 
 ## Baseline
 
@@ -24,13 +24,13 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 1,767 | 10,461 (85.5%) | low | 21 ms |
-| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 22 ms |
+| compressed_pack | 1,737 | 10,491 (85.8%) | low | 21 ms |
+| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 21 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 1,767 (14.5% of baseline)
-- **Saved tokens:** 10,461 (85.5% reduction)
+- **Input tokens:** 1,737 (14.2% of baseline)
+- **Saved tokens:** 10,491 (85.8% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -54,7 +54,7 @@ Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 22 ms
+Second run (warm cache): **150 tokens**, 15 cache hits, 21 ms
 
 ## Token estimator comparison
 
@@ -62,4 +62,4 @@ Second run (warm cache): **150 tokens**, 15 cache hits, 22 ms
 |--------|-----------|---------------|----------------|
 | task | 15 | 18 | 15 *(fallback)* |
 | top_ranked_file | 753 | 861 | 753 *(fallback)* |
-| packed_context | 1771 | 2024 | 1771 *(fallback)* |
+| packed_context | 1740 | 1989 | 1740 *(fallback)* |

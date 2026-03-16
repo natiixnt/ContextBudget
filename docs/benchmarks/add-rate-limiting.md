@@ -11,8 +11,8 @@ Evaluates context selection for rate-limiting middleware spanning route handlers
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 7 ms |
-| Generated | 2026-03-16T20:29:58.491246+00:00 |
+| Scan runtime | 6 ms |
+| Generated | 2026-03-16T20:32:40.181968+00:00 |
 
 ## Baseline
 
@@ -24,13 +24,13 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 642 | 11,586 (94.7%) | low | 20 ms |
+| compressed_pack | 633 | 11,595 (94.8%) | low | 19 ms |
 | cache_assisted_pack | 150 | 12,078 (98.8%) | low | 20 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 642 (5.3% of baseline)
-- **Saved tokens:** 11,586 (94.7% reduction)
+- **Input tokens:** 633 (5.2% of baseline)
+- **Saved tokens:** 11,595 (94.8% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -62,4 +62,4 @@ Second run (warm cache): **150 tokens**, 16 cache hits, 20 ms
 |--------|-----------|---------------|----------------|
 | task | 21 | 24 | 21 *(fallback)* |
 | top_ranked_file | 467 | 534 | 467 *(fallback)* |
-| packed_context | 647 | 739 | 647 *(fallback)* |
+| packed_context | 638 | 729 | 638 *(fallback)* |

@@ -652,9 +652,11 @@ def _condense_class_body(body_lines: list[str], max_lines: int, method_re: re.Pa
 
     kept = "\n".join(body_lines[:max_lines])
     stubs: list[str] = []
+    is_py_method = method_re is _PY_METHOD_RE
     for line in body_lines[max_lines:]:
         if method_re.match(line):
-            stubs.append(line.rstrip() + " ...")
+            sig = _strip_py_annotations(line.rstrip()) if is_py_method else line.rstrip()
+            stubs.append(sig + " ...")
     if stubs:
         return kept + "\n    # --- remaining methods (signatures only) ---\n" + "\n".join(stubs)
     omitted = len(body_lines) - max_lines

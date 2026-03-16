@@ -67,8 +67,8 @@
     {
       "strategy": "compressed_pack",
       "description": "Use Redcon scoring + compression under configured token budget.",
-      "estimated_input_tokens": 2962,
-      "estimated_saved_tokens": 9266,
+      "estimated_input_tokens": 2888,
+      "estimated_saved_tokens": 9340,
       "files_included": [
         "src/routes/tasks.py",
         "src/services/task_service.py",
@@ -200,19 +200,19 @@
     },
     {
       "name": "packed_context",
-      "chars": 11860,
+      "chars": 11563,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2965,
+          "estimated_tokens": 2891,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 3389,
+          "estimated_tokens": 3304,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +220,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 2965,
+          "estimated_tokens": 2891,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-16T20:29:58.331504+00:00",
+  "generated_at": "2026-03-16T20:32:40.027711+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",
