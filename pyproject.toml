@@ -17,6 +17,16 @@ dev = ["pytest>=8.0", "fakeredis>=2.0", "redis>=5.0"]
 tokenizers = ["tiktoken>=0.7"]
 redis = ["redis>=5.0"]
 gateway = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+openai = ["openai>=1.0"]
+anthropic = ["anthropic>=0.20"]
+all = [
+    "tiktoken>=0.7",
+    "redis>=5.0",
+    "fastapi>=0.110",
+    "uvicorn[standard]>=0.29",
+    "openai>=1.0",
+    "anthropic>=0.20",
+]
 
 [project.scripts]
 redcon = "redcon.cli:main"
