@@ -60,7 +60,7 @@ jobs:
           changed_files="${CHANGED_FILES_INPUT}"
           if [[ -z "$changed_files" ]]; then
             if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              git fetch origin "${{ github.base_ref }}" --depth=1
+              git fetch origin "${{ github.base_ref }}"
               changed_files="$(git diff --name-only "origin/${{ github.base_ref }}...${{ github.sha }}" | paste -sd, -)"
             elif [[ "${{ github.event_name }}" == "push" ]]; then
               changed_files="$(git diff --name-only "${{ github.event.before }}...${{ github.sha }}" | paste -sd, -)"
