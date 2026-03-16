@@ -484,6 +484,9 @@ def _trim_candidate(candidate: _SymbolCandidate, budget: int) -> _SymbolCandidat
     )
 
 
+_STUB_SCORE_THRESHOLD = 3.5  # symbols below this get signature-only stubs (no body)
+
+
 def _select_symbol_candidates(candidates: list[_SymbolCandidate], line_budget: int, max_symbols: int = 4) -> list[_SymbolCandidate]:
     if not candidates:
         return []
@@ -520,7 +523,11 @@ def _render_selected_symbols(lines: list[str], selected: list[_SymbolCandidate])
             f"## {symbol.symbol_type} {symbol.name}{export_marker} "
             f"lines {symbol.start + 1}-{symbol.end + 1}"
         )
-        body = "\n".join(lines[symbol.start : symbol.end + 1])
+        if symbol.score < _STUB_SCORE_THRESHOLD and symbol.end > symbol.start:
+            # Low keyword relevance — include only the signature line to save tokens.
+            body = lines[symbol.start] + " ..."
+        else:
+            body = "\n".join(lines[symbol.start : symbol.end + 1])
         parts.append(f"{header}\n{body}")
     return "\n\n".join(parts)
 

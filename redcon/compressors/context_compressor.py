@@ -45,6 +45,15 @@ class _SnippetSelection:
     selected_ranges: list[dict[str, int | str]]
 
 
+_TEST_FILE_PATTERNS = ("test_", "_test.", "/test/", "/tests/", "spec_", "_spec.")
+
+
+def _is_test_file(path: str) -> bool:
+    """Return True if the file path looks like a test file."""
+    p = path.lower().replace("\\", "/")
+    return any(pat in p for pat in _TEST_FILE_PATTERNS)
+
+
 def _format_keywords(keywords: list[str]) -> str:
     if not keywords:
         return "task context"
@@ -317,7 +326,12 @@ def compress_ranked_files(
             )
         )
 
-        if raw_tokens <= cfg.full_file_threshold_tokens:
+        is_test = _is_test_file(file_record.path)
+        # Test files always get symbol/slice extraction — fixture-heavy structure
+        # wastes tokens when sent in full even at small sizes.
+        force_compress = is_test and symbol_selection is not None
+
+        if raw_tokens <= cfg.full_file_threshold_tokens and not force_compress:
             strategy = "full"
             compressed = f"# Full: {file_record.path}\n{full_text}"
             chunk_strategy = "full-file"
@@ -334,7 +348,7 @@ def compress_ranked_files(
                 if line_count > 0
                 else []
             )
-        elif symbol_selection is not None and relevance_score >= cfg.snippet_score_threshold:
+        elif symbol_selection is not None and (relevance_score >= cfg.snippet_score_threshold or force_compress):
             strategy = "symbol"
             compressed = f"# {file_record.path}\n{symbol_selection.text}"
             chunk_strategy = symbol_selection.chunk_strategy

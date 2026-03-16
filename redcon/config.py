@@ -100,11 +100,11 @@ class ScoreSettings:
 class CompressionSettings:
     """Settings for context compression behavior."""
 
-    full_file_threshold_tokens: int = 600
+    full_file_threshold_tokens: int = 300
     snippet_score_threshold: float = 2.5
     symbol_extraction_enabled: bool = True
-    snippet_hit_limit: int = 8
-    snippet_context_lines: int = 2
+    snippet_hit_limit: int = 6
+    snippet_context_lines: int = 1
     snippet_total_line_limit: int = 120
     snippet_fallback_lines: int = 60
     summary_preview_lines: int = 8
