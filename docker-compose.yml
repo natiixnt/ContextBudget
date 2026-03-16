@@ -1,0 +1,54 @@
+# Redcon — full gateway + Redis stack
+#
+# Usage:
+#   docker compose up -d
+#
+# The gateway will be available at http://localhost:8787
+#
+# Environment variables (override in .env or shell):
+#   RC_GATEWAY_API_KEY   — Bearer token for auth (leave unset to disable auth)
+#   RC_GATEWAY_MAX_TOKENS — default token budget (default 128000)
+#
+# Scale gateway replicas (session state is stored in Redis):
+#   docker compose up -d --scale gateway=3
+
+services:
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    command: redis-server --save 60 1 --loglevel warning
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
+  gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: redcon:latest
+    restart: unless-stopped
+    command: gateway --host 0.0.0.0 --port 8787
+    ports:
+      - "8787:8787"
+    environment:
+      RC_GATEWAY_HOST: "0.0.0.0"
+      RC_GATEWAY_PORT: "8787"
+      RC_GATEWAY_REDIS_URL: "redis://redis:6379/0"
+      RC_GATEWAY_MAX_TOKENS: "${RC_GATEWAY_MAX_TOKENS:-128000}"
+      RC_GATEWAY_MAX_FILES: "${RC_GATEWAY_MAX_FILES:-100}"
+      RC_GATEWAY_API_KEY: "${RC_GATEWAY_API_KEY:-}"
+      RC_GATEWAY_LOG_REQUESTS: "true"
+      RC_GATEWAY_TIMEOUT_SECONDS: "60"
+    volumes:
+      # Mount host repos read-only so the gateway can scan them
+      - "${REDCON_REPO_ROOT:-/tmp}:/repos:ro"
+    depends_on:
+      redis:
+        condition: service_healthy
+
+volumes:
+  redis-data:
