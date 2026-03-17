@@ -17,6 +17,7 @@ class FileRecord:
     line_count: int
     content_hash: str
     content_preview: str
+    symbol_names: str = ""
     relative_path: str = ""
     repo_label: str = ""
     repo_root: str = ""

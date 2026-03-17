@@ -32,6 +32,7 @@ def _builtin_relevance_score(
         settings=settings,
         history_entries=options.get("history_entries"),
         similarity=options.get("task_similarity"),
+        dirty_paths=options.get("dirty_paths"),
     )
 
 

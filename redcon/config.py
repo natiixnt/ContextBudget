@@ -51,6 +51,7 @@ class ScoreSettings:
     path_keyword_weight: float = 2.0
     content_keyword_weight: float = 0.25
     content_keyword_cap: float = 4.0
+    symbol_name_weight: float = 1.0
     code_extension_bonus: float = 0.35
     test_path_bonus: float = 0.25
     large_file_line_threshold: int = 500
@@ -63,6 +64,7 @@ class ScoreSettings:
     graph_depends_on_relevant_bonus: float = 0.7
     graph_entrypoint_adjacency_bonus: float = 0.45
     graph_bonus_cap: float = 2.5
+    git_dirty_boost: float = 3.0
     history_selected_file_boost: float = 1.25
     history_ignored_file_penalty: float = 0.35
     history_score_cap: float = 3.0
@@ -319,6 +321,10 @@ def _apply_score_overrides(settings: ScoreSettings, data: Mapping[str, Any]) -> 
         settings.content_keyword_weight = float(data["content_keyword_weight"])
     if "content_keyword_cap" in data:
         settings.content_keyword_cap = float(data["content_keyword_cap"])
+    if "symbol_name_weight" in data:
+        settings.symbol_name_weight = float(data["symbol_name_weight"])
+    if "git_dirty_boost" in data:
+        settings.git_dirty_boost = float(data["git_dirty_boost"])
     if "code_extension_bonus" in data:
         settings.code_extension_bonus = float(data["code_extension_bonus"])
     if "test_path_bonus" in data:

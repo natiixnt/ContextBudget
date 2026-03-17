@@ -8,8 +8,11 @@ import fnmatch
 import json
 import os
 from pathlib import Path, PurePosixPath
+import re
 from typing import Any
 import hashlib
+
+_SYMBOL_DEF_RE = re.compile(r"^(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)", re.MULTILINE)
 
 from redcon.schemas.models import (
     BINARY_EXTENSIONS,
@@ -214,6 +217,7 @@ def _load_scan_index(path: Path, *, settings_fingerprint: str) -> ScanIndexState
                     line_count=int(record_raw.get("line_count", 0) or 0),
                     content_hash=str(record_raw.get("content_hash", "")),
                     content_preview=str(record_raw.get("content_preview", "")),
+                    symbol_names=str(record_raw.get("symbol_names", "")),
                     relative_path=str(record_raw.get("relative_path", "")),
                     repo_label=str(record_raw.get("repo_label", "")),
                     repo_root=str(record_raw.get("repo_root", "")),
@@ -301,6 +305,7 @@ def _load_scan_index_sqlite(db_path: Path, *, settings_fingerprint: str) -> Scan
                         line_count=int(rd.get("line_count", 0) or 0),
                         content_hash=str(rd.get("content_hash", "")),
                         content_preview=str(rd.get("content_preview", "")),
+                        symbol_names=str(rd.get("symbol_names", "")),
                         relative_path=str(rd.get("relative_path", "")),
                         repo_label=str(rd.get("repo_label", "")),
                         repo_root=str(rd.get("repo_root", "")),
@@ -413,6 +418,7 @@ def _build_file_record(
     except OSError:
         return None
     digest = hashlib.sha1(text.encode("utf-8", errors="ignore")).hexdigest()
+    symbol_names = " ".join(m.lower() for m in _SYMBOL_DEF_RE.findall(text))
     return FileRecord(
         path=_scoped_path(rel, repo_label),
         absolute_path=str(path),
@@ -421,6 +427,7 @@ def _build_file_record(
         line_count=_count_lines(text),
         content_hash=digest,
         content_preview=text[:preview_chars],
+        symbol_names=symbol_names,
         relative_path=rel,
         repo_label=repo_label or "",
         repo_root=str(repo_path),

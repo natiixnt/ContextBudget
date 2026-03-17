@@ -5,6 +5,7 @@ from __future__ import annotations
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
+import subprocess
 
 from redcon.cache.run_history import load_run_history
 from redcon.cache.summary_cache import SummaryCacheBackend, create_summary_cache_backend
@@ -140,6 +141,20 @@ def run_scan_workspace_stage(
     return scan_workspace(workspace, config=config, internal_paths=_scan_internal_paths(config))
 
 
+def _get_git_dirty_paths(repo: Path) -> set[str]:
+    """Return relative paths of files with uncommitted changes (staged + unstaged)."""
+    try:
+        result = subprocess.run(
+            ["git", "diff", "--name-only", "HEAD"],
+            cwd=repo, capture_output=True, text=True, timeout=5, check=False,
+        )
+        if result.returncode == 0:
+            return {line.strip() for line in result.stdout.splitlines() if line.strip()}
+    except Exception:  # noqa: BLE001
+        pass
+    return set()
+
+
 def run_score_stage(
     task: str,
     files: list[FileRecord],
@@ -158,6 +173,10 @@ def run_score_stage(
             history_file=config.cache.history_file,
             history_db=config.cache.history_db,
         )
+    if repo is not None and config.score.git_dirty_boost > 0:
+        dirty = _get_git_dirty_paths(repo)
+        if dirty:
+            scorer_options["dirty_paths"] = dirty
     return resolved.scorer.score(
         task=task,
         files=files,

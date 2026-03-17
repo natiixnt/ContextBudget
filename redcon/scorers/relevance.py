@@ -2,11 +2,20 @@ from __future__ import annotations
 
 """Relevance scoring stage for repository files."""
 
+import re
+
 from redcon.config import ScoreSettings
 from redcon.core.text import task_keywords
 from redcon.schemas.models import FileRecord, RankedFile
 from redcon.scorers.history import TaskSimilarityCallable, compute_historical_adjustments
 from redcon.scorers.import_graph import build_import_graph
+
+_PATH_SEG_RE = re.compile(r"[a-z0-9]+")
+
+
+def _path_tokens(path_lower: str) -> frozenset[str]:
+    """Extract word tokens from a file path (split on separators, min 4 chars)."""
+    return frozenset(t for t in _PATH_SEG_RE.findall(path_lower) if len(t) >= 4)
 
 _SIGNAL_FILES = {
     "readme.md": 0.5,
@@ -37,6 +46,7 @@ def score_files(
     *,
     history_entries=None,
     similarity: TaskSimilarityCallable | None = None,
+    dirty_paths: set[str] | None = None,
 ) -> list[RankedFile]:
     """Score files for a task using deterministic keyword and import-graph heuristics."""
 
@@ -57,15 +67,25 @@ def score_files(
                 score += cfg.critical_path_bonus
                 _add_reason(reasons, f"critical path keyword '{critical_keyword}'")
 
+        path_tokens = _path_tokens(path_lower)
+        symbols_lower = record.symbol_names
         for keyword in keywords:
             path_hits = path_lower.count(keyword)
             preview_hits = preview_lower.count(keyword)
+            symbol_hits = symbols_lower.count(keyword) if symbols_lower else 0
             if path_hits:
                 score += cfg.path_keyword_weight * path_hits
                 _add_reason(reasons, f"path contains '{keyword}'")
+            elif tokens_matching := [t for t in path_tokens if keyword.startswith(t)]:
+                # Abbreviation match: keyword "authentication" starts with path token "auth"
+                score += cfg.path_keyword_weight * 0.6
+                _add_reason(reasons, f"path abbreviation '{tokens_matching[0]}' matches '{keyword}'")
             if preview_hits:
                 score += min(cfg.content_keyword_cap, cfg.content_keyword_weight * preview_hits)
                 _add_reason(reasons, f"content mentions '{keyword}'")
+            if symbol_hits and not preview_hits:
+                score += min(cfg.content_keyword_cap, cfg.symbol_name_weight * symbol_hits)
+                _add_reason(reasons, f"defines symbol matching '{keyword}'")
 
         name = record.path.rsplit("/", 1)[-1].lower()
         signals = cfg.signal_files if cfg.signal_files else _SIGNAL_FILES
@@ -82,6 +102,10 @@ def score_files(
 
         if record.line_count > cfg.large_file_line_threshold:
             score -= cfg.large_file_penalty
+
+        if dirty_paths and cfg.git_dirty_boost > 0 and record.relative_path in dirty_paths:
+            score += cfg.git_dirty_boost
+            _add_reason(reasons, "has uncommitted changes")
 
         heuristic_scores[record.path] = score
         reasons_by_path[record.path] = reasons
