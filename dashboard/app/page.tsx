@@ -8,7 +8,7 @@ import TokenBarChart from "@/components/charts/TokenBarChart";
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section className="mb-8">
-      <h2 className="text-base font-semibold text-slate-800 mb-4 pb-2 border-b border-slate-200">{title}</h2>
+      <h2 className="text-base font-semibold text-white mb-4 pb-2 border-b border-white/10">{title}</h2>
       {children}
     </section>
   );
@@ -16,20 +16,20 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function riskBadge(risk: string) {
   const map: Record<string, string> = {
-    low: "bg-emerald-100 text-emerald-800",
-    medium: "bg-amber-100 text-amber-800",
-    high: "bg-red-100 text-red-800",
+    low: "bg-emerald-900/50 text-emerald-400",
+    medium: "bg-amber-900/50 text-amber-400",
+    high: "bg-red-900/50 text-red-400",
   };
-  return map[risk] || "bg-slate-100 text-slate-600";
+  return map[risk] || "bg-white/10 text-white/60";
 }
 
 function cmdBadge(cmd: string) {
   const map: Record<string, string> = {
-    pack: "bg-blue-100 text-blue-800",
-    benchmark: "bg-violet-100 text-violet-800",
-    "simulate-agent": "bg-cyan-100 text-cyan-800",
+    pack: "bg-accent/20 text-accent",
+    benchmark: "bg-violet-900/50 text-violet-400",
+    "simulate-agent": "bg-cyan-900/50 text-cyan-400",
   };
-  return map[cmd] || "bg-slate-100 text-slate-600";
+  return map[cmd] || "bg-white/10 text-white/60";
 }
 
 function computeDrift(runTrend: { input_tokens: number }[]) {
@@ -50,18 +50,17 @@ export default function OverviewPage() {
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-2xl font-bold text-slate-900">Overview</h1>
-        <p className="text-slate-500 text-sm mt-1">
+        <h1 className="text-2xl font-bold text-white">Overview</h1>
+        <p className="text-white/50 text-sm mt-1">
           Agent context infrastructure at a glance.{" "}
           {!data.connected && !loading && (
-            <span className="text-amber-600 font-medium">
-              Not connected — run <code className="font-mono bg-amber-50 px-1 rounded">redcon dashboard</code> to load live data.
+            <span className="text-amber-400 font-medium">
+              Not connected - run <code className="font-mono bg-white/5 px-1 rounded">redcon dashboard</code> to load live data.
             </span>
           )}
         </p>
       </div>
 
-      {/* Summary Cards */}
       <Section title="Summary">
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
           <MetricCard
@@ -93,74 +92,71 @@ export default function OverviewPage() {
             label="Context Drift"
             value={
               drift === null
-                ? "—"
+                ? "-"
                 : (drift > 0 ? "+" : "") + drift.toFixed(1) + "%"
             }
             color={drift === null ? "default" : drift > 20 ? "red" : drift > 5 ? "amber" : "green"}
-            sub="first → latest pack run"
+            sub="first -> latest pack run"
           />
           <MetricCard
             label="Cache Reuse"
             value={summary.total_saved_tokens > 0 && summary.total_input_tokens > 0
               ? (summary.total_saved_tokens / (summary.total_input_tokens + summary.total_saved_tokens) * 100).toFixed(1) + "%"
-              : "—"}
+              : "-"}
             color="blue"
             sub="of total context avoided"
           />
         </div>
       </Section>
 
-      {/* Token Trend */}
       <Section title="Token Usage Trend">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+        <div className="bg-card rounded-xl border border-white/10 p-5">
           <TokenTrendChart data={run_trend} />
         </div>
       </Section>
 
-      {/* Pack Run Bar Chart */}
-      <Section title="Token Usage — Pack Runs">
-        <div className="bg-white rounded-xl border border-slate-200 p-5 shadow-sm">
+      <Section title="Token Usage - Pack Runs">
+        <div className="bg-card rounded-xl border border-white/10 p-5">
           <TokenBarChart data={token_chart} />
         </div>
       </Section>
 
-      {/* Recent Runs */}
       <Section title="Recent Runs">
         {recentRuns.length === 0 ? (
-          <p className="text-slate-400 text-sm py-6 text-center">No runs recorded yet.</p>
+          <p className="text-white/30 text-sm py-6 text-center">No runs recorded yet.</p>
         ) : (
-          <div className="overflow-x-auto rounded-xl border border-slate-200 shadow-sm">
-            <table className="w-full text-sm bg-white">
-              <thead className="bg-slate-50 border-b border-slate-200">
+          <div className="overflow-x-auto rounded-xl border border-white/10">
+            <table className="w-full text-sm bg-card">
+              <thead className="border-b border-white/10">
                 <tr>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Command</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Task</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Input Tokens</th>
-                  <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-slate-500">Saved</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Risk</th>
-                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-slate-500">Date</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-white/40">Command</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-white/40">Task</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-white/40">Input Tokens</th>
+                  <th className="px-3 py-2.5 text-right text-xs font-semibold uppercase tracking-wide text-white/40">Saved</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-white/40">Risk</th>
+                  <th className="px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-white/40">Date</th>
                 </tr>
               </thead>
               <tbody>
                 {recentRuns.map((r, i) => (
-                  <tr key={i} className="border-b border-slate-100 last:border-0 hover:bg-slate-50">
+                  <tr key={i} className="border-b border-white/5 last:border-0 hover:bg-white/5">
                     <td className="px-3 py-2.5">
                       <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${cmdBadge(r.command)}`}>
                         {r.command}
                       </span>
                     </td>
-                    <td className="px-3 py-2.5 text-slate-700 max-w-xs truncate">{r.task || "—"}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums">{r.input_tokens.toLocaleString()}</td>
-                    <td className="px-3 py-2.5 text-right tabular-nums text-emerald-600">{r.saved_tokens.toLocaleString()}</td>
+                    <td className="px-3 py-2.5 text-white/70 max-w-xs truncate">{r.task || "-"}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-white/80">{r.input_tokens.toLocaleString()}</td>
+                    <td className="px-3 py-2.5 text-right tabular-nums text-emerald-400">{r.saved_tokens.toLocaleString()}</td>
                     <td className="px-3 py-2.5">
                       {r.risk ? (
                         <span className={`inline-block px-2 py-0.5 rounded-full text-xs font-semibold ${riskBadge(r.risk)}`}>
                           {r.risk}
                         </span>
-                      ) : "—"}
+                      ) : "-"}
                     </td>
-                    <td className="px-3 py-2.5 text-slate-400 text-xs whitespace-nowrap">
-                      {r.generated_at ? r.generated_at.slice(0, 16).replace("T", " ") : "—"}
+                    <td className="px-3 py-2.5 text-white/30 text-xs whitespace-nowrap">
+                      {r.generated_at ? r.generated_at.slice(0, 16).replace("T", " ") : "-"}
                     </td>
                   </tr>
                 ))}

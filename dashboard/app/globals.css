@@ -7,7 +7,10 @@
 }
 
 body {
-  @apply bg-slate-50 text-slate-900 antialiased;
+  background: #0b0016;
+  color: #ffffff;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .heat-row {

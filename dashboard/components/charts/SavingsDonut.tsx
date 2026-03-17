@@ -7,7 +7,7 @@ interface Props {
   saved: number;
 }
 
-const COLORS = ["#3b82f6", "#10b981"];
+const COLORS = ["#d40012", "#10b981"];
 
 function fmtK(v: number) {
   if (v >= 1_000_000) return (v / 1_000_000).toFixed(1) + "M";
@@ -18,7 +18,7 @@ function fmtK(v: number) {
 export default function SavingsDonut({ used, saved }: Props) {
   if (used + saved === 0) {
     return (
-      <div className="flex items-center justify-center h-48 text-slate-400 text-sm">
+      <div className="flex items-center justify-center h-48 text-white/30 text-sm">
         No token data yet.
       </div>
     );
@@ -49,14 +49,14 @@ export default function SavingsDonut({ used, saved }: Props) {
           </Pie>
           <Tooltip
             formatter={(v: number) => [v.toLocaleString(), ""]}
-            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid #e2e8f0" }}
+            contentStyle={{ fontSize: 12, borderRadius: 8, border: "1px solid rgba(255,255,255,0.10)", background: "#150020", color: "#fff" }}
           />
-          <Legend wrapperStyle={{ fontSize: 12 }} />
+          <Legend wrapperStyle={{ fontSize: 12, color: "rgba(255,255,255,0.60)" }} />
         </PieChart>
       </ResponsiveContainer>
       <div className="text-center -mt-2">
-        <div className="text-xs text-slate-400">Total</div>
-        <div className="text-xl font-bold text-slate-800">{fmtK(total)}</div>
+        <div className="text-xs text-white/40">Total</div>
+        <div className="text-xl font-bold text-white">{fmtK(total)}</div>
       </div>
     </div>
   );

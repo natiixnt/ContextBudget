@@ -11,7 +11,7 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Issue the API key — this endpoint accepts any valid Bearer key or admin token
+    // Issue the API key - this endpoint accepts any valid Bearer key or admin token
     const url = cloudUrl.replace(/\/$/, "") + `/orgs/${orgId}/api-keys`;
     const res = await fetch(url, {
       method: "POST",
