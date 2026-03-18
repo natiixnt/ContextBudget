@@ -6,7 +6,10 @@ import re
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
-from typing import Callable
+from typing import TYPE_CHECKING, Callable
+
+if TYPE_CHECKING:
+    from redcon.compressors.representations import FileTiers
 
 from redcon.cache.summary_cache import SummaryCacheBackend
 from redcon.config import CompressionSettings, SummarizationSettings
@@ -52,28 +55,7 @@ class _SnippetSelection:
     selected_ranges: list[dict[str, int | str]]
 
 
-_TEST_FILE_PATTERNS = ("test_", "_test.", "/test/", "/tests/", "spec_", "_spec.")
-
-_UTILITY_FILE_PATTERNS = (
-    "/config.", "/config/", "helpers.", "utils.", "/utils/",
-    "validators.", "constants.", "settings.", "/types.", "exceptions.", "errors.",
-)
-
-
-def _is_test_file(path: str) -> bool:
-    """Return True if the file path looks like a test file."""
-    p = path.lower().replace("\\", "/")
-    return any(pat in p for pat in _TEST_FILE_PATTERNS)
-
-
-def _is_utility_file(path: str) -> bool:
-    """Return True if the file is a utility/config/helper module.
-
-    Utility files rarely contain task-specific logic so their bodies are
-    stubbed - only imports and signatures are retained, saving 40-60%.
-    """
-    p = path.lower().replace("\\", "/")
-    return any(pat in p for pat in _UTILITY_FILE_PATTERNS)
+from redcon.compressors.file_patterns import _is_test_file, _is_utility_file  # noqa: E402
 
 
 def _strip_docstrings_in_text(text: str) -> str:
@@ -567,7 +549,7 @@ def compress_ranked_files(
 
 
 def _compress_greedy(
-    prepared: list,
+    prepared: list[FileTiers],
     max_tokens: int,
     cfg: CompressionSettings,
     cache: SummaryCacheBackend,
@@ -580,7 +562,6 @@ def _compress_greedy(
     summarizer: SummarizationService,
 ) -> CompressionResult:
     """Original greedy strategy: pick best tier per file, skip if over budget."""
-    from redcon.compressors.representations import FileTiers
 
     compressed_files: list[CompressedFile] = []
     files_included: list[str] = []
@@ -621,7 +602,7 @@ def _compress_greedy(
 
 
 def _compress_progressive(
-    prepared: list,
+    prepared: list[FileTiers],
     max_tokens: int,
     cfg: CompressionSettings,
     cache: SummaryCacheBackend,
@@ -639,8 +620,6 @@ def _compress_progressive(
     Pass 2 (degradation): downgrade the lowest-scoring included files to
     reclaim budget for files that were skipped.
     """
-    from redcon.compressors.representations import FileTiers
-
     # -- Pass 1: tentative assignment --
     # Each entry: (FileTiers, chosen_tier_index)
     assignments: list[tuple[FileTiers, int]] = []

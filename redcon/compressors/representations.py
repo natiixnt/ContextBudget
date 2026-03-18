@@ -14,6 +14,7 @@ tier per file, degrading before dropping.
 from dataclasses import dataclass, field
 from typing import Any, Callable
 
+from redcon.compressors.file_patterns import _is_test_file, _is_utility_file
 from redcon.compressors.language_chunks import SliceRelationshipContext
 from redcon.compressors.summarizers import SummaryRequest, SummarizationService
 from redcon.config import CompressionSettings
@@ -45,23 +46,6 @@ class FileTiers:
     full_text: str
     line_count: int
     tiers: list[Tier]  # Ordered: most detailed first
-
-
-_TEST_FILE_PATTERNS = ("test_", "_test.", "/test/", "/tests/", "spec_", "_spec.")
-_UTILITY_FILE_PATTERNS = (
-    "/config.", "/config/", "helpers.", "utils.", "/utils/",
-    "validators.", "constants.", "settings.", "/types.", "exceptions.", "errors.",
-)
-
-
-def _is_test_file(path: str) -> bool:
-    p = path.lower().replace("\\", "/")
-    return any(pat in p for pat in _TEST_FILE_PATTERNS)
-
-
-def _is_utility_file(path: str) -> bool:
-    p = path.lower().replace("\\", "/")
-    return any(pat in p for pat in _UTILITY_FILE_PATTERNS)
 
 
 # Strategy ordering: most detailed first.

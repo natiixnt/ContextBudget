@@ -236,6 +236,8 @@ export interface PrepareContextResponse {
   cache_hits: number;
   quality_risk: string;
   tokens_saved: number;
+  degraded_files: string[];
+  degradation_savings: number;
 }
 
 export interface RunAgentStepRequest extends PrepareContextRequest {
