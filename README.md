@@ -1,5 +1,11 @@
 # Redcon
 
+[![Tests](https://github.com/natiixnt/ContextBudget/actions/workflows/test.yml/badge.svg)](https://github.com/natiixnt/ContextBudget/actions/workflows/test.yml)
+[![Redcon CI](https://github.com/natiixnt/ContextBudget/actions/workflows/redcon.yml/badge.svg)](https://github.com/natiixnt/ContextBudget/actions/workflows/redcon.yml)
+[![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Code style: ruff](https://img.shields.io/badge/code%20style-ruff-000000.svg)](https://github.com/astral-sh/ruff)
+
 Redcon selects, compresses, and budgets repository context for coding-agent workflows. It is deterministic, local-first, and built to produce machine-readable artifacts that can be reused in CI, local tooling, and agent middleware.
 
 ## What It Does
