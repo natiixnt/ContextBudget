@@ -88,6 +88,9 @@ def _render_scan_change_paths(summary: ScanRefreshSummary, limit: int = 5) -> st
 def _validate_repo_config(repo: str, config: str | None = None) -> int | None:
     """Validate config for a repo; return exit code on error or None if valid."""
     repo_path = Path(repo).resolve()
+    if not repo_path.is_dir():
+        print(f"error: repository path does not exist: {repo_path}", file=sys.stderr)
+        return 2
     try:
         cfg = load_config(repo_path, config_path=Path(config).resolve() if config else None)
     except Exception as exc:
@@ -101,6 +104,49 @@ def _validate_repo_config(repo: str, config: str | None = None) -> int | None:
         print("hint: run 'redcon doctor' to diagnose configuration issues", file=sys.stderr)
         return 2
     return None
+
+
+def _fmt_elapsed(start: float) -> str:
+    elapsed = time.time() - start
+    if elapsed < 1:
+        return f"{elapsed * 1000:.0f}ms"
+    return f"{elapsed:.1f}s"
+
+
+def cmd_completion(args: argparse.Namespace) -> int:
+    """Generate shell completion script."""
+    shell = args.shell
+    commands = [
+        "doctor", "plan", "plan-agent", "simulate-agent", "pack", "export",
+        "profile", "pipeline", "read-profiler", "report", "diff", "pr-audit",
+        "benchmark", "dataset", "context-dataset", "heatmap", "watch",
+        "advise", "observe", "visualize", "prepare-context", "enforce",
+        "policy", "drift", "cost-analysis", "gateway", "control-plane",
+        "init", "roi", "benchmark-report",
+    ]
+    if shell == "bash":
+        print(f"""# Redcon bash completion - add to ~/.bashrc or ~/.bash_completion
+_redcon_completions() {{
+    local cur="${{COMP_WORDS[COMP_CWORD]}}"
+    if [ "$COMP_CWORD" -eq 1 ]; then
+        COMPREPLY=($(compgen -W "{' '.join(commands)}" -- "$cur"))
+    fi
+}}
+complete -F _redcon_completions redcon""")
+    elif shell == "zsh":
+        cmds_list = " ".join(f"'{c}'" for c in commands)
+        print(f"""# Redcon zsh completion - add to ~/.zshrc or place in fpath
+#compdef redcon
+_redcon() {{
+    local -a commands
+    commands=({cmds_list})
+    _arguments '1:command:($commands)' '*:file:_files'
+}}
+_redcon""")
+    elif shell == "fish":
+        for cmd in commands:
+            print(f"complete -c redcon -n '__fish_use_subcommand' -a '{cmd}'")
+    return 0
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
@@ -142,6 +188,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     validation_error = _validate_repo_config(args.repo, getattr(args, "config", None))
     if validation_error is not None:
         return validation_error
+    t0 = time.time()
     engine = RedconEngine(config_path=args.config)
     data = engine.plan(
         task=args.task,
@@ -149,6 +196,9 @@ def cmd_plan(args: argparse.Namespace) -> int:
         workspace=args.workspace,
         top_files=args.top_files,
     )
+
+    if not data.get("ranked_files"):
+        print("warning: no files matched the scan criteria", file=sys.stderr)
 
     base = args.out_prefix or f"redcon-plan-{_base_name(args.task)}"
     json_path = Path(f"{base}.json")
@@ -161,6 +211,7 @@ def cmd_plan(args: argparse.Namespace) -> int:
     print(f"Wrote plan Markdown: {md_path}")
     for idx, item in enumerate(data["ranked_files"][:10], start=1):
         print(f"{idx}. {item['path']} (score={item['score']})")
+    print(f"Done in {_fmt_elapsed(t0)}")
     return 0
 
 
@@ -348,6 +399,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
     if validation_error is not None:
         return validation_error
 
+    t0 = time.time()
     engine = RedconEngine(config_path=args.config)
     data = engine.pack(
         task=args.task,
@@ -404,7 +456,17 @@ def cmd_pack(args: argparse.Namespace) -> int:
         print(_json_mod.dumps(data, indent=2, default=str))
         return 0
 
+    if not data.get("files_included"):
+        print("warning: no files matched the scan criteria - context is empty", file=sys.stderr)
+
     budget = data["budget"]
+    files_included = len(data.get("files_included") or [])
+    files_skipped = len(data.get("files_skipped") or [])
+    cache_report = data.get("cache", {})
+    cache_hits = int(cache_report.get("hits", 0) or 0) if isinstance(cache_report, dict) else 0
+    cache_misses = int(cache_report.get("misses", 0) or 0) if isinstance(cache_report, dict) else 0
+    cache_total = cache_hits + cache_misses
+
     print(f"Wrote run JSON: {json_path}")
     print(f"Wrote run Markdown: {md_path}")
     print(
@@ -412,6 +474,10 @@ def cmd_pack(args: argparse.Namespace) -> int:
         f"input={budget['estimated_input_tokens']} tokens, "
         f"saved={budget['estimated_saved_tokens']} tokens, "
         f"risk={budget['quality_risk_estimate']}"
+    )
+    print(
+        f"Files: {files_included} included, {files_skipped} skipped"
+        + (f", cache {cache_hits}/{cache_total} hits" if cache_total > 0 else "")
     )
     model_profile = data.get("model_profile", {})
     if isinstance(model_profile, dict) and model_profile:
@@ -469,6 +535,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
             for violation in policy_result.get("violations", []):
                 print(f"- {violation}")
             return 2
+    print(f"Done in {_fmt_elapsed(t0)}")
     return 0
 
 
@@ -1944,6 +2011,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     doctor.set_defaults(func=cmd_doctor)
 
+    completion = sub.add_parser(
+        "completion",
+        help="Generate shell completion script (bash, zsh, or fish)",
+    )
+    completion.add_argument(
+        "shell",
+        choices=["bash", "zsh", "fish"],
+        help="Shell type to generate completions for.",
+    )
+    completion.set_defaults(func=cmd_completion)
+
     plan = sub.add_parser("plan", help="Rank relevant files for a natural language task")
     plan.add_argument("task", help="Task description")
     plan.add_argument("--repo", default=".", help="Repository path")
@@ -2109,6 +2187,13 @@ def build_parser() -> argparse.ArgumentParser:
     pack.add_argument(
         "--config",
         help="Optional path to config TOML (default: <repo>/redcon.toml).",
+    )
+    pack.add_argument(
+        "--skip-cache",
+        dest="skip_cache",
+        action="store_true",
+        default=False,
+        help="Disable cache reads and skip history recording for a fresh pack.",
     )
     pack.add_argument(
         "--format",
