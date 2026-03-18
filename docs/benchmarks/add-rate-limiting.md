@@ -11,8 +11,8 @@ Evaluates context selection for rate-limiting middleware spanning route handlers
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 6 ms |
-| Generated | 2026-03-16T20:32:40.181968+00:00 |
+| Scan runtime | 20 ms |
+| Generated | 2026-03-18T11:06:33.279952+00:00 |
 
 ## Baseline
 
@@ -24,13 +24,13 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 633 | 11,595 (94.8%) | low | 19 ms |
-| cache_assisted_pack | 150 | 12,078 (98.8%) | low | 20 ms |
+| compressed_pack | 802 | 11,426 (93.4%) | low | 36 ms |
+| cache_assisted_pack | 802 | 11,426 (93.4%) | low | 37 ms |
 
 ## Compressed pack details
 
-- **Input tokens:** 633 (5.2% of baseline)
-- **Saved tokens:** 11,595 (94.8% reduction)
+- **Input tokens:** 802 (6.6% of baseline)
+- **Saved tokens:** 11,426 (93.4% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -54,12 +54,12 @@ Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 16 cache hits, 20 ms
+Second run (warm cache): **802 tokens**, 30 cache hits, 37 ms
 
 ## Token estimator comparison
 
 | Sample | heuristic | model_aligned | exact_tiktoken |
 |--------|-----------|---------------|----------------|
 | task | 21 | 24 | 21 *(fallback)* |
-| top_ranked_file | 467 | 534 | 467 *(fallback)* |
-| packed_context | 638 | 729 | 638 *(fallback)* |
+| top_ranked_file | 392 | 448 | 392 *(fallback)* |
+| packed_context | 804 | 919 | 804 *(fallback)* |

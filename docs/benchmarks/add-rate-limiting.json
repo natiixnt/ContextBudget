@@ -5,7 +5,7 @@
   "max_tokens": 8000,
   "top_files": 20,
   "baseline_full_context_tokens": 12228,
-  "scan_runtime_ms": 6,
+  "scan_runtime_ms": 20,
   "strategies": [
     {
       "strategy": "naive_full_context",
@@ -41,12 +41,12 @@
       "estimated_input_tokens": 12228,
       "estimated_saved_tokens": 0,
       "files_included": [
-        "README.md",
         "src/config.py",
         "src/db/connection.py",
         "src/routes/tasks.py",
         "src/routes/users.py",
         "src/app.py",
+        "README.md",
         "tests/test_tasks.py",
         "tests/test_users.py",
         "src/db/repository.py",
@@ -67,15 +67,15 @@
     {
       "strategy": "compressed_pack",
       "description": "Use Redcon scoring + compression under configured token budget.",
-      "estimated_input_tokens": 633,
-      "estimated_saved_tokens": 11595,
+      "estimated_input_tokens": 802,
+      "estimated_saved_tokens": 11426,
       "files_included": [
-        "README.md",
         "src/config.py",
         "src/db/connection.py",
         "src/routes/tasks.py",
         "src/routes/users.py",
         "src/app.py",
+        "README.md",
         "tests/test_tasks.py",
         "tests/test_users.py",
         "src/db/repository.py",
@@ -89,21 +89,21 @@
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 8,
-      "runtime_ms": 19
+      "cache_hits": 24,
+      "runtime_ms": 36
     },
     {
       "strategy": "cache_assisted_pack",
       "description": "Repeat compressed pack on warm cache to measure cache-assisted behavior.",
-      "estimated_input_tokens": 150,
-      "estimated_saved_tokens": 12078,
+      "estimated_input_tokens": 802,
+      "estimated_saved_tokens": 11426,
       "files_included": [
-        "README.md",
         "src/config.py",
         "src/db/connection.py",
         "src/routes/tasks.py",
         "src/routes/users.py",
         "src/app.py",
+        "README.md",
         "tests/test_tasks.py",
         "tests/test_users.py",
         "src/db/repository.py",
@@ -117,8 +117,8 @@
       "files_skipped": [],
       "duplicate_reads_prevented": 0,
       "quality_risk_estimate": "low",
-      "cache_hits": 16,
-      "runtime_ms": 20,
+      "cache_hits": 30,
+      "runtime_ms": 37,
       "notes": "second run with warmed summary cache"
     }
   ],
@@ -169,19 +169,19 @@
     },
     {
       "name": "top_ranked_file",
-      "chars": 1868,
+      "chars": 1566,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 467,
+          "estimated_tokens": 392,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 534,
+          "estimated_tokens": 448,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -189,30 +189,30 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 467,
+          "estimated_tokens": 392,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
           "fallback_reason": "Optional dependency \"tiktoken\" is not installed."
         }
       ],
-      "path": "README.md"
+      "path": "src/config.py"
     },
     {
       "name": "packed_context",
-      "chars": 2550,
+      "chars": 3215,
       "estimators": [
         {
           "backend": "heuristic",
           "effective_backend": "heuristic",
-          "estimated_tokens": 638,
+          "estimated_tokens": 804,
           "uncertainty": "approximate",
           "fallback_used": false
         },
         {
           "backend": "model_aligned",
           "effective_backend": "model_aligned",
-          "estimated_tokens": 729,
+          "estimated_tokens": 919,
           "uncertainty": "approximate",
           "fallback_used": false,
           "model": "gpt-4o-mini"
@@ -220,7 +220,7 @@
         {
           "backend": "exact_tiktoken",
           "effective_backend": "heuristic",
-          "estimated_tokens": 638,
+          "estimated_tokens": 804,
           "uncertainty": "approximate",
           "fallback_used": true,
           "model": "gpt-4o-mini",
@@ -229,7 +229,7 @@
       ]
     }
   ],
-  "generated_at": "2026-03-16T20:32:40.181968+00:00",
+  "generated_at": "2026-03-18T11:06:33.279952+00:00",
   "implementations": {
     "scorer": "builtin.relevance",
     "compressor": "builtin.default",
