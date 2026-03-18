@@ -213,10 +213,6 @@ def _fragment_reference_id(cache_key: str) -> str:
     return f"cb-frag:{sha256(cache_key.encode('utf-8')).hexdigest()[:16]}"
 
 
-def _fragment_reference_text(reference_id: str) -> str:
-    return f"@cached-summary:{reference_id}"
-
-
 def _render_selected_ranges(lines: list[str], selected_ranges: list[dict[str, int | str]]) -> str:
     parts: list[str] = []
     for item in selected_ranges:
