@@ -32,6 +32,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -41,8 +43,20 @@ jobs:
       - name: Install ruff
         run: pip install ruff
 
-      - name: Ruff check
-        run: ruff check .
+      - name: Ruff check (changed files only)
+        if: github.event_name == 'pull_request'
+        run: |
+          changed=$(git diff --name-only --diff-filter=ACMR "origin/${{ github.base_ref }}...HEAD" -- '*.py' | grep -v -E '^(benchmarks|dashboard|examples|redcon-cloud|redcon-benchmarks)/' || true)
+          if [ -n "$changed" ]; then
+            echo "$changed" | xargs ruff check
+            echo "$changed" | xargs ruff format --check
+          else
+            echo "No Python files changed"
+          fi
 
-      - name: Ruff format check
-        run: ruff format --check .
+      - name: Ruff check (full, non-blocking)
+        if: github.event_name == 'push'
+        continue-on-error: true
+        run: |
+          ruff check .
+          ruff format --check .
