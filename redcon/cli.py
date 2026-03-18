@@ -4,10 +4,12 @@ from __future__ import annotations
 
 import argparse
 import json as _json_mod
+import logging
 from pathlib import Path
+import sys
 import time
 
-from redcon.config import RedconConfig, load_config
+from redcon.config import RedconConfig, load_config, validate_config
 from redcon.core.policy import (
     default_strict_policy,
     load_policy,
@@ -83,7 +85,63 @@ def _render_scan_change_paths(summary: ScanRefreshSummary, limit: int = 5) -> st
     return " ".join(changes)
 
 
+def _validate_repo_config(repo: str, config: str | None = None) -> int | None:
+    """Validate config for a repo; return exit code on error or None if valid."""
+    repo_path = Path(repo).resolve()
+    try:
+        cfg = load_config(repo_path, config_path=Path(config).resolve() if config else None)
+    except Exception as exc:
+        print(f"error: failed to load config: {exc}", file=sys.stderr)
+        return 2
+    errors = validate_config(cfg)
+    if errors:
+        print("error: invalid configuration:", file=sys.stderr)
+        for err in errors:
+            print(f"  - {err}", file=sys.stderr)
+        print("hint: run 'redcon doctor' to diagnose configuration issues", file=sys.stderr)
+        return 2
+    return None
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    from redcon.core.doctor import run_doctor, doctor_as_dict
+
+    repo = Path(args.repo).resolve()
+    report = run_doctor(repo)
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
+
+    if fmt == "json":
+        print(_json_mod.dumps(doctor_as_dict(report), indent=2))
+        return 0
+
+    _STATUS_ICONS = {"ok": "[ok]", "warn": "[!!]", "fail": "[XX]"}
+
+    print(f"Redcon Doctor v{report.redcon_version}")
+    print(f"Python {report.python_version} on {report.platform}")
+    print()
+
+    for check in report.checks:
+        icon = _STATUS_ICONS.get(check.status, "[ ]")
+        print(f"  {icon} {check.name}: {check.message}")
+        if check.detail:
+            for line in check.detail.split("; "):
+                print(f"       {line}")
+
+    print()
+    parts = [f"{report.passed} passed"]
+    if report.warnings:
+        parts.append(f"{report.warnings} warnings")
+    if report.failures:
+        parts.append(f"{report.failures} failures")
+    print(f"  {', '.join(parts)} / {len(report.checks)} checks")
+
+    return 1 if report.failures > 0 else 0
+
+
 def cmd_plan(args: argparse.Namespace) -> int:
+    validation_error = _validate_repo_config(args.repo, getattr(args, "config", None))
+    if validation_error is not None:
+        return validation_error
     engine = RedconEngine(config_path=args.config)
     data = engine.plan(
         task=args.task,
@@ -284,6 +342,12 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
 
 
 def cmd_pack(args: argparse.Namespace) -> int:
+    fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
+
+    validation_error = _validate_repo_config(args.repo, getattr(args, "config", None))
+    if validation_error is not None:
+        return validation_error
+
     engine = RedconEngine(config_path=args.config)
     data = engine.pack(
         task=args.task,
@@ -293,6 +357,22 @@ def cmd_pack(args: argparse.Namespace) -> int:
         top_files=args.top_files,
         delta_from=args.delta,
     )
+
+    # context-only: emit just the compressed text to stdout for piping
+    if fmt == "context-only":
+        for entry in data.get("compressed_context") or []:
+            if not isinstance(entry, dict):
+                continue
+            path = str(entry.get("path") or "")
+            text = str(entry.get("text") or "")
+            if text.startswith("@cached-summary:"):
+                continue
+            if path:
+                print(f"# File: {path}")
+            if text:
+                print(text)
+            print()
+        return 0
 
     base = args.out_prefix or "run"
     json_path = Path(f"{base}.json")
@@ -319,6 +399,10 @@ def cmd_pack(args: argparse.Namespace) -> int:
             "run_markdown": str(md_path.resolve()),
         },
     )
+
+    if fmt == "json":
+        print(_json_mod.dumps(data, indent=2, default=str))
+        return 0
 
     budget = data["budget"]
     print(f"Wrote run JSON: {json_path}")
@@ -385,6 +469,56 @@ def cmd_pack(args: argparse.Namespace) -> int:
             for violation in policy_result.get("violations", []):
                 print(f"- {violation}")
             return 2
+    return 0
+
+
+def cmd_export(args: argparse.Namespace) -> int:
+    """Export compressed context from a run artifact to stdout, file, or clipboard."""
+    from redcon.core.render import read_json as _read_json
+
+    run_path = Path(args.run_json)
+    if not run_path.exists():
+        print(f"error: run artifact not found: {run_path}", file=sys.stderr)
+        return 2
+
+    data = _read_json(run_path)
+    lines: list[str] = []
+    for entry in data.get("compressed_context") or []:
+        if not isinstance(entry, dict):
+            continue
+        path = str(entry.get("path") or "")
+        text = str(entry.get("text") or "")
+        if text.startswith("@cached-summary:"):
+            continue
+        if path:
+            lines.append(f"# File: {path}")
+        if text:
+            lines.append(text)
+        lines.append("")
+
+    output_text = "\n".join(lines)
+
+    out_file = getattr(args, "out", None)
+    if out_file:
+        Path(out_file).write_text(output_text, encoding="utf-8")
+        print(f"Exported context to: {out_file}", file=sys.stderr)
+    elif getattr(args, "clipboard", False):
+        try:
+            import subprocess
+            proc = subprocess.run(
+                ["pbcopy"] if sys.platform == "darwin" else ["xclip", "-selection", "clipboard"],
+                input=output_text.encode("utf-8"),
+                check=True,
+            )
+            budget = data.get("budget", {})
+            tokens = int(budget.get("estimated_input_tokens", 0) or 0)
+            print(f"Copied to clipboard ({tokens} tokens)", file=sys.stderr)
+        except (FileNotFoundError, subprocess.CalledProcessError):
+            print("error: clipboard utility not available (pbcopy/xclip)", file=sys.stderr)
+            return 2
+    else:
+        print(output_text)
+
     return 0
 
 
@@ -1255,10 +1389,71 @@ max_estimated_input_tokens = {default_max_tokens}
     config_path.write_text(config_content, encoding="utf-8")
     policy_path.write_text(policy_content, encoding="utf-8")
 
+    # ── Generate CI workflow ──────────────────────────────────────────────────
+    ci_workflow_dir = repo_path / ".github" / "workflows"
+    ci_workflow_path = ci_workflow_dir / "redcon-pr-audit.yml"
+    ci_created = False
+    if not ci_workflow_path.exists() or args.force:
+        ci_workflow_content = """# Redcon PR context audit - generated by `redcon init`
+# Runs on every pull request and comments with context growth analysis.
+
+name: Redcon PR Audit
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+  pull-requests: write
+
+jobs:
+  pr-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Redcon
+        run: pip install redcon
+
+      - name: Run PR audit
+        run: |
+          redcon pr-audit \\
+            --repo . \\
+            --base "${{ github.event.pull_request.base.sha }}" \\
+            --head "${{ github.event.pull_request.head.sha }}" \\
+            --out-prefix pr-audit
+
+      - name: Comment on PR
+        if: always()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const comment = fs.readFileSync('pr-audit.comment.md', 'utf8');
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+              body: comment,
+            });
+"""
+        ci_workflow_dir.mkdir(parents=True, exist_ok=True)
+        ci_workflow_path.write_text(ci_workflow_content, encoding="utf-8")
+        ci_created = True
+
     # ── Print summary ─────────────────────────────────────────────────────────
     print(f"Initialized Redcon for: {repo_path}")
     print(f"  Created: redcon.toml")
     print(f"  Created: policy.toml")
+    if ci_created:
+        print(f"  Created: .github/workflows/redcon-pr-audit.yml")
     if dominant_lang:
         lang_breakdown = ", ".join(f"{ext}={n}" for ext, n in list(lang_hints['file_counts'].items())[:3])
         print(f"  Detected: {dominant_lang} ({lang_breakdown})")
@@ -1266,8 +1461,9 @@ max_estimated_input_tokens = {default_max_tokens}
     print(f"  Estimated savings: ~{estimated_savings_pct}%  (~{estimated_saved:,} tokens saved per run)")
     print()
     print("Next steps:")
-    print("  redcon pack 'describe your task' --repo .")
-    print("  redcon plan 'describe your task' --repo .")
+    print("  redcon doctor                              # verify setup")
+    print("  redcon pack 'describe your task' --repo .  # compress context")
+    print("  redcon plan 'describe your task' --repo .  # rank files")
     return 0
 
 
@@ -1718,7 +1914,35 @@ def build_parser() -> argparse.ArgumentParser:
             "[summarization], [plugins], [cache], [telemetry]."
         ),
     )
+    parser.add_argument(
+        "-v", "--verbose",
+        action="store_true",
+        default=False,
+        help="Enable verbose (DEBUG) logging output.",
+    )
+    parser.add_argument(
+        "-q", "--quiet",
+        action="store_true",
+        default=False,
+        help="Suppress all output except errors.",
+    )
     sub = parser.add_subparsers(dest="command", required=True)
+
+    doctor = sub.add_parser("doctor", help="Check environment health, dependencies, and configuration")
+    doctor.add_argument("--repo", default=".", help="Repository path to check (default: current directory).")
+    doctor.add_argument(
+        "--format",
+        choices=["human", "json"],
+        default="human",
+        help="Output format (default: human).",
+    )
+    doctor.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
+    )
+    doctor.set_defaults(func=cmd_doctor)
 
     plan = sub.add_parser("plan", help="Rank relevant files for a natural language task")
     plan.add_argument("task", help="Task description")
@@ -1886,7 +2110,41 @@ def build_parser() -> argparse.ArgumentParser:
         "--config",
         help="Optional path to config TOML (default: <repo>/redcon.toml).",
     )
+    pack.add_argument(
+        "--format",
+        choices=["human", "json", "context-only"],
+        default="human",
+        help=(
+            "Output format: human (default) for readable summary, "
+            "json to print raw JSON to stdout, "
+            "context-only to emit just the compressed text (pipe-friendly)."
+        ),
+    )
+    pack.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print raw JSON to stdout (shorthand for --format json).",
+    )
     pack.set_defaults(func=cmd_pack)
+
+    export = sub.add_parser(
+        "export",
+        help="Export compressed context from a run artifact to stdout, file, or clipboard",
+    )
+    export.add_argument("run_json", help="Path to run JSON produced by pack")
+    export.add_argument(
+        "--out",
+        default=None,
+        help="Write exported context to this file path instead of stdout.",
+    )
+    export.add_argument(
+        "--clipboard",
+        action="store_true",
+        default=False,
+        help="Copy exported context to system clipboard (macOS: pbcopy, Linux: xclip).",
+    )
+    export.set_defaults(func=cmd_export)
 
     profile = sub.add_parser("profile", help="Show token savings breakdown for a pack run")
     profile.add_argument("run_json", help="Path to run JSON produced by pack")
@@ -2605,9 +2863,24 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _configure_logging(args: argparse.Namespace) -> None:
+    if getattr(args, "verbose", False):
+        level = logging.DEBUG
+    elif getattr(args, "quiet", False):
+        level = logging.ERROR
+    else:
+        level = logging.WARNING
+    logging.basicConfig(
+        level=level,
+        format="%(levelname)s %(name)s: %(message)s",
+        stream=sys.stderr,
+    )
+
+
 def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
+    _configure_logging(args)
     return int(args.func(args))
 
 
