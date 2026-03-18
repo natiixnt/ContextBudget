@@ -12,6 +12,7 @@ Roles:
 """
 
 import os
+from functools import lru_cache
 
 _TEST_MARKERS = ("test", "tests", "spec", "__tests__", "specs")
 _EXAMPLE_MARKERS = ("example", "examples", "demo", "demos", "sample", "samples")
@@ -44,6 +45,7 @@ def _part_matches(part: str, marker: str) -> bool:
     return False
 
 
+@lru_cache(maxsize=4096)
 def classify_file_role(path: str) -> str:
     """Return the role of a file based on path heuristics."""
     parts = path.lower().replace("\\", "/").split("/")
