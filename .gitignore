@@ -1,11 +1,49 @@
+# Python
 __pycache__/
 *.py[cod]
+*.egg-info/
+dist/
+build/
+*.egg
+
+# Virtual environments
+.venv/
+.venv-*/
+venv/
+
+# Testing
 .pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+
+# Ruff
+.ruff_cache/
+
+# Redcon artifacts
 .redcon/
 .redcon_cache.json
-.venv/
-*.egg-info/
-node_modules/
 run.json
 run.md
+
+# Node/Dashboard
+node_modules/
 *.tsbuildinfo
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+.env.*.local
