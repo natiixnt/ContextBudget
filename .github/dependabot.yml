@@ -3,26 +3,38 @@ updates:
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
     commit-message:
       prefix: "chore(deps):"
+    groups:
+      all-pip:
+        patterns: ["*"]
 
   - package-ecosystem: "npm"
     directory: "/dashboard"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    open-pull-requests-limit: 3
     labels:
       - "dependencies"
     commit-message:
       prefix: "chore(deps):"
+    groups:
+      all-npm:
+        patterns: ["*"]
 
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
-      interval: "weekly"
+      interval: "monthly"
+    open-pull-requests-limit: 2
     labels:
       - "dependencies"
     commit-message:
       prefix: "chore(deps):"
+    groups:
+      all-actions:
+        patterns: ["*"]
