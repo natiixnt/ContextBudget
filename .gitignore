@@ -6,3 +6,6 @@ __pycache__/
 .venv/
 *.egg-info/
 node_modules/
+run.json
+run.md
+*.tsbuildinfo
