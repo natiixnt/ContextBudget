@@ -32,6 +32,33 @@ class _BrokenExternalSummarizer(ExternalSummaryAdapter):
         raise RuntimeError("adapter boom")
 
 
+def test_deterministic_summarizer_skips_license_headers(tmp_path: Path) -> None:
+    """The summarizer should skip leading license blocks and docstrings."""
+    _write(
+        tmp_path / "src" / "auth.py",
+        '#!/usr/bin/env python3\n'
+        '# Copyright 2026 Example Corp.\n'
+        '# Licensed under the MIT License.\n'
+        '# See LICENSE for details.\n'
+        '\n'
+        '"""Auth module for token validation."""\n'
+        '\n'
+        'import hashlib\n'
+        '\n'
+        'def login(token: str) -> bool:\n'
+        '    return hashlib.sha256(token.encode()).hexdigest().startswith("00")\n',
+    )
+
+    data = as_json_dict(run_pack("auth login", repo=tmp_path, max_tokens=100))
+    entry = next(item for item in data["compressed_context"] if item["path"] == "src/auth.py")
+
+    # The summary should NOT start with license/shebang text.
+    assert "Copyright" not in entry["text"].split("\n")[1]
+    assert "Licensed" not in entry["text"].split("\n")[1]
+    # Should contain actual code.
+    assert "import" in entry["text"] or "login" in entry["text"] or "hashlib" in entry["text"]
+
+
 def test_deterministic_summarizer_is_default(tmp_path: Path) -> None:
     _write(tmp_path / "src" / "large.py", "\n".join(f"line {index}" for index in range(2000)) + "\n")
 

@@ -63,18 +63,88 @@ class ExternalSummaryAdapter(SummaryAdapter):
 
 
 class DeterministicSummaryAdapter(SummaryAdapter):
-    """Local deterministic summary preview built from leading non-empty lines."""
+    """Local deterministic summary preview built from leading non-empty lines.
+
+    Skips leading license headers, module docstrings, and shebang lines
+    so the preview contains actual code or meaningful content.
+    """
 
     name = SUMMARIZER_BACKEND_DETERMINISTIC
     backend = SUMMARIZER_BACKEND_DETERMINISTIC
 
     def summarize(self, request: SummaryRequest) -> str:
-        lines = [line.strip() for line in request.text.splitlines() if line.strip()]
+        raw_lines = request.text.splitlines()
+        start = _skip_leading_boilerplate(raw_lines)
+        lines = [line.strip() for line in raw_lines[start:] if line.strip()]
         first_lines = lines[: request.line_limit]
         summary = "\n".join(first_lines)
         if len(lines) > request.line_limit:
             summary += "\n..."
         return summary if summary else "<empty file>"
+
+
+def _skip_leading_boilerplate(lines: list[str]) -> int:
+    """Return the index of the first meaningful line, skipping boilerplate.
+
+    Skips: shebang, encoding declarations, license/copyright block comments,
+    and module-level triple-quoted docstrings.
+    """
+    i = 0
+    n = len(lines)
+
+    # Skip shebang and encoding.
+    while i < n:
+        s = lines[i].strip()
+        if s.startswith("#!") or s.startswith("# -*-") or s.startswith("# coding"):
+            i += 1
+        else:
+            break
+
+    # Skip blank lines.
+    while i < n and not lines[i].strip():
+        i += 1
+
+    # Skip block comment (/* ... */ style for JS/Go/Java/Rust).
+    if i < n and lines[i].strip().startswith("/*"):
+        while i < n:
+            if "*/" in lines[i]:
+                i += 1
+                break
+            i += 1
+
+    # Skip leading # comment block (license/copyright headers in Python/Ruby).
+    comment_start = i
+    while i < n and lines[i].strip().startswith("#"):
+        i += 1
+    # Only skip if block was 3+ lines (likely a license header, not a short comment).
+    if i - comment_start < 3:
+        i = comment_start
+
+    # Skip blank lines after comments.
+    while i < n and not lines[i].strip():
+        i += 1
+
+    # Skip triple-quoted module docstring (Python).
+    if i < n:
+        s = lines[i].strip()
+        for delim in ('"""', "'''"):
+            if s.startswith(delim):
+                rest = s[len(delim):]
+                if rest.endswith(delim) and len(rest) >= len(delim):
+                    i += 1  # Single-line docstring.
+                    break
+                i += 1
+                while i < n and delim not in lines[i]:
+                    i += 1
+                if i < n:
+                    i += 1  # Skip closing line.
+                break
+
+    # Skip blank lines after docstring.
+    while i < n and not lines[i].strip():
+        i += 1
+
+    return i
 
 
 _EXTERNAL_SUMMARY_ADAPTERS: dict[str, ExternalSummaryAdapter] = {}
@@ -368,7 +438,9 @@ class SummarizationService:
 
     @staticmethod
     def _build_cache_key(cache_key_prefix: str, *, backend: str, provider_identity: str, line_limit: int) -> str:
-        return f"{cache_key_prefix}:summary:{backend}:{provider_identity}:lines={line_limit}"
+        # Include line_limit in key so changing summary_preview_lines
+        # invalidates stale cached summaries.
+        return f"{cache_key_prefix}:summary:{backend}:{provider_identity}:lines={line_limit}:v2"
 
     @staticmethod
     def _normalize_summary_body(value: str) -> str:
