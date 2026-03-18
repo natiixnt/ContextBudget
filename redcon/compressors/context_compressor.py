@@ -26,7 +26,7 @@ from redcon.compressors.summarizers import SummaryRequest, SummarizationService
 from redcon.core.text import task_keywords
 from redcon.core.tokens import estimate_tokens
 from redcon.schemas.models import CacheReport, CompressedFile, RankedFile, SummarizerReport
-from redcon.scorers.import_graph import build_import_graph
+from redcon.scorers.import_graph import ImportGraph, build_import_graph
 
 
 @dataclass(slots=True)
@@ -312,12 +312,15 @@ def _snippet_from_text(path: str, text: str, keywords: list[str], settings: Comp
     )
 
 
-def _build_slice_relationship_contexts(ranked_files: list[RankedFile]) -> dict[str, SliceRelationshipContext]:
+def _build_slice_relationship_contexts(
+    ranked_files: list[RankedFile],
+    import_graph: ImportGraph | None = None,
+) -> dict[str, SliceRelationshipContext]:
     if not ranked_files:
         return {}
 
     files = [item.file for item in ranked_files]
-    graph = build_import_graph(files)
+    graph = import_graph if import_graph is not None else build_import_graph(files)
     ranked_paths = {item.file.path for item in ranked_files}
     contexts: dict[str, SliceRelationshipContext] = {}
     for path in ranked_paths:
@@ -406,6 +409,7 @@ def compress_ranked_files(
     summarization_settings: SummarizationSettings | None = None,
     duplicate_hash_cache_enabled: bool = True,
     token_estimator: Callable[[str], int] = estimate_tokens,
+    import_graph: ImportGraph | None = None,
 ) -> CompressionResult:
     """Compress ranked files under a token budget.
 
@@ -420,7 +424,7 @@ def compress_ranked_files(
 
     duplicate_reads_prevented = 0
     seen_hashes: set[str] = set()
-    slice_relationships = _build_slice_relationship_contexts(ranked_files)
+    slice_relationships = _build_slice_relationship_contexts(ranked_files, import_graph=import_graph)
     summarizer = SummarizationService(
         backend=(summarization_settings.backend if summarization_settings is not None else "deterministic"),
         adapter_name=(summarization_settings.adapter if summarization_settings is not None else ""),

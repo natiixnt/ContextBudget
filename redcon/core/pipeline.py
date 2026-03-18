@@ -18,6 +18,7 @@ from redcon.core.pr_audit import analyze_pull_request, pr_audit_as_dict
 from redcon.core.render import read_json, render_pr_comment_markdown
 from redcon.core.tokens import normalize_token_estimator_report
 from redcon.plugins import ResolvedPlugins, resolve_plugins
+from redcon.scorers.import_graph import build_import_graph
 from redcon.schemas.models import DEFAULT_TOP_FILES, RunReport
 from redcon.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
 from redcon.stages.workflow import (
@@ -380,7 +381,22 @@ def run_pack(
     telemetry.emit("scoring_completed", scanned_files=len(files), ranked_files=ranked_count, top_files=telemetry_top_files)
     if effective_top_files is not None:
         ranked = ranked[:effective_top_files]
+    # Build import graph once and share with compression stage to avoid
+    # rebuilding it from disk reads.
+    import_graph = build_import_graph(files) if prepared_cfg.score.enable_import_graph_signals else None
     cache = run_cache_stage(target_repo, prepared_cfg)
+    pack_plugins = resolved_plugins
+    if import_graph is not None:
+        # Thread the graph to the compressor via options dict.
+        pack_plugins = ResolvedPlugins(
+            scorer=resolved_plugins.scorer,
+            scorer_options=resolved_plugins.scorer_options,
+            compressor=resolved_plugins.compressor,
+            compressor_options={**resolved_plugins.compressor_options, "import_graph": import_graph},
+            token_estimator=resolved_plugins.token_estimator,
+            token_estimator_options=resolved_plugins.token_estimator_options,
+            token_estimator_report=resolved_plugins.token_estimator_report,
+        )
     compressed = run_pack_stage(
         task,
         target_repo,
@@ -388,7 +404,7 @@ def run_pack(
         effective_max_tokens,
         cache,
         prepared_cfg,
-        plugins=resolved_plugins,
+        plugins=pack_plugins,
     )
     cache.save()
     cache_snap = cache.snapshot()

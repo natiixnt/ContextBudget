@@ -49,7 +49,6 @@ def _builtin_default_compress(
     estimate_tokens,
     duplicate_hash_cache_enabled: bool,
 ):
-    del options
     return compress_ranked_files(
         task=task,
         repo=repo,
@@ -60,6 +59,7 @@ def _builtin_default_compress(
         summarization_settings=summarization_settings,
         duplicate_hash_cache_enabled=duplicate_hash_cache_enabled,
         token_estimator=estimate_tokens,
+        import_graph=options.get("import_graph"),
     )
 
 
