@@ -9,10 +9,17 @@ from __future__ import annotations
 import json
 import logging
 import urllib.error
+import urllib.parse
 import urllib.request
 import uuid
 from datetime import datetime, timezone
 from typing import Any
+
+
+def _validate_url(url: str) -> bool:
+    """Reject non-HTTP(S) URLs to prevent SSRF via file://, ftp://, etc."""
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
 
 from redcon.agents.middleware import RedconMiddleware
 from redcon.core.policy import PolicySpec
@@ -52,6 +59,9 @@ def _fetch_remote_policy(config: GatewayConfig, repository_id: str | None = None
     if repository_id:
         params.append(f"repository_id={urllib.request.quote(repository_id, safe='')}")
     url = f"{config.cloud_policy_url.rstrip('/')}/policies/active?{'&'.join(params)}"
+    if not _validate_url(url):
+        logger.warning("Invalid cloud policy URL: %s", url)
+        return None
 
     req = urllib.request.Request(url)
     if config.cloud_api_key:
@@ -129,6 +139,9 @@ def _push_audit_entry(config: GatewayConfig, **fields: Any) -> None:
     if not config.cloud_policy_url or config.cloud_policy_org_id is None or not config.cloud_api_key:
         return
     url = f"{config.cloud_policy_url.rstrip('/')}/orgs/{config.cloud_policy_org_id}/audit-log"
+    if not _validate_url(url):
+        logger.warning("Invalid cloud audit URL: %s", url)
+        return
     data = json.dumps(fields).encode()
     req = urllib.request.Request(url, data=data, method="POST")
     req.add_header("Content-Type", "application/json")
