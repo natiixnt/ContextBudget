@@ -79,7 +79,7 @@ outputs:
     value: ${{ steps.pack.outputs.tokens_saved }}
 
   savings-rate:
-    description: "Percentage of tokens saved (0–100)."
+    description: "Percentage of tokens saved (0-100)."
     value: ${{ steps.pack.outputs.savings_rate }}
 
   policy-passed:
@@ -92,11 +92,11 @@ outputs:
 
   artifact-json:
     description: "Path to the run artifact JSON file."
-    value: ${{ inputs.out-prefix }}.json
+    value: ${{ steps.pack.outputs.artifact_json }}
 
   artifact-md:
     description: "Path to the Markdown report."
-    value: ${{ inputs.out-prefix }}.md
+    value: ${{ steps.pack.outputs.artifact_md }}
 
 runs:
   using: "composite"
@@ -110,58 +110,73 @@ runs:
     - name: Run Redcon pack
       id: pack
       shell: bash
+      env:
+        INPUT_TASK: ${{ inputs.task }}
+        INPUT_REPO: ${{ inputs.repo }}
+        INPUT_OUT_PREFIX: ${{ inputs.out-prefix }}
+        INPUT_MAX_TOKENS: ${{ inputs.max-tokens }}
+        INPUT_TOP_FILES: ${{ inputs.top-files }}
+        INPUT_POLICY: ${{ inputs.policy }}
+        INPUT_STRICT: ${{ inputs.strict }}
       run: |
         set -euo pipefail
 
-        TASK="${{ inputs.task }}"
+        TASK="${INPUT_TASK}"
         if [[ -z "$TASK" ]]; then
           TASK="evaluate repository context budget"
         fi
 
-        ARGS=(pack "$TASK" --repo "${{ inputs.repo }}" --out-prefix "${{ inputs.out-prefix }}")
-        ARGS+=(--max-tokens "${{ inputs.max-tokens }}")
-        ARGS+=(--top-files "${{ inputs.top-files }}")
+        ARGS=(pack "$TASK" --repo "$INPUT_REPO" --out-prefix "$INPUT_OUT_PREFIX")
+        ARGS+=(--max-tokens "$INPUT_MAX_TOKENS")
+        ARGS+=(--top-files "$INPUT_TOP_FILES")
 
-        if [[ -n "${{ inputs.policy }}" && -f "${{ inputs.policy }}" ]]; then
-          ARGS+=(--policy "${{ inputs.policy }}")
+        if [[ -n "$INPUT_POLICY" && -f "$INPUT_POLICY" ]]; then
+          ARGS+=(--policy "$INPUT_POLICY")
         fi
 
-        if [[ "${{ inputs.strict }}" == "true" ]]; then
+        if [[ "$INPUT_STRICT" == "true" ]]; then
           ARGS+=(--strict)
         fi
 
         python -m redcon.cli "${ARGS[@]}" 2>&1 | tee /tmp/cb-pack-output.txt || true
 
         # Parse key metrics from the JSON artifact
-        JSON="${{ inputs.out-prefix }}.json"
+        JSON="${INPUT_OUT_PREFIX}.json"
         if [[ -f "$JSON" ]]; then
-          TOKEN_ESTIMATE=$(python3 -c "import json,sys; d=json.load(open('$JSON')); m=d.get('metadata',{}); print(m.get('estimated_input_tokens',0))" 2>/dev/null || echo "0")
-          TOKENS_SAVED=$(python3 -c "import json,sys; d=json.load(open('$JSON')); m=d.get('metadata',{}); print(m.get('estimated_saved_tokens',0))" 2>/dev/null || echo "0")
-          BASELINE=$(python3 -c "import json,sys; d=json.load(open('$JSON')); m=d.get('metadata',{}); print(m.get('baseline_full_context_tokens', int(m.get('estimated_input_tokens',0)) + int(m.get('estimated_saved_tokens',0))))" 2>/dev/null || echo "0")
+          TOKEN_ESTIMATE=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); m=d.get('metadata',{}); print(m.get('estimated_input_tokens',0))" "$JSON" 2>/dev/null || echo "0")
+          TOKENS_SAVED=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); m=d.get('metadata',{}); print(m.get('estimated_saved_tokens',0))" "$JSON" 2>/dev/null || echo "0")
+          BASELINE=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); m=d.get('metadata',{}); print(m.get('baseline_full_context_tokens', int(m.get('estimated_input_tokens',0)) + int(m.get('estimated_saved_tokens',0))))" "$JSON" 2>/dev/null || echo "0")
           if [[ "$BASELINE" -gt 0 ]]; then
-            SAVINGS_RATE=$(python3 -c "print(round(int('$TOKENS_SAVED')/int('$BASELINE')*100,1))" 2>/dev/null || echo "0")
+            SAVINGS_RATE=$(python3 -c "print(round(int(sys.argv[1])/int(sys.argv[2])*100,1))" "$TOKENS_SAVED" "$BASELINE" 2>/dev/null || echo "0")
           else
             SAVINGS_RATE="0"
           fi
-          POLICY_PASSED=$(python3 -c "import json; d=json.load(open('$JSON')); pr=d.get('policy_result'); print('true' if (pr is None or pr.get('passed',True)) else 'false')" 2>/dev/null || echo "true")
+          POLICY_PASSED=$(python3 -c "import json,sys; d=json.load(open(sys.argv[1])); pr=d.get('policy_result'); print('true' if (pr is None or pr.get('passed',True)) else 'false')" "$JSON" 2>/dev/null || echo "true")
         else
           TOKEN_ESTIMATE="0"; TOKENS_SAVED="0"; SAVINGS_RATE="0"; POLICY_PASSED="true"
         fi
 
-        echo "token_estimate=$TOKEN_ESTIMATE" >> "$GITHUB_OUTPUT"
-        echo "tokens_saved=$TOKENS_SAVED"     >> "$GITHUB_OUTPUT"
-        echo "savings_rate=$SAVINGS_RATE"     >> "$GITHUB_OUTPUT"
-        echo "policy_passed=$POLICY_PASSED"   >> "$GITHUB_OUTPUT"
+        {
+          echo "token_estimate=$TOKEN_ESTIMATE"
+          echo "tokens_saved=$TOKENS_SAVED"
+          echo "savings_rate=$SAVINGS_RATE"
+          echo "policy_passed=$POLICY_PASSED"
+          echo "artifact_json=${INPUT_OUT_PREFIX}.json"
+          echo "artifact_md=${INPUT_OUT_PREFIX}.md"
+        } >> "$GITHUB_OUTPUT"
 
     - name: Generate Markdown report
       id: report
       shell: bash
       continue-on-error: true
+      env:
+        INPUT_OUT_PREFIX: ${{ inputs.out-prefix }}
+        INPUT_POLICY: ${{ inputs.policy }}
       run: |
         set -euo pipefail
-        ARGS=(report "${{ inputs.out-prefix }}.json" --out "${{ inputs.out-prefix }}.report.md")
-        if [[ -n "${{ inputs.policy }}" && -f "${{ inputs.policy }}" ]]; then
-          ARGS+=(--policy "${{ inputs.policy }}")
+        ARGS=(report "${INPUT_OUT_PREFIX}.json" --out "${INPUT_OUT_PREFIX}.report.md")
+        if [[ -n "$INPUT_POLICY" && -f "$INPUT_POLICY" ]]; then
+          ARGS+=(--policy "$INPUT_POLICY")
         fi
         python -m redcon.cli "${ARGS[@]}"
 
@@ -169,12 +184,15 @@ runs:
       id: cost
       shell: bash
       continue-on-error: true
+      env:
+        INPUT_OUT_PREFIX: ${{ inputs.out-prefix }}
+        INPUT_MODEL: ${{ inputs.model }}
       run: |
         set -euo pipefail
-        if [[ -f "${{ inputs.out-prefix }}.json" ]]; then
-          RESULT=$(python -m redcon.cli cost-analysis "${{ inputs.out-prefix }}.json" \
-            --model "${{ inputs.model }}" --format json 2>/dev/null || echo '{}')
-          DOLLARS=$(python3 -c "import json; d=json.loads('$RESULT'); print(round(d.get('saved_cost_usd',0),4))" 2>/dev/null || echo "0")
+        if [[ -f "${INPUT_OUT_PREFIX}.json" ]]; then
+          RESULT=$(python -m redcon.cli cost-analysis "${INPUT_OUT_PREFIX}.json" \
+            --model "$INPUT_MODEL" --format json 2>/dev/null || echo '{}')
+          DOLLARS=$(echo "$RESULT" | python3 -c "import json,sys; d=json.load(sys.stdin); print(round(d.get('saved_cost_usd',0),4))" 2>/dev/null || echo "0")
           echo "dollars_saved=$DOLLARS" >> "$GITHUB_OUTPUT"
         else
           echo "dollars_saved=0" >> "$GITHUB_OUTPUT"
@@ -183,34 +201,43 @@ runs:
     - name: Add GitHub Step Summary
       if: always()
       shell: bash
+      env:
+        TOKEN_ESTIMATE: ${{ steps.pack.outputs.token_estimate }}
+        TOKENS_SAVED: ${{ steps.pack.outputs.tokens_saved }}
+        SAVINGS_RATE: ${{ steps.pack.outputs.savings_rate }}
+        DOLLARS_SAVED: ${{ steps.cost.outputs.dollars_saved }}
+        POLICY_PASSED: ${{ steps.pack.outputs.policy_passed }}
+        INPUT_OUT_PREFIX: ${{ inputs.out-prefix }}
       run: |
         {
           echo "## Redcon Results"
           echo ""
           echo "| Metric | Value |"
           echo "|--------|-------|"
-          echo "| Token estimate | \`${{ steps.pack.outputs.token_estimate }}\` |"
-          echo "| Tokens saved | \`${{ steps.pack.outputs.tokens_saved }}\` |"
-          echo "| Savings rate | \`${{ steps.pack.outputs.savings_rate }}%\` |"
-          echo "| Estimated \$ saved | \`\$${{ steps.cost.outputs.dollars_saved }}\` |"
-          echo "| Policy passed | \`${{ steps.pack.outputs.policy_passed }}\` |"
+          echo "| Token estimate | \`${TOKEN_ESTIMATE}\` |"
+          echo "| Tokens saved | \`${TOKENS_SAVED}\` |"
+          echo "| Savings rate | \`${SAVINGS_RATE}%\` |"
+          echo "| Estimated \$ saved | \`\$${DOLLARS_SAVED}\` |"
+          echo "| Policy passed | \`${POLICY_PASSED}\` |"
           echo ""
 
-          REPORT="${{ inputs.out-prefix }}.report.md"
+          REPORT="${INPUT_OUT_PREFIX}.report.md"
           if [[ -f "$REPORT" ]]; then
             echo "---"
             cat "$REPORT"
-          elif [[ -f "${{ inputs.out-prefix }}.md" ]]; then
+          elif [[ -f "${INPUT_OUT_PREFIX}.md" ]]; then
             echo "---"
-            cat "${{ inputs.out-prefix }}.md"
+            cat "${INPUT_OUT_PREFIX}.md"
           fi
         } >> "$GITHUB_STEP_SUMMARY"
 
     - name: Enforce policy result
       if: inputs.strict == 'true'
       shell: bash
+      env:
+        POLICY_PASSED: ${{ steps.pack.outputs.policy_passed }}
       run: |
-        if [[ "${{ steps.pack.outputs.policy_passed }}" != "true" ]]; then
+        if [[ "$POLICY_PASSED" != "true" ]]; then
           echo "Redcon: policy check FAILED in strict mode."
           exit 1
         fi
