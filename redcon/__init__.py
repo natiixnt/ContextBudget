@@ -66,4 +66,4 @@ __all__ = [
     "record_run",
     "unregister_external_summarizer_adapter",
 ]
-__version__ = "0.2.0"
+__version__ = "1.1.0"
