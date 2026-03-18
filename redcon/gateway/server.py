@@ -15,10 +15,11 @@ Install gateway extras:
 """
 
 import asyncio
+import hmac
 import logging
 import os
-import time
 import threading
+import time
 from typing import Any
 
 from redcon.gateway.config import GatewayConfig
@@ -55,8 +56,9 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
 
     app = FastAPI(title="Redcon Gateway", version="1.0.0-alpha", docs_url=None, redoc_url=None)
 
-    # Request counter
+    # Request counter (thread-safe)
     _stats = {"requests_total": 0, "requests_active": 0}
+    _stats_lock = threading.Lock()
 
     # ── Auth middleware ────────────────────────────────────────────────────────
 
@@ -67,7 +69,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         if not auth_header.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
         token = auth_header[len("Bearer "):]
-        if token != config.api_key:
+        if not hmac.compare_digest(token, config.api_key):
             raise HTTPException(status_code=401, detail="Invalid API key")
 
     # ── Exception handlers ─────────────────────────────────────────────────────
@@ -75,7 +77,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
     @app.exception_handler(Exception)
     async def _unhandled_exception_handler(request: Request, exc: Exception):
         logger.exception("Unhandled error for %s %s", request.method, request.url.path)
-        return JSONResponse(status_code=500, content={"error": str(exc), "type": type(exc).__name__})
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
     # ── Health & metrics ───────────────────────────────────────────────────────
 
@@ -108,8 +110,9 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
 
     @app.post("/prepare-context", dependencies=[Depends(_verify_api_key)])
     async def prepare_context(body: dict, request: Request):
-        _stats["requests_total"] += 1
-        _stats["requests_active"] += 1
+        with _stats_lock:
+            _stats["requests_total"] += 1
+            _stats["requests_active"] += 1
         try:
             req = PrepareContextRequest.from_dict(body)
             resp = await _run_with_timeout(
@@ -122,13 +125,15 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         except KeyError as exc:
             raise HTTPException(status_code=422, detail=f"Missing required field: {exc}")
         finally:
-            _stats["requests_active"] -= 1
+            with _stats_lock:
+                _stats["requests_active"] -= 1
 
     @app.post("/run-agent-step", dependencies=[Depends(_verify_api_key)])
     @app.post("/run-step", dependencies=[Depends(_verify_api_key)])
     async def run_agent_step(body: dict, request: Request):
-        _stats["requests_total"] += 1
-        _stats["requests_active"] += 1
+        with _stats_lock:
+            _stats["requests_total"] += 1
+            _stats["requests_active"] += 1
         try:
             req = RunAgentStepRequest.from_dict(body)
             resp = await _run_with_timeout(
@@ -141,12 +146,14 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         except KeyError as exc:
             raise HTTPException(status_code=422, detail=f"Missing required field: {exc}")
         finally:
-            _stats["requests_active"] -= 1
+            with _stats_lock:
+                _stats["requests_active"] -= 1
 
     @app.post("/report-run", dependencies=[Depends(_verify_api_key)])
     async def report_run(body: dict, request: Request):
-        _stats["requests_total"] += 1
-        _stats["requests_active"] += 1
+        with _stats_lock:
+            _stats["requests_total"] += 1
+            _stats["requests_active"] += 1
         try:
             req = ReportRunRequest.from_dict(body)
             resp = await _run_with_timeout(
@@ -159,7 +166,8 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         except KeyError as exc:
             raise HTTPException(status_code=422, detail=f"Missing required field: {exc}")
         finally:
-            _stats["requests_active"] -= 1
+            with _stats_lock:
+                _stats["requests_active"] -= 1
 
     return app, uvicorn
 
@@ -249,7 +257,7 @@ class GatewayServer:
                 # Auth check
                 if config.api_key:
                     auth = self.headers.get("Authorization", "")
-                    if not auth.startswith("Bearer ") or auth[len("Bearer "):] != config.api_key:
+                    if not auth.startswith("Bearer ") or not hmac.compare_digest(auth[len("Bearer "):], config.api_key):
                         self._send_json({"error": "Invalid API key"}, 401)
                         return
 
@@ -270,9 +278,9 @@ class GatewayServer:
                         self._send_json({"error": f"unknown endpoint: {path}"}, 404)
                 except KeyError as exc:
                     self._send_json({"error": f"missing required field: {exc}"}, 400)
-                except Exception as exc:
+                except Exception:
                     logger.exception("unhandled error for %s", path)
-                    self._send_json({"error": str(exc)}, 500)
+                    self._send_json({"error": "Internal server error"}, 500)
 
             def do_GET(self):
                 path = self.path.split("?")[0]
