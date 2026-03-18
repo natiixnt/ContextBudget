@@ -19,6 +19,10 @@ JS_REQUIRE_RE = re.compile(r"\brequire\(\s*[\"']([^\"']+)[\"']\s*\)")
 
 JS_TS_EXTENSIONS = {".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"}
 
+GO_IMPORT_RE = re.compile(r'^\s*"([^"]+)"\s*$')
+GO_IMPORT_BLOCK_START_RE = re.compile(r"^\s*import\s*\(\s*$")
+GO_IMPORT_SINGLE_RE = re.compile(r'^\s*import\s+"([^"]+)"\s*$')
+
 
 @dataclass(slots=True)
 class ImportGraph:
@@ -233,16 +237,100 @@ def _extract_js_ts_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
     return edges
 
 
+def _extract_go_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
+    """Extract import edges for Go files.
+
+    Go imports use full module paths.  We resolve relative paths within
+    the repo by matching the last path segments of the import spec against
+    known Go file directories.
+    """
+    edges: dict[str, set[str]] = defaultdict(set)
+    repo_groups: dict[str, list[FileRecord]] = defaultdict(list)
+
+    for record in files:
+        repo_groups[record.repo_label].append(record)
+
+    for repo_files in repo_groups.values():
+        # Map directory paths to their Go files for package resolution.
+        go_files: list[FileRecord] = [r for r in repo_files if r.extension == ".go"]
+        if not go_files:
+            continue
+
+        # Build a reverse index: directory -> set of Go file paths in that dir.
+        dir_to_files: dict[str, set[str]] = defaultdict(set)
+        for record in go_files:
+            rel = record.relative_path or record.path
+            parent = posixpath.dirname(rel)
+            dir_to_files[parent].add(record.path)
+
+        # Build suffix index for import resolution.
+        # Import "github.com/user/repo/pkg/auth" should match dir "pkg/auth".
+        suffix_to_dir: dict[str, str] = {}
+        for dir_path in dir_to_files:
+            if dir_path:
+                parts = dir_path.split("/")
+                for i in range(len(parts)):
+                    suffix = "/".join(parts[i:])
+                    if suffix not in suffix_to_dir:
+                        suffix_to_dir[suffix] = dir_path
+
+        for record in go_files:
+            try:
+                source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
+            except OSError:
+                continue
+
+            import_specs: list[str] = []
+            in_block = False
+            for raw_line in source.splitlines():
+                line = raw_line.strip()
+                if not line or line.startswith("//"):
+                    continue
+                if GO_IMPORT_SINGLE_RE.match(line):
+                    import_specs.append(GO_IMPORT_SINGLE_RE.match(line).group(1))
+                    continue
+                if GO_IMPORT_BLOCK_START_RE.match(line):
+                    in_block = True
+                    continue
+                if in_block:
+                    if line == ")":
+                        in_block = False
+                        continue
+                    block_match = GO_IMPORT_RE.match(line)
+                    if block_match:
+                        import_specs.append(block_match.group(1))
+
+            current_dir = posixpath.dirname(record.relative_path or record.path)
+            for spec in import_specs:
+                # Try matching suffix of the import path against repo directories.
+                parts = spec.split("/")
+                matched_dir = None
+                for i in range(len(parts)):
+                    suffix = "/".join(parts[i:])
+                    if suffix in suffix_to_dir:
+                        matched_dir = suffix_to_dir[suffix]
+                        break
+                if matched_dir is not None and matched_dir != current_dir:
+                    for target in dir_to_files[matched_dir]:
+                        if target != record.path:
+                            edges[record.path].add(target)
+
+    return edges
+
+
 def build_import_graph(files: list[FileRecord], entrypoint_filenames: set[str] | None = None) -> ImportGraph:
-    """Build a deterministic, local-file import graph for Python and JS/TS files."""
+    """Build a deterministic, local-file import graph for Python, JS/TS, and Go files."""
 
     py_edges = _extract_python_import_edges(files)
     js_ts_edges = _extract_js_ts_import_edges(files)
+    go_edges = _extract_go_import_edges(files)
 
     outgoing: dict[str, set[str]] = defaultdict(set)
     for source, targets in py_edges.items():
         outgoing[source].update(targets)
     for source, targets in js_ts_edges.items():
+        outgoing[source].update(targets)
+    for source, targets in go_edges.items():
         outgoing[source].update(targets)
 
     incoming: dict[str, set[str]] = defaultdict(set)

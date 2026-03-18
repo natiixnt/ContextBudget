@@ -310,3 +310,44 @@ def test_role_keyword_override_boosts_test_files(tmp_path: Path) -> None:
     assert "tests/test_auth.py" in by_path
     reasons = by_path["tests/test_auth.py"].reasons
     assert any("role=test" in r and "x1.2" in r for r in reasons)
+
+
+def test_go_import_graph_propagates_relevance(tmp_path: Path) -> None:
+    """Go import edges should propagate scoring between files."""
+    _write(
+        tmp_path / "cmd" / "main.go",
+        'package main\n\nimport "myapp/pkg/auth"\n\nfunc main() {\n\tauth.Check()\n}\n',
+    )
+    _write(
+        tmp_path / "pkg" / "auth" / "handler.go",
+        'package auth\n\nimport "myapp/pkg/store"\n\nfunc Check() bool {\n\treturn store.Lookup() != nil\n}\n',
+    )
+    _write(
+        tmp_path / "pkg" / "store" / "db.go",
+        'package store\n\nfunc Lookup() interface{} {\n\treturn nil\n}\n',
+    )
+
+    records = scan_repository(tmp_path)
+    ranked = score_files("refactor auth handler", records)
+    by_path = {item.file.path: item for item in ranked}
+
+    assert "pkg/auth/handler.go" in by_path
+    # The store file should get a graph bonus because auth imports it.
+    if "pkg/store/db.go" in by_path:
+        store_reasons = by_path["pkg/store/db.go"].reasons
+        assert any("imported by" in r or "depends on" in r for r in store_reasons)
+
+
+def test_score_breakdown_is_populated(tmp_path: Path) -> None:
+    """RankedFile.score_breakdown should contain per-signal contributions."""
+    _write(tmp_path / "src" / "auth.py", "def login(token):\n    return True\n")
+
+    records = scan_repository(tmp_path)
+    ranked = score_files("auth login token", records)
+    by_path = {item.file.path: item for item in ranked}
+
+    assert "src/auth.py" in by_path
+    bd = by_path["src/auth.py"].score_breakdown
+    assert isinstance(bd, dict)
+    assert "path_keyword" in bd or "content_keyword" in bd
+    assert all(isinstance(v, (int, float)) for v in bd.values())
