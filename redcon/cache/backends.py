@@ -726,12 +726,23 @@ def create_summary_cache_backend(
     if backend_name == InMemorySummaryCacheBackend.backend_name:
         return InMemorySummaryCacheBackend(enabled=enabled)
     if backend_name == RedisSummaryCacheBackend.backend_name:
-        return RedisSummaryCacheBackend(
-            redis_url=redis_url,
-            namespace=redis_namespace,
-            ttl_seconds=redis_ttl_seconds,
-            enabled=enabled,
-        )
+        try:
+            backend_instance = RedisSummaryCacheBackend(
+                redis_url=redis_url,
+                namespace=redis_namespace,
+                ttl_seconds=redis_ttl_seconds,
+                enabled=enabled,
+            )
+            # Probe connectivity - fall back to local_file on failure
+            backend_instance._client().ping()
+            return backend_instance
+        except Exception:  # noqa: BLE001
+            import logging
+            logging.getLogger(__name__).warning(
+                "Redis unavailable at %s - falling back to local_file cache backend",
+                redis_url,
+            )
+            return LocalFileSummaryCacheBackend(repo_path=repo_path, cache_file=cache_file, enabled=enabled)
     raise AssertionError(f"Unhandled cache backend: {backend_name}")
 
 

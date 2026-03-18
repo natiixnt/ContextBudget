@@ -253,7 +253,14 @@ def test_token_savings_recorded_on_fragment_reuse(tmp_path: Path) -> None:
 # Factory
 # ---------------------------------------------------------------------------
 
-def test_create_summary_cache_backend_redis(tmp_path: Path) -> None:
+def test_create_summary_cache_backend_redis(tmp_path: Path, monkeypatch) -> None:
+    # Patch Redis.from_url to use fakeredis so the ping probe succeeds
+    fake_server = fakeredis.FakeServer()
+    monkeypatch.setattr(
+        _redis_module.Redis,
+        "from_url",
+        staticmethod(lambda url, **kw: fakeredis.FakeRedis(server=fake_server)),
+    )
     backend = create_summary_cache_backend(
         tmp_path,
         backend="redis",
