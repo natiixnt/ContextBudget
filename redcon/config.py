@@ -711,6 +711,81 @@ def load_config_from_mapping(data: Mapping[str, Any]) -> RedconConfig:
     return _apply_overrides(config, data)
 
 
+def validate_config(config: RedconConfig) -> list[str]:
+    """Validate configuration values and return a list of error descriptions.
+
+    Returns an empty list when the configuration is valid.
+    """
+    errors: list[str] = []
+
+    if config.budget.max_tokens <= 0:
+        errors.append(f"[budget].max_tokens must be > 0, got {config.budget.max_tokens}")
+
+    if config.budget.top_files is not None and config.budget.top_files <= 0:
+        errors.append(f"[budget].top_files must be > 0 or omitted, got {config.budget.top_files}")
+
+    if config.scan.max_file_size_bytes <= 0:
+        errors.append(f"[scan].max_file_size_bytes must be > 0, got {config.scan.max_file_size_bytes}")
+
+    if config.scan.preview_chars < 0:
+        errors.append(f"[scan].preview_chars must be >= 0, got {config.scan.preview_chars}")
+
+    valid_cache_backends = {"local_file", "redis", "sqlite", "memory"}
+    if config.cache.backend not in valid_cache_backends:
+        errors.append(
+            f"[cache].backend must be one of {sorted(valid_cache_backends)}, got '{config.cache.backend}'"
+        )
+
+    valid_token_backends = {
+        "heuristic", "simple", "model_aligned", "model-aligned",
+        "exact", "exact_tiktoken", "exact-tiktoken", "tiktoken",
+    }
+    if config.tokens.backend not in valid_token_backends:
+        errors.append(
+            f"[tokens].backend must be one of {sorted(valid_token_backends)}, got '{config.tokens.backend}'"
+        )
+
+    valid_summarization_backends = {"deterministic", "external"}
+    if config.summarization.backend not in valid_summarization_backends:
+        errors.append(
+            f"[summarization].backend must be one of {sorted(valid_summarization_backends)}, "
+            f"got '{config.summarization.backend}'"
+        )
+
+    if config.compression.max_degradation_rounds < 0:
+        errors.append(
+            f"[compression].max_degradation_rounds must be >= 0, "
+            f"got {config.compression.max_degradation_rounds}"
+        )
+
+    if config.compression.full_file_threshold_tokens < 0:
+        errors.append(
+            f"[compression].full_file_threshold_tokens must be >= 0, "
+            f"got {config.compression.full_file_threshold_tokens}"
+        )
+
+    for role, multiplier in config.score.role_multipliers.items():
+        if multiplier < 0:
+            errors.append(f"[score].role_multipliers.{role} must be >= 0, got {multiplier}")
+
+    valid_telemetry_sinks = {"noop", "jsonl_file"}
+    if config.telemetry.enabled and config.telemetry.sink not in valid_telemetry_sinks:
+        errors.append(
+            f"[telemetry].sink must be one of {sorted(valid_telemetry_sinks)}, got '{config.telemetry.sink}'"
+        )
+
+    return errors
+
+
+class ConfigValidationError(ValueError):
+    """Raised when redcon.toml contains invalid values."""
+
+    def __init__(self, errors: list[str]) -> None:
+        self.errors = errors
+        message = "Invalid configuration:\n" + "\n".join(f"  - {e}" for e in errors)
+        super().__init__(message)
+
+
 def load_config(repo: Path, config_path: Path | None = None) -> RedconConfig:
     """Load configuration from ``redcon.toml`` with defaults fallback."""
 
