@@ -25,7 +25,6 @@ is input; output tokens are the model's response, not tracked here).
 
 import json
 from pathlib import Path
-from typing import Optional
 
 from redcon.core.agent_cost import (
     ModelPricing,
@@ -81,7 +80,7 @@ def compute_cost_analysis(
     run_data: dict,
     *,
     model: str = "gpt-4o",
-    price_per_1m_input: Optional[float] = None,
+    price_per_1m_input: float | None = None,
 ) -> dict:
     """Compute the cost analysis for a single run artifact.
 

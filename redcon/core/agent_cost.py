@@ -14,7 +14,6 @@ Adding a new model is a single-line change to ``BUILTIN_MODEL_PRICING``.
 """
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 # ---------------------------------------------------------------------------
@@ -105,8 +104,8 @@ _ALIASES: dict[str, str] = {
 def resolve_model_pricing(
     model: str,
     *,
-    price_per_1m_input: Optional[float] = None,
-    price_per_1m_output: Optional[float] = None,
+    price_per_1m_input: float | None = None,
+    price_per_1m_output: float | None = None,
 ) -> ModelPricing:
     """Return a ModelPricing for *model*, with optional per-call overrides.
 
@@ -186,8 +185,8 @@ def compute_workflow_cost(
     steps: list[dict],
     total_tokens: int,
     total_output_tokens: int,
-    price_per_1m_input: Optional[float] = None,
-    price_per_1m_output: Optional[float] = None,
+    price_per_1m_input: float | None = None,
+    price_per_1m_output: float | None = None,
 ) -> dict:
     """Compute cost breakdown for the full workflow simulation.
 
