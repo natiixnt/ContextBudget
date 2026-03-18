@@ -1,0 +1,14 @@
+# Default owner for everything
+* @natiixnt
+
+# Core engine
+/redcon/core/       @natiixnt
+/redcon/compressors/ @natiixnt
+/redcon/scorers/    @natiixnt
+/redcon/stages/     @natiixnt
+
+# CI and workflows
+/.github/           @natiixnt
+
+# Documentation
+/docs/              @natiixnt
