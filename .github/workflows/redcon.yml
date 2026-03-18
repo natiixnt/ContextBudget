@@ -37,12 +37,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
         with:
           fetch-depth: 0
 
       - name: Setup Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
         with:
           python-version: "3.11"
 
@@ -54,16 +54,21 @@ jobs:
       - name: Resolve task
         id: resolve
         shell: bash
+        env:
+          GH_EVENT_NAME: ${{ github.event_name }}
+          GH_BASE_REF: ${{ github.base_ref }}
+          GH_SHA: ${{ github.sha }}
+          GH_BEFORE: ${{ github.event.before }}
         run: |
           set -euo pipefail
 
           changed_files="${CHANGED_FILES_INPUT}"
           if [[ -z "$changed_files" ]]; then
-            if [[ "${{ github.event_name }}" == "pull_request" ]]; then
-              git fetch origin "${{ github.base_ref }}" --depth=1
-              changed_files="$(git diff --name-only "origin/${{ github.base_ref }}...${{ github.sha }}" | paste -sd, -)"
-            elif [[ "${{ github.event_name }}" == "push" ]]; then
-              changed_files="$(git diff --name-only "${{ github.event.before }}...${{ github.sha }}" | paste -sd, -)"
+            if [[ "$GH_EVENT_NAME" == "pull_request" ]]; then
+              git fetch origin "$GH_BASE_REF" --depth=1
+              changed_files="$(git diff --name-only "origin/${GH_BASE_REF}...${GH_SHA}" | paste -sd, -)"
+            elif [[ "$GH_EVENT_NAME" == "push" ]]; then
+              changed_files="$(git diff --name-only "${GH_BEFORE}...${GH_SHA}" | paste -sd, -)"
             fi
           fi
 
@@ -89,10 +94,12 @@ jobs:
         id: pack
         continue-on-error: true
         shell: bash
+        env:
+          RESOLVED_TASK: ${{ steps.resolve.outputs.task }}
         run: |
           set -euo pipefail
 
-          args=(pack "${{ steps.resolve.outputs.task }}" --repo . --out-prefix redcon-ci)
+          args=(pack "$RESOLVED_TASK" --repo . --out-prefix redcon-ci)
           if [[ "$STRICT_MODE" == "true" ]]; then
             args+=(--strict)
             if [[ -f "$POLICY_PATH" ]]; then
@@ -119,6 +126,9 @@ jobs:
       - name: Add CI summary
         if: always()
         shell: bash
+        env:
+          RESOLVED_TASK: ${{ steps.resolve.outputs.task }}
+          RESOLVED_CHANGED: ${{ steps.resolve.outputs.changed_files }}
         run: |
           if [[ -f redcon-ci.report.md ]]; then
             cat redcon-ci.report.md >> "$GITHUB_STEP_SUMMARY"
@@ -130,14 +140,14 @@ jobs:
 
           echo "" >> "$GITHUB_STEP_SUMMARY"
           echo "### Redcon Run Meta" >> "$GITHUB_STEP_SUMMARY"
-          echo "- Task: \\`${{ steps.resolve.outputs.task }}\\`" >> "$GITHUB_STEP_SUMMARY"
-          if [[ -n "${{ steps.resolve.outputs.changed_files }}" ]]; then
-            echo "- Changed files input: \\`${{ steps.resolve.outputs.changed_files }}\\`" >> "$GITHUB_STEP_SUMMARY"
+          echo "- Task: \`${RESOLVED_TASK}\`" >> "$GITHUB_STEP_SUMMARY"
+          if [[ -n "$RESOLVED_CHANGED" ]]; then
+            echo "- Changed files input: \`${RESOLVED_CHANGED}\`" >> "$GITHUB_STEP_SUMMARY"
           fi
 
       - name: Upload Redcon artifacts
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: redcon-artifacts
           path: |
@@ -149,15 +159,18 @@ jobs:
       - name: Enforce workflow result
         if: always()
         shell: bash
+        env:
+          PACK_OUTCOME: ${{ steps.pack.outcome }}
+          REPORT_OUTCOME: ${{ steps.report.outcome }}
         run: |
           set -euo pipefail
 
-          if [[ "${{ steps.pack.outcome }}" != "success" ]]; then
+          if [[ "$PACK_OUTCOME" != "success" ]]; then
             echo "Redcon pack step failed."
             exit 1
           fi
 
-          if [[ "$STRICT_MODE" == "true" && "${{ steps.report.outcome }}" != "success" ]]; then
+          if [[ "$STRICT_MODE" == "true" && "$REPORT_OUTCOME" != "success" ]]; then
             echo "Strict mode is enabled and policy checks failed."
             exit 1
           fi
