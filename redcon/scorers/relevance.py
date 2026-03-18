@@ -47,16 +47,19 @@ def score_files(
 
     heuristic_scores: dict[str, float] = {}
     reasons_by_path: dict[str, list[str]] = {}
+    breakdowns: dict[str, dict[str, float]] = {}
 
     for record in files:
         path_lower = record.path.lower()
         preview_lower = record.content_preview.lower()
         score = 0.0
         reasons: list[str] = []
+        breakdown: dict[str, float] = {}
 
         for critical_keyword in cfg.critical_path_keywords:
             if critical_keyword and critical_keyword in path_lower:
                 score += cfg.critical_path_bonus
+                breakdown["critical_path"] = breakdown.get("critical_path", 0) + cfg.critical_path_bonus
                 _add_reason(reasons, f"critical path keyword '{critical_keyword}'")
 
         path_tokens = _path_tokens(path_lower)
@@ -66,41 +69,54 @@ def score_files(
             preview_hits = preview_lower.count(keyword)
             symbol_hits = symbols_lower.count(keyword) if symbols_lower else 0
             if path_hits:
-                score += cfg.path_keyword_weight * path_hits
+                delta = cfg.path_keyword_weight * path_hits
+                score += delta
+                breakdown["path_keyword"] = breakdown.get("path_keyword", 0) + delta
                 _add_reason(reasons, f"path contains '{keyword}'")
             elif tokens_matching := [t for t in path_tokens if keyword.startswith(t)]:
-                # Abbreviation match: keyword "authentication" starts with path token "auth"
-                score += cfg.path_keyword_weight * 0.6
+                delta = cfg.path_keyword_weight * 0.6
+                score += delta
+                breakdown["path_keyword"] = breakdown.get("path_keyword", 0) + delta
                 _add_reason(reasons, f"path abbreviation '{tokens_matching[0]}' matches '{keyword}'")
             if preview_hits:
-                score += min(cfg.content_keyword_cap, cfg.content_keyword_weight * preview_hits)
+                delta = min(cfg.content_keyword_cap, cfg.content_keyword_weight * preview_hits)
+                score += delta
+                breakdown["content_keyword"] = breakdown.get("content_keyword", 0) + delta
                 _add_reason(reasons, f"content mentions '{keyword}'")
             if symbol_hits and not preview_hits:
-                score += min(cfg.content_keyword_cap, cfg.symbol_name_weight * symbol_hits)
+                delta = min(cfg.content_keyword_cap, cfg.symbol_name_weight * symbol_hits)
+                score += delta
+                breakdown["symbol_match"] = breakdown.get("symbol_match", 0) + delta
                 _add_reason(reasons, f"defines symbol matching '{keyword}'")
 
         name = record.path.rsplit("/", 1)[-1].lower()
         signals = cfg.signal_files
         if name in signals:
             score += signals[name]
+            breakdown["signal_file"] = signals[name]
             _add_reason(reasons, f"signal file {name}")
 
         if record.extension in cfg.code_extensions:
             score += cfg.code_extension_bonus
+            breakdown["code_extension"] = cfg.code_extension_bonus
 
         if "test" in path_lower:
             score += cfg.test_path_bonus
+            breakdown["test_proximity"] = cfg.test_path_bonus
             _add_reason(reasons, "test proximity")
 
         if record.line_count > cfg.large_file_line_threshold:
             score -= cfg.large_file_penalty
+            breakdown["large_file_penalty"] = -cfg.large_file_penalty
 
         if dirty_paths and cfg.git_dirty_boost > 0 and record.relative_path in dirty_paths:
             score += cfg.git_dirty_boost
+            breakdown["git_dirty"] = cfg.git_dirty_boost
             _add_reason(reasons, "has uncommitted changes")
 
         heuristic_scores[record.path] = score
         reasons_by_path[record.path] = reasons
+        breakdowns[record.path] = breakdown
 
     # -- File-role multipliers --
     if cfg.role_multipliers:
@@ -119,6 +135,7 @@ def score_files(
                 heuristic_scores[record.path] = old_score * multiplier
                 reasons = reasons_by_path[record.path]
                 _add_reason(reasons, f"role={role} (x{multiplier:.1f})")
+                breakdowns[record.path]["role_multiplier"] = multiplier
 
     if cfg.enable_import_graph_signals and files:
         graph = build_import_graph(files, entrypoint_filenames=cfg.entrypoint_filenames)
@@ -142,22 +159,32 @@ def score_files(
             score = heuristic_scores[path]
             reasons = reasons_by_path[path]
 
+            bd = breakdowns.get(path, {})
+            graph_total = 0.0
+
             inbound_from_seed = graph.incoming.get(path, set()) & seed_paths
             if inbound_from_seed:
                 bonus = min(cfg.graph_bonus_cap, cfg.graph_imported_by_relevant_bonus * len(inbound_from_seed))
                 score += bonus
+                graph_total += bonus
                 _add_reason(reasons, _format_graph_reason("imported by relevant file", inbound_from_seed))
 
             outbound_to_seed = graph.outgoing.get(path, set()) & seed_paths
             if outbound_to_seed:
                 bonus = min(cfg.graph_bonus_cap, cfg.graph_depends_on_relevant_bonus * len(outbound_to_seed))
                 score += bonus
+                graph_total += bonus
                 _add_reason(reasons, _format_graph_reason("depends on relevant module", outbound_to_seed))
 
             adjacent_entrypoints = (graph.incoming.get(path, set()) | graph.outgoing.get(path, set())) & graph.entrypoints
             if adjacent_entrypoints:
                 score += cfg.graph_entrypoint_adjacency_bonus
+                graph_total += cfg.graph_entrypoint_adjacency_bonus
                 _add_reason(reasons, _format_graph_reason("adjacent to entrypoint", adjacent_entrypoints))
+
+            if graph_total > 0:
+                bd["import_graph"] = round(graph_total, 3)
+                breakdowns[path] = bd
 
             heuristic_scores[path] = score
             reasons_by_path[path] = reasons
@@ -182,6 +209,9 @@ def score_files(
         if historical_score is not None:
             for reason in historical_score.reasons:
                 _add_reason(reasons, reason)
+        bd = breakdowns.get(record.path, {})
+        if historical_value:
+            bd["historical"] = round(historical_value, 3)
         ranked.append(
             RankedFile(
                 file=record,
@@ -189,6 +219,7 @@ def score_files(
                 heuristic_score=heuristic_score,
                 historical_score=round(historical_value, 3),
                 reasons=reasons[:6],
+                score_breakdown={k: round(v, 3) for k, v in bd.items()},
             )
         )
 
