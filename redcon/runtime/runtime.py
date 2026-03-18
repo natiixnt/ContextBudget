@@ -52,6 +52,7 @@ Quick-start
     print(result.llm_response)
 """
 
+import logging
 from pathlib import Path
 from typing import Any, Callable, Mapping
 
@@ -68,11 +69,16 @@ from redcon.runtime.context import PreparedContext, RuntimeResult
 from redcon.runtime.session import RuntimeSession
 
 
+_log = logging.getLogger(__name__)
+
+
 def _build_prompt_text(run_artifact: dict[str, Any]) -> str:
     """Assemble a plain-text prompt body from a pack run artifact.
 
     Walks the ``compressed_context`` list in include order, prefixing each
     entry with a ``# File: <path>`` header and appending its ``text`` block.
+    Entries whose text is an unresolved ``@cached-summary:`` marker are
+    skipped with a warning - the compressor should never emit these.
     """
     lines: list[str] = []
     for entry in run_artifact.get("compressed_context") or []:
@@ -80,6 +86,12 @@ def _build_prompt_text(run_artifact: dict[str, Any]) -> str:
             continue
         path = str(entry.get("path") or "")
         text = str(entry.get("text") or "")
+        if text.startswith("@cached-summary:"):
+            _log.warning(
+                "Skipping unresolved cache marker for %s - prompt must be self-contained",
+                path,
+            )
+            continue
         if path:
             lines.append(f"# File: {path}")
         if text:

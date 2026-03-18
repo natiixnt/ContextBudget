@@ -111,7 +111,9 @@ snippet_score_threshold = 999
     assert first_entry["cache_reference"]
     assert second_entry["cache_status"] == "reused"
     assert second_entry["cache_reference"] == first_entry["cache_reference"]
-    assert second_entry["text"] == f"@cached-summary:{first_entry['cache_reference']}"
+    # Text must always contain real content, never an opaque cache marker.
+    assert not second_entry["text"].startswith("@cached-summary:")
+    assert second_entry["text"] == first_entry["text"]
     assert second["cache"]["fragment_hits"] >= 1
 
 
@@ -156,11 +158,63 @@ snippet_score_threshold = 999
 
     first_entry = next(item for item in first["compressed_context"] if item["path"] == "src/auth.py")
     second_entry = next(item for item in second["compressed_context"] if item["path"] == "src/auth.py")
-    expected_saved = first_entry["compressed_tokens"] - second_entry["compressed_tokens"]
 
-    assert expected_saved > 0
-    assert second["cache"]["tokens_saved"] == expected_saved
-    assert second["budget"]["estimated_input_tokens"] == first["budget"]["estimated_input_tokens"] - expected_saved
+    # With self-contained cache, real text is always kept - no fake token
+    # savings from marker replacement.  Token counts match across runs.
+    assert second_entry["compressed_tokens"] == first_entry["compressed_tokens"]
+    assert second_entry["text"] == first_entry["text"]
+    assert not second_entry["text"].startswith("@cached-summary:")
+    assert second["budget"]["estimated_input_tokens"] == first["budget"]["estimated_input_tokens"]
+
+
+def test_warm_cache_produces_self_contained_prompt(tmp_path: Path) -> None:
+    """Every compressed entry must contain real text, never a cache marker."""
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[compression]
+full_file_threshold_tokens = 1
+snippet_score_threshold = 0
+""".strip(),
+    )
+    _write(
+        tmp_path / "src" / "auth.py",
+        "def login(token: str) -> bool:\n    return token.startswith('prod_')\n" * 10,
+    )
+    _write(
+        tmp_path / "src" / "middleware.py",
+        "def auth_middleware(req):\n    return check(req.token)\n" * 10,
+    )
+
+    # First run populates cache, second run hits it.
+    run_pack("update auth middleware", repo=tmp_path, max_tokens=2000)
+    second = as_json_dict(run_pack("update auth middleware", repo=tmp_path, max_tokens=2000))
+
+    for entry in second["compressed_context"]:
+        assert not entry["text"].startswith("@cached-summary:"), (
+            f"Cache marker leaked into prompt for {entry['path']}"
+        )
+        assert len(entry["text"]) > 10, (
+            f"Suspiciously short text for {entry['path']}: {entry['text']!r}"
+        )
+
+
+def test_runtime_build_prompt_skips_cache_markers() -> None:
+    """The runtime guard must filter out any stale cache markers."""
+    from redcon.runtime.runtime import _build_prompt_text
+
+    artifact = {
+        "compressed_context": [
+            {"path": "src/good.py", "text": "def good(): pass"},
+            {"path": "src/bad.py", "text": "@cached-summary:cb-frag:abc123"},
+            {"path": "src/also_good.py", "text": "def also_good(): pass"},
+        ]
+    }
+    prompt = _build_prompt_text(artifact)
+    assert "good" in prompt
+    assert "also_good" in prompt
+    assert "@cached-summary" not in prompt
+    assert "src/bad.py" not in prompt
 
 
 def test_shared_stub_cache_backend_records_misses_without_persistence(tmp_path: Path) -> None:
@@ -486,3 +540,88 @@ def test_model_profile_clamps_explicit_budget_to_context_window(tmp_path: Path) 
     assert data["model_profile"]["budget_source"] == "cli"
     assert data["model_profile"]["budget_clamped"] is True
     assert any("Clamped max_tokens" in note for note in data["model_profile"]["notes"])
+
+
+def test_progressive_packer_degrades_before_dropping(tmp_path: Path) -> None:
+    """Under a tight budget, the progressive packer should degrade a low-score
+    file to make room for a higher-score file that would otherwise be skipped."""
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[compression]
+full_file_threshold_tokens = 5000
+snippet_score_threshold = 0
+progressive_packer_enabled = true
+""".strip(),
+    )
+    # Large file that matches the task well - should always be included.
+    _write(
+        tmp_path / "src" / "auth.py",
+        "def login(token: str) -> bool:\n    return token.startswith('prod_')\n" * 30,
+    )
+    # Second file - also matches, will compete for budget.
+    _write(
+        tmp_path / "src" / "middleware.py",
+        "def auth_middleware(req):\n    return check_auth(req.token)\n" * 30,
+    )
+
+    # Use a tight budget that cannot fit both files at full detail.
+    # First get baseline token counts.
+    big_budget = as_json_dict(run_pack("update auth middleware", repo=tmp_path, max_tokens=50000))
+    total_full = sum(e["compressed_tokens"] for e in big_budget["compressed_context"])
+    # Set budget to ~60% of total - enough for one full + one degraded.
+    tight_budget = int(total_full * 0.6)
+    if tight_budget < 50:
+        tight_budget = 50
+
+    data = as_json_dict(run_pack("update auth middleware", repo=tmp_path, max_tokens=tight_budget))
+
+    # Both files should be included (neither dropped).
+    assert len(data["files_included"]) == 2
+    assert len(data["files_skipped"]) == 0
+    # At least one file should have been degraded from its original strategy.
+    strategies = [e["strategy"] for e in data["compressed_context"]]
+    assert any(s != "full" for s in strategies), f"Expected degradation, got {strategies}"
+    assert data["budget"]["estimated_input_tokens"] <= tight_budget
+
+
+def test_progressive_packer_reports_degradation_metrics(tmp_path: Path) -> None:
+    """Degradation metrics should appear in the run report."""
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[compression]
+full_file_threshold_tokens = 5000
+snippet_score_threshold = 0
+progressive_packer_enabled = true
+""".strip(),
+    )
+    _write(
+        tmp_path / "src" / "auth.py",
+        "def login(token: str) -> bool:\n    return token.startswith('prod_')\n" * 30,
+    )
+    _write(
+        tmp_path / "src" / "middleware.py",
+        "def auth_middleware(req):\n    return check_auth(req.token)\n" * 30,
+    )
+
+    data = as_json_dict(run_pack("update auth middleware", repo=tmp_path, max_tokens=50000))
+    # With a large budget no degradation should occur.
+    assert data.get("degraded_files", []) == []
+    assert data.get("degradation_savings", 0) == 0
+
+
+def test_greedy_fallback_when_progressive_disabled(tmp_path: Path) -> None:
+    """When progressive_packer_enabled is false, the old greedy behavior is used."""
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[compression]
+progressive_packer_enabled = false
+""".strip(),
+    )
+    _write(tmp_path / "src" / "auth.py", "def login():\n    return True\n")
+
+    data = as_json_dict(run_pack("update auth", repo=tmp_path, max_tokens=1000))
+    assert data["files_included"] == ["src/auth.py"]
+    assert data.get("degraded_files", []) == []

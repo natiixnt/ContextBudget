@@ -48,6 +48,6 @@ def test_in_memory_cache_tracks_fragment_reuse_stats(tmp_path: Path) -> None:
     assert first.compressed_files[0].cache_status == "stored"
     assert second.cache.fragment_hits >= 1
     assert second.compressed_files[0].cache_status == "reused"
-    assert second.cache.tokens_saved == (
-        first.compressed_files[0].compressed_tokens - second.compressed_files[0].compressed_tokens
-    )
+    # Self-contained cache keeps real text - no fake token savings from markers.
+    assert second.compressed_files[0].compressed_tokens == first.compressed_files[0].compressed_tokens
+    assert not second.compressed_files[0].text.startswith("@cached-summary:")

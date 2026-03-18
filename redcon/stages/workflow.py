@@ -279,6 +279,8 @@ def run_render_stage(
         scanned_repos=[_serialize_scanned_repo(item) for item in (scanned_repos or [])],
         selected_repos=_selected_repos_from_compressed(compressed),
         implementations=dict(implementations or {}),
+        degraded_files=compressed.degraded_files,
+        degradation_savings=compressed.degradation_savings,
     )
 
 

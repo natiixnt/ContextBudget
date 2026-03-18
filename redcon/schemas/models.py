@@ -297,6 +297,8 @@ class RunReport:
     selected_repos: list[str] = field(default_factory=list)
     implementations: dict[str, str] = field(default_factory=dict)
     delta: dict = field(default_factory=dict)
+    degraded_files: list[str] = field(default_factory=list)
+    degradation_savings: int = 0
 
 
 CACHE_FILE = ".redcon_cache.json"

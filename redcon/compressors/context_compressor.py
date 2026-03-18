@@ -3,7 +3,7 @@ from __future__ import annotations
 """Pack/compression stage for budgeted context generation."""
 
 import re
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 from typing import Callable
@@ -40,6 +40,8 @@ class CompressionResult:
     cache_hits: int
     quality_risk_estimate: str
     summarizer: SummarizerReport
+    degraded_files: list[str] = field(default_factory=list)
+    degradation_savings: int = 0
 
 
 @dataclass(slots=True)
@@ -348,6 +350,70 @@ def _build_slice_relationship_contexts(ranked_files: list[RankedFile]) -> dict[s
     return contexts
 
 
+def _build_risk_estimate(
+    cfg: CompressionSettings,
+    files_skipped: list[str],
+    ranked_files: list[RankedFile],
+    total_compressed: int,
+    total_raw: int,
+) -> str:
+    skipped_ratio = len(files_skipped) / max(1, len(ranked_files))
+    compression_ratio = total_compressed / max(1, total_raw)
+    bounded_ratio = min(1.0, max(0.0, compression_ratio))
+    total_weight = cfg.risk_skip_weight + cfg.risk_compression_weight
+    if total_weight <= 0:
+        total_weight = 1.0
+    skip_weight = cfg.risk_skip_weight / total_weight
+    compression_weight = cfg.risk_compression_weight / total_weight
+    risk_score = skip_weight * skipped_ratio + compression_weight * bounded_ratio
+    if risk_score < 0.25:
+        return "low"
+    if risk_score < 0.5:
+        return "medium"
+    return "high"
+
+
+def _finalize_entry(
+    file_record: "RankedFile.file",  # type: ignore[name-defined]
+    tier: "Tier",  # type: ignore[name-defined]
+    raw_tokens: int,
+    seen_imports: set[str],
+    cache: SummaryCacheBackend,
+    token_estimator: Callable[[str], int],
+) -> CompressedFile:
+    """Build a CompressedFile from a chosen tier, apply import dedup and cache."""
+    text = _dedup_imports(tier.text, seen_imports) if tier.strategy != "full" else tier.text
+    compressed_tokens = token_estimator(text)
+
+    fragment_cache_key_val = _fragment_cache_key(file_record.path, tier.selected_ranges, text)
+    fragment_reference = _fragment_reference_id(fragment_cache_key_val)
+    cached_reference = cache.get_fragment(fragment_cache_key_val)
+    cache_status = ""
+    effective_chunk_reason = tier.chunk_reason
+    if cached_reference is not None:
+        cache_status = "reused"
+        effective_chunk_reason = f"reused cached fragment; {tier.chunk_reason}"
+    else:
+        if cache.put_fragment(fragment_cache_key_val, fragment_reference):
+            cache_status = "stored"
+
+    return CompressedFile(
+        path=file_record.path,
+        strategy=tier.strategy,
+        original_tokens=raw_tokens,
+        compressed_tokens=compressed_tokens,
+        text=text,
+        chunk_strategy=tier.chunk_strategy,
+        chunk_reason=effective_chunk_reason,
+        selected_ranges=tier.selected_ranges,
+        symbols=tier.symbols,
+        cache_reference=(cached_reference or fragment_reference) if cache_status else "",
+        cache_status=cache_status,
+        relative_path=file_record.relative_path,
+        repo_label=file_record.repo_label,
+    )
+
+
 def compress_ranked_files(
     task: str,
     repo: Path,
@@ -359,17 +425,17 @@ def compress_ranked_files(
     duplicate_hash_cache_enabled: bool = True,
     token_estimator: Callable[[str], int] = estimate_tokens,
 ) -> CompressionResult:
-    """Compress ranked files under a token budget."""
+    """Compress ranked files under a token budget.
+
+    When ``progressive_packer_enabled`` is set in *settings*, files are
+    pre-computed at multiple compression tiers and the packer degrades
+    representations before dropping files entirely.
+    """
 
     cfg = settings if settings is not None else CompressionSettings()
     keywords = task_keywords(task)
-    compressed_files: list[CompressedFile] = []
-    files_included: list[str] = []
-    files_skipped: list[str] = []
     seen_imports: set[str] = set()
 
-    total_raw = 0
-    total_compressed = 0
     duplicate_reads_prevented = 0
     seen_hashes: set[str] = set()
     slice_relationships = _build_slice_relationship_contexts(ranked_files)
@@ -378,9 +444,15 @@ def compress_ranked_files(
         adapter_name=(summarization_settings.adapter if summarization_settings is not None else ""),
     )
 
+    # -- Phase 0: Read files and filter duplicates --
+    from redcon.compressors.representations import FileTiers, build_tiers
+
+    prepared: list[FileTiers] = []
+    files_skipped: list[str] = []
+    total_raw = 0
+
     for ranked in ranked_files:
         file_record = ranked.file
-        relevance_score = ranked.heuristic_score if ranked.heuristic_score > 0 else ranked.score
         if duplicate_hash_cache_enabled and file_record.content_hash in seen_hashes:
             duplicate_reads_prevented += 1
             files_skipped.append(file_record.path)
@@ -396,16 +468,12 @@ def compress_ranked_files(
 
         raw_tokens = token_estimator(full_text)
         total_raw += raw_tokens
-        cache_key = f"{file_record.path}:{file_record.size_bytes}:{file_record.content_hash}"
-        line_count = len(full_text.splitlines())
         relationship_context = slice_relationships.get(file_record.path, SliceRelationshipContext())
-        symbols: list[dict[str, int | str | bool]] = []
-        symbol_failure_reason = ""
 
+        relevance_score = ranked.heuristic_score if ranked.heuristic_score > 0 else ranked.score
         is_test = _is_test_file(file_record.path)
 
-        # Scale extraction line budget and symbol count by relevance:
-        # high-scoring files get more lines and more symbols extracted.
+        # Adaptive line budget (same logic as the old greedy path).
         if cfg.adaptive_line_budget and cfg.snippet_score_threshold > 0:
             _score_ratio = relevance_score / cfg.snippet_score_threshold
             _factor = min(cfg.adaptive_line_budget_max_factor, max(0.5, _score_ratio))
@@ -415,12 +483,12 @@ def compress_ranked_files(
             effective_line_budget = cfg.snippet_total_line_limit
             effective_max_symbols = 4
 
-        # Test files use a higher stub score threshold so that test function
-        # bodies are stubbed out unless the function is highly keyword-relevant.
-        # This avoids spending tokens on generic test boilerplate.
         effective_stub_threshold = 7.0 if is_test else _STUB_SCORE_THRESHOLD
 
+        # Pre-compute extractions here so that monkeypatches on this module
+        # propagate correctly (tests patch context_compressor.select_*).
         symbol_selection = None
+        symbol_failure_reason = ""
         if cfg.symbol_extraction_enabled:
             try:
                 symbol_selection = select_symbol_aware_chunks(
@@ -431,7 +499,7 @@ def compress_ranked_files(
                     max_symbols=effective_max_symbols,
                     stub_score_threshold=effective_stub_threshold,
                 )
-            except Exception as exc:  # pragma: no cover - exercised via monkeypatch tests
+            except Exception as exc:
                 symbol_failure_reason = f"symbol extraction failed: {exc}"
                 symbol_selection = None
 
@@ -443,215 +511,251 @@ def compress_ranked_files(
             relationship_context=relationship_context,
             surrounding_lines=min(1, max(0, cfg.snippet_context_lines)),
         )
-        slice_text = f"# {file_record.path}\n{slice_selection.text}" if slice_selection is not None else ""
-        slice_tokens = token_estimator(slice_text) if slice_text else 0
-        slice_line_count = _selected_line_count(slice_selection.selected_ranges) if slice_selection is not None else 0
-        slice_supported = slice_selection is not None and slice_tokens > 0 and slice_line_count > 0
-        slice_is_reduction = bool(
-            slice_supported
-            and slice_line_count < line_count
-            and slice_tokens < raw_tokens
-        )
-        relationship_driven = bool(
-            relationship_context.outgoing_related_paths
-            or relationship_context.incoming_related_paths
-            or relationship_context.incoming_entrypoint_paths
-        )
-        slice_requested = bool(
-            slice_supported
-            and (
-                relevance_score >= cfg.snippet_score_threshold
-                or relationship_driven
-            )
+
+        tiers = build_tiers(
+            ranked=ranked,
+            full_text=full_text,
+            keywords=keywords,
+            relationship_context=relationship_context,
+            cfg=cfg,
+            summarizer=summarizer,
+            cache=cache,
+            symbol_selection=symbol_selection,
+            slice_selection=slice_selection,
+            symbol_failure_reason=symbol_failure_reason,
+            token_estimator=token_estimator,
         )
 
-        is_utility = _is_utility_file(file_record.path)
-        # Test and utility files always get symbol/slice extraction regardless of
-        # size - fixtures and boilerplate bodies waste tokens when sent verbatim.
-        force_compress = (is_test or is_utility) and symbol_selection is not None
+        prepared.append(FileTiers(
+            path=file_record.path,
+            ranked=ranked,
+            raw_tokens=raw_tokens,
+            full_text=full_text,
+            line_count=len(full_text.splitlines()),
+            tiers=tiers,
+        ))
 
-        # When a relationship-driven file has symbol extraction available, compare
-        # symbol vs slice token counts and prefer whichever is smaller.
-        symbol_text = f"# {file_record.path}\n{symbol_selection.text}" if symbol_selection is not None else ""
-        symbol_tokens = token_estimator(symbol_text) if symbol_text else 0
-        symbol_beats_slice = bool(
-            symbol_selection is not None
-            and relationship_driven
-            and slice_supported
-            and symbol_tokens < slice_tokens
+    if cfg.progressive_packer_enabled:
+        result = _compress_progressive(
+            prepared=prepared,
+            max_tokens=max_tokens,
+            cfg=cfg,
+            cache=cache,
+            seen_imports=seen_imports,
+            token_estimator=token_estimator,
+            files_skipped=files_skipped,
+            total_raw=total_raw,
+            duplicate_reads_prevented=duplicate_reads_prevented,
+            ranked_files=ranked_files,
+            summarizer=summarizer,
         )
-
-        if raw_tokens <= cfg.full_file_threshold_tokens and not force_compress:
-            strategy = "full"
-            compressed = f"# Full: {file_record.path}\n{full_text}"
-            chunk_strategy = "full-file"
-            chunk_reason = "file fits within full-file threshold"
-            selected_ranges = (
-                [
-                    {
-                        "start_line": 1,
-                        "end_line": line_count,
-                        "kind": "full",
-                        "reason": chunk_reason,
-                    }
-                ]
-                if line_count > 0
-                else []
-            )
-        elif symbol_selection is not None and (
-            relevance_score >= cfg.snippet_score_threshold or force_compress or symbol_beats_slice
-        ):
-            strategy = "symbol"
-            compressed = symbol_text
-            chunk_strategy = symbol_selection.chunk_strategy
-            chunk_reason = symbol_selection.chunk_reason
-            selected_ranges = _selected_ranges_with_reason(symbol_selection.selected_ranges, chunk_reason)
-            symbols = symbol_selection.symbols
-        elif slice_supported and (slice_is_reduction or slice_requested):
-            strategy = "snippet" if symbol_failure_reason else "slice"
-            compressed = slice_text
-            chunk_strategy = slice_selection.chunk_strategy
-            chunk_reason = slice_selection.chunk_reason
-            if symbol_failure_reason:
-                chunk_reason = f"{symbol_failure_reason}; {chunk_reason}"
-            selected_ranges = slice_selection.selected_ranges
-        elif relevance_score >= cfg.snippet_score_threshold:
-            strategy = "snippet"
-            snippet = _snippet_from_text(file_record.path, full_text, keywords, cfg)
-            compressed = snippet.text
-            chunk_strategy = "keyword-window"
-            chunk_reason = "fallback keyword-window snippet selection"
-            if symbol_failure_reason:
-                chunk_reason = f"{symbol_failure_reason}; {chunk_reason}"
-            selected_ranges = _selected_ranges_with_reason(snippet.selected_ranges, chunk_reason)
-        else:
-            strategy = "summary"
-            summary = summarizer.summarize(
-                cache=cache,
-                cache_key_prefix=cache_key,
-                request=SummaryRequest(
-                    task=task,
-                    path=file_record.path,
-                    text=full_text,
-                    line_limit=cfg.summary_preview_lines,
-                    score=ranked.score,
-                    keywords=keywords,
-                ),
-            )
-            compressed = summary.text
-            chunk_reason = summary.chunk_reason
-            chunk_strategy = summary.chunk_strategy
-            if chunk_strategy == "summary-external":
-                selected_ranges = (
-                    [
-                        {
-                            "start_line": 1,
-                            "end_line": line_count,
-                            "kind": "summary",
-                            "reason": chunk_reason,
-                        }
-                    ]
-                    if line_count > 0
-                    else []
-                )
-            else:
-                preview_end = min(cfg.summary_preview_lines, line_count)
-                selected_ranges = (
-                    [
-                        {
-                            "start_line": 1,
-                            "end_line": preview_end,
-                            "kind": "summary",
-                            "reason": chunk_reason,
-                        }
-                    ]
-                    if preview_end > 0
-                    else []
-                )
-
-        # Post-compression cleanup: strip docstrings and collapse blank lines.
-        # Applied to all non-full strategies so slice/snippet output gets the
-        # same cleanup that symbol extraction already applies internally.
-        is_py_file = file_record.extension == ".py"
-        if strategy != "full":
-            if is_py_file:
-                compressed = _strip_docstrings_in_text(compressed)
-                compressed = _truncate_data_blocks_in_text(compressed)
-            compressed = _strip_decorative_dividers(compressed)
-            compressed = _collapse_blank_lines(compressed)
-            compressed = _dedup_imports(compressed, seen_imports)
-        else:
-            compressed = _collapse_blank_lines(compressed)
-
-        fragment_cache_key = _fragment_cache_key(file_record.path, selected_ranges, compressed)
-        fragment_reference = _fragment_reference_id(fragment_cache_key)
-        cached_reference = cache.get_fragment(fragment_cache_key)
-        cache_status = ""
-        effective_chunk_reason = chunk_reason
-        candidate_text = compressed
-        source_tokens = token_estimator(compressed)
-        compressed_tokens = source_tokens
-        if cached_reference is not None:
-            cache_status = "reused"
-            effective_chunk_reason = f"reused cached summary reference; {chunk_reason}"
-            candidate_text = _fragment_reference_text(cached_reference)
-            compressed_tokens = token_estimator(candidate_text)
-        if total_compressed + compressed_tokens > max_tokens:
-            files_skipped.append(file_record.path)
-            continue
-
-        total_compressed += compressed_tokens
-        if cached_reference is not None:
-            cache.record_tokens_saved(max(0, source_tokens - compressed_tokens))
-        else:
-            if cache.put_fragment(fragment_cache_key, fragment_reference):
-                cache_status = "stored"
-        compressed_files.append(
-            CompressedFile(
-                path=file_record.path,
-                strategy=strategy,
-                original_tokens=raw_tokens,
-                compressed_tokens=compressed_tokens,
-                text=candidate_text,
-                chunk_strategy=chunk_strategy,
-                chunk_reason=effective_chunk_reason,
-                selected_ranges=selected_ranges,
-                symbols=symbols,
-                cache_reference=(cached_reference or fragment_reference) if cache_status else "",
-                cache_status=cache_status,
-                relative_path=file_record.relative_path,
-                repo_label=file_record.repo_label,
-            )
-        )
-        files_included.append(file_record.path)
-
-    saved = max(0, total_raw - total_compressed)
-    skipped_ratio = len(files_skipped) / max(1, len(ranked_files))
-    compression_ratio = total_compressed / max(1, total_raw)
-    bounded_ratio = min(1.0, max(0.0, compression_ratio))
-    total_weight = cfg.risk_skip_weight + cfg.risk_compression_weight
-    if total_weight <= 0:
-        total_weight = 1.0
-    skip_weight = cfg.risk_skip_weight / total_weight
-    compression_weight = cfg.risk_compression_weight / total_weight
-    risk_score = skip_weight * skipped_ratio + compression_weight * bounded_ratio
-    if risk_score < 0.25:
-        risk = "low"
-    elif risk_score < 0.5:
-        risk = "medium"
     else:
-        risk = "high"
+        result = _compress_greedy(
+            prepared=prepared,
+            max_tokens=max_tokens,
+            cfg=cfg,
+            cache=cache,
+            seen_imports=seen_imports,
+            token_estimator=token_estimator,
+            files_skipped=files_skipped,
+            total_raw=total_raw,
+            duplicate_reads_prevented=duplicate_reads_prevented,
+            ranked_files=ranked_files,
+            summarizer=summarizer,
+        )
+    return result
 
+
+def _compress_greedy(
+    prepared: list,
+    max_tokens: int,
+    cfg: CompressionSettings,
+    cache: SummaryCacheBackend,
+    seen_imports: set[str],
+    token_estimator: Callable[[str], int],
+    files_skipped: list[str],
+    total_raw: int,
+    duplicate_reads_prevented: int,
+    ranked_files: list[RankedFile],
+    summarizer: SummarizationService,
+) -> CompressionResult:
+    """Original greedy strategy: pick best tier per file, skip if over budget."""
+    from redcon.compressors.representations import FileTiers
+
+    compressed_files: list[CompressedFile] = []
+    files_included: list[str] = []
+    total_compressed = 0
+
+    for ft in prepared:
+        if not ft.tiers:
+            files_skipped.append(ft.path)
+            continue
+        # Pick the first (most detailed) tier - matches old behavior.
+        tier = ft.tiers[0]
+        entry = _finalize_entry(
+            ft.ranked.file, tier, ft.raw_tokens, seen_imports, cache, token_estimator,
+        )
+        if total_compressed + entry.compressed_tokens > max_tokens:
+            files_skipped.append(ft.path)
+            continue
+        total_compressed += entry.compressed_tokens
+        compressed_files.append(entry)
+        files_included.append(ft.path)
+
+    risk = _build_risk_estimate(cfg, files_skipped, ranked_files, total_compressed, total_raw)
     cache_snapshot = cache.snapshot()
     return CompressionResult(
         compressed_files=compressed_files,
         files_included=files_included,
         files_skipped=files_skipped,
         estimated_input_tokens=total_compressed,
-        estimated_saved_tokens=saved,
+        estimated_saved_tokens=max(0, total_raw - total_compressed),
         duplicate_reads_prevented=duplicate_reads_prevented,
         cache=cache_snapshot,
         cache_hits=cache_snapshot.hits,
         quality_risk_estimate=risk,
         summarizer=summarizer.snapshot(),
+        degraded_files=[],
+        degradation_savings=0,
+    )
+
+
+def _compress_progressive(
+    prepared: list,
+    max_tokens: int,
+    cfg: CompressionSettings,
+    cache: SummaryCacheBackend,
+    seen_imports: set[str],
+    token_estimator: Callable[[str], int],
+    files_skipped: list[str],
+    total_raw: int,
+    duplicate_reads_prevented: int,
+    ranked_files: list[RankedFile],
+    summarizer: SummarizationService,
+) -> CompressionResult:
+    """Progressive packer: degrade representations before dropping files.
+
+    Pass 1 (tentative): assign each file its best affordable tier.
+    Pass 2 (degradation): downgrade the lowest-scoring included files to
+    reclaim budget for files that were skipped.
+    """
+    from redcon.compressors.representations import FileTiers
+
+    # -- Pass 1: tentative assignment --
+    # Each entry: (FileTiers, chosen_tier_index)
+    assignments: list[tuple[FileTiers, int]] = []
+    skipped: list[FileTiers] = []
+    budget_remaining = max_tokens
+
+    for ft in prepared:
+        if not ft.tiers:
+            files_skipped.append(ft.path)
+            continue
+        assigned = False
+        for i, tier in enumerate(ft.tiers):
+            if tier.tokens <= budget_remaining:
+                assignments.append((ft, i))
+                budget_remaining -= tier.tokens
+                assigned = True
+                break
+        if not assigned:
+            skipped.append(ft)
+
+    # -- Pass 2: degradation rounds --
+    degraded_files: list[str] = []
+    degradation_savings = 0
+
+    for _round in range(cfg.max_degradation_rounds):
+        if not skipped:
+            break
+
+        # Sort assignments by score ascending - degrade lowest-scoring first.
+        degradable = [
+            (idx, ft, tier_idx)
+            for idx, (ft, tier_idx) in enumerate(assignments)
+            if tier_idx + 1 < len(ft.tiers)
+        ]
+        degradable.sort(
+            key=lambda x: (
+                x[1].ranked.heuristic_score
+                if x[1].ranked.heuristic_score > 0
+                else x[1].ranked.score
+            ),
+        )
+
+        still_skipped: list[FileTiers] = []
+        for skipped_ft in skipped:
+            fitted = False
+            # Find cheapest tier that could fit this skipped file.
+            cheapest_tier = skipped_ft.tiers[-1]
+
+            # Try freeing budget by degrading included files.
+            for deg_idx, deg_ft, deg_tier_idx in degradable:
+                if fitted:
+                    break
+                current_tier = deg_ft.tiers[deg_tier_idx]
+                next_tier = deg_ft.tiers[deg_tier_idx + 1]
+                freed = current_tier.tokens - next_tier.tokens
+                if freed <= 0:
+                    continue
+
+                # Check if degrading frees enough for any tier of the skipped file.
+                new_budget = budget_remaining + freed
+                for s_tier_idx, s_tier in enumerate(skipped_ft.tiers):
+                    if s_tier.tokens <= new_budget:
+                        # Degrade the included file.
+                        assignments[deg_idx] = (deg_ft, deg_tier_idx + 1)
+                        budget_remaining += freed
+                        degraded_files.append(deg_ft.path)
+                        degradation_savings += freed
+
+                        # Include the skipped file.
+                        assignments.append((skipped_ft, s_tier_idx))
+                        budget_remaining -= s_tier.tokens
+                        fitted = True
+                        break
+
+            if not fitted:
+                still_skipped.append(skipped_ft)
+
+        skipped = still_skipped
+
+    for ft in skipped:
+        files_skipped.append(ft.path)
+
+    # -- Pass 3: finalize entries in original order --
+    # Rebuild assignments in the order files were prepared so that import
+    # deduplication remains deterministic.
+    assignment_map: dict[str, int] = {ft.path: tier_idx for ft, tier_idx in assignments}
+    compressed_files: list[CompressedFile] = []
+    files_included: list[str] = []
+    total_compressed = 0
+
+    for ft in prepared:
+        if ft.path not in assignment_map:
+            continue
+        tier_idx = assignment_map[ft.path]
+        tier = ft.tiers[tier_idx]
+        entry = _finalize_entry(
+            ft.ranked.file, tier, ft.raw_tokens, seen_imports, cache, token_estimator,
+        )
+        total_compressed += entry.compressed_tokens
+        compressed_files.append(entry)
+        files_included.append(ft.path)
+
+    risk = _build_risk_estimate(cfg, files_skipped, ranked_files, total_compressed, total_raw)
+    cache_snapshot = cache.snapshot()
+    return CompressionResult(
+        compressed_files=compressed_files,
+        files_included=files_included,
+        files_skipped=files_skipped,
+        estimated_input_tokens=total_compressed,
+        estimated_saved_tokens=max(0, total_raw - total_compressed),
+        duplicate_reads_prevented=duplicate_reads_prevented,
+        cache=cache_snapshot,
+        cache_hits=cache_snapshot.hits,
+        quality_risk_estimate=risk,
+        summarizer=summarizer.snapshot(),
+        degraded_files=degraded_files,
+        degradation_savings=degradation_savings,
     )
