@@ -7,6 +7,7 @@ import re
 from redcon.config import ScoreSettings
 from redcon.core.text import task_keywords
 from redcon.schemas.models import FileRecord, RankedFile
+from redcon.scorers.file_roles import classify_file_role
 from redcon.scorers.history import TaskSimilarityCallable, compute_historical_adjustments
 from redcon.scorers.import_graph import build_import_graph
 
@@ -109,6 +110,24 @@ def score_files(
 
         heuristic_scores[record.path] = score
         reasons_by_path[record.path] = reasons
+
+    # -- File-role multipliers --
+    if cfg.role_multipliers:
+        keywords_lower = {k.lower() for k in keywords}
+        for record in files:
+            role = classify_file_role(record.path)
+            multiplier = cfg.role_multipliers.get(role, 1.0)
+            # Override: when task keywords mention the role's domain, boost
+            # instead of penalizing (e.g. "test" keyword boosts test files).
+            for override_role, override_keywords in (cfg.role_keyword_overrides or {}).items():
+                if role == override_role and any(kw in keywords_lower for kw in override_keywords):
+                    multiplier = cfg.role_keyword_override_multiplier
+                    break
+            if multiplier != 1.0:
+                old_score = heuristic_scores[record.path]
+                heuristic_scores[record.path] = old_score * multiplier
+                reasons = reasons_by_path[record.path]
+                _add_reason(reasons, f"role={role} (x{multiplier:.1f})")
 
     if cfg.enable_import_graph_signals and files:
         graph = build_import_graph(files, entrypoint_filenames=cfg.entrypoint_filenames)

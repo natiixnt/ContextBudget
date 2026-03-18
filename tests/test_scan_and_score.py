@@ -250,3 +250,50 @@ path = "worker"
     assert "worker:src/auth.py" in by_path
     assert any("adjacent to entrypoint" in reason for reason in by_path["api:src/auth.py"].reasons)
     assert any("adjacent to entrypoint" in reason for reason in by_path["worker:src/auth.py"].reasons)
+
+
+def test_file_role_classification_basic() -> None:
+    from redcon.scorers.file_roles import classify_file_role
+
+    assert classify_file_role("src/auth/service.py") == "prod"
+    assert classify_file_role("tests/test_auth.py") == "test"
+    assert classify_file_role("docs/guide.md") == "docs"
+    assert classify_file_role("README.md") == "docs"
+    assert classify_file_role("examples/demo.py") == "example"
+    assert classify_file_role("redcon.toml") == "config"
+    assert classify_file_role("config/settings.yaml") == "config"
+    assert classify_file_role("src/__pycache__/module.cpython-312.pyc") == "generated"
+    assert classify_file_role("src/proto/message_pb2.py") == "generated"
+
+
+def test_role_multipliers_lower_docs_and_examples(tmp_path: Path) -> None:
+    """Docs and examples should score lower than equivalent prod files."""
+    _write(tmp_path / "src" / "auth.py", "def login(token):\n    return token.startswith('prod_')\n")
+    _write(tmp_path / "docs" / "auth.md", "# Auth\nlogin with token prod_")
+    _write(tmp_path / "examples" / "auth_demo.py", "def login(token):\n    return token.startswith('prod_')\n")
+
+    records = scan_repository(tmp_path)
+    ranked = score_files("login auth token", records)
+    by_path = {item.file.path: item for item in ranked}
+
+    assert "src/auth.py" in by_path
+    # Prod code should score higher than docs/examples with same keyword hits.
+    prod_score = by_path["src/auth.py"].score
+    if "docs/auth.md" in by_path:
+        assert by_path["docs/auth.md"].score < prod_score
+    if "examples/auth_demo.py" in by_path:
+        assert by_path["examples/auth_demo.py"].score < prod_score
+
+
+def test_role_keyword_override_boosts_test_files(tmp_path: Path) -> None:
+    """When task mentions 'test', test files should get a boost, not a penalty."""
+    _write(tmp_path / "src" / "auth.py", "def login(token):\n    return True\n")
+    _write(tmp_path / "tests" / "test_auth.py", "def test_login():\n    assert login('x')\n")
+
+    records = scan_repository(tmp_path)
+    ranked = score_files("fix test for login", records)
+    by_path = {item.file.path: item for item in ranked}
+
+    assert "tests/test_auth.py" in by_path
+    reasons = by_path["tests/test_auth.py"].reasons
+    assert any("role=test" in r and "x1.2" in r for r in reasons)

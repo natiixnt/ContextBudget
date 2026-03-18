@@ -96,6 +96,24 @@ class ScoreSettings:
             "dockerfile": 0.2,
         }
     )
+    role_multipliers: dict[str, float] = field(
+        default_factory=lambda: {
+            "prod": 1.0,
+            "test": 0.6,
+            "docs": 0.4,
+            "example": 0.3,
+            "config": 0.7,
+            "generated": 0.1,
+        }
+    )
+    role_keyword_overrides: dict[str, list[str]] = field(
+        default_factory=lambda: {
+            "test": ["test", "spec", "fixture", "mock"],
+            "docs": ["doc", "documentation", "readme", "guide"],
+            "example": ["example", "demo", "sample", "tutorial"],
+        }
+    )
+    role_keyword_override_multiplier: float = 1.2
 
 
 @dataclass(slots=True)
