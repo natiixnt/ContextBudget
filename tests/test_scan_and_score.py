@@ -266,6 +266,19 @@ def test_file_role_classification_basic() -> None:
     assert classify_file_role("src/proto/message_pb2.py") == "generated"
 
 
+def test_file_role_does_not_match_substrings() -> None:
+    """Words like 'contest' or 'attest' must not be classified as test files."""
+    from redcon.scorers.file_roles import classify_file_role
+
+    assert classify_file_role("src/contest/rules.py") == "prod"
+    assert classify_file_role("src/attest/verify.py") == "prod"
+    assert classify_file_role("src/latest/handler.py") == "prod"
+    # But prefixed/suffixed forms should still match.
+    assert classify_file_role("src/test_utils/helpers.py") == "test"
+    assert classify_file_role("src/auth_test.py") == "test"
+    assert classify_file_role("src\\tests\\test_auth.py") == "test"  # Windows paths
+
+
 def test_role_multipliers_lower_docs_and_examples(tmp_path: Path) -> None:
     """Docs and examples should score lower than equivalent prod files."""
     _write(tmp_path / "src" / "auth.py", "def login(token):\n    return token.startswith('prod_')\n")

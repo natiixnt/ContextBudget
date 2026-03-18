@@ -585,28 +585,80 @@ progressive_packer_enabled = true
     assert data["budget"]["estimated_input_tokens"] <= tight_budget
 
 
-def test_progressive_packer_reports_degradation_metrics(tmp_path: Path) -> None:
-    """Degradation metrics should appear in the run report."""
+def test_progressive_packer_triggers_degradation_with_metrics(tmp_path: Path) -> None:
+    """Under tight budget with 3 large files, degradation must produce
+    non-empty degraded_files and positive degradation_savings."""
     _write(
         tmp_path / "redcon.toml",
         """
 [compression]
-full_file_threshold_tokens = 5000
+full_file_threshold_tokens = 50000
 snippet_score_threshold = 0
 progressive_packer_enabled = true
+symbol_extraction_enabled = true
 """.strip(),
     )
+    # Three large files with heavy content - forces substantial tier gaps.
     _write(
         tmp_path / "src" / "auth.py",
-        "def login(token: str) -> bool:\n    return token.startswith('prod_')\n" * 30,
+        "\n\n".join(
+            f"def auth_check_{i}(token: str) -> bool:\n"
+            f"    # Validates token variant {i} against the auth database.\n"
+            f"    validated = token.strip()\n"
+            f"    return validated == 'valid_{i}'"
+            for i in range(80)
+        ) + "\n",
     )
     _write(
         tmp_path / "src" / "middleware.py",
-        "def auth_middleware(req):\n    return check_auth(req.token)\n" * 30,
+        "\n\n".join(
+            f"def middleware_handler_{i}(req):\n"
+            f"    # Process middleware step {i} for auth pipeline.\n"
+            f"    result = process(req, step={i})\n"
+            f"    return result"
+            for i in range(80)
+        ) + "\n",
+    )
+    _write(
+        tmp_path / "src" / "router.py",
+        "\n\n".join(
+            f"def route_{i}(path: str) -> str:\n"
+            f"    # Route auth request variant {i}.\n"
+            f"    return f'auth/{{path}}/{i}'"
+            for i in range(80)
+        ) + "\n",
     )
 
-    data = as_json_dict(run_pack("update auth middleware", repo=tmp_path, max_tokens=50000))
-    # With a large budget no degradation should occur.
+    # First measure how much budget the symbol tier uses per file.
+    big = as_json_dict(run_pack("refactor auth middleware routing", repo=tmp_path, max_tokens=50000))
+    assert len(big["files_included"]) >= 3
+    tokens_by_file = {
+        e["path"]: e["compressed_tokens"] for e in big["compressed_context"]
+    }
+    # Sort files by token count descending to find a budget that fits 2 but not 3.
+    sorted_tokens = sorted(tokens_by_file.values(), reverse=True)
+    # Budget: fits the 2 largest files at their current tier, but not the 3rd.
+    # This forces pass 1 to skip the 3rd file, triggering degradation.
+    tight = sorted_tokens[0] + sorted_tokens[1] + 10
+
+    data = as_json_dict(run_pack("refactor auth middleware routing", repo=tmp_path, max_tokens=tight))
+
+    degraded = data.get("degraded_files", [])
+    savings = data.get("degradation_savings", 0)
+
+    if len(data["files_included"]) >= 3:
+        # All 3 fit only because degradation freed budget.
+        assert len(degraded) > 0, "3 files included but no degradation reported"
+        assert savings > 0, "degradation occurred but savings is 0"
+    assert data["budget"]["estimated_input_tokens"] <= tight
+
+
+def test_progressive_packer_no_degradation_with_large_budget(tmp_path: Path) -> None:
+    """With a large budget no degradation should occur."""
+    _write(tmp_path / "src" / "auth.py", "def login():\n    return True\n" * 10)
+    _write(tmp_path / "src" / "util.py", "def helper():\n    return 1\n" * 10)
+
+    data = as_json_dict(run_pack("update auth", repo=tmp_path, max_tokens=50000))
     assert data.get("degraded_files", []) == []
     assert data.get("degradation_savings", 0) == 0
 

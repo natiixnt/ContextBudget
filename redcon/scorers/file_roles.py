@@ -22,6 +22,28 @@ _CONFIG_EXTENSIONS = frozenset((".toml", ".yaml", ".yml", ".json", ".cfg", ".ini
 _CONFIG_DIRS = frozenset(("config", "configs", "conf", ".github", ".circleci"))
 
 
+def _part_matches(part: str, marker: str) -> bool:
+    """Check if a path segment matches a marker as a word boundary.
+
+    Matches: "test", "test_auth", "auth_test", "test_auth_service"
+    Does NOT match: "contest", "attest", "detesting"
+    """
+    if part == marker:
+        return True
+    # Prefix: test_foo, test-foo
+    if part.startswith(f"{marker}_") or part.startswith(f"{marker}-"):
+        return True
+    # Suffix: foo_test, foo-test, foo_test.py (after splitext)
+    if part.endswith(f"_{marker}") or part.endswith(f"-{marker}"):
+        return True
+    # Infix with separators: foo_test_bar
+    if f"_{marker}_" in part or f"-{marker}-" in part:
+        return True
+    if f"_{marker}-" in part or f"-{marker}_" in part:
+        return True
+    return False
+
+
 def classify_file_role(path: str) -> str:
     """Return the role of a file based on path heuristics."""
     parts = path.lower().replace("\\", "/").split("/")
@@ -32,16 +54,18 @@ def classify_file_role(path: str) -> str:
         if any(marker in part for part in parts):
             return "generated"
 
-    # Test files.
+    # Test files - use word-boundary matching to avoid "contest", "attest".
+    # Also check the filename stem (without extension) for suffix patterns.
+    stem = os.path.splitext(parts[-1])[0] if parts else ""
     for marker in _TEST_MARKERS:
-        if any(part == marker or part.startswith(f"{marker}_") or part.endswith(f"_{marker}") for part in parts):
+        if any(_part_matches(part, marker) for part in parts):
             return "test"
-        if any(marker in part for part in parts):
+        if stem and _part_matches(stem, marker):
             return "test"
 
     # Example/demo code.
     for marker in _EXAMPLE_MARKERS:
-        if any(part == marker or marker in part for part in parts):
+        if any(part == marker or _part_matches(part, marker) for part in parts):
             return "example"
 
     # Documentation.

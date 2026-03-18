@@ -387,6 +387,18 @@ def _apply_score_overrides(settings: ScoreSettings, data: Mapping[str, Any]) -> 
         merged = dict(settings.signal_files)
         merged.update(_to_float_map(data["signal_files"]))
         settings.signal_files = merged
+    if "role_multipliers" in data:
+        merged_roles = dict(settings.role_multipliers)
+        merged_roles.update(_to_float_map(data["role_multipliers"]))
+        settings.role_multipliers = merged_roles
+    if "role_keyword_overrides" in data:
+        raw = data["role_keyword_overrides"]
+        if isinstance(raw, dict):
+            settings.role_keyword_overrides = {
+                str(k): [str(v) for v in _to_list(vals)] for k, vals in raw.items()
+            }
+    if "role_keyword_override_multiplier" in data:
+        settings.role_keyword_override_multiplier = float(data["role_keyword_override_multiplier"])
 
 
 def _apply_compression_overrides(settings: CompressionSettings, data: Mapping[str, Any]) -> None:
@@ -406,6 +418,14 @@ def _apply_compression_overrides(settings: CompressionSettings, data: Mapping[st
         settings.snippet_fallback_lines = int(data["snippet_fallback_lines"])
     if "summary_preview_lines" in data:
         settings.summary_preview_lines = int(data["summary_preview_lines"])
+    if "adaptive_line_budget" in data:
+        settings.adaptive_line_budget = bool(data["adaptive_line_budget"])
+    if "adaptive_line_budget_max_factor" in data:
+        settings.adaptive_line_budget_max_factor = float(data["adaptive_line_budget_max_factor"])
+    if "progressive_packer_enabled" in data:
+        settings.progressive_packer_enabled = bool(data["progressive_packer_enabled"])
+    if "max_degradation_rounds" in data:
+        settings.max_degradation_rounds = int(data["max_degradation_rounds"])
     if "risk_skip_weight" in data:
         settings.risk_skip_weight = float(data["risk_skip_weight"])
     if "risk_compression_weight" in data:

@@ -18,15 +18,6 @@ def _path_tokens(path_lower: str) -> frozenset[str]:
     """Extract word tokens from a file path (split on separators, min 4 chars)."""
     return frozenset(t for t in _PATH_SEG_RE.findall(path_lower) if len(t) >= 4)
 
-_SIGNAL_FILES = {
-    "readme.md": 0.5,
-    "contributing.md": 0.4,
-    "package.json": 0.3,
-    "pyproject.toml": 0.3,
-    "requirements.txt": 0.3,
-    "dockerfile": 0.2,
-}
-
 
 def _add_reason(reasons: list[str], reason: str) -> None:
     if reason not in reasons:
@@ -89,7 +80,7 @@ def score_files(
                 _add_reason(reasons, f"defines symbol matching '{keyword}'")
 
         name = record.path.rsplit("/", 1)[-1].lower()
-        signals = cfg.signal_files if cfg.signal_files else _SIGNAL_FILES
+        signals = cfg.signal_files
         if name in signals:
             score += signals[name]
             _add_reason(reasons, f"signal file {name}")
