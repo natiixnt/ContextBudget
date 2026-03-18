@@ -23,8 +23,15 @@ htmlcov/
 # Redcon artifacts
 .redcon/
 .redcon_cache.json
+.redcon_cache.db
 run.json
 run.md
+redcon-*.json
+redcon-*.md
+rb*-profile.*
+
+# VSCode extension dev
+vscode-redcon/
 
 # Node/Dashboard
 node_modules/
