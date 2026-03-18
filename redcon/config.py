@@ -759,6 +759,8 @@ def load_workspace(workspace_path: Path, config_path: Path | None = None) -> Wor
             raise ValueError(f"Workspace repo entry #{index} is missing 'path'.")
 
         repo_path = (root / str(raw_path)).resolve()
+        if not str(repo_path).startswith(str(root.resolve())):
+            raise ValueError(f"Workspace repo path escapes root directory: {raw_path}")
         if not repo_path.exists() or not repo_path.is_dir():
             raise ValueError(f"Workspace repo path does not exist: {repo_path}")
 
