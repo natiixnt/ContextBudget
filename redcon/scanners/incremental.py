@@ -107,8 +107,7 @@ def _count_lines(text: str) -> int:
 
 
 def _matches_glob(path: str, pattern: str) -> bool:
-    candidate = PurePosixPath(path)
-    return candidate.match(pattern) or fnmatch.fnmatch(path, pattern)
+    return fnmatch.fnmatch(path, pattern) or PurePosixPath(path).match(pattern)
 
 
 def _scoped_path(relative_path: str, repo_label: str | None = None) -> str:
