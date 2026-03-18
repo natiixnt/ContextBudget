@@ -22,6 +22,9 @@ updates:
       - "dependencies"
     commit-message:
       prefix: "chore(deps):"
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       all-npm:
         patterns: ["*"]
