@@ -1,0 +1,811 @@
+/**
+ * Chat-style WebviewView - single conversational UI replacing the 4 sidebar panels.
+ * Messages flow as a conversation: user types task -> system shows analyzing -> results appear as rich cards.
+ */
+
+import * as vscode from 'vscode';
+import { state } from '../state';
+import { getNonce, getSharedStyles, escapeHtml, formatTokens } from './theme';
+import type {
+  RunReport,
+  DoctorReport,
+  BenchmarkReport,
+  SimulationReport,
+  DriftReport,
+  AgentPlanReport,
+  CompressedFileJson,
+} from '../types';
+
+/* ------------------------------------------------------------------ */
+/*  Message types                                                      */
+/* ------------------------------------------------------------------ */
+
+interface ChatMessage {
+  id: string;
+  role: 'user' | 'system' | 'result';
+  type: string;
+  html: string;
+  timestamp: number;
+}
+
+let msgCounter = 0;
+function nextId(): string {
+  return `msg-${Date.now()}-${++msgCounter}`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Strategy helpers                                                   */
+/* ------------------------------------------------------------------ */
+
+function pillClass(s: string): string {
+  if (s === 'full') return 'pill-full';
+  if (s === 'snippet') return 'pill-snippet';
+  if (s === 'symbol_extraction') return 'pill-symbol';
+  if (s === 'summary') return 'pill-summary';
+  if (s === 'cache_reuse') return 'pill-cache';
+  return 'pill-slicing';
+}
+
+function riskBadge(risk: string): string {
+  if (risk === 'low') return '<span class="badge badge-success">low risk</span>';
+  if (risk === 'medium') return '<span class="badge badge-warning">medium risk</span>';
+  return '<span class="badge badge-error">high risk</span>';
+}
+
+/* ------------------------------------------------------------------ */
+/*  Card renderers                                                     */
+/* ------------------------------------------------------------------ */
+
+function renderWelcome(): string {
+  return `
+    <div class="welcome animate-in">
+      <div class="welcome-icon">&#9889;</div>
+      <div class="welcome-title">Redcon</div>
+      <div class="welcome-sub">Context budgeting for AI coding agents</div>
+      <div class="welcome-hint">Type a task below to analyze and pack your repository context.</div>
+      <div class="welcome-actions">
+        <button class="btn btn-sm" onclick="send('doctor')">Run Doctor</button>
+        <button class="btn btn-sm" onclick="send('config')">Open Config</button>
+      </div>
+    </div>`;
+}
+
+function renderTutorial(): string {
+  return `
+    <div class="result-card animate-in">
+      <div class="result-section-title">Quick Start Guide</div>
+      <div class="tutorial-steps">
+        <div class="tutorial-step">
+          <span class="tutorial-num">1</span>
+          <div class="tutorial-body">
+            <div class="tutorial-step-title">Initialize config</div>
+            <div class="card-sub">Run <strong>Redcon: Initialize Config</strong> from the Command Palette or click <em>Open Config</em> to create a <code>redcon.toml</code> in your project root.</div>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <span class="tutorial-num">2</span>
+          <div class="tutorial-body">
+            <div class="tutorial-step-title">Describe your task</div>
+            <div class="card-sub">Type a task description in the input bar below (e.g. "add user authentication") and click <strong>Pack</strong>. Redcon will rank and compress the most relevant files.</div>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <span class="tutorial-num">3</span>
+          <div class="tutorial-body">
+            <div class="tutorial-step-title">Review results</div>
+            <div class="card-sub">See which files were included, compression strategies used, token budget consumed, and quality risk. Click <strong>Copy Context</strong> to paste into your AI agent.</div>
+          </div>
+        </div>
+        <div class="tutorial-step">
+          <span class="tutorial-num">4</span>
+          <div class="tutorial-body">
+            <div class="tutorial-step-title">Explore more</div>
+            <div class="card-sub">Use <strong>Dashboard</strong> for detailed analytics, <strong>Benchmark</strong> to compare strategies, <strong>Simulate</strong> to estimate costs, and <strong>Drift</strong> to track token growth over time.</div>
+          </div>
+        </div>
+      </div>
+    </div>`;
+}
+
+function renderUserTask(task: string): string {
+  return `<div class="msg-user-bubble">${escapeHtml(task)}</div>`;
+}
+
+function renderAnalyzing(label: string): string {
+  return `
+    <div class="msg-system analyzing">
+      <span class="dot-pulse"></span>
+      <span>${escapeHtml(label)}</span>
+    </div>`;
+}
+
+function renderPackResult(run: RunReport): string {
+  const b = run.budget;
+  const used = b.estimated_input_tokens;
+  const max = run.max_tokens;
+  const saved = b.estimated_saved_tokens;
+  const pct = max > 0 ? Math.round((used / max) * 100) : 0;
+  const totalRaw = used + saved;
+  const comprPct = totalRaw > 0 ? Math.round((saved / totalRaw) * 100) : 0;
+
+  // Gauge
+  const r = 40;
+  const circ = 2 * Math.PI * r;
+  const offset = circ - (circ * Math.min(pct, 100)) / 100;
+  const gaugeColor = pct > 90 ? 'var(--error)' : pct > 70 ? 'var(--warning)' : 'var(--success)';
+
+  // Strategy counts
+  const stratCounts: Record<string, number> = {};
+  for (const f of run.compressed_context ?? []) {
+    stratCounts[f.strategy] = (stratCounts[f.strategy] ?? 0) + 1;
+  }
+
+  const stratPills = Object.entries(stratCounts)
+    .sort((a, b) => b[1] - a[1])
+    .map(([s, c]) => `<span class="pill ${pillClass(s)}">${s.replace('_', ' ')} ${c}</span>`)
+    .join(' ');
+
+  // Top files (max 8)
+  const topFiles = (run.compressed_context ?? []).slice(0, 8);
+  const totalCompressed = run.compressed_context?.length ?? 0;
+
+  const fileRows = topFiles.map((f: CompressedFileJson) => {
+    const savedPct = f.original_tokens > 0
+      ? Math.round(((f.original_tokens - f.compressed_tokens) / f.original_tokens) * 100)
+      : 0;
+    const name = f.path.split('/').pop() ?? f.path;
+    const dir = f.path.split('/').slice(0, -1).join('/');
+    return `
+      <div class="file-item" onclick="action('openFile','${escapeHtml(f.path)}')">
+        <div class="file-item-body">
+          <div class="file-item-name">${escapeHtml(name)}</div>
+          <div class="file-item-meta">
+            <span>${escapeHtml(dir)}</span>
+            <span class="pill ${pillClass(f.strategy)}" style="padding:1px 5px;font-size:9px;">${f.strategy.replace('_', ' ')}</span>
+          </div>
+        </div>
+        <div class="file-item-right">
+          <div style="font-size:11px;font-weight:600;">${formatTokens(f.compressed_tokens)}</div>
+          ${savedPct > 0 ? `<div style="font-size:9px;color:var(--success);">-${savedPct}%</div>` : ''}
+        </div>
+      </div>`;
+  }).join('');
+
+  const moreFiles = totalCompressed > 8
+    ? `<div class="more-link" onclick="action('dashboard')">${totalCompressed - 8} more files - open dashboard</div>`
+    : '';
+
+  return `
+    <div class="result-card animate-in">
+      <!-- Header with gauge -->
+      <div class="result-header">
+        <div class="gauge-ring" style="width:90px;height:90px;">
+          <svg width="90" height="90" viewBox="0 0 90 90">
+            <circle class="gauge-ring-bg" cx="45" cy="45" r="${r}" stroke-width="6"/>
+            <circle class="gauge-ring-fill" cx="45" cy="45" r="${r}" stroke-width="6"
+              stroke="${gaugeColor}"
+              stroke-dasharray="${circ}"
+              stroke-dashoffset="${offset}"/>
+          </svg>
+          <div class="gauge-ring-center">
+            <div class="gauge-ring-value" style="color:${gaugeColor};font-size:16px;">${pct}%</div>
+            <div class="gauge-ring-label">used</div>
+          </div>
+        </div>
+        <div class="result-kpis">
+          <div class="kpi"><span class="kpi-val">${formatTokens(used)}<span class="kpi-dim">/${formatTokens(max)}</span></span><span class="kpi-label">tokens</span></div>
+          <div class="kpi"><span class="kpi-val" style="color:var(--success);">${formatTokens(saved)}</span><span class="kpi-label">${comprPct}% saved</span></div>
+          <div class="kpi"><span class="kpi-val">${run.files_included.length}</span><span class="kpi-label">files (${run.files_skipped.length} skipped)</span></div>
+          <div class="kpi">${riskBadge(b.quality_risk_estimate)}</div>
+        </div>
+      </div>
+
+      <!-- Strategies -->
+      <div class="result-strats">${stratPills}</div>
+
+      <!-- File list -->
+      <div class="result-files">${fileRows}${moreFiles}</div>
+
+      <!-- Actions -->
+      <div class="actions-row">
+        <button class="btn btn-sm" onclick="action('copy')">Copy Context</button>
+        <button class="btn btn-sm" onclick="action('export')">Export</button>
+        <button class="btn btn-sm btn-primary" onclick="action('dashboard')">Dashboard</button>
+      </div>
+    </div>`;
+}
+
+function renderDoctorResult(doc: DoctorReport): string {
+  const checks = doc.checks.map((c) => {
+    const icon = c.status === 'ok' ? '&#10003;' : c.status === 'warn' ? '&#9888;' : '&#10007;';
+    const cls = c.status === 'ok' ? 'check-ok' : c.status === 'warn' ? 'check-warn' : 'check-fail';
+    return `<div class="check-item ${cls}"><span class="check-icon">${icon}</span><span>${escapeHtml(c.name)}: ${escapeHtml(c.message)}</span></div>`;
+  }).join('');
+
+  const statusLine = doc.failures > 0
+    ? `<span class="badge badge-error">${doc.failures} failed</span>`
+    : doc.warnings > 0
+      ? `<span class="badge badge-warning">${doc.warnings} warnings</span>`
+      : '<span class="badge badge-success">all passed</span>';
+
+  return `
+    <div class="result-card animate-in">
+      <div class="result-section-title">Doctor ${statusLine}</div>
+      <div class="card-sub" style="margin-bottom:8px;">v${escapeHtml(doc.redcon_version)} - Python ${escapeHtml(doc.python_version)} - ${escapeHtml(doc.platform)}</div>
+      <div class="check-list">${checks}</div>
+    </div>`;
+}
+
+function renderBenchmarkResult(bench: BenchmarkReport): string {
+  const rows = bench.strategies.map((s) => `
+    <tr>
+      <td><span class="pill ${pillClass(s.strategy)}" style="padding:1px 5px;font-size:9px;">${s.strategy}</span></td>
+      <td>${formatTokens(s.estimated_input_tokens)}</td>
+      <td style="color:var(--success);">${formatTokens(s.estimated_saved_tokens)}</td>
+      <td>${s.files_included.length}</td>
+      <td>${riskBadge(s.quality_risk_estimate)}</td>
+    </tr>`).join('');
+
+  return `
+    <div class="result-card animate-in">
+      <div class="result-section-title">Benchmark</div>
+      <table class="mini-table">
+        <thead><tr><th>Strategy</th><th>Tokens</th><th>Saved</th><th>Files</th><th>Risk</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderSimulateResult(sim: SimulationReport): string {
+  const steps = sim.steps.map((s, i) => {
+    const cost = sim.cost_estimate.steps_cost[i];
+    return `<div class="sim-step">
+      <span class="sim-step-name">${escapeHtml(s.title)}</span>
+      <span>${formatTokens(s.context_tokens)} tok</span>
+      <span style="color:var(--success);">$${cost?.total_cost_usd?.toFixed(4) ?? '?'}</span>
+    </div>`;
+  }).join('');
+
+  return `
+    <div class="result-card animate-in">
+      <div class="result-section-title">Cost Simulation - ${escapeHtml(sim.model)}</div>
+      <div class="grid grid-3" style="margin-bottom:8px;">
+        <div class="card" style="text-align:center;padding:8px;">
+          <div class="card-title">Total</div>
+          <div style="font-size:16px;font-weight:700;color:var(--success);">$${sim.cost_estimate.total_cost_usd.toFixed(4)}</div>
+        </div>
+        <div class="card" style="text-align:center;padding:8px;">
+          <div class="card-title">Input</div>
+          <div style="font-size:12px;">$${sim.cost_estimate.total_input_cost_usd.toFixed(4)}</div>
+        </div>
+        <div class="card" style="text-align:center;padding:8px;">
+          <div class="card-title">Output</div>
+          <div style="font-size:12px;">$${sim.cost_estimate.total_output_cost_usd.toFixed(4)}</div>
+        </div>
+      </div>
+      <div class="sim-steps">${steps}</div>
+    </div>`;
+}
+
+function renderDriftResult(drift: DriftReport): string {
+  const cls = drift.drift_detected ? 'badge-warning' : 'badge-success';
+  const icon = drift.drift_detected ? '&#9888;' : '&#10003;';
+  return `
+    <div class="result-card animate-in">
+      <div class="result-section-title">${icon} Drift Check</div>
+      <span class="badge ${cls}">${drift.drift_detected ? `${drift.drift_pct.toFixed(1)}% growth` : 'no drift'}</span>
+      <div class="card-sub" style="margin-top:6px;">${escapeHtml(drift.message)}</div>
+      ${drift.drift_detected ? `<div class="card-sub">Trend: ${escapeHtml(drift.trend)} | Mean: ${formatTokens(drift.mean_tokens)} | Latest: ${formatTokens(drift.latest_tokens)}</div>` : ''}
+    </div>`;
+}
+
+function renderPlanAgentResult(plan: AgentPlanReport): string {
+  const steps = plan.steps.map((s) => `
+    <div class="plan-step card" style="padding:8px;margin-bottom:4px;">
+      <div style="font-weight:600;font-size:11px;">${escapeHtml(s.id)}. ${escapeHtml(s.title)}</div>
+      <div class="card-sub">${escapeHtml(s.objective)}</div>
+      <div class="file-item-meta" style="margin-top:4px;">
+        <span>${formatTokens(s.estimated_tokens)} tok</span>
+        <span>${s.context.length} files</span>
+      </div>
+    </div>`).join('');
+
+  return `
+    <div class="result-card animate-in">
+      <div class="result-section-title">Agent Workflow - ${plan.steps.length} steps</div>
+      <div class="grid grid-2" style="margin-bottom:8px;">
+        <div class="card" style="text-align:center;padding:8px;">
+          <div class="card-title">Total</div>
+          <div style="font-size:14px;font-weight:700;">${formatTokens(plan.total_estimated_tokens)}</div>
+        </div>
+        <div class="card" style="text-align:center;padding:8px;">
+          <div class="card-title">Reused</div>
+          <div style="font-size:14px;font-weight:700;color:var(--success);">${formatTokens(plan.reused_context_tokens)}</div>
+        </div>
+      </div>
+      ${steps}
+    </div>`;
+}
+
+function renderError(message: string): string {
+  return `<div class="msg-error animate-in"><span>&#10007;</span> ${escapeHtml(message)}</div>`;
+}
+
+function renderInfo(message: string): string {
+  return `<div class="msg-info animate-in">${escapeHtml(message)}</div>`;
+}
+
+/* ------------------------------------------------------------------ */
+/*  ChatViewProvider                                                   */
+/* ------------------------------------------------------------------ */
+
+export class ChatViewProvider implements vscode.WebviewViewProvider {
+  static readonly viewType = 'redcon.chat';
+
+  private view?: vscode.WebviewView;
+  private messages: ChatMessage[] = [];
+
+  constructor(private readonly extensionUri: vscode.Uri) {}
+
+  resolveWebviewView(webviewView: vscode.WebviewView): void {
+    this.view = webviewView;
+    webviewView.webview.options = {
+      enableScripts: true,
+      localResourceRoots: [this.extensionUri],
+    };
+
+    webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
+    this.renderShell();
+
+    // Show welcome
+    if (this.messages.length === 0) {
+      this.addMessage('system', 'welcome', renderWelcome());
+    }
+
+    // Restore previous messages
+    this.view.webview.postMessage({ command: 'setMessages', messages: this.messages });
+  }
+
+  /* -- Public API for commands.ts -- */
+
+  addUserMessage(task: string): void {
+    this.addMessage('user', 'task', renderUserTask(task));
+  }
+
+  addAnalyzing(label: string): string {
+    const id = this.addMessage('system', 'analyzing', renderAnalyzing(label));
+    return id;
+  }
+
+  replaceWithPackResult(analyzingId: string, run: RunReport): void {
+    this.replaceMessage(analyzingId, 'result', 'pack-result', renderPackResult(run));
+  }
+
+  replaceWithDoctorResult(analyzingId: string, doc: DoctorReport): void {
+    this.replaceMessage(analyzingId, 'result', 'doctor-result', renderDoctorResult(doc));
+  }
+
+  replaceWithBenchmarkResult(analyzingId: string, bench: BenchmarkReport): void {
+    this.replaceMessage(analyzingId, 'result', 'benchmark-result', renderBenchmarkResult(bench));
+  }
+
+  replaceWithSimulateResult(analyzingId: string, sim: SimulationReport): void {
+    this.replaceMessage(analyzingId, 'result', 'simulate-result', renderSimulateResult(sim));
+  }
+
+  replaceWithDriftResult(analyzingId: string, drift: DriftReport): void {
+    this.replaceMessage(analyzingId, 'result', 'drift-result', renderDriftResult(drift));
+  }
+
+  replaceWithPlanAgentResult(analyzingId: string, plan: AgentPlanReport): void {
+    this.replaceMessage(analyzingId, 'result', 'plan-agent-result', renderPlanAgentResult(plan));
+  }
+
+  replaceWithError(analyzingId: string, err: unknown): void {
+    const msg = err instanceof Error ? err.message : String(err);
+    this.replaceMessage(analyzingId, 'result', 'error', renderError(msg));
+  }
+
+  addInfo(message: string): void {
+    this.addMessage('system', 'info', renderInfo(message));
+  }
+
+  refresh(): void {
+    // Re-render the shell if the view is available
+    if (this.view) {
+      this.renderShell();
+      this.view.webview.postMessage({ command: 'setMessages', messages: this.messages });
+    }
+  }
+
+  /* -- Internal -- */
+
+  private addMessage(role: ChatMessage['role'], type: string, html: string): string {
+    const id = nextId();
+    const msg: ChatMessage = { id, role, type, html, timestamp: Date.now() };
+    this.messages.push(msg);
+    this.view?.webview.postMessage({ command: 'addMessage', message: msg });
+    return id;
+  }
+
+  private replaceMessage(id: string, role: ChatMessage['role'], type: string, html: string): void {
+    const idx = this.messages.findIndex((m) => m.id === id);
+    if (idx >= 0) {
+      this.messages[idx] = { ...this.messages[idx], role, type, html };
+    }
+    this.view?.webview.postMessage({ command: 'updateMessage', id, html });
+  }
+
+  private handleMessage(msg: { command: string; text?: string; action?: string; data?: string }): void {
+    switch (msg.command) {
+      case 'submit':
+        if (msg.text?.trim()) {
+          vscode.commands.executeCommand('redcon.pack', msg.text.trim());
+        }
+        break;
+      case 'action':
+        this.handleAction(msg.action ?? '', msg.data);
+        break;
+      case 'send':
+        // Quick actions from welcome screen
+        if (msg.text === 'doctor') {
+          vscode.commands.executeCommand('redcon.doctor');
+        } else if (msg.text === 'config') {
+          vscode.commands.executeCommand('redcon.openConfig');
+        } else if (msg.text === 'help') {
+          this.addMessage('result', 'tutorial', renderTutorial());
+        }
+        break;
+    }
+  }
+
+  private handleAction(action: string, data?: string): void {
+    switch (action) {
+      case 'copy':
+        vscode.commands.executeCommand('redcon.copyContext');
+        break;
+      case 'export':
+        vscode.commands.executeCommand('redcon.export');
+        break;
+      case 'dashboard':
+        vscode.commands.executeCommand('redcon.openDashboard');
+        break;
+      case 'openFile':
+        if (data) {
+          const folders = vscode.workspace.workspaceFolders;
+          if (folders?.length) {
+            const uri = vscode.Uri.joinPath(folders[0].uri, data);
+            vscode.window.showTextDocument(uri);
+          }
+        }
+        break;
+    }
+  }
+
+  private renderShell(): void {
+    if (!this.view) return;
+    const nonce = getNonce();
+
+    const chatStyles = `
+      body { padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
+
+      /* Messages area */
+      #messages { flex: 1; overflow-y: auto; padding: 8px; position: relative; }
+
+      /* Welcome */
+      .welcome {
+        text-align: center;
+        padding: 24px 12px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        min-height: 100%;
+      }
+      .welcome-icon { font-size: 32px; margin-bottom: 8px; color: var(--accent); filter: drop-shadow(0 0 8px rgba(229, 57, 53, 0.4)); }
+      .welcome-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--fg); }
+      .welcome-sub { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
+      .welcome-hint { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
+      .welcome-actions { display: flex; gap: 6px; justify-content: center; }
+
+      /* User message */
+      .msg-user { display: flex; justify-content: flex-end; margin-bottom: 8px; }
+      .msg-user-bubble {
+        background: var(--accent-dim);
+        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+        border-radius: var(--radius) var(--radius) 4px var(--radius);
+        padding: 8px 12px;
+        font-size: 12px;
+        max-width: 85%;
+        word-break: break-word;
+      }
+
+      /* System messages */
+      .msg-system {
+        display: flex; align-items: center; gap: 8px;
+        color: var(--muted); font-size: 11px;
+        padding: 6px 0; margin-bottom: 4px;
+      }
+      .analyzing { animation: pulse 1.5s infinite; }
+
+      /* Dot pulse animation */
+      .dot-pulse {
+        display: inline-flex; gap: 3px;
+      }
+      .dot-pulse::before, .dot-pulse::after, .dot-pulse {
+        position: relative;
+      }
+      @keyframes dotPulse {
+        0%, 80%, 100% { opacity: 0.3; }
+        40% { opacity: 1; }
+      }
+      .dot-pulse::before {
+        content: '';
+        width: 5px; height: 5px;
+        border-radius: 50%;
+        background: var(--accent);
+        animation: dotPulse 1.4s ease-in-out infinite;
+      }
+
+      /* Result cards */
+      .result-card {
+        background: var(--card);
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius);
+        padding: 12px;
+        margin-bottom: 8px;
+        backdrop-filter: blur(10px);
+      }
+      .result-header {
+        display: flex; align-items: center; gap: 12px;
+        margin-bottom: 10px;
+      }
+      .result-kpis { flex: 1; }
+      .kpi { display: flex; flex-direction: column; margin-bottom: 4px; }
+      .kpi-val { font-size: 13px; font-weight: 600; }
+      .kpi-dim { font-size: 11px; font-weight: 400; color: var(--muted); }
+      .kpi-label { font-size: 10px; color: var(--muted); }
+
+      .result-strats { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+
+      .result-files { margin-bottom: 8px; }
+
+      .result-section-title {
+        font-size: 12px; font-weight: 600;
+        margin-bottom: 8px;
+        display: flex; align-items: center; gap: 6px;
+      }
+
+      .more-link {
+        text-align: center; font-size: 10px; color: var(--accent);
+        cursor: pointer; padding: 4px; margin-top: 4px;
+      }
+      .more-link:hover { text-decoration: underline; }
+
+      /* Actions */
+      .actions-row { display: flex; flex-wrap: wrap; gap: 4px; }
+
+      /* Error / Info */
+      .msg-error {
+        background: var(--error-dim); border: 1px solid color-mix(in srgb, var(--error) 30%, transparent);
+        border-radius: var(--radius); padding: 8px 12px; font-size: 11px; color: var(--error);
+        margin-bottom: 8px;
+      }
+      .msg-info {
+        color: var(--muted); font-size: 11px;
+        padding: 4px 0; margin-bottom: 4px;
+      }
+
+      /* Doctor checks */
+      .check-list { display: flex; flex-direction: column; gap: 4px; }
+      .check-item {
+        display: flex; align-items: flex-start; gap: 6px;
+        font-size: 11px; padding: 4px 0;
+      }
+      .check-icon { flex-shrink: 0; }
+      .check-ok .check-icon { color: var(--success); }
+      .check-warn .check-icon { color: var(--warning); }
+      .check-fail .check-icon { color: var(--error); }
+
+      /* Benchmark table */
+      .mini-table {
+        width: 100%; border-collapse: collapse; font-size: 10px;
+      }
+      .mini-table th {
+        text-align: left; padding: 4px 6px;
+        border-bottom: 1px solid var(--card-border);
+        color: var(--muted); font-weight: 600;
+      }
+      .mini-table td { padding: 4px 6px; }
+      .mini-table tr:hover td { background: var(--card-hover); }
+
+      /* Simulate steps */
+      .sim-steps { display: flex; flex-direction: column; gap: 4px; }
+      .sim-step {
+        display: flex; align-items: center; gap: 8px;
+        font-size: 11px; padding: 4px 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--card-border) 50%, transparent);
+      }
+      .sim-step-name { flex: 1; }
+
+      /* Help button */
+      #help-btn {
+        position: absolute;
+        top: 8px;
+        right: 8px;
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
+        border: 1.5px solid var(--accent);
+        background: transparent;
+        color: var(--accent);
+        font-size: 14px;
+        font-weight: 700;
+        cursor: pointer;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        transition: all var(--transition);
+        font-family: inherit;
+        z-index: 10;
+        line-height: 1;
+      }
+      #help-btn:hover {
+        background: var(--accent);
+        color: #fff;
+        box-shadow: 0 0 10px rgba(229, 57, 53, 0.4);
+      }
+
+      /* Tutorial */
+      .tutorial-steps { display: flex; flex-direction: column; gap: 10px; }
+      .tutorial-step {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid color-mix(in srgb, var(--card-border) 50%, transparent);
+      }
+      .tutorial-step:last-child { border-bottom: none; }
+      .tutorial-num {
+        width: 24px; height: 24px;
+        border-radius: 50%;
+        background: var(--accent);
+        color: #fff;
+        font-size: 12px; font-weight: 700;
+        display: flex; align-items: center; justify-content: center;
+        flex-shrink: 0;
+      }
+      .tutorial-body { flex: 1; }
+      .tutorial-step-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+      .tutorial-step code {
+        background: var(--input);
+        padding: 1px 4px;
+        border-radius: 3px;
+        font-size: 10px;
+      }
+
+      /* Input bar */
+      #input-bar {
+        padding: 8px;
+        border-top: 1px solid var(--card-border);
+        background: var(--bg);
+        display: flex; gap: 6px;
+      }
+      #task-input {
+        flex: 1;
+        padding: 8px 10px;
+        border: 1px solid var(--card-border);
+        border-radius: var(--radius-sm);
+        background: var(--input);
+        color: var(--fg);
+        font-size: 12px;
+        font-family: inherit;
+        outline: none;
+        transition: border-color var(--transition);
+      }
+      #task-input:focus { border-color: var(--accent); }
+      #task-input::placeholder { color: var(--muted); }
+      #send-btn {
+        padding: 8px 14px;
+        border: none;
+        border-radius: var(--radius-sm);
+        background: var(--accent);
+        color: #fff;
+        font-size: 12px;
+        font-weight: 600;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all var(--transition);
+        box-shadow: 0 0 8px rgba(229, 57, 53, 0.3);
+      }
+      #send-btn:hover { opacity: 0.85; box-shadow: 0 0 14px rgba(229, 57, 53, 0.5); }
+      #send-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+    `;
+
+    const script = `
+      const vscode = acquireVsCodeApi();
+      const messagesEl = document.getElementById('messages');
+      const inputEl = document.getElementById('task-input');
+      const sendBtn = document.getElementById('send-btn');
+
+      function scrollToBottom() {
+        messagesEl.scrollTop = messagesEl.scrollHeight;
+      }
+
+      function appendMessage(msg) {
+        const wrapper = document.createElement('div');
+        wrapper.className = 'msg msg-' + msg.role;
+        wrapper.id = msg.id;
+        wrapper.innerHTML = msg.html;
+        messagesEl.appendChild(wrapper);
+        scrollToBottom();
+      }
+
+      function submit() {
+        const text = inputEl.value.trim();
+        if (!text) return;
+        inputEl.value = '';
+        vscode.postMessage({ command: 'submit', text: text });
+      }
+
+      function send(text) {
+        vscode.postMessage({ command: 'send', text: text });
+      }
+
+      function action(act, data) {
+        vscode.postMessage({ command: 'action', action: act, data: data });
+      }
+
+      inputEl.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter' && !e.shiftKey) {
+          e.preventDefault();
+          submit();
+        }
+      });
+
+      sendBtn.addEventListener('click', submit);
+
+      window.addEventListener('message', function(event) {
+        const msg = event.data;
+        if (msg.command === 'addMessage') {
+          appendMessage(msg.message);
+        } else if (msg.command === 'updateMessage') {
+          const el = document.getElementById(msg.id);
+          if (el) {
+            el.innerHTML = msg.html;
+            el.className = el.className.replace(/msg-(user|system|result)/, 'msg-result');
+            scrollToBottom();
+          }
+        } else if (msg.command === 'setMessages') {
+          messagesEl.innerHTML = '';
+          for (const m of msg.messages) {
+            appendMessage(m);
+          }
+        }
+      });
+    `;
+
+    const body = `
+      <div id="messages">
+        <button id="help-btn" title="Quick Start Guide" onclick="send('help')">?</button>
+      </div>
+      <div id="input-bar">
+        <input type="text" id="task-input" placeholder="Describe your task..." />
+        <button id="send-btn">Pack</button>
+      </div>
+    `;
+
+    this.view.webview.html = `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  ${getSharedStyles(nonce)}
+  <style nonce="${nonce}">${chatStyles}</style>
+</head>
+<body>
+  ${body}
+  <script nonce="${nonce}">${script}</script>
+</body>
+</html>`;
+  }
+}

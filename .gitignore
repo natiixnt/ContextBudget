@@ -30,8 +30,10 @@ redcon-*.json
 redcon-*.md
 rb*-profile.*
 
-# VSCode extension dev
-vscode-redcon/
+# VSCode extension dev artifacts
+vscode-redcon/node_modules/
+vscode-redcon/dist/
+vscode-redcon/*.vsix
 
 # Node/Dashboard
 node_modules/

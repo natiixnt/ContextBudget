@@ -1,0 +1,284 @@
+{
+  "name": "redcon",
+  "displayName": "Redcon - Context Budget",
+  "description": "Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under token limits.",
+  "version": "0.3.0",
+  "publisher": "redcon",
+  "license": "MIT",
+  "icon": "resources/icon.png",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/redcon-dev/redcon"
+  },
+  "homepage": "https://github.com/redcon-dev/redcon/tree/main/vscode-redcon",
+  "bugs": {
+    "url": "https://github.com/redcon-dev/redcon/issues"
+  },
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "engines": {
+    "vscode": "^1.85.0"
+  },
+  "categories": [
+    "Machine Learning",
+    "Other"
+  ],
+  "keywords": [
+    "context",
+    "tokens",
+    "budget",
+    "llm",
+    "ai",
+    "agent",
+    "compression",
+    "context-window",
+    "token-budget"
+  ],
+  "activationEvents": [
+    "workspaceContains:redcon.toml"
+  ],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "redcon.pack",
+        "title": "Pack Context",
+        "category": "Redcon",
+        "icon": "$(package)"
+      },
+      {
+        "command": "redcon.plan",
+        "title": "Plan - Rank Files",
+        "category": "Redcon",
+        "icon": "$(list-ordered)"
+      },
+      {
+        "command": "redcon.planAgent",
+        "title": "Plan Agent Workflow",
+        "category": "Redcon",
+        "icon": "$(rocket)"
+      },
+      {
+        "command": "redcon.doctor",
+        "title": "Doctor - Check Environment",
+        "category": "Redcon",
+        "icon": "$(heart)"
+      },
+      {
+        "command": "redcon.init",
+        "title": "Initialize Config",
+        "category": "Redcon",
+        "icon": "$(gear)"
+      },
+      {
+        "command": "redcon.export",
+        "title": "Export Context",
+        "category": "Redcon",
+        "icon": "$(export)"
+      },
+      {
+        "command": "redcon.benchmark",
+        "title": "Benchmark Strategies",
+        "category": "Redcon",
+        "icon": "$(beaker)"
+      },
+      {
+        "command": "redcon.simulate",
+        "title": "Simulate Agent Cost",
+        "category": "Redcon",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "redcon.drift",
+        "title": "Check Token Drift",
+        "category": "Redcon",
+        "icon": "$(pulse)"
+      },
+      {
+        "command": "redcon.openDashboard",
+        "title": "Open Dashboard",
+        "category": "Redcon",
+        "icon": "$(dashboard)"
+      },
+      {
+        "command": "redcon.openConfig",
+        "title": "Open Configuration",
+        "category": "Redcon",
+        "icon": "$(settings-gear)"
+      },
+      {
+        "command": "redcon.refresh",
+        "title": "Refresh",
+        "category": "Redcon",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "redcon.copyContext",
+        "title": "Copy Context to Clipboard",
+        "category": "Redcon",
+        "icon": "$(clippy)"
+      },
+      {
+        "command": "redcon.revealFile",
+        "title": "Open File",
+        "category": "Redcon",
+        "icon": "$(go-to-file)"
+      }
+    ],
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "redcon",
+          "title": "Redcon",
+          "icon": "resources/activitybar.svg"
+        }
+      ]
+    },
+    "views": {
+      "redcon": [
+        {
+          "id": "redcon.chat",
+          "name": "Redcon",
+          "type": "webview"
+        }
+      ]
+    },
+    "viewsWelcome": [],
+    "menus": {
+      "view/title": [
+        {
+          "command": "redcon.refresh",
+          "when": "view == redcon.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "redcon.openDashboard",
+          "when": "view == redcon.chat",
+          "group": "navigation"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Redcon",
+      "properties": {
+        "redcon.pythonPath": {
+          "type": "string",
+          "default": "python",
+          "description": "Path to Python interpreter (must have redcon installed)."
+        },
+        "redcon.cliCommand": {
+          "type": "string",
+          "default": "redcon",
+          "description": "Redcon CLI command or path to executable."
+        },
+        "redcon.defaultMaxTokens": {
+          "type": "number",
+          "default": 30000,
+          "description": "Default token budget for pack commands."
+        },
+        "redcon.defaultTopFiles": {
+          "type": "number",
+          "default": 25,
+          "description": "Default maximum number of ranked files."
+        },
+        "redcon.autoRefreshOnSave": {
+          "type": "boolean",
+          "default": false,
+          "description": "Automatically re-run plan when files are saved."
+        },
+        "redcon.showStatusBar": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show token budget in the status bar."
+        },
+        "redcon.showFileDecorations": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show relevance score badges on files in the explorer."
+        },
+        "redcon.showCodeLens": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show compression strategy as CodeLens above file headers."
+        },
+        "redcon.configPath": {
+          "type": "string",
+          "default": "",
+          "description": "Path to redcon.toml (auto-detected if empty)."
+        }
+      }
+    },
+    "colors": [
+      {
+        "id": "redcon.scoreHigh",
+        "description": "Color for high relevance score files",
+        "defaults": {
+          "dark": "#4ec9b0",
+          "light": "#16825d",
+          "highContrast": "#4ec9b0"
+        }
+      },
+      {
+        "id": "redcon.scoreMedium",
+        "description": "Color for medium relevance score files",
+        "defaults": {
+          "dark": "#dcdcaa",
+          "light": "#795e26",
+          "highContrast": "#dcdcaa"
+        }
+      },
+      {
+        "id": "redcon.scoreLow",
+        "description": "Color for low relevance score files",
+        "defaults": {
+          "dark": "#6a9955",
+          "light": "#008000",
+          "highContrast": "#6a9955"
+        }
+      },
+      {
+        "id": "redcon.scoreSkipped",
+        "description": "Color for skipped files",
+        "defaults": {
+          "dark": "#808080",
+          "light": "#808080",
+          "highContrast": "#808080"
+        }
+      },
+      {
+        "id": "redcon.budgetUsed",
+        "description": "Color for budget usage indicator",
+        "defaults": {
+          "dark": "#569cd6",
+          "light": "#0451a5",
+          "highContrast": "#569cd6"
+        }
+      },
+      {
+        "id": "redcon.budgetWarning",
+        "description": "Color for budget near limit",
+        "defaults": {
+          "dark": "#ce9178",
+          "light": "#a31515",
+          "highContrast": "#ce9178"
+        }
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "lint": "eslint src --ext ts",
+    "package": "vsce package"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "@types/vscode": "^1.85.0",
+    "@vscode/vsce": "^2.22.0",
+    "esbuild": "^0.19.0",
+    "typescript": "^5.3.0"
+  }
+}
