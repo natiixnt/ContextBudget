@@ -2,7 +2,7 @@
   "name": "redcon",
   "displayName": "Redcon - Context Budget",
   "description": "Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under token limits.",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "publisher": "redcon",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -125,6 +125,12 @@
         "title": "Open File",
         "category": "Redcon",
         "icon": "$(go-to-file)"
+      },
+      {
+        "command": "redcon.help",
+        "title": "Quick Start Guide",
+        "category": "Redcon",
+        "icon": "$(question)"
       }
     ],
     "viewsContainers": {
@@ -149,12 +155,17 @@
     "menus": {
       "view/title": [
         {
-          "command": "redcon.refresh",
+          "command": "redcon.help",
           "when": "view == redcon.chat",
           "group": "navigation"
         },
         {
           "command": "redcon.openDashboard",
+          "when": "view == redcon.chat",
+          "group": "navigation"
+        },
+        {
+          "command": "redcon.refresh",
           "when": "view == redcon.chat",
           "group": "navigation"
         }

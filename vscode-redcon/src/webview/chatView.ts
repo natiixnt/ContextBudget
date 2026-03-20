@@ -4,7 +4,7 @@
  */
 
 import * as vscode from 'vscode';
-import { state } from '../state';
+import { state as appState } from '../state';
 import { getNonce, getSharedStyles, escapeHtml, formatTokens } from './theme';
 import type {
   RunReport,
@@ -64,8 +64,8 @@ function renderWelcome(): string {
       <div class="welcome-sub">Context budgeting for AI coding agents</div>
       <div class="welcome-hint">Type a task below to analyze and pack your repository context.</div>
       <div class="welcome-actions">
-        <button class="btn btn-sm" onclick="send('doctor')">Run Doctor</button>
-        <button class="btn btn-sm" onclick="send('config')">Open Config</button>
+        <button class="btn btn-sm" data-send="doctor">Run Doctor</button>
+        <button class="btn btn-sm" data-send="config">Open Config</button>
       </div>
     </div>`;
 }
@@ -156,7 +156,7 @@ function renderPackResult(run: RunReport): string {
     const name = f.path.split('/').pop() ?? f.path;
     const dir = f.path.split('/').slice(0, -1).join('/');
     return `
-      <div class="file-item" onclick="action('openFile','${escapeHtml(f.path)}')">
+      <div class="file-item" data-action="openFile" data-data="${escapeHtml(f.path)}">
         <div class="file-item-body">
           <div class="file-item-name">${escapeHtml(name)}</div>
           <div class="file-item-meta">
@@ -172,7 +172,7 @@ function renderPackResult(run: RunReport): string {
   }).join('');
 
   const moreFiles = totalCompressed > 8
-    ? `<div class="more-link" onclick="action('dashboard')">${totalCompressed - 8} more files - open dashboard</div>`
+    ? `<div class="more-link" data-action="dashboard">${totalCompressed - 8} more files - open dashboard</div>`
     : '';
 
   return `
@@ -208,9 +208,9 @@ function renderPackResult(run: RunReport): string {
 
       <!-- Actions -->
       <div class="actions-row">
-        <button class="btn btn-sm" onclick="action('copy')">Copy Context</button>
-        <button class="btn btn-sm" onclick="action('export')">Export</button>
-        <button class="btn btn-sm btn-primary" onclick="action('dashboard')">Dashboard</button>
+        <button class="btn btn-sm" data-action="copy">Copy Context</button>
+        <button class="btn btn-sm" data-action="export">Export</button>
+        <button class="btn btn-sm btn-primary" data-action="dashboard">Dashboard</button>
       </div>
     </div>`;
 }
@@ -364,6 +364,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     // Restore previous messages
     this.view.webview.postMessage({ command: 'setMessages', messages: this.messages });
+
+    // Update description with savings if available
+    this.updateDescription();
+  }
+
+  updateDescription(): void {
+    if (!this.view) return;
+    const run = appState.state.lastRun;
+    if (run?.budget) {
+      const saved = run.budget.estimated_saved_tokens;
+      const total = run.budget.estimated_input_tokens + saved;
+      const pct = total > 0 ? Math.round((saved / total) * 100) : 0;
+      this.view.description = pct > 0 ? `${pct}% saved` : '';
+    }
   }
 
   /* -- Public API for commands.ts -- */
@@ -379,6 +393,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   replaceWithPackResult(analyzingId: string, run: RunReport): void {
     this.replaceMessage(analyzingId, 'result', 'pack-result', renderPackResult(run));
+    this.updateDescription();
   }
 
   replaceWithDoctorResult(analyzingId: string, doc: DoctorReport): void {
@@ -408,6 +423,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   addInfo(message: string): void {
     this.addMessage('system', 'info', renderInfo(message));
+  }
+
+  showTutorial(): void {
+    this.addMessage('result', 'tutorial', renderTutorial());
   }
 
   refresh(): void {
@@ -490,9 +509,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       body { padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
       /* Messages area */
-      #messages { flex: 1; overflow-y: auto; padding: 8px; position: relative; }
+      #messages {
+        flex: 1; overflow-y: auto; padding: 8px;
+        display: flex; flex-direction: column;
+      }
+      #messages > .msg { width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; }
 
       /* Welcome */
+      .msg-system:first-child:last-child {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
       .welcome {
         text-align: center;
         padding: 24px 12px;
@@ -500,7 +529,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         flex-direction: column;
         align-items: center;
         justify-content: center;
-        min-height: 100%;
+        width: 100%;
+        max-width: 600px;
       }
       .welcome-icon { font-size: 32px; margin-bottom: 8px; color: var(--accent); filter: drop-shadow(0 0 8px rgba(229, 57, 53, 0.4)); }
       .welcome-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--fg); }
@@ -628,34 +658,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       .sim-step-name { flex: 1; }
 
-      /* Help button */
-      #help-btn {
-        position: absolute;
-        top: 8px;
-        right: 8px;
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
-        border: 1.5px solid var(--accent);
-        background: transparent;
-        color: var(--accent);
-        font-size: 14px;
-        font-weight: 700;
-        cursor: pointer;
-        display: flex;
-        align-items: center;
-        justify-content: center;
-        transition: all var(--transition);
-        font-family: inherit;
-        z-index: 10;
-        line-height: 1;
-      }
-      #help-btn:hover {
-        background: var(--accent);
-        color: #fff;
-        box-shadow: 0 0 10px rgba(229, 57, 53, 0.4);
-      }
-
       /* Tutorial */
       .tutorial-steps { display: flex; flex-direction: column; gap: 10px; }
       .tutorial-step {
@@ -683,11 +685,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
 
       /* Input bar */
-      #input-bar {
-        padding: 8px;
+      #input-wrap {
         border-top: 1px solid var(--card-border);
         background: var(--bg);
+      }
+      #input-bar {
+        padding: 8px;
         display: flex; gap: 6px;
+        width: 100%;
+        max-width: 600px;
+        margin: 0 auto;
+        box-sizing: border-box;
       }
       #task-input {
         flex: 1;
@@ -746,14 +754,6 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         vscode.postMessage({ command: 'submit', text: text });
       }
 
-      function send(text) {
-        vscode.postMessage({ command: 'send', text: text });
-      }
-
-      function action(act, data) {
-        vscode.postMessage({ command: 'action', action: act, data: data });
-      }
-
       inputEl.addEventListener('keydown', function(e) {
         if (e.key === 'Enter' && !e.shiftKey) {
           e.preventDefault();
@@ -762,6 +762,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       });
 
       sendBtn.addEventListener('click', submit);
+
+      // Delegated click handler for data-send and data-action attributes
+      document.addEventListener('click', function(e) {
+        const target = e.target.closest('[data-send]');
+        if (target) {
+          vscode.postMessage({ command: 'send', text: target.dataset.send });
+          return;
+        }
+        const actionEl = e.target.closest('[data-action]');
+        if (actionEl) {
+          vscode.postMessage({ command: 'action', action: actionEl.dataset.action, data: actionEl.dataset.data || '' });
+        }
+      });
 
       window.addEventListener('message', function(event) {
         const msg = event.data;
@@ -784,12 +797,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     `;
 
     const body = `
-      <div id="messages">
-        <button id="help-btn" title="Quick Start Guide" onclick="send('help')">?</button>
-      </div>
-      <div id="input-bar">
-        <input type="text" id="task-input" placeholder="Describe your task..." />
-        <button id="send-btn">Pack</button>
+      <div id="messages"></div>
+      <div id="input-wrap">
+        <div id="input-bar">
+          <input type="text" id="task-input" placeholder="Describe your task..." />
+          <button id="send-btn">Pack</button>
+        </div>
       </div>
     `;
 

@@ -14,7 +14,7 @@ export class DashboardPanel {
     this.panel = vscode.window.createWebviewPanel(
       'redconDashboard',
       'Redcon Dashboard',
-      vscode.ViewColumn.One,
+      vscode.ViewColumn.Active,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -86,7 +86,8 @@ export class DashboardPanel {
       --fg: var(--vscode-editor-foreground);
       --border: var(--vscode-panel-border);
       --card-bg: var(--vscode-sideBar-background);
-      --accent: var(--vscode-textLink-foreground);
+      --accent: #e53935;
+      --accent-dim: rgba(229, 57, 53, 0.15);
       --success: #4ec9b0;
       --warning: #dcdcaa;
       --error: #f14c4c;
@@ -144,9 +145,11 @@ export class DashboardPanel {
     .btn:hover { background: var(--badge-bg); }
     .btn-primary {
       background: var(--accent);
-      color: var(--badge-fg);
+      color: #fff;
       border-color: var(--accent);
+      box-shadow: 0 0 8px rgba(229, 57, 53, 0.3);
     }
+    .btn-primary:hover { opacity: 0.9; box-shadow: 0 0 14px rgba(229, 57, 53, 0.5); }
 
     .grid {
       display: grid;
@@ -198,7 +201,7 @@ export class DashboardPanel {
       height: 100%;
       border-radius: 14px;
       transition: width 0.6s ease;
-      background: linear-gradient(90deg, var(--success), var(--accent));
+      background: linear-gradient(90deg, var(--success), #e53935);
     }
 
     .gauge-fill.warn {

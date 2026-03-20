@@ -94,6 +94,10 @@ export async function activate(
       DashboardPanel.show(context.extensionUri);
     }),
 
+    vscode.commands.registerCommand('redcon.help', () => {
+      chatView.showTutorial();
+    }),
+
     vscode.commands.registerCommand('redcon.refresh', () => {
       chatView.refresh();
       codeLensProvider.refresh();
