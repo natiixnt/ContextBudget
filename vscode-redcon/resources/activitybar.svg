@@ -1,12 +1,11 @@
-<svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <!-- Token budget gauge icon -->
-  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8z" fill="currentColor" opacity="0.6"/>
-  <path d="M12 4C7.58 4 4 7.58 4 12s3.58 8 8 8 8-3.58 8-8-3.58-8-8-8z" fill="currentColor" opacity="0.1"/>
-  <!-- Budget fill arc (bottom-left to top) -->
-  <path d="M12 4a8 8 0 0 1 6.93 4" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.9"/>
-  <path d="M18.93 8A8 8 0 0 1 20 12" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.7"/>
-  <!-- Center icon: stacked bars -->
-  <rect x="8" y="14" width="8" height="2" rx="1" fill="currentColor" opacity="0.9"/>
-  <rect x="8" y="11" width="6" height="2" rx="1" fill="currentColor" opacity="0.7"/>
-  <rect x="8" y="8" width="4" height="2" rx="1" fill="currentColor" opacity="0.5"/>
+<svg width="28" height="28" viewBox="0 0 28 28" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Outer ring -->
+  <circle cx="14" cy="14" r="12" stroke="currentColor" stroke-width="2" fill="none" opacity="0.5"/>
+  <!-- Budget fill arc -->
+  <path d="M14 2a12 12 0 0 1 10.39 6" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none"/>
+  <path d="M24.39 8A12 12 0 0 1 26 14" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" fill="none" opacity="0.8"/>
+  <!-- Center bars -->
+  <rect x="8" y="17" width="12" height="2.5" rx="1.25" fill="currentColor"/>
+  <rect x="8" y="13" width="9" height="2.5" rx="1.25" fill="currentColor" opacity="0.8"/>
+  <rect x="8" y="9" width="6" height="2.5" rx="1.25" fill="currentColor" opacity="0.6"/>
 </svg>

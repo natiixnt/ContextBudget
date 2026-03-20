@@ -14,7 +14,7 @@ export class DashboardPanel {
     this.panel = vscode.window.createWebviewPanel(
       'redconDashboard',
       'Redcon Dashboard',
-      vscode.ViewColumn.Active,
+      vscode.ViewColumn.One,
       {
         enableScripts: true,
         retainContextWhenHidden: true,
@@ -59,7 +59,7 @@ export class DashboardPanel {
 
   static show(extensionUri: vscode.Uri): void {
     if (DashboardPanel.instance) {
-      DashboardPanel.instance.panel.reveal();
+      DashboardPanel.instance.panel.reveal(vscode.ViewColumn.One);
       return;
     }
     DashboardPanel.instance = new DashboardPanel(extensionUri);
