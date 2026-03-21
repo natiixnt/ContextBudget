@@ -2,7 +2,7 @@
   "name": "redcon",
   "displayName": "Redcon - Context Budget",
   "description": "Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under token limits.",
-  "version": "0.4.1",
+  "version": "0.5.0",
   "publisher": "redcon",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -100,7 +100,7 @@
         "command": "redcon.openDashboard",
         "title": "Open Dashboard",
         "category": "Redcon",
-        "icon": "$(dashboard)"
+        "icon": "$(graph)"
       },
       {
         "command": "redcon.openConfig",
@@ -131,6 +131,12 @@
         "title": "Quick Start Guide",
         "category": "Redcon",
         "icon": "$(question)"
+      },
+      {
+        "command": "redcon.syncContext",
+        "title": "Sync Context to Agents",
+        "category": "Redcon",
+        "icon": "$(sync)"
       }
     ],
     "viewsContainers": {
@@ -218,6 +224,30 @@
           "type": "string",
           "default": "",
           "description": "Path to redcon.toml (auto-detected if empty)."
+        },
+        "redcon.contextSync.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Auto-generate context files for AI agents after each analysis."
+        },
+        "redcon.contextSync.autoSyncOnPack": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically sync context files after each pack/analysis run."
+        },
+        "redcon.contextSync.targets": {
+          "type": "array",
+          "default": ["claude"],
+          "items": {
+            "type": "string",
+            "enum": ["claude", "cursor", "copilot"]
+          },
+          "description": "Which AI agents to generate context files for."
+        },
+        "redcon.contextSync.maxFiles": {
+          "type": "number",
+          "default": 30,
+          "description": "Maximum number of files to include in the context map."
         }
       }
     },

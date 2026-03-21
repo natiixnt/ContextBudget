@@ -10,6 +10,7 @@ import * as redcon from './redcon';
 import { state } from './state';
 import type { RunReport } from './types';
 import type { ChatViewProvider } from './webview/chatView';
+import { syncContextFiles, type SyncTarget } from './contextSync';
 
 let chatView: ChatViewProvider | null = null;
 
@@ -57,6 +58,9 @@ export async function cmdPack(taskFromChat?: string): Promise<void> {
     const result = await redcon.pack(task, { cwd, maxTokens, topFiles });
     state.setRun(result);
     await state.loadHistory(cwd);
+
+    // Auto-sync context files
+    await autoSync(result, cwd);
 
     if (analyzingId) {
       chatView?.replaceWithPackResult(analyzingId, result);
@@ -451,5 +455,49 @@ export async function cmdLoadRun(runPath: string): Promise<void> {
 export async function cmdRevealFile(item: { resourceUri?: vscode.Uri }): Promise<void> {
   if (item?.resourceUri) {
     await vscode.window.showTextDocument(item.resourceUri);
+  }
+}
+
+// --- Context Sync ---
+
+async function autoSync(result: RunReport, cwd: string): Promise<void> {
+  const config = vscode.workspace.getConfiguration('redcon');
+  if (!config.get<boolean>('contextSync.enabled', false)) return;
+  if (!config.get<boolean>('contextSync.autoSyncOnPack', true)) return;
+
+  const targets = config.get<SyncTarget[]>('contextSync.targets', ['claude']);
+  const maxFiles = config.get<number>('contextSync.maxFiles', 30);
+  const syncResult = await syncContextFiles(result, cwd, targets, maxFiles);
+
+  if (syncResult.filesWritten.length > 0) {
+    const names = syncResult.filesWritten.map((p) => path.basename(p)).join(', ');
+    chatView?.addInfo(`Context synced: ${names}`);
+  }
+  if (syncResult.errors.length > 0) {
+    chatView?.addInfo(`Sync errors: ${syncResult.errors.join('; ')}`);
+  }
+}
+
+export async function cmdSyncContext(): Promise<void> {
+  const run = state.state.lastRun;
+  if (!run) {
+    chatView?.addInfo('No analysis data yet. Send a task first.');
+    return;
+  }
+
+  const cwd = getWorkspaceRoot();
+  const config = vscode.workspace.getConfiguration('redcon');
+  const targets = config.get<SyncTarget[]>('contextSync.targets', ['claude']);
+  const maxFiles = config.get<number>('contextSync.maxFiles', 30);
+
+  const syncResult = await syncContextFiles(run, cwd, targets, maxFiles);
+
+  if (syncResult.filesWritten.length > 0) {
+    const names = syncResult.filesWritten.map((p) => path.basename(p)).join(', ');
+    chatView?.addInfo(`Context synced: ${names}`);
+  } else if (syncResult.errors.length > 0) {
+    chatView?.addInfo(`Sync failed: ${syncResult.errors.join('; ')}`);
+  } else {
+    chatView?.addInfo('No sync targets configured. Enable in Settings > Redcon > Context Sync.');
   }
 }

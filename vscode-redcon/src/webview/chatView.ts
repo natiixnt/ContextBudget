@@ -79,28 +79,33 @@ function renderTutorial(): string {
           <span class="tutorial-num">1</span>
           <div class="tutorial-body">
             <div class="tutorial-step-title">Initialize config</div>
-            <div class="card-sub">Run <strong>Redcon: Initialize Config</strong> from the Command Palette or click <em>Open Config</em> to create a <code>redcon.toml</code> in your project root.</div>
+            <div class="card-sub">Create a <code>redcon.toml</code> config in your project root to set token budgets and compression strategies.</div>
+            <button class="btn btn-sm" style="margin-top:6px;" data-send="config">Open Config</button>
           </div>
         </div>
         <div class="tutorial-step">
           <span class="tutorial-num">2</span>
           <div class="tutorial-body">
             <div class="tutorial-step-title">Describe your task</div>
-            <div class="card-sub">Type a task description in the input bar below (e.g. "add user authentication") and click <strong>Pack</strong>. Redcon will rank and compress the most relevant files.</div>
+            <div class="card-sub">Type what you're working on in the input bar below (e.g. "add user authentication") and hit send. Redcon will rank and compress the most relevant files to fit your token budget.</div>
           </div>
         </div>
         <div class="tutorial-step">
           <span class="tutorial-num">3</span>
           <div class="tutorial-body">
-            <div class="tutorial-step-title">Review results</div>
-            <div class="card-sub">See which files were included, compression strategies used, token budget consumed, and quality risk. Click <strong>Copy Context</strong> to paste into your AI agent.</div>
+            <div class="tutorial-step-title">Review and copy</div>
+            <div class="card-sub">See which files were included, compression strategies used, and token budget consumed. Copy the packed context to paste into your AI agent.</div>
           </div>
         </div>
         <div class="tutorial-step">
           <span class="tutorial-num">4</span>
           <div class="tutorial-body">
             <div class="tutorial-step-title">Explore more</div>
-            <div class="card-sub">Use <strong>Dashboard</strong> for detailed analytics, <strong>Benchmark</strong> to compare strategies, <strong>Simulate</strong> to estimate costs, and <strong>Drift</strong> to track token growth over time.</div>
+            <div class="card-sub">Check environment health, view detailed analytics, or run diagnostics.</div>
+            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+              <button class="btn btn-sm" data-send="doctor">Doctor</button>
+              <button class="btn btn-sm" data-action="dashboard">Dashboard</button>
+            </div>
           </div>
         </div>
       </div>
@@ -335,6 +340,151 @@ function renderInfo(message: string): string {
   return `<div class="msg-info animate-in">${escapeHtml(message)}</div>`;
 }
 
+const STRAT_COLORS: Record<string, string> = {
+  full: '#4ec9b0', snippet: '#dcdcaa', symbol_extraction: '#e53935',
+  summary: '#888', slicing: '#6a9955', cache_reuse: '#c678dd',
+};
+
+function renderDashboardCard(run: RunReport): string {
+  const used = run.budget.estimated_input_tokens;
+  const max = run.max_tokens;
+  const saved = run.budget.estimated_saved_tokens;
+  const pct = max > 0 ? Math.round((used / max) * 100) : 0;
+  const available = max - used;
+
+  const totalOrig = run.compressed_context.reduce((s, f) => s + f.original_tokens, 0);
+  const totalComp = run.compressed_context.reduce((s, f) => s + f.compressed_tokens, 0);
+  const comprPct = totalOrig > 0 ? Math.round(((totalOrig - totalComp) / totalOrig) * 100) : 0;
+
+  // Strategy counts
+  const stratCounts: Record<string, number> = {};
+  for (const f of run.compressed_context) {
+    stratCounts[f.strategy] = (stratCounts[f.strategy] ?? 0) + 1;
+  }
+
+  // Donut SVG for budget
+  const r = 44;
+  const circ = 2 * Math.PI * r;
+  const usedLen = max > 0 ? (used / max) * circ : 0;
+  const gaugeColor = pct > 90 ? '#f14c4c' : pct > 70 ? '#dcdcaa' : '#4ec9b0';
+
+  // Strategy pie segments
+  const stratEntries = Object.entries(stratCounts).sort((a, b) => b[1] - a[1]);
+  const totalFiles = stratEntries.reduce((s, [, c]) => s + c, 0);
+  let pieOffset = 0;
+  const piePaths = stratEntries.map(([s, c]) => {
+    const len = totalFiles > 0 ? (c / totalFiles) * circ : 0;
+    const html = `<circle cx="50" cy="50" r="${r}" fill="none"
+      stroke="${STRAT_COLORS[s] ?? '#888'}" stroke-width="10"
+      stroke-dasharray="${Math.max(0, len - 1.5)} ${circ - Math.max(0, len - 1.5)}"
+      stroke-dashoffset="${-pieOffset}" stroke-linecap="round"/>`;
+    pieOffset += len;
+    return html;
+  }).join('');
+
+  // Top files horizontal bars
+  const topFiles = run.compressed_context.slice(0, 10);
+  const maxTok = Math.max(...topFiles.map((f) => f.original_tokens), 1);
+  const fileBars = topFiles.map((f) => {
+    const name = f.path.split('/').pop() ?? f.path;
+    const origW = Math.round((f.original_tokens / maxTok) * 100);
+    const compW = Math.round((f.compressed_tokens / maxTok) * 100);
+    const savedPct = f.original_tokens > 0 ? Math.round(((f.original_tokens - f.compressed_tokens) / f.original_tokens) * 100) : 0;
+    return `
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;">
+        <div style="width:100px;font-size:9px;text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);" title="${escapeHtml(f.path)}">${escapeHtml(name)}</div>
+        <div style="flex:1;height:14px;background:var(--input);border-radius:3px;overflow:hidden;position:relative;">
+          <div style="position:absolute;top:0;left:0;height:100%;width:${origW}%;background:var(--card-border);border-radius:3px;opacity:0.5;"></div>
+          <div style="position:absolute;top:0;left:0;height:100%;width:${compW}%;background:var(--accent);border-radius:3px;"></div>
+        </div>
+        <div style="width:36px;font-size:9px;color:var(--success);">${savedPct > 0 ? `-${savedPct}%` : '0%'}</div>
+      </div>`;
+  }).join('');
+
+  const stratLegend = stratEntries.map(([s, c]) => `
+    <div style="display:flex;align-items:center;gap:5px;font-size:10px;">
+      <span style="width:8px;height:8px;border-radius:2px;background:${STRAT_COLORS[s] ?? '#888'};flex-shrink:0;"></span>
+      <span style="flex:1;">${s.replace(/_/g, ' ')}</span>
+      <span style="font-weight:600;">${c}</span>
+    </div>`).join('');
+
+  return `
+    <div class="result-card animate-in">
+      <div class="result-section-title" style="margin-bottom:12px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" style="color:var(--accent);">
+          <path d="M3 3v18h18" stroke="currentColor" stroke-width="2" stroke-linecap="round"/>
+          <path d="M7 16l4-6 4 4 5-8" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+        </svg>
+        Analytics - ${escapeHtml(run.task)}
+      </div>
+
+      <!-- KPI row -->
+      <div class="grid grid-2" style="margin-bottom:10px;">
+        <div class="card" style="text-align:center;padding:8px;">
+          <div class="card-title">Budget</div>
+          <div style="font-size:18px;font-weight:700;color:${gaugeColor};">${pct}%</div>
+          <div class="card-sub">${formatTokens(used)} / ${formatTokens(max)}</div>
+        </div>
+        <div class="card" style="text-align:center;padding:8px;">
+          <div class="card-title">Saved</div>
+          <div style="font-size:18px;font-weight:700;color:var(--success);">${formatTokens(saved)}</div>
+          <div class="card-sub">${comprPct}% compression</div>
+        </div>
+      </div>
+
+      <!-- Charts row -->
+      <div class="grid grid-2" style="margin-bottom:10px;">
+        <div class="card" style="padding:10px;">
+          <div class="card-title">Budget Usage</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:6px 0;">
+            <div style="position:relative;display:flex;align-items:center;justify-content:center;">
+              <svg width="100" height="100" viewBox="0 0 100 100" style="transform:rotate(-90deg);">
+                <circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--input)" stroke-width="10"/>
+                <circle cx="50" cy="50" r="${r}" fill="none" stroke="${gaugeColor}" stroke-width="10"
+                  stroke-dasharray="${usedLen} ${circ - usedLen}" stroke-linecap="round"/>
+              </svg>
+              <div style="position:absolute;text-align:center;">
+                <div style="font-size:16px;font-weight:700;color:${gaugeColor};">${pct}%</div>
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:3px;font-size:10px;">
+              <div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${gaugeColor};vertical-align:middle;margin-right:4px;"></span>Used: ${formatTokens(used)}</div>
+              <div><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--input);vertical-align:middle;margin-right:4px;"></span>Free: ${formatTokens(available > 0 ? available : 0)}</div>
+            </div>
+          </div>
+        </div>
+        <div class="card" style="padding:10px;">
+          <div class="card-title">Strategies</div>
+          <div style="display:flex;align-items:center;justify-content:center;gap:12px;padding:6px 0;">
+            <svg width="100" height="100" viewBox="0 0 100 100" style="transform:rotate(-90deg);">
+              <circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--input)" stroke-width="10"/>
+              ${piePaths}
+            </svg>
+            <div style="display:flex;flex-direction:column;gap:3px;">
+              ${stratLegend}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- File bars -->
+      <div class="card" style="padding:10px;margin-bottom:10px;">
+        <div class="card-title">Token Impact (top ${topFiles.length})</div>
+        <div style="padding:4px 0;">${fileBars}</div>
+        <div style="display:flex;gap:12px;justify-content:center;font-size:9px;color:var(--muted);padding-top:4px;">
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--card-border);border-radius:2px;opacity:0.5;vertical-align:middle;margin-right:3px;"></span>Original</span>
+          <span><span style="display:inline-block;width:8px;height:8px;background:var(--accent);border-radius:2px;vertical-align:middle;margin-right:3px;"></span>Compressed</span>
+        </div>
+      </div>
+
+      <!-- Actions -->
+      <div class="actions-row">
+        <button class="btn btn-sm" data-action="copy">Copy Context</button>
+        <button class="btn btn-sm" data-action="export">Export</button>
+      </div>
+    </div>`;
+}
+
 /* ------------------------------------------------------------------ */
 /*  ChatViewProvider                                                   */
 /* ------------------------------------------------------------------ */
@@ -429,6 +579,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     this.addMessage('result', 'tutorial', renderTutorial());
   }
 
+  showDashboard(): void {
+    const run = appState.state.lastRun;
+    if (run) {
+      this.addMessage('result', 'dashboard', renderDashboardCard(run));
+    } else {
+      this.addInfo('No analysis data yet. Send a task first.');
+    }
+  }
+
   refresh(): void {
     // Re-render the shell if the view is available
     if (this.view) {
@@ -487,7 +646,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         vscode.commands.executeCommand('redcon.export');
         break;
       case 'dashboard':
-        vscode.commands.executeCommand('redcon.openDashboard');
+        this.showDashboard();
+        break;
+      case 'sync':
+        vscode.commands.executeCommand('redcon.syncContext');
         break;
       case 'openFile':
         if (data) {
@@ -712,15 +874,20 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       #task-input:focus { border-color: var(--accent); }
       #task-input::placeholder { color: var(--muted); }
       #send-btn {
-        padding: 8px 14px;
+        width: 32px;
+        height: 32px;
+        padding: 0;
         border: none;
-        border-radius: var(--radius-sm);
+        border-radius: 50%;
         background: var(--accent);
         color: #fff;
-        font-size: 12px;
-        font-weight: 600;
+        font-size: 14px;
+        line-height: 1;
         cursor: pointer;
-        font-family: inherit;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        flex-shrink: 0;
         transition: all var(--transition);
         box-shadow: 0 0 8px rgba(229, 57, 53, 0.3);
       }
@@ -801,7 +968,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       <div id="input-wrap">
         <div id="input-bar">
           <input type="text" id="task-input" placeholder="Describe your task..." />
-          <button id="send-btn">Pack</button>
+          <button id="send-btn" title="Send"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5L3.5 6H6.5V14h3V6h3L8 1.5z"/></svg></button>
         </div>
       </div>
     `;

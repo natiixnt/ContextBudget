@@ -91,8 +91,10 @@ export async function activate(
     vscode.commands.registerCommand('redcon.loadRun', commands.cmdLoadRun),
 
     vscode.commands.registerCommand('redcon.openDashboard', () => {
-      DashboardPanel.show(context.extensionUri);
+      chatView.showDashboard();
     }),
+
+    vscode.commands.registerCommand('redcon.syncContext', commands.cmdSyncContext),
 
     vscode.commands.registerCommand('redcon.help', () => {
       chatView.showTutorial();
