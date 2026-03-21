@@ -671,9 +671,29 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       body { padding: 0; display: flex; flex-direction: column; height: 100vh; overflow: hidden; }
 
       /* Messages area */
+      #messages-wrap {
+        flex: 1; position: relative; overflow: hidden;
+      }
+      #messages-wrap::before, #messages-wrap::after {
+        content: '';
+        position: absolute; left: 0; right: 0; height: 24px;
+        pointer-events: none; z-index: 2;
+        transition: opacity 0.3s ease;
+      }
+      #messages-wrap::before {
+        top: 0;
+        background: linear-gradient(to bottom, var(--bg), transparent);
+      }
+      #messages-wrap::after {
+        bottom: 0;
+        background: linear-gradient(to top, var(--bg), transparent);
+      }
+      #messages-wrap.at-top::before { opacity: 0; }
+      #messages-wrap.at-bottom::after { opacity: 0; }
       #messages {
-        flex: 1; overflow-y: auto; padding: 8px;
+        height: 100%; overflow-y: auto; padding: 8px;
         display: flex; flex-direction: column;
+        scroll-behavior: smooth;
       }
       #messages > .msg { width: 100%; max-width: 600px; margin-left: auto; margin-right: auto; }
 
@@ -694,7 +714,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         width: 100%;
         max-width: 600px;
       }
-      .welcome-icon { font-size: 32px; margin-bottom: 8px; color: var(--accent); filter: drop-shadow(0 0 8px rgba(229, 57, 53, 0.4)); }
+      .welcome-icon {
+        font-size: 36px; margin-bottom: 10px; color: var(--accent);
+        filter: drop-shadow(0 0 12px rgba(229, 57, 53, 0.6));
+        text-shadow: 0 0 20px rgba(229, 57, 53, 0.5), 0 0 40px rgba(229, 57, 53, 0.3);
+      }
       .welcome-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--fg); }
       .welcome-sub { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
       .welcome-hint { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
@@ -848,41 +872,46 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
       /* Input bar */
       #input-wrap {
-        border-top: 1px solid var(--card-border);
         background: var(--bg);
+        padding: 8px;
       }
       #input-bar {
-        padding: 8px;
-        display: flex; gap: 6px;
+        display: flex; gap: 8px;
+        align-items: center;
         width: 100%;
         max-width: 600px;
         margin: 0 auto;
         box-sizing: border-box;
+        padding: 6px 6px 6px 14px;
+        border: 1.5px solid var(--accent);
+        border-radius: 22px;
+        background: var(--input);
+        transition: box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
+        box-shadow: 0 0 0 transparent;
+      }
+      #input-bar:focus-within {
+        border-color: var(--accent);
+        box-shadow: 0 0 12px rgba(229, 57, 53, 0.15), 0 0 30px rgba(229, 57, 53, 0.08);
       }
       #task-input {
         flex: 1;
-        padding: 8px 10px;
-        border: 1px solid var(--card-border);
-        border-radius: var(--radius-sm);
-        background: var(--input);
+        padding: 6px 0;
+        border: none;
+        background: transparent;
         color: var(--fg);
         font-size: 12px;
         font-family: inherit;
         outline: none;
-        transition: border-color var(--transition);
       }
-      #task-input:focus { border-color: var(--accent); }
       #task-input::placeholder { color: var(--muted); }
       #send-btn {
-        width: 32px;
-        height: 32px;
+        width: 30px;
+        height: 30px;
         padding: 0;
         border: none;
         border-radius: 50%;
         background: var(--accent);
         color: #fff;
-        font-size: 14px;
-        line-height: 1;
         cursor: pointer;
         display: flex;
         align-items: center;
@@ -891,6 +920,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         transition: all var(--transition);
         box-shadow: 0 0 8px rgba(229, 57, 53, 0.3);
       }
+      #send-btn svg {
+        display: block;
+      }
       #send-btn:hover { opacity: 0.85; box-shadow: 0 0 14px rgba(229, 57, 53, 0.5); }
       #send-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
     `;
@@ -898,11 +930,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const script = `
       const vscode = acquireVsCodeApi();
       const messagesEl = document.getElementById('messages');
+      const wrapEl = document.getElementById('messages-wrap');
       const inputEl = document.getElementById('task-input');
       const sendBtn = document.getElementById('send-btn');
 
+      function updateScrollClasses() {
+        const t = messagesEl.scrollTop;
+        const h = messagesEl.scrollHeight - messagesEl.clientHeight;
+        wrapEl.classList.toggle('at-top', t < 4);
+        wrapEl.classList.toggle('at-bottom', t >= h - 4);
+      }
+      messagesEl.addEventListener('scroll', updateScrollClasses);
+
       function scrollToBottom() {
         messagesEl.scrollTop = messagesEl.scrollHeight;
+        updateScrollClasses();
       }
 
       function appendMessage(msg) {
@@ -964,11 +1006,13 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     `;
 
     const body = `
-      <div id="messages"></div>
+      <div id="messages-wrap" class="at-top at-bottom">
+        <div id="messages"></div>
+      </div>
       <div id="input-wrap">
         <div id="input-bar">
           <input type="text" id="task-input" placeholder="Describe your task..." />
-          <button id="send-btn" title="Send"><svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor"><path d="M8 1.5L3.5 6H6.5V14h3V6h3L8 1.5z"/></svg></button>
+          <button id="send-btn" title="Send"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-left:2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
         </div>
       </div>
     `;
