@@ -237,7 +237,7 @@
         },
         "redcon.contextSync.targets": {
           "type": "array",
-          "default": ["claude"],
+          "default": ["claude", "cursor", "copilot"],
           "items": {
             "type": "string",
             "enum": ["claude", "cursor", "copilot"]
