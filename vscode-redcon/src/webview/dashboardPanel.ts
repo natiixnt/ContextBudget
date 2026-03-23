@@ -8,7 +8,7 @@ import { state } from '../state';
 const STRATEGY_COLORS: Record<string, string> = {
   full: '#4ec9b0',
   snippet: '#dcdcaa',
-  symbol_extraction: '#e53935',
+  symbol_extraction: '#1e3a5f',
   summary: '#888',
   slicing: '#6a9955',
   cache_reuse: '#c678dd',
@@ -94,8 +94,8 @@ export class DashboardPanel {
       --fg: var(--vscode-editor-foreground);
       --border: var(--vscode-panel-border);
       --card-bg: var(--vscode-sideBar-background);
-      --accent: #e53935;
-      --accent-dim: rgba(229, 57, 53, 0.15);
+      --accent: #1e3a5f;
+      --accent-dim: rgba(30, 58, 95, 0.15);
       --success: #4ec9b0;
       --warning: #dcdcaa;
       --error: #f14c4c;
@@ -139,10 +139,10 @@ export class DashboardPanel {
     }
     .btn:hover { border-color: var(--accent); }
     .btn-primary {
-      background: var(--accent); color: #fff; border-color: var(--accent);
-      box-shadow: 0 0 8px rgba(229, 57, 53, 0.3);
+      background: linear-gradient(135deg, #e53935, #1e3a5f); color: #fff; border-color: transparent;
+      box-shadow: 0 0 8px rgba(30, 58, 95, 0.3);
     }
-    .btn-primary:hover { opacity: 0.9; box-shadow: 0 0 14px rgba(229, 57, 53, 0.5); }
+    .btn-primary:hover { opacity: 0.9; box-shadow: 0 0 14px rgba(30, 58, 95, 0.5); }
 
     /* Layout */
     .row { display: grid; gap: 20px; margin-bottom: 24px; }

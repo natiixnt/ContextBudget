@@ -12,8 +12,9 @@ export function getSharedStyles(nonce: string): string {
       --card: color-mix(in srgb, var(--vscode-sideBar-background) 80%, transparent);
       --card-hover: color-mix(in srgb, var(--vscode-sideBar-background) 95%, white 5%);
       --card-border: color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
-      --accent: #e53935;
-      --accent-dim: rgba(229, 57, 53, 0.15);
+      --accent: #1e3a5f;
+      --accent-dim: rgba(30, 58, 95, 0.15);
+      --accent-grad: linear-gradient(135deg, #e53935, #1e3a5f);
       --success: #4ec9b0;
       --success-dim: rgba(78, 201, 176, 0.15);
       --warning: #dcdcaa;
@@ -164,9 +165,9 @@ export function getSharedStyles(nonce: string): string {
     }
     .btn:hover { background: var(--card-hover); border-color: var(--accent); }
     .btn-primary {
-      background: var(--accent);
+      background: linear-gradient(135deg, #e53935, #1e3a5f);
       color: #fff;
-      border-color: var(--accent);
+      border-color: transparent;
     }
     .btn-primary:hover { opacity: 0.9; }
     .btn-sm { padding: 3px 8px; font-size: 10px; }

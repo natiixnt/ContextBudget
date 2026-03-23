@@ -80,7 +80,9 @@ function renderTutorial(): string {
           <div class="tutorial-body">
             <div class="tutorial-step-title">Initialize config</div>
             <div class="card-sub">Create a <code>redcon.toml</code> config in your project root to set token budgets and compression strategies.</div>
-            <button class="btn btn-sm" style="margin-top:6px;" data-send="config">Open Config</button>
+            <div class="tutorial-actions">
+              <button class="btn btn-sm" data-send="config">Open Config</button>
+            </div>
           </div>
         </div>
         <div class="tutorial-step">
@@ -102,7 +104,7 @@ function renderTutorial(): string {
           <div class="tutorial-body">
             <div class="tutorial-step-title">Explore more</div>
             <div class="card-sub">Check environment health, view detailed analytics, or run diagnostics.</div>
-            <div style="display:flex;gap:4px;flex-wrap:wrap;margin-top:6px;">
+            <div class="tutorial-actions">
               <button class="btn btn-sm" data-send="doctor">Doctor</button>
               <button class="btn btn-sm" data-action="dashboard">Dashboard</button>
             </div>
@@ -341,7 +343,7 @@ function renderInfo(message: string): string {
 }
 
 const STRAT_COLORS: Record<string, string> = {
-  full: '#4ec9b0', snippet: '#dcdcaa', symbol_extraction: '#e53935',
+  full: '#4ec9b0', snippet: '#dcdcaa', symbol_extraction: '#1e3a5f',
   summary: '#888', slicing: '#6a9955', cache_reuse: '#c678dd',
 };
 
@@ -715,9 +717,11 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         max-width: 600px;
       }
       .welcome-icon {
-        font-size: 36px; margin-bottom: 10px; color: var(--accent);
-        filter: drop-shadow(0 0 12px rgba(229, 57, 53, 0.6));
-        text-shadow: 0 0 20px rgba(229, 57, 53, 0.5), 0 0 40px rgba(229, 57, 53, 0.3);
+        font-size: 36px; margin-bottom: 10px;
+        background: linear-gradient(135deg, #e53935, #1e3a5f);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        filter: drop-shadow(0 0 12px rgba(229, 57, 53, 0.4)) drop-shadow(0 0 24px rgba(30, 58, 95, 0.3));
       }
       .welcome-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--fg); }
       .welcome-sub { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
@@ -727,8 +731,8 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       /* User message */
       .msg-user { display: flex; justify-content: flex-end; margin-bottom: 8px; }
       .msg-user-bubble {
-        background: var(--accent-dim);
-        border: 1px solid color-mix(in srgb, var(--accent) 30%, transparent);
+        background: linear-gradient(135deg, rgba(229, 57, 53, 0.12), rgba(30, 58, 95, 0.18));
+        border: 1px solid rgba(229, 57, 53, 0.2);
         border-radius: var(--radius) var(--radius) 4px var(--radius);
         padding: 8px 12px;
         font-size: 12px;
@@ -845,17 +849,17 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .sim-step-name { flex: 1; }
 
       /* Tutorial */
-      .tutorial-steps { display: flex; flex-direction: column; gap: 10px; }
+      .tutorial-steps { display: flex; flex-direction: column; gap: 4px; }
       .tutorial-step {
         display: flex; align-items: flex-start; gap: 10px;
-        padding: 8px 0;
+        padding: 12px 0;
         border-bottom: 1px solid color-mix(in srgb, var(--card-border) 50%, transparent);
       }
-      .tutorial-step:last-child { border-bottom: none; }
+      .tutorial-step:last-child { border-bottom: none; padding-bottom: 4px; }
       .tutorial-num {
         width: 24px; height: 24px;
         border-radius: 50%;
-        background: var(--accent);
+        background: linear-gradient(135deg, #e53935, #1e3a5f);
         color: #fff;
         font-size: 12px; font-weight: 700;
         display: flex; align-items: center; justify-content: center;
@@ -863,6 +867,10 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       .tutorial-body { flex: 1; }
       .tutorial-step-title { font-size: 12px; font-weight: 600; margin-bottom: 2px; }
+      .tutorial-actions {
+        display: flex; gap: 6px; flex-wrap: wrap;
+        padding-top: 5px;
+      }
       .tutorial-step code {
         background: var(--input);
         padding: 1px 4px;
@@ -883,15 +891,15 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         margin: 0 auto;
         box-sizing: border-box;
         padding: 6px 6px 6px 14px;
-        border: 1.5px solid var(--accent);
+        border: 1.5px solid rgba(229, 57, 53, 0.3);
         border-radius: 22px;
         background: var(--input);
-        transition: box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1), border-color 0.3s ease;
+        transition: border-color 0.5s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.5s cubic-bezier(0.4, 0, 0.2, 1);
         box-shadow: 0 0 0 transparent;
       }
       #input-bar:focus-within {
-        border-color: var(--accent);
-        box-shadow: 0 0 12px rgba(229, 57, 53, 0.15), 0 0 30px rgba(229, 57, 53, 0.08);
+        border-color: rgba(229, 57, 53, 0.6);
+        box-shadow: 0 0 16px rgba(229, 57, 53, 0.2), 0 0 40px rgba(30, 58, 95, 0.15), 0 0 60px rgba(229, 57, 53, 0.06);
       }
       #task-input {
         flex: 1;
@@ -910,7 +918,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         padding: 0;
         border: none;
         border-radius: 50%;
-        background: var(--accent);
+        background: linear-gradient(135deg, #e53935, #1e3a5f);
         color: #fff;
         cursor: pointer;
         display: flex;
@@ -918,12 +926,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         justify-content: center;
         flex-shrink: 0;
         transition: all var(--transition);
-        box-shadow: 0 0 8px rgba(229, 57, 53, 0.3);
+        box-shadow: 0 0 6px rgba(229, 57, 53, 0.2), 0 0 12px rgba(30, 58, 95, 0.2);
       }
       #send-btn svg {
         display: block;
       }
-      #send-btn:hover { opacity: 0.85; box-shadow: 0 0 14px rgba(229, 57, 53, 0.5); }
+      #send-btn:hover { opacity: 0.85; box-shadow: 0 0 10px rgba(229, 57, 53, 0.3), 0 0 20px rgba(30, 58, 95, 0.3); }
       #send-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
     `;
 
