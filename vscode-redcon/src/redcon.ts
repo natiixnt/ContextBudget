@@ -45,9 +45,13 @@ async function exec(
   const timeout = opts.timeout ?? 120_000;
 
   return new Promise((resolve, reject) => {
+    const pathDirs = ['/usr/local/bin', '/opt/homebrew/bin', process.env.HOME + '/.local/bin'].join(':');
+    const env = { ...process.env, PYTHONUNBUFFERED: '1' };
+    env.PATH = pathDirs + ':' + (process.env.PATH ?? '');
+
     const proc = spawn(cmd, args, {
       cwd: opts.cwd,
-      env: { ...process.env, PYTHONUNBUFFERED: '1' },
+      env,
       stdio: ['ignore', 'pipe', 'pipe'],
     });
 
@@ -80,6 +84,8 @@ async function exec(
               `Or set "redcon.cliCommand" in VS Code settings.`,
           ),
         );
+      } else if ((err as NodeJS.ErrnoException).code === 'EACCES') {
+        reject(new Error('Permission denied running redcon CLI. Check file permissions.'));
       } else {
         reject(err);
       }
@@ -95,7 +101,7 @@ function parseJson<T>(result: CliResult): T {
       `Failed to parse Redcon output as JSON.\n` +
         `Exit code: ${result.exitCode}\n` +
         `stderr: ${result.stderr}\n` +
-        `stdout (first 500 chars): ${result.stdout.slice(0, 500)}`,
+        `stdout (first 1000 chars): ${result.stdout.slice(0, 1000)}`,
     );
   }
 }

@@ -6,25 +6,27 @@
 export function getSharedStyles(nonce: string): string {
   return `<style nonce="${nonce}">
     :root {
-      --bg: var(--vscode-editor-background);
-      --fg: var(--vscode-editor-foreground);
-      --border: var(--vscode-panel-border);
-      --card: color-mix(in srgb, var(--vscode-sideBar-background) 80%, transparent);
-      --card-hover: color-mix(in srgb, var(--vscode-sideBar-background) 95%, white 5%);
-      --card-border: color-mix(in srgb, var(--vscode-panel-border) 60%, transparent);
+      --bg: var(--vscode-editor-background, #1e1e1e);
+      --fg: var(--vscode-editor-foreground, #d4d4d4);
+      --border: var(--vscode-panel-border, #2d2d2d);
+      --card: color-mix(in srgb, var(--vscode-sideBar-background, #252526) 80%, transparent);
+      --card-hover: color-mix(in srgb, var(--vscode-sideBar-background, #252526) 95%, white 5%);
+      --card-border: color-mix(in srgb, var(--vscode-panel-border, #2d2d2d) 60%, transparent);
+      --accent-red: #e53935;
+      --accent-navy: #1e3a5f;
       --accent: #1e3a5f;
       --accent-dim: rgba(30, 58, 95, 0.15);
-      --accent-grad: linear-gradient(135deg, #e53935, #1e3a5f);
+      --accent-grad: linear-gradient(135deg, var(--accent-red), var(--accent-navy));
       --success: #4ec9b0;
       --success-dim: rgba(78, 201, 176, 0.15);
       --warning: #dcdcaa;
       --warning-dim: rgba(220, 220, 170, 0.15);
       --error: #f14c4c;
       --error-dim: rgba(241, 76, 76, 0.15);
-      --muted: var(--vscode-descriptionForeground);
-      --input: var(--vscode-input-background);
-      --badge-bg: var(--vscode-badge-background);
-      --badge-fg: var(--vscode-badge-foreground);
+      --muted: var(--vscode-descriptionForeground, #808080);
+      --input: var(--vscode-input-background, #3c3c3c);
+      --badge-bg: var(--vscode-badge-background, #4d4d4d);
+      --badge-fg: var(--vscode-badge-foreground, #ffffff);
       --radius: 10px;
       --radius-sm: 6px;
       --radius-lg: 14px;
@@ -37,7 +39,7 @@ export function getSharedStyles(nonce: string): string {
 
     body {
       font-family: var(--vscode-font-family, system-ui, -apple-system, sans-serif);
-      font-size: 12px;
+      font-size: 13px;
       color: var(--fg);
       background: transparent;
       padding: 8px;
@@ -60,15 +62,6 @@ export function getSharedStyles(nonce: string): string {
       border-color: var(--accent-dim);
       box-shadow: var(--shadow);
     }
-    .card-glass {
-      background: linear-gradient(
-        135deg,
-        color-mix(in srgb, var(--vscode-sideBar-background) 70%, transparent),
-        color-mix(in srgb, var(--vscode-sideBar-background) 90%, transparent)
-      );
-      border: 1px solid color-mix(in srgb, white 8%, transparent);
-    }
-
     .card-title {
       font-size: 10px;
       text-transform: uppercase;
@@ -165,7 +158,7 @@ export function getSharedStyles(nonce: string): string {
     }
     .btn:hover { background: var(--card-hover); border-color: var(--accent); }
     .btn-primary {
-      background: linear-gradient(135deg, #e53935, #1e3a5f);
+      background: var(--accent-grad);
       color: #fff;
       border-color: transparent;
     }
@@ -267,18 +260,6 @@ export function getSharedStyles(nonce: string): string {
       margin-top: 2px;
     }
 
-    /* --- Sparkline --- */
-    .sparkline {
-      display: inline-block;
-      vertical-align: middle;
-    }
-    .sparkline polyline {
-      fill: none;
-      stroke-width: 1.5;
-      stroke-linecap: round;
-      stroke-linejoin: round;
-    }
-
     /* --- Section headers --- */
     .section-title {
       font-size: 11px;
@@ -333,20 +314,25 @@ export function getSharedStyles(nonce: string): string {
     .animate-slide {
       animation: slideIn 0.3s ease forwards;
     }
-    .stagger > * {
-      opacity: 0;
-      animation: fadeIn 0.3s ease forwards;
+
+    @media (prefers-reduced-motion: reduce) {
+      *, *::before, *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+      }
     }
-    .stagger > *:nth-child(1) { animation-delay: 0s; }
-    .stagger > *:nth-child(2) { animation-delay: 0.05s; }
-    .stagger > *:nth-child(3) { animation-delay: 0.1s; }
-    .stagger > *:nth-child(4) { animation-delay: 0.15s; }
-    .stagger > *:nth-child(5) { animation-delay: 0.2s; }
-    .stagger > *:nth-child(6) { animation-delay: 0.25s; }
-    .stagger > *:nth-child(7) { animation-delay: 0.3s; }
-    .stagger > *:nth-child(8) { animation-delay: 0.35s; }
-    .stagger > *:nth-child(9) { animation-delay: 0.4s; }
-    .stagger > *:nth-child(10) { animation-delay: 0.45s; }
+
+    /* --- Accessibility --- */
+    .sr-only {
+      position: absolute;
+      width: 1px;
+      height: 1px;
+      overflow: hidden;
+      clip: rect(0, 0, 0, 0);
+      white-space: nowrap;
+      border: 0;
+    }
 
     /* --- Scrollbar --- */
     ::-webkit-scrollbar { width: 6px; }
@@ -398,7 +384,8 @@ export function escapeHtml(text: string): string {
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
 }
 
 export function formatTokens(n: number): string {

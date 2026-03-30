@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import { state } from './state';
+import { formatTokens } from './webview/theme';
 
 export class StatusBar {
   private readonly budgetItem: vscode.StatusBarItem;
@@ -64,7 +65,7 @@ export class StatusBar {
 
     // Budget item
     const icon = pct > 90 ? '$(warning)' : pct > 70 ? '$(info)' : '$(package)';
-    this.budgetItem.text = `${icon} ${this.formatTokens(used)}/${this.formatTokens(max)}`;
+    this.budgetItem.text = `${icon} ${formatTokens(used)}/${formatTokens(max)}`;
     this.budgetItem.tooltip = new vscode.MarkdownString(
       [
         `**Redcon Budget**`,
@@ -103,18 +104,8 @@ export class StatusBar {
     this.riskItem.show();
   }
 
-  private formatTokens(n: number): string {
-    if (n >= 1_000_000) {
-      return `${(n / 1_000_000).toFixed(1)}M`;
-    }
-    if (n >= 1_000) {
-      return `${(n / 1_000).toFixed(1)}k`;
-    }
-    return String(n);
-  }
-
   private progressBar(pct: number): string {
-    const filled = Math.round(pct / 5);
+    const filled = Math.max(0, Math.min(20, Math.round(pct / 5)));
     const empty = 20 - filled;
     return '\u2588'.repeat(filled) + '\u2591'.repeat(empty);
   }

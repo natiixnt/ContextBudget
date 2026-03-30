@@ -3,7 +3,13 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
 import { state } from '../state';
+
+function getRelativePath(fsPath: string, repoRoot: string): string {
+  if (!repoRoot) return fsPath;
+  return path.relative(repoRoot, fsPath).split(path.sep).join('/');
+}
 
 export class RedconCodeLensProvider implements vscode.CodeLensProvider {
   private readonly _onDidChange = new vscode.EventEmitter<void>();
@@ -29,10 +35,7 @@ export class RedconCodeLensProvider implements vscode.CodeLensProvider {
     }
 
     const repoRoot = run.repo ?? '';
-    let relPath = document.uri.fsPath;
-    if (repoRoot && relPath.startsWith(repoRoot)) {
-      relPath = relPath.slice(repoRoot.length).replace(/^[/\\]/, '');
-    }
+    const relPath = getRelativePath(document.uri.fsPath, repoRoot);
 
     // Find in compressed context
     const compressed = run.compressed_context?.find(
@@ -83,13 +86,22 @@ export class RedconCodeLensProvider implements vscode.CodeLensProvider {
 
     // Show selected ranges as additional lenses
     if (compressed.selected_ranges?.length && compressed.strategy === 'snippet') {
-      for (const range of compressed.selected_ranges.slice(0, 3)) {
+      for (const range of (compressed.selected_ranges ?? []).slice(0, 3)) {
         const startLine = Math.max(0, (range.start as number) - 1);
         lenses.push(
           new vscode.CodeLens(new vscode.Range(startLine, 0, startLine, 0), {
             title: `$(selection) included: L${range.start}-${range.end} (${range.type})`,
             command: '',
             tooltip: `This range is included in the packed context`,
+          }),
+        );
+      }
+      if (compressed.selected_ranges.length > 3) {
+        lenses.push(
+          new vscode.CodeLens(new vscode.Range(0, 0, 0, 0), {
+            title: `+${compressed.selected_ranges.length - 3} more ranges`,
+            command: 'redcon.openDashboard',
+            tooltip: `${compressed.selected_ranges.length} total ranges included`,
           }),
         );
       }

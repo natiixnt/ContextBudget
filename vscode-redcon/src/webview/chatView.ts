@@ -64,8 +64,8 @@ function renderWelcome(): string {
       <div class="welcome-sub">Context budgeting for AI coding agents</div>
       <div class="welcome-hint">Type a task below to analyze and pack your repository context.</div>
       <div class="welcome-actions">
-        <button class="btn btn-sm" data-send="doctor">Run Doctor</button>
-        <button class="btn btn-sm" data-send="config">Open Config</button>
+        <button class="btn btn-sm btn-primary" data-send="doctor">Run Doctor</button>
+        <button class="btn btn-sm btn-primary" data-send="config">Open Config</button>
       </div>
     </div>`;
 }
@@ -123,6 +123,7 @@ function renderAnalyzing(label: string): string {
     <div class="msg-system analyzing">
       <span class="dot-pulse"></span>
       <span>${escapeHtml(label)}</span>
+      <span class="analyzing-timer" style="margin-left:auto;font-size:10px;color:var(--muted);">0s</span>
     </div>`;
 }
 
@@ -335,7 +336,7 @@ function renderPlanAgentResult(plan: AgentPlanReport): string {
 }
 
 function renderError(message: string): string {
-  return `<div class="msg-error animate-in"><span>&#10007;</span> ${escapeHtml(message)}</div>`;
+  return `<div class="msg-error animate-in"><span>&#10007;</span> ${escapeHtml(message)}<button class="btn btn-sm" data-action="retry" style="margin-left:auto;font-size:10px;">Retry</button></div>`;
 }
 
 function renderInfo(message: string): string {
@@ -604,6 +605,16 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     const id = nextId();
     const msg: ChatMessage = { id, role, type, html, timestamp: Date.now() };
     this.messages.push(msg);
+
+    // Enforce message count limit - remove oldest non-welcome message
+    if (this.messages.length > 100) {
+      const removeIdx = this.messages.findIndex((m) => m.type !== 'welcome');
+      if (removeIdx >= 0) {
+        const removed = this.messages.splice(removeIdx, 1)[0];
+        this.view?.webview.postMessage({ command: 'removeMessage', id: removed.id });
+      }
+    }
+
     this.view?.webview.postMessage({ command: 'addMessage', message: msg });
     return id;
   }
@@ -653,6 +664,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'sync':
         vscode.commands.executeCommand('redcon.syncContext');
         break;
+      case 'retry': {
+        // Re-send the last user task
+        const lastUser = [...this.messages].reverse().find((m) => m.role === 'user' && m.type === 'task');
+        if (lastUser) {
+          // Extract raw text from the user bubble html
+          const match = lastUser.html.match(/<div class="msg-user-bubble">(.*?)<\/div>/s);
+          const text = match ? match[1].replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&quot;/g, '"') : '';
+          if (text) {
+            vscode.commands.executeCommand('redcon.pack', text);
+          }
+        }
+        break;
+      }
       case 'openFile':
         if (data) {
           const folders = vscode.workspace.workspaceFolders;
@@ -732,7 +756,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .msg-user { display: flex; justify-content: flex-end; margin-bottom: 8px; }
       .msg-user-bubble {
         background: linear-gradient(135deg, rgba(229, 57, 53, 0.12), rgba(30, 58, 95, 0.18));
-        border: 1px solid rgba(229, 57, 53, 0.2);
+        border: 1px solid var(--card-border);
         border-radius: var(--radius) var(--radius) 4px var(--radius);
         padding: 8px 12px;
         font-size: 12px;
@@ -933,6 +957,26 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       }
       #send-btn:hover { opacity: 0.85; box-shadow: 0 0 10px rgba(229, 57, 53, 0.3), 0 0 20px rgba(30, 58, 95, 0.3); }
       #send-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+
+      /* Gradient border pseudo for input bar */
+      #input-bar { position: relative; }
+      #input-bar::before {
+        content: '';
+        position: absolute;
+        inset: -1.5px;
+        border-radius: 23px;
+        padding: 1.5px;
+        background: linear-gradient(135deg, #e53935, #1e3a5f);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        opacity: 0.3;
+        pointer-events: none;
+        transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+      }
+      #input-bar:focus-within::before {
+        opacity: 0.6;
+      }
     `;
 
     const script = `
@@ -955,6 +999,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         updateScrollClasses();
       }
 
+      // Track analyzing timers so they can be cleared on replace
+      const analyzingTimers = {};
+
       function appendMessage(msg) {
         const wrapper = document.createElement('div');
         wrapper.className = 'msg msg-' + msg.role;
@@ -962,6 +1009,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         wrapper.innerHTML = msg.html;
         messagesEl.appendChild(wrapper);
         scrollToBottom();
+
+        // Start elapsed timer for analyzing messages
+        const analyzingEl = wrapper.querySelector('.analyzing');
+        if (analyzingEl) {
+          const timerSpan = analyzingEl.querySelector('.analyzing-timer');
+          if (timerSpan) {
+            let seconds = 0;
+            analyzingTimers[msg.id] = setInterval(() => {
+              seconds++;
+              timerSpan.textContent = seconds + 's';
+            }, 1000);
+          }
+        }
+      }
+
+      function removeMessage(id) {
+        const el = document.getElementById(id);
+        if (el) el.remove();
+        if (analyzingTimers[id]) {
+          clearInterval(analyzingTimers[id]);
+          delete analyzingTimers[id];
+        }
       }
 
       function submit() {
@@ -998,12 +1067,19 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         if (msg.command === 'addMessage') {
           appendMessage(msg.message);
         } else if (msg.command === 'updateMessage') {
+          // Clear analyzing timer if present
+          if (analyzingTimers[msg.id]) {
+            clearInterval(analyzingTimers[msg.id]);
+            delete analyzingTimers[msg.id];
+          }
           const el = document.getElementById(msg.id);
           if (el) {
             el.innerHTML = msg.html;
             el.className = el.className.replace(/msg-(user|system|result)/, 'msg-result');
             scrollToBottom();
           }
+        } else if (msg.command === 'removeMessage') {
+          removeMessage(msg.id);
         } else if (msg.command === 'setMessages') {
           messagesEl.innerHTML = '';
           for (const m of msg.messages) {
@@ -1011,16 +1087,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
           }
         }
       });
+
+      // Rotating placeholder text
+      const placeholders = [
+        'Describe your task...',
+        'e.g. add user authentication',
+        'e.g. refactor database layer',
+        'e.g. fix payment webhook handler',
+        'e.g. write API integration tests',
+        'What are you working on?',
+      ];
+      let placeholderIdx = 0;
+      setInterval(() => {
+        placeholderIdx = (placeholderIdx + 1) % placeholders.length;
+        inputEl.placeholder = placeholders[placeholderIdx];
+      }, 5000);
     `;
 
     const body = `
       <div id="messages-wrap" class="at-top at-bottom">
-        <div id="messages"></div>
+        <div id="messages" role="log" aria-live="polite"></div>
       </div>
       <div id="input-wrap">
         <div id="input-bar">
-          <input type="text" id="task-input" placeholder="Describe your task..." />
-          <button id="send-btn" title="Send"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-left:2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
+          <input type="text" id="task-input" placeholder="Describe your task..." aria-label="Task description" />
+          <button id="send-btn" title="Send" aria-label="Send message"><svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor" style="margin-left:2px;"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg></button>
         </div>
       </div>
     `;

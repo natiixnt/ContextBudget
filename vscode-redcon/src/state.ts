@@ -4,6 +4,7 @@
 
 import * as vscode from 'vscode';
 import * as fs from 'fs';
+import * as fsp from 'fs/promises';
 import * as path from 'path';
 import type {
   RedconState,
@@ -71,6 +72,11 @@ class StateManager {
     this._onDidChange.fire('runHistory');
   }
 
+  clearHistory(): void {
+    this._state.runHistory = [];
+    this._onDidChange.fire('runHistory');
+  }
+
   /**
    * Scan workspace for run*.json artifacts and populate history.
    */
@@ -86,7 +92,7 @@ class StateManager {
 
       let files: string[];
       try {
-        files = fs.readdirSync(dir);
+        files = await fsp.readdir(dir);
       } catch {
         continue;
       }
@@ -97,7 +103,7 @@ class StateManager {
         }
         const filePath = path.join(dir, file);
         try {
-          const raw = fs.readFileSync(filePath, 'utf-8');
+          const raw = await fsp.readFile(filePath, 'utf-8');
           const data = JSON.parse(raw);
           if (data.command === 'pack' && data.task && data.budget) {
             entries.push({
@@ -110,8 +116,9 @@ class StateManager {
               risk: data.budget.quality_risk_estimate ?? 'unknown',
             });
           }
-        } catch {
-          // skip invalid JSON
+        } catch (e) {
+          console.warn('Redcon: skipping invalid artifact:', file, e);
+          continue;
         }
       }
     }
@@ -120,6 +127,7 @@ class StateManager {
       (a, b) =>
         new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime(),
     );
+    entries.splice(50);
 
     this.setHistory(entries);
   }

@@ -26,19 +26,33 @@ function getWorkspaceRoot(): string {
   return folders[0].uri.fsPath;
 }
 
+function guardRunning(): boolean {
+  if (state.state.isRunning) {
+    vscode.window.showWarningMessage('A Redcon command is already running.');
+    return true;
+  }
+  return false;
+}
+
 async function askTask(placeholder?: string): Promise<string | undefined> {
   const lastTask = state.state.lastTask;
-  return vscode.window.showInputBox({
+  const result = await vscode.window.showInputBox({
     prompt: 'Describe the task for context analysis',
     placeHolder: placeholder ?? 'e.g. add user authentication',
     value: lastTask || undefined,
     ignoreFocusOut: true,
   });
+  if (result !== undefined && result.trim() === '') {
+    return undefined;
+  }
+  return result?.trim();
 }
 
 // --- Pack ---
 
 export async function cmdPack(taskFromChat?: string): Promise<void> {
+  if (guardRunning()) return;
+
   const task = typeof taskFromChat === 'string' ? taskFromChat : await askTask();
   if (!task) {
     return;
@@ -48,6 +62,11 @@ export async function cmdPack(taskFromChat?: string): Promise<void> {
   const config = vscode.workspace.getConfiguration('redcon');
   const maxTokens = config.get<number>('defaultMaxTokens', 30000);
   const topFiles = config.get<number>('defaultTopFiles', 25);
+
+  if (maxTokens <= 0) {
+    vscode.window.showErrorMessage('Redcon: maxTokens must be greater than 0');
+    return;
+  }
 
   // Post to chat
   chatView?.addUserMessage(task);
@@ -127,6 +146,8 @@ export async function cmdPlan(): Promise<void> {
 // --- Plan Agent ---
 
 export async function cmdPlanAgent(): Promise<void> {
+  if (guardRunning()) return;
+
   const task = await askTask('e.g. implement shopping cart with checkout');
   if (!task) {
     return;
@@ -164,6 +185,8 @@ export async function cmdPlanAgent(): Promise<void> {
 // --- Doctor ---
 
 export async function cmdDoctor(): Promise<void> {
+  if (guardRunning()) return;
+
   const cwd = getWorkspaceRoot();
 
   const analyzingId = chatView?.addAnalyzing('Running diagnostics...');
@@ -234,8 +257,8 @@ export async function cmdExport(): Promise<void> {
     .readdirSync(cwd)
     .filter(
       (f) =>
-        f.endsWith('.json') &&
-        (f.startsWith('run') || f.includes('redcon')),
+        (f.endsWith('.json') && f.startsWith('redcon-')) ||
+        f === 'run.json',
     )
     .map((f) => path.join(cwd, f));
 
@@ -276,6 +299,8 @@ export async function cmdExport(): Promise<void> {
 // --- Benchmark ---
 
 export async function cmdBenchmark(): Promise<void> {
+  if (guardRunning()) return;
+
   const task = await askTask();
   if (!task) {
     return;
@@ -315,6 +340,8 @@ export async function cmdBenchmark(): Promise<void> {
 // --- Simulate ---
 
 export async function cmdSimulate(): Promise<void> {
+  if (guardRunning()) return;
+
   const task = await askTask('e.g. refactor payment processing');
   if (!task) {
     return;
@@ -328,6 +355,7 @@ export async function cmdSimulate(): Promise<void> {
       { label: 'gpt-4o-mini', description: 'OpenAI GPT-4o Mini' },
       { label: 'claude-sonnet-4-20250514', description: 'Anthropic Claude Sonnet' },
       { label: 'claude-opus-4-20250514', description: 'Anthropic Claude Opus' },
+      { label: 'claude-sonnet-4-20250514', description: 'Anthropic Claude 4 Sonnet' },
     ],
     { placeHolder: 'Select model for cost estimation' },
   );
@@ -366,6 +394,8 @@ export async function cmdSimulate(): Promise<void> {
 // --- Drift ---
 
 export async function cmdDrift(): Promise<void> {
+  if (guardRunning()) return;
+
   const cwd = getWorkspaceRoot();
 
   const analyzingId = chatView?.addAnalyzing('Checking token drift...');
@@ -409,10 +439,13 @@ export async function cmdOpenConfig(): Promise<void> {
       'Yes',
       'No',
     );
-    if (create === 'Yes') {
-      await cmdInit();
+    if (create !== 'Yes') {
+      return;
     }
-    return;
+    await cmdInit();
+    if (!fs.existsSync(configPath)) {
+      return;
+    }
   }
 
   const doc = await vscode.workspace.openTextDocument(configPath);
@@ -433,6 +466,7 @@ export async function cmdCopyContext(): Promise<void> {
     .join('\n\n');
 
   await vscode.env.clipboard.writeText(text);
+  vscode.window.setStatusBarMessage('Context copied to clipboard', 3000);
   chatView?.addInfo(`Copied context for ${run.compressed_context.length} files to clipboard`);
 }
 

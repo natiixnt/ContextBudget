@@ -20,7 +20,7 @@ export interface SyncResult {
 function groupByDir(paths: string[]): Record<string, string[]> {
   const groups: Record<string, string[]> = {};
   for (const p of paths) {
-    const parts = p.split('/');
+    const parts = p.split(/[/\\]/);
     const dir = parts.length > 1 ? parts.slice(0, -1).join('/') : '.';
     const name = parts.pop() ?? p;
     if (!groups[dir]) groups[dir] = [];
@@ -42,6 +42,7 @@ export function generateContextMarkdown(run: RunReport, maxFiles: number = 30): 
   lines.push('# Redcon Context');
   lines.push('');
   lines.push(`> Auto-generated. Do not edit. Task: "${run.task}"`);
+  lines.push(`> Last synced: ${new Date().toISOString()}`);
   lines.push('');
 
   // Rule 1: Budget status
@@ -109,10 +110,6 @@ function fmtTokens(n: number): string {
   return String(n);
 }
 
-function wrapForAgent(markdown: string): string {
-  return markdown;
-}
-
 export async function syncContextFiles(
   run: RunReport,
   workspaceRoot: string,
@@ -155,7 +152,7 @@ export async function syncContextFiles(
           continue;
       }
 
-      fs.writeFileSync(filePath, wrapForAgent(markdown), 'utf-8');
+      fs.writeFileSync(filePath, markdown, 'utf-8');
       result.filesWritten.push(filePath);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);

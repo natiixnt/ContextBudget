@@ -13,9 +13,22 @@ export class RedconDecorationProvider
     new vscode.EventEmitter<vscode.Uri | vscode.Uri[] | undefined>();
   readonly onDidChangeFileDecorations = this._onDidChange.event;
 
-  private scoreMap = new Map<string, { score: number; included: boolean; strategy?: string }>();
+  private scoreMap = new Map<string, { score: number; included: boolean; strategy?: string; reason?: string }>();
+  private showDecorations: boolean;
 
   constructor() {
+    const config = vscode.workspace.getConfiguration('redcon');
+    this.showDecorations = config.get<boolean>('showFileDecorations', true);
+
+    vscode.workspace.onDidChangeConfiguration((e) => {
+      if (e.affectsConfiguration('redcon.showFileDecorations')) {
+        this.showDecorations = vscode.workspace
+          .getConfiguration('redcon')
+          .get<boolean>('showFileDecorations', true);
+        this._onDidChange.fire(undefined);
+      }
+    });
+
     state.onDidChange((key) => {
       if (key === 'lastRun') {
         this.rebuildMap();
@@ -27,8 +40,7 @@ export class RedconDecorationProvider
   provideFileDecoration(
     uri: vscode.Uri,
   ): vscode.FileDecoration | undefined {
-    const config = vscode.workspace.getConfiguration('redcon');
-    if (!config.get<boolean>('showFileDecorations', true)) {
+    if (!this.showDecorations) {
       return undefined;
     }
 
@@ -37,12 +49,11 @@ export class RedconDecorationProvider
       return undefined;
     }
 
-    // Match by relative path
+    // Match by relative path (cross-platform)
     const repoRoot = run.repo ?? '';
-    let relPath = uri.fsPath;
-    if (repoRoot && relPath.startsWith(repoRoot)) {
-      relPath = relPath.slice(repoRoot.length).replace(/^[/\\]/, '');
-    }
+    const relPath = repoRoot
+      ? path.relative(repoRoot, uri.fsPath).split(path.sep).join('/')
+      : uri.fsPath;
 
     const entry = this.scoreMap.get(relPath);
     if (!entry) {
@@ -51,9 +62,10 @@ export class RedconDecorationProvider
 
     if (entry.included) {
       const badge = entry.score >= 5 ? '\u2605' : '\u2713';
+      const reasonPart = entry.reason ? ` - ${entry.reason}` : '';
       return {
         badge,
-        tooltip: `Redcon: score ${entry.score.toFixed(1)}${entry.strategy ? ` (${entry.strategy})` : ''}`,
+        tooltip: `Redcon: score ${entry.score.toFixed(1)}${entry.strategy ? ` (${entry.strategy})` : ''}${reasonPart}`,
         color: new vscode.ThemeColor(
           entry.score >= 5
             ? 'redcon.scoreHigh'
@@ -86,10 +98,12 @@ export class RedconDecorationProvider
     }
 
     for (const rf of run.ranked_files ?? []) {
+      const firstReason = rf.reasons?.[0];
       this.scoreMap.set(rf.path, {
         score: rf.score,
         included: included.has(rf.path),
         strategy: strategyMap.get(rf.path),
+        reason: firstReason,
       });
     }
   }

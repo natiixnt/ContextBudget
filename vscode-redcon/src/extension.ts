@@ -17,6 +17,10 @@ import * as redcon from './redcon';
 export async function activate(
   context: vscode.ExtensionContext,
 ): Promise<void> {
+  if (!vscode.workspace.isTrusted) {
+    return;
+  }
+
   const output = vscode.window.createOutputChannel('Redcon');
   output.appendLine('Redcon extension activating...');
 
@@ -96,6 +100,10 @@ export async function activate(
 
     vscode.commands.registerCommand('redcon.syncContext', commands.cmdSyncContext),
 
+    vscode.commands.registerCommand('redcon.clearHistory', () => {
+      state.setHistory([]);
+    }),
+
     vscode.commands.registerCommand('redcon.help', () => {
       chatView.showTutorial();
     }),
@@ -109,14 +117,21 @@ export async function activate(
     }),
   );
 
-  // --- Auto-refresh on save ---
+  // --- Auto-refresh on save (debounced) ---
 
+  let autoRefreshTimer: ReturnType<typeof setTimeout> | undefined;
   context.subscriptions.push(
     vscode.workspace.onDidSaveTextDocument(() => {
       const config = vscode.workspace.getConfiguration('redcon');
       if (config.get<boolean>('autoRefreshOnSave', false) && state.state.lastTask) {
-        chatView.addInfo('File saved - re-analyzing...');
-        vscode.commands.executeCommand('redcon.pack', state.state.lastTask);
+        if (autoRefreshTimer) {
+          clearTimeout(autoRefreshTimer);
+        }
+        autoRefreshTimer = setTimeout(() => {
+          autoRefreshTimer = undefined;
+          chatView.addInfo('File saved - re-analyzing...');
+          vscode.commands.executeCommand('redcon.pack', state.state.lastTask);
+        }, 2000);
       }
     }),
   );
