@@ -72,7 +72,7 @@ def test_pct_change_negative():
 
 
 def test_pct_change_zero_baseline():
-    assert _pct_change(0, 500) == 0.0
+    assert _pct_change(0, 500) == 100.0
 
 
 def test_verdict_none(threshold=10.0):
@@ -215,8 +215,9 @@ def test_run_drift_requires_min_two_entries(tmp_path: Path):
     repo = _make_repo(tmp_path, [
         _entry("2026-01-01T00:00:00+00:00", "t", 1000, ["a.py"]),
     ])
-    with pytest.raises(ValueError, match="2 history entries"):
-        run_drift(repo)
+    report = run_drift(repo)
+    assert report["drift"]["verdict"] == "not_enough_data"
+    assert report["drift"]["alert"] is False
 
 
 def test_run_drift_no_history(tmp_path: Path):
