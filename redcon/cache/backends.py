@@ -3,12 +3,15 @@ from __future__ import annotations
 """Cache backend abstractions and built-in implementations."""
 
 import json
+import logging
 import zlib
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 from pathlib import Path
 from typing import Any, Mapping
+
+logger = logging.getLogger(__name__)
 
 from redcon.schemas.models import CACHE_FILE, CacheReport
 
@@ -46,8 +49,10 @@ class SummaryCacheBackend(ABC):
         summary = self._get_summary(key)
         if summary is None:
             self.stats.misses += 1
+            logger.debug("cache miss [summary] backend=%s key=%s", self.backend_name, key)
             return None
         self.stats.hits += 1
+        logger.debug("cache hit [summary] backend=%s key=%s", self.backend_name, key)
         return summary
 
     def put_summary(self, key: str, summary: str) -> bool:
@@ -69,9 +74,11 @@ class SummaryCacheBackend(ABC):
         if fragment is None:
             self.stats.misses += 1
             self.stats.fragment_misses += 1
+            logger.debug("cache miss [fragment] backend=%s key=%s", self.backend_name, key)
             return None
         self.stats.hits += 1
         self.stats.fragment_hits += 1
+        logger.debug("cache hit [fragment] backend=%s key=%s", self.backend_name, key)
         return fragment
 
     def put_fragment(self, key: str, reference: str) -> bool:
@@ -94,9 +101,11 @@ class SummaryCacheBackend(ABC):
         if value is None:
             self.stats.misses += 1
             self.stats.slice_misses += 1
+            logger.debug("cache miss [slice] backend=%s key=%s", self.backend_name, key)
             return None
         self.stats.hits += 1
         self.stats.slice_hits += 1
+        logger.debug("cache hit [slice] backend=%s key=%s", self.backend_name, key)
         return value
 
     def put_slice(self, key: str, data: str) -> bool:
@@ -127,6 +136,15 @@ class SummaryCacheBackend(ABC):
         if not self.enabled:
             return
         self.stats.tokens_saved += max(0, int(tokens_saved))
+
+    def clear(self) -> None:
+        """Remove all entries from the cache and reset counters."""
+
+        if not self.enabled:
+            return
+        self._clear()
+        self.stats = CacheStats()
+        logger.debug("cache cleared backend=%s", self.backend_name)
 
     def save(self) -> None:
         """Flush backend state if needed."""
@@ -183,6 +201,9 @@ class SummaryCacheBackend(ABC):
 
         Return ``True`` if at least one entry was removed.
         """
+
+    def _clear(self) -> None:
+        """Optional hook to remove all cached entries."""
 
     def _save(self) -> None:
         """Optional persistence hook."""
@@ -264,6 +285,9 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
                 del store[key]
                 removed = True
         return removed
+
+    def _clear(self) -> None:
+        self._data = {"summaries": {}, "fragments": {}, "slices": {}}
 
     def _save(self) -> None:
         try:
@@ -404,6 +428,15 @@ class SQLiteSummaryCacheBackend(SummaryCacheBackend):
             return False
         return deleted > 0
 
+    def _clear(self) -> None:
+        try:
+            conn = self._connect()
+            for table in ("summaries", "fragments", "slices"):
+                conn.execute(f"DELETE FROM {table}")  # noqa: S608
+            conn.commit()
+        except Exception:  # noqa: BLE001
+            pass
+
     def __del__(self) -> None:
         if self._conn is not None:
             try:
@@ -441,6 +474,9 @@ class SharedSummaryCacheBackendStub(SummaryCacheBackend):
 
     def _invalidate(self, key: str) -> bool:
         return False
+
+    def _clear(self) -> None:
+        pass
 
 
 def build_redis_cache_key(
@@ -520,6 +556,7 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
         self.namespace = namespace
         self.ttl_seconds = ttl_seconds
         self._redis: Any = None  # Lazy-initialised on first use
+        self._fallback: InMemorySummaryCacheBackend | None = None
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -534,7 +571,18 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
                     "The 'redis' package is required for the Redis cache backend. "
                     "Install it with: pip install 'redcon[redis]'"
                 ) from exc
-            self._redis = _redis.Redis.from_url(self.redis_url, decode_responses=False)
+            try:
+                client = _redis.Redis.from_url(self.redis_url, decode_responses=False)
+                client.ping()
+                self._redis = client
+            except Exception:  # noqa: BLE001
+                logger.warning(
+                    "Redis connection failed at %s - falling back to in-memory cache",
+                    self.redis_url,
+                )
+                if self._fallback is None:
+                    self._fallback = InMemorySummaryCacheBackend(enabled=self.enabled)
+                return None
         return self._redis
 
     def _namespace_key(self, prefix: str, key: str) -> str:
@@ -547,8 +595,11 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
         return zlib.decompress(data).decode("utf-8")
 
     def _redis_get(self, redis_key: str) -> str | None:
+        client = self._client()
+        if client is None:
+            return None
         try:
-            raw = self._client().get(redis_key)
+            raw = client.get(redis_key)
         except Exception:  # noqa: BLE001 - connection failures degrade gracefully
             return None
         if raw is None:
@@ -560,9 +611,11 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
 
     def _redis_set(self, redis_key: str, value: str) -> bool:
         """Store *value* at *redis_key* with TTL.  Returns True if key was new."""
+        client = self._client()
+        if client is None:
+            return False
         compressed = self._compress(value)
         try:
-            client = self._client()
             is_new = not client.exists(redis_key)
             if self.ttl_seconds > 0:
                 client.setex(redis_key, self.ttl_seconds, compressed)
@@ -577,35 +630,58 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
     # ------------------------------------------------------------------
 
     def _get_summary(self, key: str) -> str | None:
+        if self._fallback is not None:
+            return self._fallback._get_summary(key)
         return self._redis_get(self._namespace_key("s", key))
 
     def _put_summary(self, key: str, summary: str) -> bool:
+        if self._fallback is not None:
+            return self._fallback._put_summary(key, summary)
         return self._redis_set(self._namespace_key("s", key), summary)
 
     def _get_fragment(self, key: str) -> str | None:
+        if self._fallback is not None:
+            return self._fallback._get_fragment(key)
         return self._redis_get(self._namespace_key("f", key))
 
     def _put_fragment(self, key: str, reference: str) -> bool:
+        if self._fallback is not None:
+            return self._fallback._put_fragment(key, reference)
         return self._redis_set(self._namespace_key("f", key), reference)
 
     def _get_slice(self, key: str) -> str | None:
+        if self._fallback is not None:
+            return self._fallback._get_slice(key)
         return self._redis_get(self._namespace_key("c", key))
 
     def _put_slice(self, key: str, data: str) -> bool:
+        if self._fallback is not None:
+            return self._fallback._put_slice(key, data)
         return self._redis_set(self._namespace_key("c", key), data)
 
     def _invalidate(self, key: str) -> bool:
         """Delete all stores (summary, fragment, slice) for *key* from Redis."""
+        if self._fallback is not None:
+            return self._fallback._invalidate(key)
         keys = [
             self._namespace_key("s", key),
             self._namespace_key("f", key),
             self._namespace_key("c", key),
         ]
+        client = self._client()
+        if client is None:
+            return False
         try:
-            deleted: int = self._client().delete(*keys)
+            deleted: int = client.delete(*keys)
         except Exception:  # noqa: BLE001
             return False
         return deleted > 0
+
+    def _clear(self) -> None:
+        if self._fallback is not None:
+            self._fallback._clear()
+            return
+        self.invalidate_namespace()
 
     def invalidate_namespace(self) -> int:
         """Delete all keys in this backend's namespace from Redis.
@@ -622,6 +698,8 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
         deleted = 0
         try:
             client = self._client()
+            if client is None:
+                return 0
             cursor = 0
             while True:
                 cursor, batch = client.scan(cursor, match=pattern, count=200)
@@ -635,47 +713,111 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
 
 
 class InMemorySummaryCacheBackend(SummaryCacheBackend):
-    """Process-local cache backend primarily for tests."""
+    """Process-local cache backend primarily for tests.
+
+    Supports per-entry TTL (default 3600 seconds / 1 hour) and a maximum
+    size limit (default 1000 entries per store).  When the limit is exceeded
+    the oldest entries are evicted first.
+    """
 
     backend_name = "memory"
 
-    def __init__(self, initial_summaries: Mapping[str, str] | None = None, *, enabled: bool = True) -> None:
+    def __init__(
+        self,
+        initial_summaries: Mapping[str, str] | None = None,
+        *,
+        enabled: bool = True,
+        ttl_seconds: int = 3600,
+        max_size: int = 1000,
+    ) -> None:
+        import time
+
         super().__init__(enabled=enabled)
-        self._summaries_store = dict(initial_summaries or {})
+        self.ttl_seconds = ttl_seconds
+        self.max_size = max_size
+        now = time.monotonic()
+        self._summaries_store: dict[str, str] = dict(initial_summaries or {})
+        self._summaries_ts: dict[str, float] = {k: now for k in self._summaries_store}
         self._fragments_store: dict[str, str] = {}
+        self._fragments_ts: dict[str, float] = {}
         self._slices_store: dict[str, str] = {}
+        self._slices_ts: dict[str, float] = {}
+
+    def _is_expired(self, ts_store: dict[str, float], key: str) -> bool:
+        import time
+
+        if self.ttl_seconds <= 0:
+            return False
+        ts = ts_store.get(key)
+        if ts is None:
+            return True
+        return (time.monotonic() - ts) > self.ttl_seconds
+
+    def _evict_oldest(self, store: dict[str, str], ts_store: dict[str, float]) -> None:
+        if self.max_size <= 0 or len(store) <= self.max_size:
+            return
+        sorted_keys = sorted(ts_store, key=lambda k: ts_store.get(k, 0))
+        to_remove = len(store) - self.max_size
+        for k in sorted_keys[:to_remove]:
+            store.pop(k, None)
+            ts_store.pop(k, None)
+
+    def _mem_get(self, store: dict[str, str], ts_store: dict[str, float], key: str) -> str | None:
+        if key not in store:
+            return None
+        if self._is_expired(ts_store, key):
+            store.pop(key, None)
+            ts_store.pop(key, None)
+            return None
+        return store[key]
+
+    def _mem_put(self, store: dict[str, str], ts_store: dict[str, float], key: str, value: str) -> bool:
+        import time
+
+        is_new_key = key not in store
+        store[key] = value
+        ts_store[key] = time.monotonic()
+        self._evict_oldest(store, ts_store)
+        return is_new_key
 
     def _get_summary(self, key: str) -> str | None:
-        return self._summaries_store.get(key)
+        return self._mem_get(self._summaries_store, self._summaries_ts, key)
 
     def _put_summary(self, key: str, summary: str) -> bool:
-        is_new_key = key not in self._summaries_store
-        self._summaries_store[key] = summary
-        return is_new_key
+        return self._mem_put(self._summaries_store, self._summaries_ts, key, summary)
 
     def _get_fragment(self, key: str) -> str | None:
-        return self._fragments_store.get(key)
+        return self._mem_get(self._fragments_store, self._fragments_ts, key)
 
     def _put_fragment(self, key: str, reference: str) -> bool:
-        is_new_key = key not in self._fragments_store
-        self._fragments_store[key] = reference
-        return is_new_key
+        return self._mem_put(self._fragments_store, self._fragments_ts, key, reference)
 
     def _get_slice(self, key: str) -> str | None:
-        return self._slices_store.get(key)
+        return self._mem_get(self._slices_store, self._slices_ts, key)
 
     def _put_slice(self, key: str, data: str) -> bool:
-        is_new_key = key not in self._slices_store
-        self._slices_store[key] = data
-        return is_new_key
+        return self._mem_put(self._slices_store, self._slices_ts, key, data)
 
     def _invalidate(self, key: str) -> bool:
         removed = False
-        for store in (self._summaries_store, self._fragments_store, self._slices_store):
+        for store, ts_store in (
+            (self._summaries_store, self._summaries_ts),
+            (self._fragments_store, self._fragments_ts),
+            (self._slices_store, self._slices_ts),
+        ):
             if key in store:
                 del store[key]
+                ts_store.pop(key, None)
                 removed = True
         return removed
+
+    def _clear(self) -> None:
+        self._summaries_store.clear()
+        self._summaries_ts.clear()
+        self._fragments_store.clear()
+        self._fragments_ts.clear()
+        self._slices_store.clear()
+        self._slices_ts.clear()
 
 
 def normalize_cache_backend_name(backend: str | None) -> str:

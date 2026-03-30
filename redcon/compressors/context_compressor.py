@@ -2,11 +2,15 @@ from __future__ import annotations
 
 """Pack/compression stage for budgeted context generation."""
 
+import logging
 import re
+import time
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
 from typing import TYPE_CHECKING, Callable
+
+logger = logging.getLogger(__name__)
 
 if TYPE_CHECKING:
     from redcon.compressors.representations import FileTiers
@@ -364,7 +368,7 @@ def _finalize_entry(
 ) -> CompressedFile:
     """Build a CompressedFile from a chosen tier, apply import dedup and cache."""
     text = _dedup_imports(tier.text, seen_imports) if tier.strategy != "full" else tier.text
-    compressed_tokens = token_estimator(text)
+    compressed_tokens = min(token_estimator(text), raw_tokens)
 
     fragment_cache_key_val = _fragment_cache_key(file_record.path, tier.selected_ranges, text)
     fragment_reference = _fragment_reference_id(fragment_cache_key_val)
@@ -415,6 +419,27 @@ def compress_ranked_files(
     """
 
     cfg = settings if settings is not None else CompressionSettings()
+
+    if not ranked_files:
+        logger.debug("compress_ranked_files called with empty file list - returning empty result")
+        empty_cache = cache.snapshot()
+        empty_summarizer = SummarizationService(
+            backend=(summarization_settings.backend if summarization_settings is not None else "deterministic"),
+            adapter_name=(summarization_settings.adapter if summarization_settings is not None else ""),
+        )
+        return CompressionResult(
+            compressed_files=[],
+            files_included=[],
+            files_skipped=[],
+            estimated_input_tokens=0,
+            estimated_saved_tokens=0,
+            duplicate_reads_prevented=0,
+            cache=empty_cache,
+            cache_hits=empty_cache.hits,
+            quality_risk_estimate="low",
+            summarizer=empty_summarizer.snapshot(),
+        )
+
     keywords = task_keywords(task)
     seen_imports: set[str] = set()
 
@@ -450,63 +475,91 @@ def compress_ranked_files(
 
         raw_tokens = token_estimator(full_text)
         total_raw += raw_tokens
-        relationship_context = slice_relationships.get(file_record.path, SliceRelationshipContext())
 
-        relevance_score = ranked.heuristic_score if ranked.heuristic_score > 0 else ranked.score
-        is_test = _is_test_file(file_record.path)
+        t0 = time.monotonic() if raw_tokens > 10000 else None
 
-        # Adaptive line budget (same logic as the old greedy path).
-        if cfg.adaptive_line_budget and cfg.snippet_score_threshold > 0:
-            _score_ratio = relevance_score / cfg.snippet_score_threshold
-            _factor = min(cfg.adaptive_line_budget_max_factor, max(0.5, _score_ratio))
-            effective_line_budget = max(1, int(cfg.snippet_total_line_limit * _factor))
-            effective_max_symbols = max(2, min(8, round(4 * _factor)))
-        else:
-            effective_line_budget = cfg.snippet_total_line_limit
-            effective_max_symbols = 4
+        try:
+            relationship_context = slice_relationships.get(file_record.path, SliceRelationshipContext())
 
-        effective_stub_threshold = 7.0 if is_test else _STUB_SCORE_THRESHOLD
+            relevance_score = ranked.heuristic_score if ranked.heuristic_score > 0 else ranked.score
+            is_test = _is_test_file(file_record.path)
 
-        # Pre-compute extractions here so that monkeypatches on this module
-        # propagate correctly (tests patch context_compressor.select_*).
-        symbol_selection = None
-        symbol_failure_reason = ""
-        if cfg.symbol_extraction_enabled:
-            try:
-                symbol_selection = select_symbol_aware_chunks(
-                    file_path=file_record.path,
+            # Adaptive line budget (same logic as the old greedy path).
+            if cfg.adaptive_line_budget and cfg.snippet_score_threshold > 0:
+                _score_ratio = relevance_score / cfg.snippet_score_threshold
+                _factor = min(cfg.adaptive_line_budget_max_factor, max(0.5, _score_ratio))
+                effective_line_budget = max(1, int(cfg.snippet_total_line_limit * _factor))
+                effective_max_symbols = max(2, min(8, round(4 * _factor)))
+            else:
+                effective_line_budget = cfg.snippet_total_line_limit
+                effective_max_symbols = 4
+
+            effective_stub_threshold = 7.0 if is_test else _STUB_SCORE_THRESHOLD
+
+            # Pre-compute extractions here so that monkeypatches on this module
+            # propagate correctly (tests patch context_compressor.select_*).
+            symbol_selection = None
+            symbol_failure_reason = ""
+            if cfg.symbol_extraction_enabled:
+                try:
+                    symbol_selection = select_symbol_aware_chunks(
+                        file_path=file_record.path,
+                        text=full_text,
+                        keywords=keywords,
+                        line_budget=effective_line_budget,
+                        max_symbols=effective_max_symbols,
+                        stub_score_threshold=effective_stub_threshold,
+                    )
+                except Exception as exc:
+                    symbol_failure_reason = f"symbol extraction failed: {exc}"
+                    symbol_selection = None
+
+            slice_selection = select_language_aware_chunks(
+                file_path=file_record.path,
+                text=full_text,
+                keywords=keywords,
+                line_budget=effective_line_budget,
+                relationship_context=relationship_context,
+                surrounding_lines=min(1, max(0, cfg.snippet_context_lines)),
+            )
+
+            tiers = build_tiers(
+                ranked=ranked,
+                full_text=full_text,
+                keywords=keywords,
+                relationship_context=relationship_context,
+                cfg=cfg,
+                summarizer=summarizer,
+                cache=cache,
+                symbol_selection=symbol_selection,
+                slice_selection=slice_selection,
+                symbol_failure_reason=symbol_failure_reason,
+                token_estimator=token_estimator,
+            )
+
+            # Fallback: if the selected strategy produced no tiers, try "full"
+            if not tiers:
+                logger.debug("No tiers produced for %s - falling back to full strategy", file_record.path)
+                from redcon.compressors.representations import Tier
+                full_tier = Tier(
+                    strategy="full",
                     text=full_text,
-                    keywords=keywords,
-                    line_budget=effective_line_budget,
-                    max_symbols=effective_max_symbols,
-                    stub_score_threshold=effective_stub_threshold,
+                    tokens=raw_tokens,
+                    selected_ranges=[],
+                    symbols=[],
+                    chunk_strategy="full",
+                    chunk_reason="fallback to full - selected strategy produced no tiers",
                 )
-            except Exception as exc:
-                symbol_failure_reason = f"symbol extraction failed: {exc}"
-                symbol_selection = None
+                tiers = [full_tier]
 
-        slice_selection = select_language_aware_chunks(
-            file_path=file_record.path,
-            text=full_text,
-            keywords=keywords,
-            line_budget=effective_line_budget,
-            relationship_context=relationship_context,
-            surrounding_lines=min(1, max(0, cfg.snippet_context_lines)),
-        )
+        except Exception as exc:
+            logger.error("Failed to compress %s: %s - skipping file", file_record.path, exc)
+            files_skipped.append(file_record.path)
+            continue
 
-        tiers = build_tiers(
-            ranked=ranked,
-            full_text=full_text,
-            keywords=keywords,
-            relationship_context=relationship_context,
-            cfg=cfg,
-            summarizer=summarizer,
-            cache=cache,
-            symbol_selection=symbol_selection,
-            slice_selection=slice_selection,
-            symbol_failure_reason=symbol_failure_reason,
-            token_estimator=token_estimator,
-        )
+        if t0 is not None:
+            elapsed = time.monotonic() - t0
+            logger.debug("Compressed large file %s (%d tokens) in %.3fs", file_record.path, raw_tokens, elapsed)
 
         prepared.append(FileTiers(
             path=file_record.path,

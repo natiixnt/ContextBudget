@@ -6,11 +6,16 @@ from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 import fnmatch
 import json
+import logging
 import os
 from pathlib import Path, PurePosixPath
 import re
 from typing import Any
 import hashlib
+
+logger = logging.getLogger(__name__)
+
+MAX_FILE_COUNT = 50_000
 
 _SYMBOL_DEF_RE = re.compile(r"^(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)", re.MULTILINE)
 
@@ -585,6 +590,9 @@ def refresh_scan_index(
     updated_paths: list[str] = []
     seen_paths: set[str] = set()
 
+    total_file_count = 0
+    resolved_symlinks: set[str] = set()
+
     for root, dirnames, filenames in os.walk(repo_path):
         dirnames[:] = sorted(
             name for name in dirnames
@@ -592,17 +600,59 @@ def refresh_scan_index(
         )
         for name in sorted(filenames):
             path = Path(root) / name
-            if not path.is_file():
+
+            # Handle symlinks - resolve and skip circular links
+            if path.is_symlink():
+                try:
+                    resolved = str(path.resolve(strict=True))
+                except OSError:
+                    logger.debug("Skipping broken symlink: %s", path)
+                    continue
+                if resolved in resolved_symlinks:
+                    logger.debug("Skipping circular symlink: %s -> %s", path, resolved)
+                    continue
+                resolved_symlinks.add(resolved)
+
+            try:
+                if not path.is_file():
+                    continue
+            except OSError:
+                logger.debug("Skipping inaccessible path: %s", path)
                 continue
+
+            # Normalize path to forward slashes consistently
             rel = path.relative_to(repo_path).as_posix()
             if rel in normalized_internal_paths:
                 continue
+
+            # File count limit guard
+            total_file_count += 1
+            if total_file_count > MAX_FILE_COUNT:
+                if total_file_count == MAX_FILE_COUNT + 1:
+                    logger.warning(
+                        "File count exceeds %d limit - capping scan results",
+                        MAX_FILE_COUNT,
+                    )
+                break
+
             try:
                 stat_result = path.stat()
             except OSError:
+                logger.debug("Skipping file due to stat error: %s", rel)
                 continue
+
             seen_paths.add(rel)
             file_size = int(stat_result.st_size)
+
+            # Log when a file is skipped due to size limit
+            if file_size > max_file_size_bytes:
+                logger.debug(
+                    "File exceeds size limit (%d > %d bytes): %s",
+                    file_size,
+                    max_file_size_bytes,
+                    rel,
+                )
+
             previous_entry = previous.entries.get(rel)
             if (
                 previous_entry is not None
@@ -634,6 +684,9 @@ def refresh_scan_index(
                 added_paths.append(rel)
             else:
                 updated_paths.append(rel)
+        else:
+            continue
+        break
 
     removed_paths = sorted(set(previous.entries) - seen_paths)
     state = ScanIndexState(settings_fingerprint=settings_fingerprint, entries=current_entries)

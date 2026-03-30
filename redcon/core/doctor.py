@@ -3,6 +3,8 @@ from __future__ import annotations
 """Diagnostics for verifying Redcon environment health."""
 
 import platform
+import shutil
+import subprocess
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -36,16 +38,21 @@ class DoctorReport:
 
 def _check_python_version() -> CheckResult:
     version = sys.version_info
+    ver_str = f"{version.major}.{version.minor}.{version.micro}"
     if version >= (3, 10):
         return CheckResult(
             name="python_version",
             status="ok",
-            message=f"Python {version.major}.{version.minor}.{version.micro}",
+            message=f"Python {ver_str}",
         )
     return CheckResult(
         name="python_version",
-        status="fail",
-        message=f"Python {version.major}.{version.minor}.{version.micro} - requires >= 3.10",
+        status="warn",
+        message=f"Python {ver_str} detected - redcon requires >= 3.10. Some features may not work.",
+        detail=(
+            "Upgrade to Python 3.10 or later for full compatibility. "
+            "Visit https://www.python.org/downloads/ for installers."
+        ),
     )
 
 
@@ -146,6 +153,123 @@ def _check_git_repo(repo: Path) -> CheckResult:
     )
 
 
+def _check_disk_space(repo: Path) -> CheckResult:
+    """Check available disk space for the workspace (fix 2)."""
+    try:
+        usage = shutil.disk_usage(repo)
+        free_gb = usage.free / (1024 ** 3)
+        total_gb = usage.total / (1024 ** 3)
+        pct_free = (usage.free / usage.total) * 100 if usage.total > 0 else 0
+        if free_gb < 0.5:
+            return CheckResult(
+                name="disk_space",
+                status="fail",
+                message=f"Very low disk space: {free_gb:.1f} GB free of {total_gb:.1f} GB ({pct_free:.0f}% free)",
+                detail="Redcon needs disk space for caching run history and artifacts.",
+            )
+        if free_gb < 2.0:
+            return CheckResult(
+                name="disk_space",
+                status="warn",
+                message=f"Low disk space: {free_gb:.1f} GB free of {total_gb:.1f} GB ({pct_free:.0f}% free)",
+                detail="Consider freeing up space to avoid issues with run history storage.",
+            )
+        return CheckResult(
+            name="disk_space",
+            status="ok",
+            message=f"{free_gb:.1f} GB free of {total_gb:.1f} GB ({pct_free:.0f}% free)",
+        )
+    except OSError as exc:
+        return CheckResult(
+            name="disk_space",
+            status="warn",
+            message=f"Could not determine disk space: {exc}",
+        )
+
+
+def _check_redcon_toml(repo: Path) -> CheckResult:
+    """Check for redcon.toml existence with helpful guidance (fix 3)."""
+    config_path = repo / "redcon.toml"
+    if not config_path.exists():
+        return CheckResult(
+            name="redcon_toml",
+            status="warn",
+            message="No redcon.toml found in project root",
+            detail=(
+                "Without a redcon.toml, all settings use defaults. "
+                "Create one with 'redcon init' or manually add a redcon.toml "
+                "to configure budget limits, scanner options, and policy rules."
+            ),
+        )
+    if not config_path.is_file():
+        return CheckResult(
+            name="redcon_toml",
+            status="fail",
+            message="redcon.toml exists but is not a regular file",
+        )
+    try:
+        size = config_path.stat().st_size
+        if size == 0:
+            return CheckResult(
+                name="redcon_toml",
+                status="warn",
+                message="redcon.toml exists but is empty - defaults will be used",
+            )
+    except OSError:
+        pass
+    return CheckResult(
+        name="redcon_toml",
+        status="ok",
+        message="redcon.toml found",
+    )
+
+
+def _check_git_available() -> CheckResult:
+    """Check that git CLI is available on PATH (fix 4)."""
+    try:
+        result = subprocess.run(
+            ["git", "--version"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        if result.returncode == 0:
+            version_str = result.stdout.strip()
+            return CheckResult(
+                name="git_available",
+                status="ok",
+                message=version_str,
+            )
+        return CheckResult(
+            name="git_available",
+            status="warn",
+            message="git found but returned an error",
+            detail=result.stderr.strip() if result.stderr else "Unknown error",
+        )
+    except FileNotFoundError:
+        return CheckResult(
+            name="git_available",
+            status="warn",
+            message="git is not installed or not on PATH",
+            detail=(
+                "Git is used by scanners for dirty-file detection and PR audit. "
+                "Install git from https://git-scm.com/downloads to enable these features."
+            ),
+        )
+    except subprocess.TimeoutExpired:
+        return CheckResult(
+            name="git_available",
+            status="warn",
+            message="git --version timed out after 5 seconds",
+        )
+    except OSError as exc:
+        return CheckResult(
+            name="git_available",
+            status="warn",
+            message=f"Could not run git: {exc}",
+        )
+
+
 def run_doctor(repo: Path) -> DoctorReport:
     """Run all diagnostic checks and return a report."""
     try:
@@ -167,8 +291,11 @@ def run_doctor(repo: Path) -> DoctorReport:
         _check_optional_dep("fastapi", "fastapi", "gateway"),
         _check_optional_dep("uvicorn", "uvicorn", "gateway"),
         _check_config(repo),
+        _check_redcon_toml(repo),
         _check_cache_dir(repo),
         _check_git_repo(repo),
+        _check_git_available(),
+        _check_disk_space(repo),
     ]
 
     for check in checks:

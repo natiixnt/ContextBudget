@@ -5,10 +5,14 @@ from __future__ import annotations
 from dataclasses import dataclass
 from functools import lru_cache
 import importlib
+import logging
 import math
+import os
 from typing import Any, Callable, Mapping, Sequence
 
 from redcon.schemas.models import TokenEstimatorReport
+
+logger = logging.getLogger(__name__)
 
 
 DEFAULT_MODEL_ALIGNED_MODEL = "gpt-4o-mini"
@@ -86,6 +90,31 @@ def _heuristic_estimate(text: str, chars_per_token: float) -> int:
     if not text:
         return 0
     return max(1, math.ceil(len(text) / chars_per_token))
+
+
+@lru_cache(maxsize=512)
+def count_file_tokens(path: str) -> int:
+    """Count tokens in a file with caching, graceful encoding errors, and empty-file fast path.
+
+    Results are cached by file path so repeated calls for the same file are free.
+    """
+    try:
+        size = os.path.getsize(path)
+    except OSError:
+        logger.debug("cannot stat file for token counting: %s", path)
+        return 0
+
+    # Fast path: empty file
+    if size == 0:
+        return 0
+
+    try:
+        text = open(path, encoding="utf-8", errors="replace").read()  # noqa: SIM115
+    except OSError:
+        logger.debug("cannot read file for token counting: %s", path)
+        return 0
+
+    return estimate_tokens_heuristic(text)
 
 
 def estimate_tokens(text: str) -> int:

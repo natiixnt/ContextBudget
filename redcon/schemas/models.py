@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Shared schema dataclasses and legacy constants."""
 
+import json
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -172,7 +173,7 @@ class AgentPlanReport:
     task: str
     repo: str
     scanned_files: int
-    ranked_files: list[dict]
+    ranked_files: list[dict[str, str | float | int]]
     steps: list[AgentPlanStep]
     shared_context: list[AgentPlanContextFile]
     total_estimated_tokens: int
@@ -180,7 +181,7 @@ class AgentPlanReport:
     reused_context_tokens: int
     generated_at: str
     workspace: str = ""
-    scanned_repos: list[dict] = field(default_factory=list)
+    scanned_repos: list[dict[str, str | int]] = field(default_factory=list)
     selected_repos: list[str] = field(default_factory=list)
     implementations: dict[str, str] = field(default_factory=dict)
     token_estimator: TokenEstimatorReport = field(
@@ -276,17 +277,22 @@ class PrAuditReport:
 
 @dataclass(slots=True)
 class RunReport:
-    """Top-level run report persisted to ``run.json``."""
+    """Top-level run report persisted to ``run.json``.
+
+    Captures every metric and artifact produced by a single redcon context
+    assembly run, including ranked/compressed file lists, budget accounting,
+    cache statistics, and optional delta comparisons.
+    """
 
     command: str
     task: str
     repo: str
     max_tokens: int
-    ranked_files: list[dict]
-    compressed_context: list[dict]
+    ranked_files: list[dict[str, str | float | int]]
+    compressed_context: list[dict[str, str | int]]
     files_included: list[str]
     files_skipped: list[str]
-    budget: dict
+    budget: dict[str, int | str]
     cache: CacheReport
     summarizer: SummarizerReport
     token_estimator: TokenEstimatorReport
@@ -294,12 +300,84 @@ class RunReport:
     generated_at: str
     model_profile: ModelProfileReport = field(default_factory=ModelProfileReport)
     workspace: str = ""
-    scanned_repos: list[dict] = field(default_factory=list)
+    scanned_repos: list[dict[str, str | int]] = field(default_factory=list)
     selected_repos: list[str] = field(default_factory=list)
     implementations: dict[str, str] = field(default_factory=dict)
-    delta: dict = field(default_factory=dict)
+    delta: dict[str, str | int | float] = field(default_factory=dict)
     degraded_files: list[str] = field(default_factory=list)
     degradation_savings: int = 0
+
+    def __post_init__(self) -> None:
+        if self.max_tokens <= 0:
+            raise ValueError(
+                f"max_tokens must be positive, got {self.max_tokens}"
+            )
+
+    def __repr__(self) -> str:
+        used = self.budget.get("estimated_input_tokens", "?")
+        return f"RunReport(task={self.task!r}, tokens={used}/{self.max_tokens})"
+
+    def to_summary(self) -> str:
+        """Return a single-line human-readable summary of this run."""
+        included = len(self.files_included)
+        saved = self.budget.get("estimated_saved_tokens", 0)
+        used = self.budget.get("estimated_input_tokens", 0)
+        return (
+            f"[{self.repo}] {self.task!r} - "
+            f"{included} files, {used} tokens used, {saved} saved"
+        )
+
+    @property
+    def compression_ratio(self) -> float:
+        """Percentage of tokens saved relative to total before compression.
+
+        Returns 0.0 when the total is zero or when saved-token data is
+        unavailable.
+        """
+        saved = self.budget.get("estimated_saved_tokens", 0)
+        used = self.budget.get("estimated_input_tokens", 0)
+        if not isinstance(saved, (int, float)) or not isinstance(used, (int, float)):
+            return 0.0
+        total = used + saved
+        if total == 0:
+            return 0.0
+        return (saved / total) * 100.0
+
+    @property
+    def is_over_budget(self) -> bool:
+        """True when estimated input tokens exceed the configured max."""
+        used = self.budget.get("estimated_input_tokens", 0)
+        if not isinstance(used, (int, float)):
+            return False
+        return used > self.max_tokens
+
+    @classmethod
+    def from_json(cls, raw: str) -> RunReport:
+        """Deserialize a RunReport from a JSON string.
+
+        Validates that required top-level keys are present and reconstructs
+        nested report dataclasses.
+
+        Raises ``ValueError`` on missing keys or malformed data, and
+        ``json.JSONDecodeError`` on invalid JSON.
+        """
+        data = json.loads(raw)
+        required_keys = {
+            "command", "task", "repo", "max_tokens", "ranked_files",
+            "compressed_context", "files_included", "files_skipped",
+            "budget", "cache", "summarizer", "token_estimator",
+            "cache_hits", "generated_at",
+        }
+        missing = required_keys - set(data)
+        if missing:
+            raise ValueError(f"Missing required keys: {sorted(missing)}")
+
+        data["cache"] = CacheReport(**data["cache"])
+        data["summarizer"] = SummarizerReport(**data["summarizer"])
+        data["token_estimator"] = TokenEstimatorReport(**data["token_estimator"])
+        if "model_profile" in data:
+            data["model_profile"] = ModelProfileReport(**data["model_profile"])
+        return cls(**data)
 
 
 CACHE_FILE = ".redcon_cache.json"

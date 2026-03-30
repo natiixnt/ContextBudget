@@ -142,3 +142,22 @@ def audit_everything(token: str) -> bool:
     assert entry["compressed_tokens"] == estimate_tokens(entry["text"])
     assert entry["compressed_tokens"] < full_tokens
     assert data["budget"]["estimated_input_tokens"] == entry["compressed_tokens"]
+
+
+def test_token_count_empty_string_returns_zero() -> None:
+    assert estimate_tokens("") == 0
+    assert estimate_tokens_model_aligned("") == 0
+    assert estimate_tokens_model_aligned("", model="claude-sonnet-4") == 0
+
+
+def test_token_count_very_long_string() -> None:
+    long_text = "x" * 200_000
+    result = estimate_tokens(long_text)
+    assert result > 0
+    # The heuristic divides by 4, so 200k chars should give ~50k tokens
+    assert result == 50_000
+    # Model-aligned should also produce a positive count
+    model_result = estimate_tokens_model_aligned(long_text, model="gpt-4o-mini")
+    assert model_result > 0
+    # Model-aligned uses a different chars-per-token ratio, so results differ
+    assert model_result != result

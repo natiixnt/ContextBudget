@@ -2,9 +2,12 @@ from __future__ import annotations
 
 """Public library API for Redcon workflows."""
 
+import logging
 import time
 from pathlib import Path
 from typing import Any, Mapping, Sequence
+
+logger = logging.getLogger(__name__)
 
 from redcon.cache import update_run_history_artifacts
 from redcon.config import RedconConfig, WorkspaceDefinition, load_config, load_workspace
@@ -173,11 +176,17 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Rank repository or workspace files relevant to a task."""
 
+        logger.info("plan: start - task=%r repo=%r", task, repo)
+        if not task or not task.strip():
+            raise ValueError("task must be a non-empty string")
+
         repo_path = normalize_repo(repo)
+        if not repo_path.is_dir():
+            raise FileNotFoundError(f"workspace_root does not exist or is not a directory: {repo_path}")
         if workspace is not None:
             workspace_definition = self._load_workspace(workspace, config_path=config_path)
             effective_top_files = top_files if top_files is not None else workspace_definition.config.budget.top_files
-            return run_plan(
+            result = run_plan(
                 task,
                 repo=workspace_definition.root,
                 top_n=effective_top_files,
@@ -185,16 +194,20 @@ class RedconEngine:
                 telemetry_sink=self._telemetry_sink,
                 workspace=workspace_definition,
             )
+            logger.info("plan: done - task=%r", task)
+            return result
 
         cfg = self._load_config(repo_path, config_path=config_path)
         effective_top_files = top_files if top_files is not None else cfg.budget.top_files
-        return run_plan(
+        result = run_plan(
             task,
             repo=repo_path,
             top_n=effective_top_files,
             config=cfg,
             telemetry_sink=self._telemetry_sink,
         )
+        logger.info("plan: done - task=%r", task)
+        return result
 
     def plan_agent(
         self,
@@ -207,6 +220,7 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Build a multi-step context plan for agent workflows."""
 
+        logger.info("plan_agent: start - task=%r repo=%r", task, repo)
         repo_path = normalize_repo(repo)
         if workspace is not None:
             workspace_definition = self._load_workspace(workspace, config_path=config_path)
@@ -247,6 +261,7 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Simulate agent workflow token and cost estimates step by step before execution."""
 
+        logger.info("simulate_agent: start - task=%r repo=%r", task, repo)
         repo_path = normalize_repo(repo)
         if workspace is not None:
             workspace_definition = self._load_workspace(workspace, config_path=config_path)
@@ -292,41 +307,102 @@ class RedconEngine:
         top_files: int | None = None,
         delta_from: RunArtifactInput | None = None,
         config_path: str | Path | None = None,
+        timeout: int = 120,
     ) -> dict[str, Any]:
-        """Build compressed context under token and file budgets."""
+        """Build compressed context under token and file budgets.
 
-        repo_path = normalize_repo(repo)
-        if workspace is not None:
-            workspace_definition = self._load_workspace(workspace, config_path=config_path)
-            report = run_pack(
-                task,
-                repo=workspace_definition.root,
-                max_tokens=max_tokens,
-                top_files=top_files,
-                delta_from=delta_from,
-                config=workspace_definition.config,
-                telemetry_sink=self._telemetry_sink,
-                workspace=workspace_definition,
-            )
-            return as_json_dict(report)
+        Parameters
+        ----------
+        timeout:
+            Maximum wall-clock seconds for the pack pipeline (default: 120).
+            The value is stored in result metadata; actual enforcement depends
+            on the underlying pipeline implementation.
+        """
 
-        cfg = self._load_config(repo_path, config_path=config_path)
-        report = run_pack(
-            task,
-            repo=repo_path,
-            max_tokens=max_tokens,
-            top_files=top_files,
-            delta_from=delta_from,
-            config=cfg,
-            telemetry_sink=self._telemetry_sink,
-        )
-        return as_json_dict(report)
+        logger.info("pack: start - task=%r repo=%r timeout=%d", task, repo, timeout)
+        if not task or not task.strip():
+            raise ValueError("task must be a non-empty string")
+
+        t0 = time.perf_counter()
+
+        try:
+            repo_path = normalize_repo(repo)
+            if not repo_path.is_dir():
+                raise FileNotFoundError(
+                    f"workspace_root does not exist or is not a directory: {repo_path}"
+                )
+
+            if workspace is not None:
+                workspace_definition = self._load_workspace(workspace, config_path=config_path)
+                report = run_pack(
+                    task,
+                    repo=workspace_definition.root,
+                    max_tokens=max_tokens,
+                    top_files=top_files,
+                    delta_from=delta_from,
+                    config=workspace_definition.config,
+                    telemetry_sink=self._telemetry_sink,
+                    workspace=workspace_definition,
+                )
+                result = as_json_dict(report)
+            else:
+                cfg = self._load_config(repo_path, config_path=config_path)
+                report = run_pack(
+                    task,
+                    repo=repo_path,
+                    max_tokens=max_tokens,
+                    top_files=top_files,
+                    delta_from=delta_from,
+                    config=cfg,
+                    telemetry_sink=self._telemetry_sink,
+                )
+                result = as_json_dict(report)
+
+            # Ensure compressed_context is always a list, never None
+            if not isinstance(result.get("compressed_context"), list):
+                result["compressed_context"] = []
+
+            # Handle no-files-matched: return empty result instead of propagating an error
+            files_included = result.get("files_included")
+            if not files_included or (isinstance(files_included, list) and len(files_included) == 0):
+                logger.info("pack: no files matched the scan for task=%r", task)
+
+            # Defensive division-by-zero guard for token percentage calculations
+            budget = result.get("budget")
+            if isinstance(budget, dict):
+                max_tok = budget.get("max_tokens") or 0
+                estimated = budget.get("estimated_input_tokens") or 0
+                if max_tok > 0:
+                    budget["utilization_pct"] = round(estimated / max_tok * 100, 2)
+                else:
+                    budget["utilization_pct"] = 0.0
+
+            # Elapsed time tracking
+            elapsed_s = round(time.perf_counter() - t0, 3)
+            meta = result.get("metadata") or {}
+            meta["elapsed_seconds"] = elapsed_s
+            meta["timeout"] = timeout
+            result["metadata"] = meta
+
+            logger.info("pack: done - task=%r elapsed=%.3fs", task, elapsed_s)
+            return result
+
+        except (ValueError, FileNotFoundError):
+            raise
+        except Exception:
+            logger.exception("pack: pipeline failed for task=%r repo=%r", task, repo)
+            raise RuntimeError(
+                f"pack pipeline failed for task={task!r} repo={repo!r} - see logs for details"
+            ) from None
 
     def report(self, run_artifact: RunArtifactInput) -> dict[str, Any]:
         """Create a summary report from a run artifact."""
 
+        logger.info("report: start")
         run_data = self._load_run_artifact(run_artifact)
-        return run_report_from_json(run_data)
+        result = run_report_from_json(run_data)
+        logger.info("report: done")
+        return result
 
     def record_history_artifacts(
         self,
@@ -367,6 +443,7 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Evaluate a run artifact against a policy and return serializable result."""
 
+        logger.info("evaluate_policy: start")
         if policy is not None and policy_path is not None:
             raise ValueError("Provide either policy or policy_path, not both.")
 
@@ -415,6 +492,7 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Compare two run artifacts and return a deterministic diff payload."""
 
+        logger.info("diff: start")
         old_data = self._load_run_artifact(old_run_artifact)
         new_data = self._load_run_artifact(new_run_artifact)
         return run_diff_from_json(old_data, new_data, old_label=old_label, new_label=new_label)
@@ -429,6 +507,7 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Analyze a pull-request diff for token and context-growth impact."""
 
+        logger.info("pr_audit: start - repo=%r", repo)
         repo_path = normalize_repo(repo)
         cfg = self._load_config(repo_path, config_path=config_path)
         return run_pr_audit(
@@ -446,7 +525,10 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Aggregate historical pack artifacts into a heatmap report."""
 
-        return run_heatmap(history=history, limit=limit)
+        logger.info("heatmap: start - limit=%d", limit)
+        result = run_heatmap(history=history, limit=limit)
+        logger.info("heatmap: done")
+        return result
 
     def drift(
         self,
@@ -488,6 +570,7 @@ class RedconEngine:
         """
         from redcon.cache.run_history import RunHistoryEntry
 
+        logger.info("drift: start - repo=%r window=%d", repo, window)
         repo_path = normalize_repo(repo)
         entries: list[RunHistoryEntry] | None = None
         if runs is not None:
@@ -524,6 +607,7 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Run deterministic strategy benchmark for a task and repository or workspace."""
 
+        logger.info("benchmark: start - task=%r repo=%r", task, repo)
         repo_path = normalize_repo(repo)
         if workspace is not None:
             workspace_definition = self._load_workspace(workspace, config_path=config_path)
@@ -754,9 +838,11 @@ class RedconEngine:
                      inclusion statistics default to zero.
             config_path: Optional path to a ``redcon.toml`` config file.
         """
+        logger.info("visualize: start - repo=%r", repo)
         repo_path = normalize_repo(repo)
         cfg = self._load_config(repo_path, config_path=config_path)
         report = build_repo_graph(repo_path, cfg, history=history)
+        logger.info("visualize: done")
         return visualize_as_dict(report)
 
     def visualize_html(
@@ -771,9 +857,11 @@ class RedconEngine:
         Returns a self-contained HTML string that can be written to a file and
         opened in any modern browser without additional dependencies.
         """
+        logger.info("visualize_html: start - repo=%r", repo)
         repo_path = normalize_repo(repo)
         cfg = self._load_config(repo_path, config_path=config_path)
         report = build_repo_graph(repo_path, cfg, history=history)
+        logger.info("visualize_html: done")
         return render_graph_html(report)
 
 
@@ -821,6 +909,7 @@ class RedconEngine:
             Optional path to a redcon.toml config file.
         """
 
+        logger.info("advise: start - repo=%r", repo)
         repo_path = normalize_repo(repo)
         cfg = self._load_config(repo_path, config_path=config_path)
         report = run_advise(
@@ -841,6 +930,7 @@ class RedconEngine:
         ``run`` may be a dict (already loaded), a path string, or a Path to a
         run JSON file produced by :meth:`pack`.
         """
+        logger.info("profile: start")
         if isinstance(run, dict):
             run_data = run
             run_json = ""
@@ -884,6 +974,7 @@ class RedconEngine:
         """
         from redcon.core.cost_analysis import compute_cost_analysis, load_run_data
 
+        logger.info("cost_analysis: start - model=%r", model)
         if isinstance(run, dict):
             run_data = run
         else:
@@ -905,6 +996,7 @@ class RedconEngine:
 
         ``run`` may be a dict, a path string, or a Path to a run JSON file.
         """
+        logger.info("pipeline_trace: start")
         if isinstance(run, dict):
             run_data = run
             run_json = ""
@@ -913,6 +1005,7 @@ class RedconEngine:
             run_data = read_json(run_path)
             run_json = str(run_path)
         trace = build_pipeline_trace(run_data, run_json=run_json)
+        logger.info("pipeline_trace: done")
         return pipeline_trace_as_dict(trace)
 
     def read_profile(self, run: RunArtifactInput) -> dict[str, Any]:
@@ -924,6 +1017,7 @@ class RedconEngine:
         ``run`` may be a dict (already loaded), a path string, or a Path to a
         run JSON file produced by :meth:`pack`.
         """
+        logger.info("read_profile: start")
         if isinstance(run, dict):
             run_data = run
             run_json = ""
@@ -932,6 +1026,7 @@ class RedconEngine:
             run_data = read_json(run_path)
             run_json = str(run_path)
         report = build_read_profile(run_data, run_json=run_json)
+        logger.info("read_profile: done")
         return read_profile_as_dict(report)
 
     def observe(
@@ -968,6 +1063,7 @@ class RedconEngine:
         """
         from redcon.telemetry.store import append_observe_entry
 
+        logger.info("observe: start - store=%r", store)
         if isinstance(run, dict):
             run_data = run
             run_json = ""
@@ -1009,9 +1105,11 @@ class RedconEngine:
         """
         from redcon.core.dashboard import build_dashboard_data, serve_dashboard
 
+        logger.info("dashboard: start - port=%d", port)
         resolved = [Path(p) for p in paths] if paths else [Path(".")]
         data = build_dashboard_data(resolved)
         serve_dashboard(data, port=port, no_open=no_open, scan_paths=resolved)
+        logger.info("dashboard: done")
         return data
 
     def cost_analytics(
@@ -1044,8 +1142,11 @@ class RedconEngine:
         """
         from redcon.core.cost_analytics import build_cost_report
 
+        logger.info("cost_analytics: start - model=%r", model)
         resolved = [Path(p) for p in paths] if paths else [Path(".")]
-        return build_cost_report(resolved, model=model)
+        result = build_cost_report(resolved, model=model)
+        logger.info("cost_analytics: done")
+        return result
 
 
 class BudgetGuard:

@@ -28,7 +28,7 @@ def test_cli_pack_shows_elapsed_time(tmp_path: Path, monkeypatch, capsys) -> Non
     )
     assert main() == 0
     output = capsys.readouterr().out
-    assert "Done in " in output
+    assert "Packed " in output and " in " in output
 
 
 def test_cli_plan_shows_elapsed_time(tmp_path: Path, monkeypatch, capsys) -> None:

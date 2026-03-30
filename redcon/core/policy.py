@@ -94,16 +94,60 @@ def _parse_policy_dict(raw: dict[str, Any]) -> PolicySpec:
     )
 
 
+def _validate_percentage_thresholds(spec: PolicySpec) -> list[str]:
+    """Validate that percentage-based thresholds are within 0-100 range (fix 6)."""
+    errors: list[str] = []
+    if spec.min_estimated_savings_percentage is not None:
+        val = spec.min_estimated_savings_percentage
+        if val < 0 or val > 100:
+            errors.append(
+                f"min_estimated_savings_percentage must be between 0 and 100, got {val}"
+            )
+    return errors
+
+
 def load_policy(path: Path) -> PolicySpec:
     """Load policy specification from TOML file."""
 
     if tomllib is None:
         raise RuntimeError("TOML parser unavailable. Install 'tomli' for Python < 3.11.")
 
-    raw = tomllib.loads(path.read_text(encoding="utf-8"))
+    text = path.read_text(encoding="utf-8")
+
+    # Fix 5: clear error message when policy file is malformed TOML
+    try:
+        raw = tomllib.loads(text)
+    except Exception as exc:
+        raise ValueError(
+            f"Policy file '{path}' contains malformed TOML and could not be parsed. "
+            f"Check for syntax errors such as missing quotes, unclosed brackets, "
+            f"or invalid key-value pairs. Parser error: {exc}"
+        ) from exc
+
     if not isinstance(raw, dict):
         return PolicySpec()
-    return _parse_policy_dict(raw)
+
+    # Fix 7: handle missing policy sections gracefully with defaults
+    if "policy" not in raw:
+        # No [policy] section - return defaults rather than failing
+        return PolicySpec()
+
+    policy_section = raw.get("policy")
+    if not isinstance(policy_section, dict):
+        # [policy] key exists but is not a table - return defaults
+        return PolicySpec()
+
+    spec = _parse_policy_dict(raw)
+
+    # Fix 6: validate percentage thresholds
+    validation_errors = _validate_percentage_thresholds(spec)
+    if validation_errors:
+        raise ValueError(
+            f"Policy file '{path}' has invalid thresholds: "
+            + "; ".join(validation_errors)
+        )
+
+    return spec
 
 
 def default_strict_policy(max_estimated_input_tokens: int | None = None) -> PolicySpec:

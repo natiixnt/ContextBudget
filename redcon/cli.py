@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import time
 
+from redcon import __version__ as _redcon_version
 from redcon.config import RedconConfig, load_config, validate_config
 from redcon.core.policy import (
     default_strict_policy,
@@ -89,16 +90,17 @@ def _validate_repo_config(repo: str, config: str | None = None) -> int | None:
     """Validate config for a repo; return exit code on error or None if valid."""
     repo_path = Path(repo).resolve()
     if not repo_path.is_dir():
-        print(f"error: repository path does not exist: {repo_path}", file=sys.stderr)
+        print(f"Error: repository path does not exist: {repo_path}", file=sys.stderr)
         return 2
     try:
         cfg = load_config(repo_path, config_path=Path(config).resolve() if config else None)
     except Exception as exc:
-        print(f"error: failed to load config: {exc}", file=sys.stderr)
+        print(f"Error: failed to load config: {exc}", file=sys.stderr)
+        print("hint: run 'redcon init' to generate a default redcon.toml", file=sys.stderr)
         return 2
     errors = validate_config(cfg)
     if errors:
-        print("error: invalid configuration:", file=sys.stderr)
+        print("Error: invalid configuration:", file=sys.stderr)
         for err in errors:
             print(f"  - {err}", file=sys.stderr)
         print("hint: run 'redcon doctor' to diagnose configuration issues", file=sys.stderr)
@@ -111,6 +113,35 @@ def _fmt_elapsed(start: float) -> str:
     if elapsed < 1:
         return f"{elapsed * 1000:.0f}ms"
     return f"{elapsed:.1f}s"
+
+
+def _is_quiet(args: argparse.Namespace) -> bool:
+    return getattr(args, "quiet", False)
+
+
+def _qprint(args: argparse.Namespace, *pargs: object, **kwargs: object) -> None:
+    """Print only when --quiet is not set."""
+    if not _is_quiet(args):
+        print(*pargs, **kwargs)
+
+
+def _validate_positive_int(value: int | None, name: str) -> str | None:
+    """Return an error message if *value* is not None and not > 0, else None."""
+    if value is not None and value <= 0:
+        return f"Error: {name} must be greater than 0 (got {value})"
+    return None
+
+
+# ---------------------------------------------------------------------------
+# Environment flag: NO_COLOR (https://no-color.org/) or --no-color CLI flag
+# ---------------------------------------------------------------------------
+_NO_COLOR = False
+
+
+def _setup_no_color(args: argparse.Namespace) -> None:
+    global _NO_COLOR
+    import os
+    _NO_COLOR = getattr(args, "no_color", False) or os.environ.get("NO_COLOR", "") != ""
 
 
 def cmd_completion(args: argparse.Namespace) -> int:
@@ -185,6 +216,11 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 
 def cmd_plan(args: argparse.Namespace) -> int:
+    err = _validate_positive_int(args.top_files, "--top-files")
+    if err:
+        print(err, file=sys.stderr)
+        return 2
+
     validation_error = _validate_repo_config(args.repo, getattr(args, "config", None))
     if validation_error is not None:
         return validation_error
@@ -207,11 +243,11 @@ def cmd_plan(args: argparse.Namespace) -> int:
     write_json(json_path, data)
     md_path.write_text(render_plan_markdown(data), encoding="utf-8")
 
-    print(f"Wrote plan JSON: {json_path}")
-    print(f"Wrote plan Markdown: {md_path}")
+    _qprint(args, f"Wrote plan JSON: {json_path}")
+    _qprint(args, f"Wrote plan Markdown: {md_path}")
     for idx, item in enumerate(data["ranked_files"][:10], start=1):
-        print(f"{idx}. {item['path']} (score={item['score']})")
-    print(f"Done in {_fmt_elapsed(t0)}")
+        _qprint(args, f"{idx}. {item['path']} (score={item['score']})")
+    _qprint(args, f"Done in {_fmt_elapsed(t0)}")
     return 0
 
 
@@ -307,7 +343,7 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
                 repo = _raw_repo
 
     if not task:
-        print("error: task is required (provide as argument or via --run-artifact)")
+        print("Error: task is required (provide as argument or via --run-artifact)")
         return 2
 
     engine = RedconEngine(config_path=args.config)
@@ -395,6 +431,16 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
 def cmd_pack(args: argparse.Namespace) -> int:
     fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
 
+    # Input validation
+    err = _validate_positive_int(args.max_tokens, "--max-tokens")
+    if err:
+        print(err, file=sys.stderr)
+        return 2
+    err = _validate_positive_int(args.top_files, "--top-files")
+    if err:
+        print(err, file=sys.stderr)
+        return 2
+
     validation_error = _validate_repo_config(args.repo, getattr(args, "config", None))
     if validation_error is not None:
         return validation_error
@@ -409,6 +455,27 @@ def cmd_pack(args: argparse.Namespace) -> int:
         top_files=args.top_files,
         delta_from=args.delta,
     )
+
+    files_included = len(data.get("files_included") or [])
+    files_skipped = len(data.get("files_skipped") or [])
+
+    # --dry-run: show what would be packed without writing files
+    if getattr(args, "dry_run", False):
+        _qprint(args, f"Dry run - would pack {files_included} files ({files_skipped} skipped)")
+        for entry in data.get("files_included") or []:
+            if isinstance(entry, dict):
+                _qprint(args, f"  {entry.get('path', '')}")
+            else:
+                _qprint(args, f"  {entry}")
+        budget = data.get("budget", {})
+        _qprint(
+            args,
+            f"Estimated tokens: {budget.get('estimated_input_tokens', 0)}, "
+            f"saved: {budget.get('estimated_saved_tokens', 0)}",
+        )
+        elapsed = _fmt_elapsed(t0)
+        _qprint(args, f"Packed {files_included} files ({files_skipped} skipped) in {elapsed}")
+        return 0
 
     # context-only: emit just the compressed text to stdout for piping
     if fmt == "context-only":
@@ -460,82 +527,87 @@ def cmd_pack(args: argparse.Namespace) -> int:
         print("warning: no files matched the scan criteria - context is empty", file=sys.stderr)
 
     budget = data["budget"]
-    files_included = len(data.get("files_included") or [])
-    files_skipped = len(data.get("files_skipped") or [])
     cache_report = data.get("cache", {})
     cache_hits = int(cache_report.get("hits", 0) or 0) if isinstance(cache_report, dict) else 0
     cache_misses = int(cache_report.get("misses", 0) or 0) if isinstance(cache_report, dict) else 0
     cache_total = cache_hits + cache_misses
 
-    print(f"Wrote run JSON: {json_path}")
-    print(f"Wrote run Markdown: {md_path}")
-    print(
+    _qprint(args, f"Wrote run JSON: {json_path}")
+    _qprint(args, f"Wrote run Markdown: {md_path}")
+    _qprint(
+        args,
         "Budget: "
         f"input={budget['estimated_input_tokens']} tokens, "
         f"saved={budget['estimated_saved_tokens']} tokens, "
-        f"risk={budget['quality_risk_estimate']}"
+        f"risk={budget['quality_risk_estimate']}",
     )
-    print(
+    _qprint(
+        args,
         f"Files: {files_included} included, {files_skipped} skipped"
-        + (f", cache {cache_hits}/{cache_total} hits" if cache_total > 0 else "")
+        + (f", cache {cache_hits}/{cache_total} hits" if cache_total > 0 else ""),
     )
     model_profile = data.get("model_profile", {})
     if isinstance(model_profile, dict) and model_profile:
-        print(
+        _qprint(
+            args,
             "Model profile: "
             f"selected={model_profile.get('selected_profile', '')} "
             f"resolved={model_profile.get('resolved_profile', '')} "
             f"context={model_profile.get('context_window', 0)} "
             f"compression={model_profile.get('recommended_compression_strategy', '')} "
-            f"max_tokens={model_profile.get('effective_max_tokens', data.get('max_tokens', 0))}"
+            f"max_tokens={model_profile.get('effective_max_tokens', data.get('max_tokens', 0))}",
         )
         if model_profile.get("budget_clamped", False):
-            print("Model profile note: max_tokens was clamped to fit the configured context window")
+            _qprint(args, "Model profile note: max_tokens was clamped to fit the configured context window")
     delta = data.get("delta", {})
     if isinstance(delta, dict) and delta:
         delta_budget = delta.get("budget", {})
         if isinstance(delta_budget, dict):
-            print(
+            _qprint(
+                args,
                 "Delta: "
                 f"original={delta_budget.get('original_tokens', 0)} tokens, "
                 f"delta={delta_budget.get('delta_tokens', 0)} tokens, "
-                f"saved={delta_budget.get('tokens_saved', 0)} tokens"
+                f"saved={delta_budget.get('tokens_saved', 0)} tokens",
             )
     estimator = data.get("token_estimator", {})
     if isinstance(estimator, dict):
-        print(
+        _qprint(
+            args,
             "Token estimator: "
             f"selected={estimator.get('selected_backend', 'heuristic')} "
             f"effective={estimator.get('effective_backend', 'heuristic')} "
-            f"fallback={estimator.get('fallback_used', False)}"
+            f"fallback={estimator.get('fallback_used', False)}",
         )
         reason = str(estimator.get("fallback_reason", "") or "")
         if reason:
-            print(f"Token estimator note: {reason}")
+            _qprint(args, f"Token estimator note: {reason}")
     summarizer = data.get("summarizer", {})
     if isinstance(summarizer, dict):
-        print(
+        _qprint(
+            args,
             "Summarizer: "
             f"selected={summarizer.get('selected_backend', 'deterministic')} "
             f"effective={summarizer.get('effective_backend', 'deterministic')} "
-            f"fallback={summarizer.get('fallback_used', False)}"
+            f"fallback={summarizer.get('fallback_used', False)}",
         )
         adapter = str(summarizer.get("external_adapter", "") or "")
         if adapter:
-            print(f"Summarizer adapter: {adapter}")
+            _qprint(args, f"Summarizer adapter: {adapter}")
         logs = summarizer.get("logs", [])
         if isinstance(logs, list):
             for item in logs:
-                print(f"Summarizer log: {item}")
+                _qprint(args, f"Summarizer log: {item}")
     if policy_result is not None:
         if bool(policy_result.get("passed", False)):
-            print("Policy check: PASS")
+            _qprint(args, "Policy check: PASS")
         else:
             print("Policy check: FAIL")
             for violation in policy_result.get("violations", []):
                 print(f"- {violation}")
             return 2
-    print(f"Done in {_fmt_elapsed(t0)}")
+    elapsed = _fmt_elapsed(t0)
+    _qprint(args, f"Packed {files_included} files ({files_skipped} skipped) in {elapsed}")
     return 0
 
 
@@ -545,7 +617,7 @@ def cmd_export(args: argparse.Namespace) -> int:
 
     run_path = Path(args.run_json)
     if not run_path.exists():
-        print(f"error: run artifact not found: {run_path}", file=sys.stderr)
+        print(f"Error: run artifact not found: {run_path}", file=sys.stderr)
         return 2
 
     data = _read_json(run_path)
@@ -581,7 +653,7 @@ def cmd_export(args: argparse.Namespace) -> int:
             tokens = int(budget.get("estimated_input_tokens", 0) or 0)
             print(f"Copied to clipboard ({tokens} tokens)", file=sys.stderr)
         except (FileNotFoundError, subprocess.CalledProcessError):
-            print("error: clipboard utility not available (pbcopy/xclip)", file=sys.stderr)
+            print("Error: clipboard utility not available (pbcopy/xclip)", file=sys.stderr)
             return 2
     else:
         print(output_text)
@@ -927,7 +999,7 @@ def cmd_dataset(args: argparse.Namespace) -> int:
     else:
         tasks_toml = getattr(args, "tasks_toml", None) or ""
         if not tasks_toml:
-            print("error: tasks_toml is required when --runs is not provided")
+            print("Error: tasks_toml is required when --runs is not provided")
             return 2
         data = engine.dataset(
             tasks_toml=tasks_toml,
@@ -1023,7 +1095,7 @@ def _print_heatmap_section(title: str, items: list[dict], *, runs_analyzed: int)
 
 def cmd_heatmap(args: argparse.Namespace) -> int:
     if args.limit <= 0:
-        print("--limit must be greater than 0")
+        print("Error: --limit must be greater than 0")
         return 2
 
     engine = RedconEngine()
@@ -1133,10 +1205,10 @@ def cmd_enforce(args: argparse.Namespace) -> int:
     run_path = Path(args.run_json)
 
     if not policy_path.exists():
-        print(f"Policy file not found: {policy_path}")
+        print(f"Error: policy file not found: {policy_path}")
         return 2
     if not run_path.exists():
-        print(f"Run artifact not found: {run_path}")
+        print(f"Error: run artifact not found: {run_path}")
         return 2
 
     policy = load_policy(policy_path)
@@ -1165,7 +1237,7 @@ def cmd_watch(args: argparse.Namespace) -> int:
     config_path = _resolve_config_path(args.config)
     poll_interval = float(args.poll_interval)
     if poll_interval <= 0:
-        print("--poll-interval must be greater than 0")
+        print("Error: --poll-interval must be greater than 0")
         return 2
 
     print(f"Watching repository: {repo_path}")
@@ -1363,14 +1435,14 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     repo_path = Path(args.repo).resolve()
     if not repo_path.is_dir():
-        print(f"Repository path does not exist: {repo_path}")
+        print(f"Error: repository path does not exist: {repo_path}")
         return 2
 
     config_path = repo_path / "redcon.toml"
     policy_path = repo_path / "policy.toml"
 
     if config_path.exists() and not args.force:
-        print(f"redcon.toml already exists. Use --force to overwrite.")
+        print("Error: redcon.toml already exists. Use --force to overwrite.")
         return 1
 
     # ── Detect languages ──────────────────────────────────────────────────────
@@ -1618,11 +1690,11 @@ def cmd_roi(args: argparse.Namespace) -> int:
         cwd = Path(".")
         run_files = sorted(cwd.glob("redcon-*.json"))
         if not run_files:
-            print("No run artifacts found. Pass paths via positional arguments or run 'cb pack' first.")
+            print("Error: no run artifacts found. Pass paths via positional arguments or run 'redcon pack' first.")
             return 2
 
     if not run_files:
-        print("No run artifacts to analyze.")
+        print("Error: no run artifacts to analyze.")
         return 2
 
     total_baseline = 0
@@ -1669,7 +1741,7 @@ def cmd_roi(args: argparse.Namespace) -> int:
         repos[repo]["runs"] += 1
 
     if processed == 0:
-        print("No valid run artifacts found.")
+        print("Error: no valid run artifacts found.")
         return 2
 
     grand = total_optimized + total_saved
@@ -1738,7 +1810,7 @@ def cmd_benchmark_report(args: argparse.Namespace) -> int:
             print(f"Warning: file not found: {path}")
 
     if not run_files:
-        print("No run artifacts found. Pass JSON artifact paths or a directory.")
+        print("Error: no run artifacts found. Pass JSON artifact paths or a directory.")
         return 2
 
     model = args.model
@@ -1797,7 +1869,7 @@ def cmd_benchmark_report(args: argparse.Namespace) -> int:
         totals["runs"] += 1
 
     if not entries:
-        print("No valid artifacts to report on.")
+        print("Error: no valid artifacts to report on.")
         return 2
 
     grand = totals["optimized"] + totals["saved"]
@@ -1908,18 +1980,18 @@ def cmd_cost_analysis(args: argparse.Namespace) -> int:
         return 0
 
     if not args.run_json:
-        print("error: run_json is required (or use --list-models)")
+        print("Error: run_json is required (or use --list-models)")
         return 2
 
     run_path = Path(args.run_json)
     if not run_path.exists():
-        print(f"Run artifact not found: {run_path}")
+        print(f"Error: run artifact not found: {run_path}")
         return 2
 
     try:
         run_data = load_run_data(run_path)
     except Exception as exc:
-        print(f"Failed to read run artifact: {exc}")
+        print(f"Error: failed to read run artifact: {exc}")
         return 2
 
     result = compute_cost_analysis(
@@ -1991,7 +2063,18 @@ def build_parser() -> argparse.ArgumentParser:
         "-q", "--quiet",
         action="store_true",
         default=False,
-        help="Suppress all output except errors.",
+        help="Suppress all output except errors and JSON.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"redcon {_redcon_version}",
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        default=False,
+        help="Disable colored output.",
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -2210,6 +2293,13 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Print raw JSON to stdout (shorthand for --format json).",
+    )
+    pack.add_argument(
+        "--dry-run",
+        dest="dry_run",
+        action="store_true",
+        default=False,
+        help="Show what would be packed without writing any output files.",
     )
     pack.set_defaults(func=cmd_pack)
 
@@ -2966,6 +3056,7 @@ def main() -> int:
     parser = build_parser()
     args = parser.parse_args()
     _configure_logging(args)
+    _setup_no_color(args)
     return int(args.func(args))
 
 

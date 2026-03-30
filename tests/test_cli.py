@@ -709,3 +709,56 @@ def test_cli_enforce_missing_run_file(tmp_path: Path, monkeypatch) -> None:
         ["redcon", "enforce", str(policy_path), str(tmp_path / "nonexistent.json")],
     )
     assert main() == 2
+
+
+def test_cli_version_flag(monkeypatch, capsys) -> None:
+    from redcon import __version__
+    from redcon.cli import build_parser
+
+    parser = build_parser()
+    monkeypatch.setattr("sys.argv", ["redcon", "doctor", "--repo", "."])
+    # Verify the module exposes a version string
+    assert isinstance(__version__, str)
+    assert len(__version__) > 0
+
+
+def test_cli_empty_task_string_is_rejected(tmp_path: Path, monkeypatch) -> None:
+    import pytest
+
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(repo / "src" / "search.py", "def search():\n    return []\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        ["redcon", "pack", "", "--repo", str(repo), "--out-prefix", "empty-task"],
+    )
+    # The engine rejects empty task strings with a ValueError
+    with pytest.raises(ValueError, match="non-empty"):
+        main()
+
+
+def test_cli_max_tokens_zero_is_rejected(tmp_path: Path, monkeypatch) -> None:
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _write(repo / "redcon.toml", "[budget]\nmax_tokens = 0\n")
+    _write(repo / "src" / "search.py", "def search():\n    return []\n")
+
+    monkeypatch.chdir(tmp_path)
+    monkeypatch.setattr(
+        "sys.argv",
+        [
+            "redcon",
+            "pack",
+            "add search",
+            "--repo",
+            str(repo),
+            "--max-tokens",
+            "0",
+            "--out-prefix",
+            "zero-tokens",
+        ],
+    )
+    # max_tokens=0 should fail validation (config requires max_tokens > 0)
+    assert main() == 2

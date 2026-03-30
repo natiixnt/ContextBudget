@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Relevance scoring stage for repository files."""
 
+import logging
 import re
 
 from redcon.config import ScoreSettings
@@ -10,6 +11,8 @@ from redcon.schemas.models import FileRecord, RankedFile
 from redcon.scorers.file_roles import classify_file_role
 from redcon.scorers.history import TaskSimilarityCallable, compute_historical_adjustments
 from redcon.scorers.import_graph import build_import_graph
+
+logger = logging.getLogger(__name__)
 
 _PATH_SEG_RE = re.compile(r"[a-z0-9]+")
 
@@ -42,6 +45,11 @@ def score_files(
 ) -> list[RankedFile]:
     """Score files for a task using deterministic keyword and import-graph heuristics."""
 
+    # Handle empty task string - return 0 score for all files with a warning
+    if not task or not task.strip():
+        logger.warning("Empty task string provided - returning zero scores for all files")
+        return []
+
     cfg = settings if settings is not None else ScoreSettings()
     keywords = task_keywords(task)
 
@@ -50,8 +58,9 @@ def score_files(
     breakdowns: dict[str, dict[str, float]] = {}
 
     for record in files:
-        path_lower = record.path.lower()
-        preview_lower = record.content_preview.lower()
+        # Handle None values in file metadata gracefully (use defaults)
+        path_lower = (record.path or "").lower()
+        preview_lower = (record.content_preview or "").lower()
         score = 0.0
         reasons: list[str] = []
         breakdown: dict[str, float] = {}
@@ -63,7 +72,7 @@ def score_files(
                 _add_reason(reasons, f"critical path keyword '{critical_keyword}'")
 
         path_tokens = _path_tokens(path_lower)
-        symbols_lower = record.symbol_names
+        symbols_lower = (record.symbol_names or "").lower()
         for keyword in keywords:
             path_hits = path_lower.count(keyword)
             preview_hits = preview_lower.count(keyword)
@@ -96,7 +105,7 @@ def score_files(
             breakdown["signal_file"] = signals[name]
             _add_reason(reasons, f"signal file {name}")
 
-        if record.extension in cfg.code_extensions:
+        if (record.extension or "") in cfg.code_extensions:
             score += cfg.code_extension_bonus
             breakdown["code_extension"] = cfg.code_extension_bonus
 
@@ -105,11 +114,11 @@ def score_files(
             breakdown["test_proximity"] = cfg.test_path_bonus
             _add_reason(reasons, "test proximity")
 
-        if record.line_count > cfg.large_file_line_threshold:
+        if (record.line_count or 0) > cfg.large_file_line_threshold:
             score -= cfg.large_file_penalty
             breakdown["large_file_penalty"] = -cfg.large_file_penalty
 
-        if dirty_paths and cfg.git_dirty_boost > 0 and record.relative_path in dirty_paths:
+        if dirty_paths and cfg.git_dirty_boost > 0 and (record.relative_path or "") in dirty_paths:
             score += cfg.git_dirty_boost
             breakdown["git_dirty"] = cfg.git_dirty_boost
             _add_reason(reasons, "has uncommitted changes")
@@ -117,6 +126,13 @@ def score_files(
         heuristic_scores[record.path] = score
         reasons_by_path[record.path] = reasons
         breakdowns[record.path] = breakdown
+
+        logger.debug(
+            "Scored %s: %.3f (reasons: %s)",
+            record.path,
+            score,
+            ", ".join(reasons) if reasons else "none",
+        )
 
     # -- File-role multipliers --
     if cfg.role_multipliers:
@@ -203,6 +219,9 @@ def score_files(
         historical_score = historical_adjustments.get(record.path, None)
         historical_value = historical_score.score if historical_score is not None else 0.0
         combined_score = round(heuristic_scores[record.path] + historical_value, 3)
+        # Clamp final score to 0.0-10.0 range
+        combined_score = max(0.0, min(10.0, combined_score))
+        heuristic_score = max(0.0, min(10.0, heuristic_score))
         if combined_score <= 0:
             continue
         reasons = reasons_by_path[record.path]
@@ -212,6 +231,13 @@ def score_files(
         bd = breakdowns.get(record.path, {})
         if historical_value:
             bd["historical"] = round(historical_value, 3)
+        logger.debug(
+            "Final ranked score for %s: %.3f (heuristic=%.3f, historical=%.3f)",
+            record.path,
+            combined_score,
+            heuristic_score,
+            historical_value,
+        )
         ranked.append(
             RankedFile(
                 file=record,

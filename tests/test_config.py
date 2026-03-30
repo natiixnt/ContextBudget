@@ -1,8 +1,9 @@
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 
-from redcon.config import load_config, load_workspace
+from redcon.config import load_config, load_workspace, validate_config
 from redcon.core.pipeline import as_json_dict, run_pack
 
 
@@ -195,3 +196,52 @@ include_globs = ["src/**/*.py"]
     assert [repo.label for repo in workspace.repos] == ["service-a", "service-b"]
     assert workspace.repos[0].ignore_globs == ["tests/**"]
     assert workspace.repos[1].include_globs == ["src/**/*.py"]
+
+
+def test_config_with_negative_max_tokens_fails_validation(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[budget]
+max_tokens = -100
+""".strip(),
+    )
+
+    cfg = load_config(tmp_path)
+    assert cfg.budget.max_tokens == -100
+    errors = validate_config(cfg)
+    assert any("max_tokens" in err and "> 0" in err for err in errors)
+
+
+def test_config_missing_budget_section_uses_defaults(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[scan]
+max_file_size_bytes = 500000
+""".strip(),
+    )
+
+    cfg = load_config(tmp_path)
+    assert cfg.budget.max_tokens == 30_000
+    assert cfg.budget.top_files is None
+    assert cfg.scan.max_file_size_bytes == 500000
+
+
+def test_config_unknown_keys_logs_warning(tmp_path: Path, caplog) -> None:
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[budget]
+max_tokens = 500
+
+[totally_made_up_section]
+foo = "bar"
+""".strip(),
+    )
+
+    with caplog.at_level(logging.WARNING, logger="redcon.config"):
+        cfg = load_config(tmp_path)
+
+    assert cfg.budget.max_tokens == 500
+    assert any("totally_made_up_section" in record.message for record in caplog.records)

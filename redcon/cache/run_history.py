@@ -3,9 +3,16 @@ from __future__ import annotations
 """Local run-history persistence for deterministic score adjustments."""
 
 from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta, timezone
 import json
+import logging
 from pathlib import Path
 from typing import Any, Mapping
+
+logger = logging.getLogger(__name__)
+
+# Maximum history file size to load (10 MB)
+_MAX_HISTORY_FILE_SIZE = 10 * 1024 * 1024
 
 from redcon.schemas.models import RUN_HISTORY_FILE
 
@@ -79,6 +86,17 @@ def _load_history_document(path: Path) -> dict[str, Any]:
     if not path.exists():
         return _empty_history_document()
     try:
+        file_size = path.stat().st_size
+    except OSError:
+        return _empty_history_document()
+    if file_size > _MAX_HISTORY_FILE_SIZE:
+        logger.warning(
+            "History file %s exceeds 10 MB (%d bytes) - skipping load",
+            path,
+            file_size,
+        )
+        return _empty_history_document()
+    try:
         data = json.loads(path.read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return _empty_history_document()
@@ -143,6 +161,7 @@ def load_run_history(
                 workspace=str(item.get("workspace", "") or ""),
             )
         )
+    entries.sort(key=lambda e: e.generated_at, reverse=True)
     return entries
 
 
@@ -251,3 +270,82 @@ def update_run_history_artifacts(
     except OSError:
         return False
     return True
+
+
+def _parse_generated_at(value: str) -> datetime | None:
+    """Try common ISO 8601 formats to parse a generated_at timestamp."""
+    for fmt in ("%Y-%m-%dT%H:%M:%S%z", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M:%S"):
+        try:
+            return datetime.strptime(value.strip(), fmt)
+        except ValueError:
+            continue
+    return None
+
+
+def prune(
+    repo_path: Path,
+    *,
+    max_age_days: int = 30,
+    enabled: bool = True,
+    history_file: str = RUN_HISTORY_FILE,
+    history_db: str = ".redcon/history.db",
+    use_sqlite: bool = True,
+) -> int:
+    """Remove history entries older than *max_age_days* and return the count removed.
+
+    Works with both the JSON file backend and the SQLite backend.
+    """
+
+    if not enabled or max_age_days <= 0:
+        return 0
+
+    cutoff = datetime.now(tz=timezone.utc) - timedelta(days=max_age_days)
+    removed = 0
+
+    # --- SQLite path ---
+    if use_sqlite:
+        try:
+            from redcon.cache.run_history_sqlite import _db_path, _ensure_schema
+            import sqlite3
+
+            resolved = repo_path.resolve()
+            db = _db_path(resolved, history_db)
+            if db.exists():
+                with sqlite3.connect(str(db), timeout=5) as conn:
+                    _ensure_schema(conn)
+                    cursor = conn.execute(
+                        "DELETE FROM run_history WHERE generated_at < ?",
+                        (cutoff.isoformat(),),
+                    )
+                    removed = cursor.rowcount
+                    conn.commit()
+                return removed
+        except Exception:
+            pass
+
+    # --- JSON fallback path ---
+    path = _history_path(repo_path.resolve(), history_file)
+    document = _load_history_document(path)
+    entries = list(document.get("entries", []))
+    kept: list[dict[str, Any]] = []
+    for item in entries:
+        if not isinstance(item, dict):
+            continue
+        generated_at = str(item.get("generated_at", "") or "").strip()
+        parsed = _parse_generated_at(generated_at)
+        if parsed is not None:
+            # Treat naive timestamps as UTC for comparison
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            if parsed < cutoff:
+                removed += 1
+                continue
+        kept.append(item)
+    if removed > 0:
+        document["entries"] = kept
+        try:
+            path.parent.mkdir(parents=True, exist_ok=True)
+            path.write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
+        except OSError:
+            pass
+    return removed

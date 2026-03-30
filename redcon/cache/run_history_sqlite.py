@@ -19,6 +19,11 @@ from redcon.schemas.models import RUN_HISTORY_FILE
 SQLITE_HISTORY_FORMAT_VERSION = 2
 
 _SCHEMA_DDL = """
+CREATE TABLE IF NOT EXISTS schema_version (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    version INTEGER NOT NULL DEFAULT 2
+);
+INSERT OR IGNORE INTO schema_version (id, version) VALUES (1, 2);
 CREATE TABLE IF NOT EXISTS run_history (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     generated_at TEXT NOT NULL,
@@ -89,7 +94,7 @@ def _migrate_from_json(db_path: Path, json_path: Path) -> None:
         return
 
     try:
-        with sqlite3.connect(str(db_path)) as conn:
+        with sqlite3.connect(str(db_path), timeout=5) as conn:
             conn.row_factory = sqlite3.Row
             _ensure_schema(conn)
             for item in raw_entries:
@@ -166,7 +171,7 @@ def load_run_history_sqlite(
             return []
 
     try:
-        with sqlite3.connect(str(db)) as conn:
+        with sqlite3.connect(str(db), timeout=5) as conn:
             conn.row_factory = sqlite3.Row
             _ensure_schema(conn)
             effective_limit = limit if limit > 0 else 200
@@ -218,7 +223,7 @@ def append_run_history_entry_sqlite(
             _migrate_from_json(db, json_path)
 
     try:
-        with sqlite3.connect(str(db)) as conn:
+        with sqlite3.connect(str(db), timeout=5) as conn:
             conn.row_factory = sqlite3.Row
             _ensure_schema(conn)
             conn.execute(
@@ -290,7 +295,7 @@ def update_run_history_artifacts_sqlite(
         return False
 
     try:
-        with sqlite3.connect(str(db)) as conn:
+        with sqlite3.connect(str(db), timeout=5) as conn:
             conn.row_factory = sqlite3.Row
             _ensure_schema(conn)
             row = conn.execute(

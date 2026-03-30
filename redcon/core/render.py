@@ -3,6 +3,8 @@ from __future__ import annotations
 """JSON and Markdown render/output helpers."""
 
 import json
+import re
+import time
 from pathlib import Path
 
 from redcon.cache import normalize_cache_report
@@ -10,6 +12,25 @@ from redcon.compressors.summarizers import normalize_summarizer_report
 from redcon.core.delta import normalize_delta_report
 from redcon.core.model_profiles import normalize_model_profile_report
 from redcon.core.tokens import normalize_token_estimator_report
+
+
+_MAX_OUTPUT_BYTES = 10 * 1024 * 1024  # 10 MB
+
+_MD_SPECIAL_RE = re.compile(r"([\\`*_\[\]()#+\-.!|{}~>])")
+
+
+def _escape_md_path(path: str) -> str:
+    """Escape markdown special characters in a file path."""
+    return _MD_SPECIAL_RE.sub(r"\\\1", path)
+
+
+def _guard_output_size(output: str) -> str:
+    """Truncate rendered output if it exceeds the 10 MB safety limit."""
+    if len(output.encode("utf-8", errors="replace")) <= _MAX_OUTPUT_BYTES:
+        return output
+    # Truncate to roughly 10 MB worth of characters and append warning
+    truncated = output[: _MAX_OUTPUT_BYTES]
+    return truncated + "\n\n[WARNING] Output truncated - exceeded 10 MB render limit.\n"
 
 
 def write_json(path: Path, data: dict) -> None:
@@ -216,6 +237,7 @@ def _fmt_usd(value: float) -> str:
 def render_agent_simulation_markdown(data: dict) -> str:
     """Render agent workflow simulation artifact to Markdown."""
 
+    render_start = time.monotonic()
     steps = data.get("steps", [])
     context_mode = data.get("context_mode", "isolated")
     cost = data.get("cost_estimate") or {}
@@ -382,8 +404,10 @@ def render_agent_simulation_markdown(data: dict) -> str:
     else:
         lines.append("- No steps produced.")
 
+    elapsed_ms = (time.monotonic() - render_start) * 1000
+    lines.append(f"\n_Rendered in {elapsed_ms:.1f} ms_")
     lines.append("")
-    return "\n".join(lines)
+    return _guard_output_size("\n".join(lines))
 
 
 def render_plan_markdown(data: dict) -> str:
@@ -500,13 +524,14 @@ def render_agent_plan_markdown(data: dict) -> str:
 def render_pack_markdown(data: dict) -> str:
     """Render pack run payload to Markdown."""
 
+    render_start = time.monotonic()
     budget = data.get("budget", {})
     cache = normalize_cache_report(data)
     lines = [
         "# Redcon Pack Report",
         "",
         f"Task: {data.get('task', '')}",
-        f"Repository: {data.get('repo', '')}",
+        f"Repository: {_escape_md_path(data.get('repo', ''))}",
         f"Max tokens: {data.get('max_tokens', 0)}",
     ]
     _append_workspace_lines(lines, data)
@@ -587,13 +612,16 @@ def render_pack_markdown(data: dict) -> str:
                     preview = f"{preview}, +{len(symbols) - 3} more"
                 lines.append(f"  - symbols: {preview}")
 
+    elapsed_ms = (time.monotonic() - render_start) * 1000
+    lines.append(f"\n_Rendered in {elapsed_ms:.1f} ms_")
     lines.append("")
-    return "\n".join(lines)
+    return _guard_output_size("\n".join(lines))
 
 
 def render_report_markdown(data: dict) -> str:
     """Render summary report payload to Markdown."""
 
+    render_start = time.monotonic()
     cache = normalize_cache_report(data)
     lines = [
         "# Redcon Summary Report",
@@ -651,8 +679,10 @@ def render_report_markdown(data: dict) -> str:
     else:
         lines.append("- None")
 
+    elapsed_ms = (time.monotonic() - render_start) * 1000
+    lines.append(f"\n_Rendered in {elapsed_ms:.1f} ms_")
     lines.append("")
-    return "\n".join(lines)
+    return _guard_output_size("\n".join(lines))
 
 
 def _append_heatmap_rows(lines: list[str], items: list[dict], *, runs_analyzed: int) -> None:

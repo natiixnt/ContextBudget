@@ -2,9 +2,15 @@ from __future__ import annotations
 
 """Deterministic and adapter-based summarization helpers."""
 
+import logging
+import signal
 from abc import ABC, abstractmethod
 from dataclasses import asdict, dataclass, field
 from typing import Any, Mapping
+
+logger = logging.getLogger(__name__)
+
+_EXTERNAL_SUMMARIZER_TIMEOUT_SECONDS = 30
 
 from redcon.schemas.models import SummarizerReport
 
@@ -279,7 +285,8 @@ class SummarizationService:
                     from_cache=True,
                 )
             try:
-                body = self._normalize_summary_body(self._external.summarize(request))
+                body = self._run_external_with_timeout(self._external, request)
+                body = self._normalize_summary_body(body)
             except Exception as exc:
                 return self._fallback_to_deterministic(
                     cache=cache,
@@ -364,7 +371,17 @@ class SummarizationService:
                 fallback_used=fallback_used,
             )
 
-        body = self._normalize_summary_body(self._deterministic.summarize(request))
+        try:
+            body = self._normalize_summary_body(self._deterministic.summarize(request))
+        except Exception as exc:
+            logger.warning(
+                "Deterministic summarizer failed for %s: %s - falling back to first N lines",
+                request.path, exc,
+            )
+            return self._fallback_to_first_n_lines(
+                request=request,
+                reason=f"Deterministic summarizer failed for {request.path} ({exc}). Using first-N-lines fallback.",
+            )
         summary_text = self._format_summary_text(request.path, body)
         cache.put_summary(deterministic_key, summary_text)
         chunk_reason = "deterministic summary preview of leading content"
@@ -452,6 +469,63 @@ class SummarizationService:
     @staticmethod
     def _format_summary_text(path: str, body: str) -> str:
         return f"# Summary: {path}\n{body}"
+
+    @staticmethod
+    def _run_external_with_timeout(adapter: "ExternalSummaryAdapter", request: SummaryRequest) -> str:
+        """Run an external summarizer with a timeout guard.
+
+        Uses SIGALRM on platforms that support it, otherwise falls back to
+        calling the adapter directly (no timeout enforcement).
+        """
+        if not hasattr(signal, "SIGALRM"):
+            return adapter.summarize(request)
+
+        def _timeout_handler(signum: int, frame: Any) -> None:
+            raise TimeoutError(
+                f"External summarizer timed out after {_EXTERNAL_SUMMARIZER_TIMEOUT_SECONDS}s"
+            )
+
+        old_handler = signal.signal(signal.SIGALRM, _timeout_handler)
+        signal.alarm(_EXTERNAL_SUMMARIZER_TIMEOUT_SECONDS)
+        try:
+            return adapter.summarize(request)
+        finally:
+            signal.alarm(0)
+            signal.signal(signal.SIGALRM, old_handler)
+
+    def _fallback_to_first_n_lines(
+        self,
+        *,
+        request: SummaryRequest,
+        reason: str,
+    ) -> SummaryResult:
+        """Fall back to first N lines of the source as a summary."""
+        self._report.fallback_used = True
+        self._report.fallback_count += 1
+        self._record_log(reason)
+        logger.warning("%s", reason)
+
+        lines = [line for line in request.text.splitlines() if line.strip()]
+        limit = max(1, request.line_limit)
+        preview = "\n".join(lines[:limit])
+        if len(lines) > limit:
+            preview += "\n..."
+        if not preview.strip():
+            preview = "<empty file>"
+
+        summary_text = self._format_summary_text(request.path, preview)
+        self._effective_backends.add(SUMMARIZER_BACKEND_DETERMINISTIC)
+        self._report.summary_count += 1
+        self._report.effective_backend = self._effective_backend_label()
+        return SummaryResult(
+            text=summary_text,
+            chunk_reason="first-N-lines fallback after summarizer failure",
+            chunk_strategy="summary-preview",
+            provider=SUMMARIZER_BACKEND_DETERMINISTIC,
+            effective_backend=SUMMARIZER_BACKEND_DETERMINISTIC,
+            from_cache=False,
+            fallback_used=True,
+        )
 
     def _record_log(self, message: str) -> None:
         normalized = str(message).strip()

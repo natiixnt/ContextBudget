@@ -677,3 +677,48 @@ progressive_packer_enabled = false
     data = as_json_dict(run_pack("update auth", repo=tmp_path, max_tokens=1000))
     assert data["files_included"] == ["src/auth.py"]
     assert data.get("degraded_files", []) == []
+
+
+def test_pack_with_no_matching_files_returns_empty_result(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[scan]
+include_globs = ["**/*.xyz_nonexistent"]
+""".strip(),
+    )
+    _write(tmp_path / "src" / "auth.py", "def login():\n    return True\n")
+
+    data = as_json_dict(run_pack("update auth", repo=tmp_path, max_tokens=1000))
+    assert data["files_included"] == []
+    assert data["compressed_context"] == []
+    assert data["budget"]["estimated_input_tokens"] == 0
+
+
+def test_compressed_tokens_never_exceeds_original_tokens(tmp_path: Path) -> None:
+    _write(
+        tmp_path / "redcon.toml",
+        """
+[compression]
+full_file_threshold_tokens = 1
+snippet_score_threshold = 0
+symbol_extraction_enabled = true
+snippet_total_line_limit = 20
+""".strip(),
+    )
+    _write(
+        tmp_path / "src" / "auth.py",
+        "def login(token: str) -> bool:\n    return token.startswith('prod_')\n" * 30,
+    )
+    _write(
+        tmp_path / "src" / "middleware.py",
+        "def auth_middleware(req):\n    return check_auth(req.token)\n" * 30,
+    )
+
+    data = as_json_dict(run_pack("update auth middleware", repo=tmp_path, max_tokens=5000))
+
+    for entry in data["compressed_context"]:
+        assert entry["compressed_tokens"] <= entry["original_tokens"], (
+            f"{entry['path']}: compressed_tokens ({entry['compressed_tokens']}) "
+            f"exceeds original_tokens ({entry['original_tokens']})"
+        )

@@ -1,4 +1,4 @@
-"""Redcon package."""
+"""Redcon - deterministic context packing for LLM agents."""
 
 from redcon.sdk import RedconSDK
 from redcon.agents import (
@@ -35,35 +35,43 @@ from redcon.telemetry import (
     TelemetrySink,
 )
 
+__version__ = "1.1.0"
+
+# Explicit public API - sorted alphabetically for easy auditing.
 __all__ = [
+    # metadata
     "__version__",
+    # SDK and engine
+    "BudgetGuard",
+    "BudgetPolicyViolationError",
+    "RedconEngine",
     "RedconSDK",
+    # agent layer
     "AgentAdapter",
     "AgentAdapterRun",
     "AgentMiddlewareResult",
     "AgentRuntime",
     "AgentTaskRequest",
-    "BudgetGuard",
+    "LocalDemoAgentAdapter",
     "PreparedContext",
+    "RedconMiddleware",
     "RuntimeResult",
     "RuntimeSession",
-    "BudgetPolicyViolationError",
-    "RedconMiddleware",
-    "RedconEngine",
+    # compressors
     "DeterministicSummaryAdapter",
     "ExternalSummaryAdapter",
-    "JsonlFileTelemetrySink",
-    "LocalDemoAgentAdapter",
-    "NoOpTelemetrySink",
     "SummaryAdapter",
+    # telemetry
+    "JsonlFileTelemetrySink",
+    "NoOpTelemetrySink",
     "TelemetryEvent",
     "TelemetrySession",
     "TelemetrySink",
+    # public functions
     "enforce_budget",
     "get_external_summarizer_adapter",
     "prepare_context",
-    "register_external_summarizer_adapter",
     "record_run",
+    "register_external_summarizer_adapter",
     "unregister_external_summarizer_adapter",
 ]
-__version__ = "1.1.0"

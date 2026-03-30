@@ -2,10 +2,12 @@ from __future__ import annotations
 
 """Benchmark mode for comparing deterministic context packing strategies."""
 
+import logging
 from dataclasses import asdict
 from datetime import datetime, timezone
 from pathlib import Path
 import time
+import traceback
 from typing import Any
 
 from redcon.config import RedconConfig, WorkspaceDefinition, load_config
@@ -16,6 +18,8 @@ from redcon.plugins import ResolvedPlugins, resolve_plugins
 from redcon.schemas.models import DEFAULT_TOP_FILES
 from redcon.stages.workflow import run_scan_stage, run_scan_workspace_stage, run_score_stage
 from redcon.telemetry import NoOpTelemetrySink, TelemetrySession, TelemetrySink, build_telemetry_sink
+
+logger = logging.getLogger(__name__)
 
 
 def _risk_from_coverage(input_tokens: int, baseline_tokens: int) -> str:
@@ -122,112 +126,138 @@ def run_benchmark(
     baseline_total_tokens = sum(readable_tokens.values())
 
     strategies: list[dict[str, Any]] = []
+    failed_strategies: list[str] = []
 
-    naive_start = time.perf_counter()
-    naive_end = time.perf_counter()
-    naive_files_included = sorted(readable_tokens.keys())
-    strategies.append(
-        {
-            "strategy": "naive_full_context",
-            "description": "Send full readable repository context without selection or compression.",
-            "estimated_input_tokens": baseline_total_tokens,
-            "estimated_saved_tokens": 0,
-            "files_included": naive_files_included,
-            "files_skipped": unreadable_paths,
-            "duplicate_reads_prevented": 0,
-            "quality_risk_estimate": "low",
-            "cache_hits": 0,
-            "runtime_ms": _round_runtime_ms(naive_start, naive_end),
-        }
-    )
-
-    topk_start = time.perf_counter()
-    topk_included = [item.file.path for item in ranked_top if item.file.path in readable_tokens]
-    topk_skipped = sorted(set(readable_tokens.keys()) - set(topk_included))
-    topk_input_tokens = sum(readable_tokens[path] for path in topk_included)
-    topk_end = time.perf_counter()
-    strategies.append(
-        {
-            "strategy": "top_k_selection",
-            "description": "Select top-ranked files and include full content without compression.",
-            "estimated_input_tokens": topk_input_tokens,
-            "estimated_saved_tokens": max(0, baseline_total_tokens - topk_input_tokens),
-            "files_included": topk_included,
-            "files_skipped": topk_skipped,
-            "duplicate_reads_prevented": 0,
-            "quality_risk_estimate": _risk_from_coverage(topk_input_tokens, baseline_total_tokens),
-            "cache_hits": 0,
-            "runtime_ms": _round_runtime_ms(topk_start, topk_end),
-            "notes": f"top_files={effective_top_files}",
-        }
-    )
-
-    pack_start = time.perf_counter()
-    packed_run = asdict(
-        run_pack(
-            task,
-            target_repo,
-            max_tokens=effective_max_tokens,
-            top_files=effective_top_files,
-            config=prepared_cfg,
-            telemetry_sink=NoOpTelemetrySink(),
-            workspace=workspace,
-            plugins=resolved_plugins,
-            record_history=False,
+    # -- Strategy 1/4: naive_full_context --
+    logger.info("benchmark: running strategy 1/4 - naive_full_context")
+    try:
+        naive_start = time.perf_counter()
+        naive_end = time.perf_counter()
+        naive_files_included = sorted(readable_tokens.keys())
+        strategies.append(
+            {
+                "strategy": "naive_full_context",
+                "description": "Send full readable repository context without selection or compression.",
+                "estimated_input_tokens": baseline_total_tokens,
+                "estimated_saved_tokens": 0,
+                "files_included": naive_files_included,
+                "files_skipped": unreadable_paths,
+                "duplicate_reads_prevented": 0,
+                "quality_risk_estimate": "low",
+                "cache_hits": 0,
+                "runtime_ms": _round_runtime_ms(naive_start, naive_end),
+            }
         )
-    )
-    pack_end = time.perf_counter()
-    pack_budget = packed_run.get("budget", {})
-    compressed_input_tokens = int(pack_budget.get("estimated_input_tokens", 0) or 0)
-    compressed_saved_tokens = max(0, baseline_total_tokens - compressed_input_tokens)
-    strategies.append(
-        {
-            "strategy": "compressed_pack",
-            "description": "Use Redcon scoring + compression under configured token budget.",
-            "estimated_input_tokens": compressed_input_tokens,
-            "estimated_saved_tokens": compressed_saved_tokens,
-            "files_included": list(packed_run.get("files_included", [])),
-            "files_skipped": list(packed_run.get("files_skipped", [])),
-            "duplicate_reads_prevented": int(pack_budget.get("duplicate_reads_prevented", 0) or 0),
-            "quality_risk_estimate": str(pack_budget.get("quality_risk_estimate", "unknown")),
-            "cache_hits": int(packed_run.get("cache_hits", 0) or 0),
-            "runtime_ms": _round_runtime_ms(pack_start, pack_end),
-        }
-    )
+    except Exception:
+        logger.warning("benchmark: strategy naive_full_context failed, skipping:\n%s", traceback.format_exc())
+        failed_strategies.append("naive_full_context")
 
-    cache_start = time.perf_counter()
-    cache_run = asdict(
-        run_pack(
-            task,
-            target_repo,
-            max_tokens=effective_max_tokens,
-            top_files=effective_top_files,
-            config=prepared_cfg,
-            telemetry_sink=NoOpTelemetrySink(),
-            workspace=workspace,
-            plugins=resolved_plugins,
-            record_history=False,
+    # -- Strategy 2/4: top_k_selection --
+    logger.info("benchmark: running strategy 2/4 - top_k_selection")
+    try:
+        topk_start = time.perf_counter()
+        topk_included = [item.file.path for item in ranked_top if item.file.path in readable_tokens]
+        topk_skipped = sorted(set(readable_tokens.keys()) - set(topk_included))
+        topk_input_tokens = sum(readable_tokens[path] for path in topk_included)
+        topk_end = time.perf_counter()
+        strategies.append(
+            {
+                "strategy": "top_k_selection",
+                "description": "Select top-ranked files and include full content without compression.",
+                "estimated_input_tokens": topk_input_tokens,
+                "estimated_saved_tokens": max(0, baseline_total_tokens - topk_input_tokens),
+                "files_included": topk_included,
+                "files_skipped": topk_skipped,
+                "duplicate_reads_prevented": 0,
+                "quality_risk_estimate": _risk_from_coverage(topk_input_tokens, baseline_total_tokens),
+                "cache_hits": 0,
+                "runtime_ms": _round_runtime_ms(topk_start, topk_end),
+                "notes": f"top_files={effective_top_files}",
+            }
         )
-    )
-    cache_end = time.perf_counter()
-    cache_budget = cache_run.get("budget", {})
-    cache_input_tokens = int(cache_budget.get("estimated_input_tokens", 0) or 0)
-    cache_saved_tokens = max(0, baseline_total_tokens - cache_input_tokens)
-    strategies.append(
-        {
-            "strategy": "cache_assisted_pack",
-            "description": "Repeat compressed pack on warm cache to measure cache-assisted behavior.",
-            "estimated_input_tokens": cache_input_tokens,
-            "estimated_saved_tokens": cache_saved_tokens,
-            "files_included": list(cache_run.get("files_included", [])),
-            "files_skipped": list(cache_run.get("files_skipped", [])),
-            "duplicate_reads_prevented": int(cache_budget.get("duplicate_reads_prevented", 0) or 0),
-            "quality_risk_estimate": str(cache_budget.get("quality_risk_estimate", "unknown")),
-            "cache_hits": int(cache_run.get("cache_hits", 0) or 0),
-            "runtime_ms": _round_runtime_ms(cache_start, cache_end),
-            "notes": "second run with warmed summary cache",
-        }
-    )
+    except Exception:
+        logger.warning("benchmark: strategy top_k_selection failed, skipping:\n%s", traceback.format_exc())
+        failed_strategies.append("top_k_selection")
+
+    # -- Strategy 3/4: compressed_pack --
+    logger.info("benchmark: running strategy 3/4 - compressed_pack")
+    packed_run: dict[str, Any] = {}
+    try:
+        pack_start = time.perf_counter()
+        packed_run = asdict(
+            run_pack(
+                task,
+                target_repo,
+                max_tokens=effective_max_tokens,
+                top_files=effective_top_files,
+                config=prepared_cfg,
+                telemetry_sink=NoOpTelemetrySink(),
+                workspace=workspace,
+                plugins=resolved_plugins,
+                record_history=False,
+            )
+        )
+        pack_end = time.perf_counter()
+        pack_budget = packed_run.get("budget", {})
+        compressed_input_tokens = int(pack_budget.get("estimated_input_tokens", 0) or 0)
+        compressed_saved_tokens = max(0, baseline_total_tokens - compressed_input_tokens)
+        strategies.append(
+            {
+                "strategy": "compressed_pack",
+                "description": "Use Redcon scoring + compression under configured token budget.",
+                "estimated_input_tokens": compressed_input_tokens,
+                "estimated_saved_tokens": compressed_saved_tokens,
+                "files_included": list(packed_run.get("files_included", [])),
+                "files_skipped": list(packed_run.get("files_skipped", [])),
+                "duplicate_reads_prevented": int(pack_budget.get("duplicate_reads_prevented", 0) or 0),
+                "quality_risk_estimate": str(pack_budget.get("quality_risk_estimate", "unknown")),
+                "cache_hits": int(packed_run.get("cache_hits", 0) or 0),
+                "runtime_ms": _round_runtime_ms(pack_start, pack_end),
+            }
+        )
+    except Exception:
+        logger.warning("benchmark: strategy compressed_pack failed, skipping:\n%s", traceback.format_exc())
+        failed_strategies.append("compressed_pack")
+
+    # -- Strategy 4/4: cache_assisted_pack --
+    logger.info("benchmark: running strategy 4/4 - cache_assisted_pack")
+    try:
+        cache_start = time.perf_counter()
+        cache_run = asdict(
+            run_pack(
+                task,
+                target_repo,
+                max_tokens=effective_max_tokens,
+                top_files=effective_top_files,
+                config=prepared_cfg,
+                telemetry_sink=NoOpTelemetrySink(),
+                workspace=workspace,
+                plugins=resolved_plugins,
+                record_history=False,
+            )
+        )
+        cache_end = time.perf_counter()
+        cache_budget = cache_run.get("budget", {})
+        cache_input_tokens = int(cache_budget.get("estimated_input_tokens", 0) or 0)
+        cache_saved_tokens = max(0, baseline_total_tokens - cache_input_tokens)
+        strategies.append(
+            {
+                "strategy": "cache_assisted_pack",
+                "description": "Repeat compressed pack on warm cache to measure cache-assisted behavior.",
+                "estimated_input_tokens": cache_input_tokens,
+                "estimated_saved_tokens": cache_saved_tokens,
+                "files_included": list(cache_run.get("files_included", [])),
+                "files_skipped": list(cache_run.get("files_skipped", [])),
+                "duplicate_reads_prevented": int(cache_budget.get("duplicate_reads_prevented", 0) or 0),
+                "quality_risk_estimate": str(cache_budget.get("quality_risk_estimate", "unknown")),
+                "cache_hits": int(cache_run.get("cache_hits", 0) or 0),
+                "runtime_ms": _round_runtime_ms(cache_start, cache_end),
+                "notes": "second run with warmed summary cache",
+            }
+        )
+    except Exception:
+        logger.warning("benchmark: strategy cache_assisted_pack failed, skipping:\n%s", traceback.format_exc())
+        failed_strategies.append("cache_assisted_pack")
 
     estimator_samples: list[dict[str, Any]] = compare_builtin_token_estimators(
         [
@@ -264,6 +294,7 @@ def run_benchmark(
         "baseline_full_context_tokens": baseline_total_tokens,
         "scan_runtime_ms": _round_runtime_ms(scan_start, scan_end),
         "strategies": strategies,
+        "failed_strategies": failed_strategies,
         "token_estimator": resolved_plugins.token_estimator_report,
         "model_profile": model_profile,
         "estimator_samples": estimator_samples,

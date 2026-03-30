@@ -3,10 +3,13 @@ from __future__ import annotations
 """Deterministic symbol-level extraction for supported source files."""
 
 import ast
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 import re
 from typing import Callable
+
+logger = logging.getLogger(__name__)
 
 
 TS_FUNC_RE = re.compile(r"^(export\s+)?(async\s+)?function\s+([A-Za-z_$][\w$]*)\s*\(")
@@ -213,7 +216,11 @@ def _python_symbol_candidates(file_path: str, text: str, keywords: list[str]) ->
 
     try:
         tree = ast.parse(text)
-    except SyntaxError:
+    except SyntaxError as exc:
+        logger.warning("AST parse failed for %s: %s - skipping symbol extraction", file_path, exc)
+        return []
+    except Exception as exc:
+        logger.warning("Unexpected error parsing %s: %s - skipping symbol extraction", file_path, exc)
         return []
 
     exported_names = _extract_python_export_names(tree)
@@ -919,6 +926,11 @@ def select_symbol_aware_chunks(
     stub_score_threshold: float = _STUB_SCORE_THRESHOLD,
 ) -> SymbolExtraction | None:
     """Extract relevant symbols from supported source files under a line budget."""
+
+    # Detect binary files by checking for null bytes in the first 8KB.
+    if "\x00" in text[:8192]:
+        logger.warning("Binary content detected in %s - skipping symbol extraction", file_path)
+        return None
 
     lines = text.splitlines()
     if not lines:

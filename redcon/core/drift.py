@@ -8,6 +8,7 @@ recent pack runs.  The report highlights which files are most responsible
 for growth so teams can act before context budgets are exhausted.
 """
 
+import logging
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -15,6 +16,8 @@ from typing import Any
 
 from redcon.cache.run_history import RunHistoryEntry, load_run_history
 from redcon.schemas.models import RUN_HISTORY_FILE
+
+logger = logging.getLogger(__name__)
 
 
 # ---------------------------------------------------------------------------
@@ -105,8 +108,13 @@ def _complexity(token_count: int, file_count: int) -> float:
 
 
 def _pct_change(old: float, new: float) -> float:
-    if old == 0:
+    """Compute percentage change with safe division (fix 9)."""
+    if old == 0 and new == 0:
         return 0.0
+    if old == 0:
+        # Avoid division by zero: treat growth from zero as 100% if new > 0
+        logger.debug("Baseline value is 0 with new value %s - reporting 100%% change", new)
+        return 100.0 if new > 0 else -100.0
     return round((new - old) / old * 100, 2)
 
 
@@ -236,12 +244,16 @@ def run_drift(
     if threshold_pct <= 0:
         raise ValueError("--threshold must be greater than 0")
 
+    logger.info("Starting drift analysis for repo=%s, window=%d, threshold=%.1f%%", repo, window, threshold_pct)
+
     all_entries = entries if entries is not None else load_run_history(repo, history_file=history_file)
 
     # Filter by task substring if requested
     task_filter = (task or "").strip()
     if task_filter:
+        before_count = len(all_entries)
         all_entries = [e for e in all_entries if task_filter.lower() in e.task.lower()]
+        logger.debug("Task filter '%s' reduced entries from %d to %d", task_filter, before_count, len(all_entries))
 
     if not all_entries:
         raise ValueError(
@@ -254,11 +266,42 @@ def run_drift(
     entries = all_entries[-window:]
     entries_analyzed = len(entries)
 
+    # Fix 8: return a "not enough data" result instead of raising an error
     if entries_analyzed < 2:
-        raise ValueError(
-            f"Need at least 2 history entries to compute drift (found {entries_analyzed}). "
-            "Run more packs to build up history."
+        logger.warning(
+            "Not enough history entries to compute drift (found %d, need at least 2)",
+            entries_analyzed,
         )
+        single = _snapshot(entries[0]) if entries else DriftSnapshot(
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            task=task_filter,
+            token_count=0,
+            file_count=0,
+            complexity=0.0,
+        )
+        no_drift = DriftMetrics(
+            token_drift_pct=0.0,
+            file_drift_pct=0.0,
+            complexity_drift_pct=0.0,
+            dep_depth_drift_pct=0.0,
+            alert=False,
+            verdict="not_enough_data",
+        )
+        report = DriftReport(
+            command="drift",
+            generated_at=datetime.now(timezone.utc).isoformat(),
+            repo=str(repo),
+            task_filter=task_filter,
+            window=window,
+            threshold_pct=threshold_pct,
+            entries_analyzed=entries_analyzed,
+            baseline=single,
+            current=single,
+            drift=no_drift,
+            top_contributors=[],
+            trend=[single],
+        )
+        return asdict(report)
 
     baseline_entry = entries[0]
     current_entry = entries[-1]
@@ -273,6 +316,19 @@ def run_drift(
 
     verdict = _verdict(token_drift, threshold_pct)
     alert = verdict != "none"
+
+    # Fix 10: log drift detection decisions
+    logger.info(
+        "Drift analysis complete: token_drift=%.2f%%, file_drift=%.2f%%, "
+        "complexity_drift=%.2f%%, dep_depth_drift=%.2f%%",
+        token_drift, file_drift, complexity_drift, dep_depth_drift,
+    )
+    logger.info("Drift verdict=%s, alert=%s (threshold=%.1f%%)", verdict, alert, threshold_pct)
+    if alert:
+        logger.warning(
+            "Context drift alert triggered: token drift %.2f%% exceeds threshold %.1f%%",
+            token_drift, threshold_pct,
+        )
 
     drift_metrics = DriftMetrics(
         token_drift_pct=token_drift,
@@ -289,6 +345,11 @@ def run_drift(
     recent_half = entries[mid:]
 
     top_contributors = _compute_contributors(baseline_half, recent_half, top_n=10)
+    if top_contributors:
+        logger.debug(
+            "Top drift contributor: %s (%s, delta=%.4f)",
+            top_contributors[0].file, top_contributors[0].status, top_contributors[0].frequency_delta,
+        )
     trend = [_snapshot(e) for e in entries]
 
     report = DriftReport(

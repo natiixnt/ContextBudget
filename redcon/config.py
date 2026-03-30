@@ -2,9 +2,12 @@ from __future__ import annotations
 
 """Configuration loading and defaults for Redcon."""
 
+import logging
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Mapping
+
+logger = logging.getLogger(__name__)
 
 from redcon.schemas.models import (
     BINARY_EXTENSIONS,
@@ -42,6 +45,7 @@ class BudgetSettings:
 
     max_tokens: int = DEFAULT_MAX_TOKENS
     top_files: int | None = None
+    strategy: str = "adaptive"
 
 
 @dataclass(slots=True)
@@ -258,6 +262,98 @@ class RedconConfig:
     plugins: PluginSettings = field(default_factory=PluginSettings)
     explicit: ExplicitSettings = field(default_factory=ExplicitSettings, repr=False)
 
+    def validate(self) -> list[str]:
+        """Check all constraints and return a list of warnings.
+
+        Returns an empty list when the configuration is fully valid.
+        """
+        warnings: list[str] = []
+
+        # Budget validations
+        if not isinstance(self.budget.max_tokens, int) or self.budget.max_tokens <= 0:
+            warnings.append(
+                f"[budget].max_tokens must be a positive integer, got {self.budget.max_tokens!r}"
+            )
+        if self.budget.top_files is not None:
+            if not isinstance(self.budget.top_files, int) or self.budget.top_files <= 0:
+                warnings.append(
+                    f"[budget].top_files must be a positive integer or omitted, "
+                    f"got {self.budget.top_files!r}"
+                )
+
+        # Compression validations
+        if not (0.0 <= self.compression.snippet_score_threshold <= 100.0):
+            warnings.append(
+                f"[compression].snippet_score_threshold looks unusual: "
+                f"{self.compression.snippet_score_threshold}"
+            )
+
+        # Scan validations
+        if self.scan.max_file_size_bytes <= 0:
+            warnings.append(
+                f"[scan].max_file_size_bytes must be > 0, got {self.scan.max_file_size_bytes}"
+            )
+        if self.scan.preview_chars < 0:
+            warnings.append(
+                f"[scan].preview_chars must be >= 0, got {self.scan.preview_chars}"
+            )
+
+        # Cache backend
+        valid_cache_backends = {"local_file", "redis", "sqlite", "memory"}
+        if self.cache.backend not in valid_cache_backends:
+            warnings.append(
+                f"[cache].backend must be one of {sorted(valid_cache_backends)}, "
+                f"got '{self.cache.backend}'"
+            )
+
+        # Token estimation backend
+        valid_token_backends = {
+            "heuristic", "simple", "model_aligned", "model-aligned",
+            "exact", "exact_tiktoken", "exact-tiktoken", "tiktoken",
+        }
+        if self.tokens.backend not in valid_token_backends:
+            warnings.append(
+                f"[tokens].backend must be one of {sorted(valid_token_backends)}, "
+                f"got '{self.tokens.backend}'"
+            )
+
+        # Summarization backend
+        valid_summarization_backends = {"deterministic", "external"}
+        if self.summarization.backend not in valid_summarization_backends:
+            warnings.append(
+                f"[summarization].backend must be one of {sorted(valid_summarization_backends)}, "
+                f"got '{self.summarization.backend}'"
+            )
+
+        # Compression bounds
+        if self.compression.max_degradation_rounds < 0:
+            warnings.append(
+                f"[compression].max_degradation_rounds must be >= 0, "
+                f"got {self.compression.max_degradation_rounds}"
+            )
+        if self.compression.full_file_threshold_tokens < 0:
+            warnings.append(
+                f"[compression].full_file_threshold_tokens must be >= 0, "
+                f"got {self.compression.full_file_threshold_tokens}"
+            )
+
+        # Role multipliers
+        for role, multiplier in self.score.role_multipliers.items():
+            if multiplier < 0:
+                warnings.append(
+                    f"[score].role_multipliers.{role} must be >= 0, got {multiplier}"
+                )
+
+        # Telemetry sink
+        valid_telemetry_sinks = {"noop", "jsonl_file"}
+        if self.telemetry.enabled and self.telemetry.sink not in valid_telemetry_sinks:
+            warnings.append(
+                f"[telemetry].sink must be one of {sorted(valid_telemetry_sinks)}, "
+                f"got '{self.telemetry.sink}'"
+            )
+
+        return warnings
+
 
 def default_config() -> RedconConfig:
     """Return a fresh default configuration object."""
@@ -301,11 +397,20 @@ def _mark_explicit_fields(explicit: set[str], data: Mapping[str, Any], field_map
             explicit.add(canonical_name)
 
 
+def _normalize_glob(pattern: str) -> str:
+    """Strip whitespace and normalize backslashes to forward slashes."""
+    return pattern.strip().replace("\\", "/")
+
+
 def _apply_scan_overrides(settings: ScanSettings, data: Mapping[str, Any]) -> None:
     if "include_globs" in data:
-        settings.include_globs = _to_list(data["include_globs"])
+        settings.include_globs = [
+            _normalize_glob(g) for g in _to_list(data["include_globs"]) if g.strip()
+        ]
     if "ignore_globs" in data:
-        settings.ignore_globs = _to_list(data["ignore_globs"])
+        settings.ignore_globs = [
+            _normalize_glob(g) for g in _to_list(data["ignore_globs"]) if g.strip()
+        ]
     if "max_file_size_bytes" in data:
         settings.max_file_size_bytes = int(data["max_file_size_bytes"])
     if "preview_chars" in data:
@@ -317,15 +422,34 @@ def _apply_scan_overrides(settings: ScanSettings, data: Mapping[str, Any]) -> No
         settings.binary_extensions = _to_set(data["binary_extensions"])
 
 
+def _coerce_int(value: Any, field_name: str) -> int:
+    """Coerce a value to int, raising ValueError only if conversion fails."""
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        raise ValueError(
+            f"{field_name} must be an integer, got {value!r}"
+        )
+
+
 def _apply_budget_overrides(settings: BudgetSettings, data: Mapping[str, Any]) -> None:
     if "max_tokens" in data:
-        settings.max_tokens = int(data["max_tokens"])
+        settings.max_tokens = _coerce_int(
+            data["max_tokens"], "[budget].max_tokens"
+        )
     if "top_files" in data:
         raw_top_files = int(data["top_files"])
-        settings.top_files = raw_top_files if raw_top_files > 0 else None
+        if raw_top_files > 0:
+            settings.top_files = raw_top_files
+        else:
+            settings.top_files = None
+    if "strategy" in data:
+        settings.strategy = str(data["strategy"]).strip().lower() or "adaptive"
     # Backward-compatible keys
     if "default_max_tokens" in data:
-        settings.max_tokens = int(data["default_max_tokens"])
+        settings.max_tokens = _coerce_int(
+            data["default_max_tokens"], "[budget].default_max_tokens"
+        )
     if "default_top_files" in data:
         raw_top_files = int(data["default_top_files"])
         settings.top_files = raw_top_files if raw_top_files > 0 else None
@@ -430,6 +554,14 @@ def _apply_compression_overrides(settings: CompressionSettings, data: Mapping[st
         settings.risk_skip_weight = float(data["risk_skip_weight"])
     if "risk_compression_weight" in data:
         settings.risk_compression_weight = float(data["risk_compression_weight"])
+
+    # Validate snippet_score_threshold range
+    if settings.snippet_score_threshold < 0.0:
+        raise ValueError(
+            f"[compression].snippet_score_threshold must be >= 0.0, "
+            f"got {settings.snippet_score_threshold}"
+        )
+
     # Backward-compatible key
     if "summary_line_limit" in data:
         settings.summary_preview_lines = int(data["summary_line_limit"])
@@ -531,7 +663,23 @@ def _apply_plugin_overrides(settings: PluginSettings, data: Mapping[str, Any]) -
         settings.registrations = registrations
 
 
+_KNOWN_TOP_LEVEL_KEYS = frozenset({
+    "scan", "budget", "score", "compression", "summarization", "cache",
+    "tokens", "model", "telemetry", "plugins", "pack", "output",
+    "model_profile", "repos", "name",
+})
+
+
+def _warn_unknown_keys(data: Mapping[str, Any]) -> None:
+    """Log a warning for any unrecognized top-level config keys (typo detection)."""
+    unknown = set(data.keys()) - _KNOWN_TOP_LEVEL_KEYS
+    for key in sorted(unknown):
+        logger.warning("Unknown top-level config key: '%s' - possible typo?", key)
+
+
 def _apply_overrides(config: RedconConfig, data: Mapping[str, Any]) -> RedconConfig:
+    _warn_unknown_keys(data)
+
     scan_data = data.get("scan")
     if isinstance(scan_data, Mapping):
         _apply_scan_overrides(config.scan, scan_data)
@@ -659,9 +807,18 @@ def _apply_overrides(config: RedconConfig, data: Mapping[str, Any]) -> RedconCon
                 "top_files": "top_files",
                 "default_top_files": "top_files",
                 "plan_default_top_n": "top_files",
+                "strategy": "strategy",
             },
         )
         _apply_budget_overrides(config.budget, budget_data)
+    else:
+        # No [budget] section found - use sensible defaults
+        # (max_tokens=DEFAULT_MAX_TOKENS, top_files=None, strategy="adaptive")
+        logger.debug(
+            "No [budget] section in config - using defaults: max_tokens=%d, strategy=%s",
+            config.budget.max_tokens,
+            config.budget.strategy,
+        )
 
     compression_data = data.get("compression")
     if isinstance(compression_data, Mapping):
@@ -718,11 +875,17 @@ def validate_config(config: RedconConfig) -> list[str]:
     """
     errors: list[str] = []
 
-    if config.budget.max_tokens <= 0:
-        errors.append(f"[budget].max_tokens must be > 0, got {config.budget.max_tokens}")
+    if not isinstance(config.budget.max_tokens, int) or config.budget.max_tokens <= 0:
+        errors.append(
+            f"[budget].max_tokens must be a positive integer (> 0), got {config.budget.max_tokens!r}"
+        )
 
-    if config.budget.top_files is not None and config.budget.top_files <= 0:
-        errors.append(f"[budget].top_files must be > 0 or omitted, got {config.budget.top_files}")
+    if config.budget.top_files is not None:
+        if not isinstance(config.budget.top_files, int) or config.budget.top_files <= 0:
+            errors.append(
+                f"[budget].top_files must be a positive integer (> 0) or omitted, "
+                f"got {config.budget.top_files!r}"
+            )
 
     if config.scan.max_file_size_bytes <= 0:
         errors.append(f"[scan].max_file_size_bytes must be > 0, got {config.scan.max_file_size_bytes}")
@@ -764,6 +927,12 @@ def validate_config(config: RedconConfig) -> list[str]:
             f"got {config.compression.full_file_threshold_tokens}"
         )
 
+    if config.compression.snippet_score_threshold < 0.0:
+        errors.append(
+            f"[compression].snippet_score_threshold must be >= 0.0, "
+            f"got {config.compression.snippet_score_threshold}"
+        )
+
     for role, multiplier in config.score.role_multipliers.items():
         if multiplier < 0:
             errors.append(f"[score].role_multipliers.{role} must be >= 0, got {multiplier}")
@@ -790,8 +959,10 @@ def load_config(repo: Path, config_path: Path | None = None) -> RedconConfig:
     """Load configuration from ``redcon.toml`` with defaults fallback."""
 
     path = _discover_config_path(repo, config_path)
+    logger.debug("Loading config from: %s", path)
 
     if not path.exists():
+        logger.debug("Config file not found at %s - using defaults", path)
         return default_config()
 
     if tomllib is None:
