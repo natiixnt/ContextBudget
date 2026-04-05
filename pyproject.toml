@@ -17,6 +17,7 @@ dev = ["pytest>=8.0", "fakeredis>=2.0", "redis>=5.0"]
 tokenizers = ["tiktoken>=0.7"]
 redis = ["redis>=5.0"]
 gateway = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
+mcp = ["mcp>=1.0"]
 
 [project.scripts]
 redcon = "redcon.cli:main"

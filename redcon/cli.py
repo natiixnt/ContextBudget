@@ -180,6 +180,33 @@ _redcon""")
     return 0
 
 
+def cmd_mcp(args: argparse.Namespace) -> int:
+    """Run the Redcon MCP server over stdio."""
+    try:
+        import asyncio
+        from redcon.mcp import serve
+    except ImportError as e:
+        print(
+            f"Error: mcp package not available: {e}\n"
+            f"Install with: pip install redcon[mcp]",
+            file=sys.stderr,
+        )
+        return 1
+
+    if args.action != "serve":
+        print(f"Error: unknown mcp action: {args.action}", file=sys.stderr)
+        return 1
+
+    try:
+        asyncio.run(serve())
+    except KeyboardInterrupt:
+        return 0
+    except Exception as e:
+        print(f"Error: MCP server failed: {e}", file=sys.stderr)
+        return 1
+    return 0
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     from redcon.core.doctor import run_doctor, doctor_as_dict
 
@@ -2104,6 +2131,17 @@ def build_parser() -> argparse.ArgumentParser:
         help="Shell type to generate completions for.",
     )
     completion.set_defaults(func=cmd_completion)
+
+    mcp_parser = sub.add_parser(
+        "mcp",
+        help="Run the Redcon MCP server (stdio transport for Claude Code, Cursor, etc.)",
+    )
+    mcp_parser.add_argument(
+        "action",
+        choices=["serve"],
+        help="Server action (currently only 'serve' is supported).",
+    )
+    mcp_parser.set_defaults(func=cmd_mcp)
 
     plan = sub.add_parser("plan", help="Rank relevant files for a natural language task")
     plan.add_argument("task", help="Task description")
