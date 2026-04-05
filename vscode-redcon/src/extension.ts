@@ -5,14 +5,16 @@
  */
 
 import * as vscode from 'vscode';
+import * as path from 'path';
+import * as fs from 'fs';
 import { state } from './state';
 import { StatusBar } from './statusBar';
 import { ChatViewProvider } from './webview/chatView';
 import { RedconDecorationProvider } from './providers/decorationProvider';
 import { RedconCodeLensProvider } from './providers/codelensProvider';
-import { DashboardPanel } from './webview/dashboardPanel';
 import * as commands from './commands';
 import * as redcon from './redcon';
+import { runSetup, registerMcp } from './setup';
 
 export async function activate(
   context: vscode.ExtensionContext,
@@ -24,28 +26,8 @@ export async function activate(
   const output = vscode.window.createOutputChannel('Redcon');
   output.appendLine('Redcon extension activating...');
 
-  // Check if redcon CLI is installed
+  // Check if redcon CLI is installed and MCP is configured
   const workspaceRoot = vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
-  if (workspaceRoot) {
-    const installed = await redcon.checkInstalled(workspaceRoot);
-    if (!installed) {
-      const action = await vscode.window.showWarningMessage(
-        'Redcon CLI not found. Install it to use context budgeting features.',
-        'Install with pip',
-        'Configure Path',
-      );
-      if (action === 'Install with pip') {
-        const terminal = vscode.window.createTerminal('Redcon Install');
-        terminal.show();
-        terminal.sendText('pip install redcon');
-      } else if (action === 'Configure Path') {
-        vscode.commands.executeCommand(
-          'workbench.action.openSettings',
-          'redcon.cliCommand',
-        );
-      }
-    }
-  }
 
   // --- Chat View (single sidebar panel) ---
 
@@ -117,6 +99,54 @@ export async function activate(
     }),
   );
 
+  // --- Setup commands (install + MCP registration) ---
+
+  context.subscriptions.push(
+    vscode.commands.registerCommand('redcon.setupInstall', async () => {
+      if (!workspaceRoot) {
+        vscode.window.showErrorMessage('Redcon: open a workspace folder first.');
+        return;
+      }
+      const result = await runSetup(workspaceRoot);
+      chatView.setSetupState(await detectSetupState(workspaceRoot));
+      if (result.ok) {
+        const action = await vscode.window.showInformationMessage(
+          result.message,
+          'Reload Window',
+        );
+        if (action === 'Reload Window') {
+          vscode.commands.executeCommand('workbench.action.reloadWindow');
+        }
+      } else {
+        vscode.window.showErrorMessage(`Redcon setup: ${result.message}`);
+      }
+    }),
+    vscode.commands.registerCommand('redcon.setupMcp', async () => {
+      if (!workspaceRoot) {
+        vscode.window.showErrorMessage('Redcon: open a workspace folder first.');
+        return;
+      }
+      const result = await registerMcp(workspaceRoot);
+      chatView.setSetupState(await detectSetupState(workspaceRoot));
+      if (result.ok) {
+        const action = await vscode.window.showInformationMessage(
+          result.message,
+          'Reload Window',
+        );
+        if (action === 'Reload Window') {
+          vscode.commands.executeCommand('workbench.action.reloadWindow');
+        }
+      } else {
+        vscode.window.showErrorMessage(`Redcon MCP: ${result.message}`);
+      }
+    }),
+  );
+
+  // Detect setup state and push it to the chat view
+  if (workspaceRoot) {
+    detectSetupState(workspaceRoot).then((s) => chatView.setSetupState(s));
+  }
+
   // --- Auto-refresh on save (debounced) ---
 
   let autoRefreshTimer: ReturnType<typeof setTimeout> | undefined;
@@ -158,4 +188,24 @@ export async function activate(
 
 export function deactivate(): void {
   // Cleanup handled by subscriptions
+}
+
+export interface SetupState {
+  cliInstalled: boolean;
+  mcpConfigured: boolean;
+}
+
+async function detectSetupState(workspaceRoot: string): Promise<SetupState> {
+  const cliInstalled = await redcon.checkInstalled(workspaceRoot);
+  let mcpConfigured = false;
+  try {
+    const mcpPath = path.join(workspaceRoot, '.mcp.json');
+    if (fs.existsSync(mcpPath)) {
+      const data = JSON.parse(fs.readFileSync(mcpPath, 'utf-8'));
+      mcpConfigured = !!data?.mcpServers?.redcon;
+    }
+  } catch {
+    mcpConfigured = false;
+  }
+  return { cliInstalled, mcpConfigured };
 }

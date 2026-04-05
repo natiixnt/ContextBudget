@@ -2,7 +2,7 @@
   "name": "redcon",
   "displayName": "Redcon - Context Budget",
   "description": "Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under token limits.",
-  "version": "0.6.0",
+  "version": "0.7.0",
   "publisher": "redcon",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -137,6 +137,18 @@
         "title": "Sync Context to Agents",
         "category": "Redcon",
         "icon": "$(sync)"
+      },
+      {
+        "command": "redcon.setupInstall",
+        "title": "Install Redcon & Set Up MCP",
+        "category": "Redcon",
+        "icon": "$(cloud-download)"
+      },
+      {
+        "command": "redcon.setupMcp",
+        "title": "Register MCP Server",
+        "category": "Redcon",
+        "icon": "$(plug)"
       }
     ],
     "viewsContainers": {

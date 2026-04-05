@@ -56,6 +56,52 @@ function riskBadge(risk: string): string {
 /*  Card renderers                                                     */
 /* ------------------------------------------------------------------ */
 
+function renderSetup(cliInstalled: boolean, mcpConfigured: boolean): string {
+  const steps: string[] = [];
+
+  steps.push(`
+    <div class="setup-step ${cliInstalled ? 'done' : 'pending'}">
+      <span class="setup-icon">${cliInstalled ? '&#10003;' : '1'}</span>
+      <div class="setup-body">
+        <div class="setup-step-title">Install Redcon CLI</div>
+        <div class="card-sub">${cliInstalled
+          ? 'redcon is installed and on your PATH.'
+          : 'Installs the <code>redcon</code> Python package via pip. Required for context budgeting.'}
+        </div>
+      </div>
+    </div>`);
+
+  steps.push(`
+    <div class="setup-step ${mcpConfigured ? 'done' : cliInstalled ? 'pending' : 'disabled'}">
+      <span class="setup-icon">${mcpConfigured ? '&#10003;' : '2'}</span>
+      <div class="setup-body">
+        <div class="setup-step-title">Register MCP server</div>
+        <div class="card-sub">${mcpConfigured
+          ? 'MCP registered. Your agent can call redcon tools directly.'
+          : 'Adds redcon to .mcp.json so Claude Code, Cursor, and Windsurf can call it as tools.'}
+        </div>
+      </div>
+    </div>`);
+
+  let action = '';
+  if (!cliInstalled) {
+    action = '<button class="btn btn-primary btn-block" data-action="setupInstall">Install Redcon &amp; Set Up MCP</button>';
+  } else if (!mcpConfigured) {
+    action = '<button class="btn btn-primary btn-block" data-action="setupMcp">Register MCP Server</button>';
+  } else {
+    action = '<div class="card-sub" style="text-align:center;color:var(--success);">Setup complete. You\'re ready to go.</div>';
+  }
+
+  return `
+    <div class="welcome animate-in">
+      <div class="welcome-icon">&#9889;</div>
+      <div class="welcome-title">Redcon</div>
+      <div class="welcome-sub">One-click setup</div>
+      <div class="setup-steps">${steps.join('')}</div>
+      <div class="setup-action">${action}</div>
+    </div>`;
+}
+
 function renderWelcome(): string {
   return `
     <div class="welcome animate-in">
@@ -497,6 +543,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
   private view?: vscode.WebviewView;
   private messages: ChatMessage[] = [];
+  private setupState: { cliInstalled: boolean; mcpConfigured: boolean } | null = null;
 
   constructor(private readonly extensionUri: vscode.Uri) {}
 
@@ -510,9 +557,9 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
     webviewView.webview.onDidReceiveMessage((msg) => this.handleMessage(msg));
     this.renderShell();
 
-    // Show welcome
+    // Show welcome or setup
     if (this.messages.length === 0) {
-      this.addMessage('system', 'welcome', renderWelcome());
+      this.addMessage('system', 'welcome', this.initialCardHtml());
     }
 
     // Restore previous messages
@@ -520,6 +567,28 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
 
     // Update description with savings if available
     this.updateDescription();
+  }
+
+  private initialCardHtml(): string {
+    if (this.setupState && (!this.setupState.cliInstalled || !this.setupState.mcpConfigured)) {
+      return renderSetup(this.setupState.cliInstalled, this.setupState.mcpConfigured);
+    }
+    return renderWelcome();
+  }
+
+  setSetupState(state: { cliInstalled: boolean; mcpConfigured: boolean }): void {
+    this.setupState = state;
+    // Re-render the welcome card if it's the first (system) message
+    const first = this.messages[0];
+    if (first && first.type === 'welcome') {
+      const newHtml = this.initialCardHtml();
+      this.messages[0] = { ...first, html: newHtml };
+      this.view?.webview.postMessage({
+        command: 'updateMessage',
+        id: first.id,
+        html: newHtml,
+      });
+    }
   }
 
   updateDescription(): void {
@@ -664,6 +733,12 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       case 'sync':
         vscode.commands.executeCommand('redcon.syncContext');
         break;
+      case 'setupInstall':
+        vscode.commands.executeCommand('redcon.setupInstall');
+        break;
+      case 'setupMcp':
+        vscode.commands.executeCommand('redcon.setupMcp');
+        break;
       case 'retry': {
         // Re-send the last user task
         const lastUser = [...this.messages].reverse().find((m) => m.role === 'user' && m.type === 'task');
@@ -751,6 +826,31 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .welcome-sub { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
       .welcome-hint { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
       .welcome-actions { display: flex; gap: 6px; justify-content: center; }
+
+      /* Setup card */
+      .setup-steps { display: flex; flex-direction: column; gap: 10px; width: 100%; margin-top: 16px; margin-bottom: 16px; text-align: left; }
+      .setup-step {
+        display: flex; align-items: flex-start; gap: 10px;
+        padding: 10px;
+        border-radius: var(--radius-sm);
+        background: var(--input);
+        border: 1px solid var(--card-border);
+        transition: all var(--transition);
+      }
+      .setup-step.done { border-color: color-mix(in srgb, var(--success) 40%, var(--card-border)); }
+      .setup-step.disabled { opacity: 0.5; }
+      .setup-icon {
+        width: 22px; height: 22px; border-radius: 50%;
+        display: flex; align-items: center; justify-content: center;
+        font-size: 11px; font-weight: 700; flex-shrink: 0;
+        background: linear-gradient(135deg, #e53935, #1e3a5f); color: #fff;
+      }
+      .setup-step.done .setup-icon { background: var(--success); color: #000; }
+      .setup-step.disabled .setup-icon { background: var(--card-border); color: var(--muted); }
+      .setup-body { flex: 1; min-width: 0; }
+      .setup-step-title { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
+      .setup-step .card-sub code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 10px; }
+      .setup-action { width: 100%; margin-top: 4px; }
 
       /* User message */
       .msg-user { display: flex; justify-content: flex-end; margin-bottom: 8px; }
