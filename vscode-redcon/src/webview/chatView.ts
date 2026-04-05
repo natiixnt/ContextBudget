@@ -85,7 +85,7 @@ function renderSetup(cliInstalled: boolean, mcpConfigured: boolean): string {
 
   let action = '';
   if (!cliInstalled) {
-    action = '<button class="btn btn-primary btn-block" data-action="setupInstall">Install Redcon &amp; Set Up MCP</button>';
+    action = '<button class="btn btn-primary btn-block" data-action="setupInstall">Install &amp; Set Up</button>';
   } else if (!mcpConfigured) {
     action = '<button class="btn btn-primary btn-block" data-action="setupMcp">Register MCP Server</button>';
   } else {
@@ -94,7 +94,7 @@ function renderSetup(cliInstalled: boolean, mcpConfigured: boolean): string {
 
   return `
     <div class="welcome animate-in">
-      <div class="welcome-icon">&#9889;</div>
+      <div class="welcome-icon"><svg width="56" height="56" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="redconGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#e53935"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="128" height="128" rx="24" ry="24" fill="url(#redconGrad)"/><g stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="30,44 50,64 30,84"/><polyline points="54,44 74,64 54,84"/><polyline points="78,44 98,64 78,84"/></g></svg></div>
       <div class="welcome-title">Redcon</div>
       <div class="welcome-sub">One-click setup</div>
       <div class="setup-steps">${steps.join('')}</div>
@@ -105,7 +105,7 @@ function renderSetup(cliInstalled: boolean, mcpConfigured: boolean): string {
 function renderWelcome(): string {
   return `
     <div class="welcome animate-in">
-      <div class="welcome-icon">&#9889;</div>
+      <div class="welcome-icon"><svg width="56" height="56" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs><linearGradient id="redconGrad" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" stop-color="#e53935"/><stop offset="100%" stop-color="#1e3a5f"/></linearGradient></defs><rect width="128" height="128" rx="24" ry="24" fill="url(#redconGrad)"/><g stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round"><polyline points="30,44 50,64 30,84"/><polyline points="54,44 74,64 54,84"/><polyline points="78,44 98,64 78,84"/></g></svg></div>
       <div class="welcome-title">Redcon</div>
       <div class="welcome-sub">Context budgeting for AI coding agents</div>
       <div class="welcome-hint">Type a task below to analyze and pack your repository context.</div>
@@ -816,12 +816,14 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         max-width: 600px;
       }
       .welcome-icon {
-        font-size: 36px; margin-bottom: 10px;
-        background: linear-gradient(135deg, #e53935, #1e3a5f);
-        -webkit-background-clip: text;
-        -webkit-text-fill-color: transparent;
-        filter: drop-shadow(0 0 12px rgba(229, 57, 53, 0.4)) drop-shadow(0 0 24px rgba(30, 58, 95, 0.3));
+        margin: 0 auto 14px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        line-height: 0;
+        filter: drop-shadow(0 4px 20px rgba(229, 57, 53, 0.28)) drop-shadow(0 4px 32px rgba(30, 58, 95, 0.22));
       }
+      .welcome-icon svg { display: block; }
       .welcome-title { font-size: 16px; font-weight: 700; margin-bottom: 4px; color: var(--fg); }
       .welcome-sub { font-size: 12px; color: var(--muted); margin-bottom: 12px; }
       .welcome-hint { font-size: 11px; color: var(--muted); margin-bottom: 12px; }
@@ -840,17 +842,78 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
       .setup-step.done { border-color: color-mix(in srgb, var(--success) 40%, var(--card-border)); }
       .setup-step.disabled { opacity: 0.5; }
       .setup-icon {
-        width: 22px; height: 22px; border-radius: 50%;
+        position: relative;
+        width: 24px; height: 24px; border-radius: 50%;
         display: flex; align-items: center; justify-content: center;
         font-size: 11px; font-weight: 700; flex-shrink: 0;
-        background: linear-gradient(135deg, #e53935, #1e3a5f); color: #fff;
+        color: #fff;
+        background: linear-gradient(135deg, rgba(229, 57, 53, 0.3), rgba(30, 58, 95, 0.3));
+        border: 1px solid rgba(255, 255, 255, 0.15);
+        backdrop-filter: blur(8px) saturate(150%);
+        -webkit-backdrop-filter: blur(8px) saturate(150%);
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 2px 8px rgba(229, 57, 53, 0.2);
       }
-      .setup-step.done .setup-icon { background: var(--success); color: #000; }
-      .setup-step.disabled .setup-icon { background: var(--card-border); color: var(--muted); }
+      .setup-step.done .setup-icon {
+        background: linear-gradient(135deg, rgba(78, 201, 176, 0.35), rgba(78, 201, 176, 0.25));
+        border-color: rgba(78, 201, 176, 0.4);
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.08) inset, 0 2px 8px rgba(78, 201, 176, 0.25);
+        color: var(--success);
+      }
+      .setup-step.disabled .setup-icon {
+        background: rgba(255, 255, 255, 0.04);
+        border-color: rgba(255, 255, 255, 0.08);
+        color: var(--muted);
+        box-shadow: none;
+      }
       .setup-body { flex: 1; min-width: 0; }
       .setup-step-title { font-size: 12px; font-weight: 600; margin-bottom: 3px; }
       .setup-step .card-sub code { background: var(--bg); padding: 1px 4px; border-radius: 3px; font-size: 10px; }
       .setup-action { width: 100%; margin-top: 4px; }
+      .setup-action .btn-primary {
+        position: relative;
+        padding: 11px 16px;
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        border-radius: var(--radius);
+        color: #fff;
+        background: linear-gradient(135deg,
+          rgba(229, 57, 53, 0.18) 0%,
+          rgba(139, 40, 72, 0.18) 50%,
+          rgba(30, 58, 95, 0.18) 100%);
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        backdrop-filter: blur(12px) saturate(150%);
+        -webkit-backdrop-filter: blur(12px) saturate(150%);
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.06) inset,
+          0 4px 16px rgba(229, 57, 53, 0.12),
+          0 4px 24px rgba(30, 58, 95, 0.12);
+        transition: all var(--transition);
+      }
+      .setup-action .btn-primary::before {
+        content: '';
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        padding: 1px;
+        background: linear-gradient(135deg, rgba(229, 57, 53, 0.6), rgba(30, 58, 95, 0.6));
+        -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        pointer-events: none;
+      }
+      .setup-action .btn-primary:hover {
+        opacity: 1;
+        background: linear-gradient(135deg,
+          rgba(229, 57, 53, 0.28) 0%,
+          rgba(139, 40, 72, 0.28) 50%,
+          rgba(30, 58, 95, 0.28) 100%);
+        box-shadow:
+          0 1px 0 rgba(255, 255, 255, 0.1) inset,
+          0 6px 24px rgba(229, 57, 53, 0.25),
+          0 6px 32px rgba(30, 58, 95, 0.2);
+        transform: translateY(-1px);
+      }
 
       /* User message */
       .msg-user { display: flex; justify-content: flex-end; margin-bottom: 8px; }
@@ -1040,9 +1103,7 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         width: 30px;
         height: 30px;
         padding: 0;
-        border: none;
         border-radius: 50%;
-        background: linear-gradient(135deg, #e53935, #1e3a5f);
         color: #fff;
         cursor: pointer;
         display: flex;
@@ -1050,13 +1111,21 @@ export class ChatViewProvider implements vscode.WebviewViewProvider {
         justify-content: center;
         flex-shrink: 0;
         transition: all var(--transition);
-        box-shadow: 0 0 6px rgba(229, 57, 53, 0.2), 0 0 12px rgba(30, 58, 95, 0.2);
+        background: linear-gradient(135deg, rgba(229, 57, 53, 0.3), rgba(30, 58, 95, 0.3));
+        border: 1px solid rgba(255, 255, 255, 0.18);
+        backdrop-filter: blur(10px) saturate(150%);
+        -webkit-backdrop-filter: blur(10px) saturate(150%);
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.1) inset, 0 2px 10px rgba(229, 57, 53, 0.2), 0 2px 16px rgba(30, 58, 95, 0.15);
       }
       #send-btn svg {
         display: block;
       }
-      #send-btn:hover { opacity: 0.85; box-shadow: 0 0 10px rgba(229, 57, 53, 0.3), 0 0 20px rgba(30, 58, 95, 0.3); }
-      #send-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; }
+      #send-btn:hover {
+        background: linear-gradient(135deg, rgba(229, 57, 53, 0.45), rgba(30, 58, 95, 0.45));
+        box-shadow: 0 1px 0 rgba(255, 255, 255, 0.15) inset, 0 2px 14px rgba(229, 57, 53, 0.35), 0 2px 22px rgba(30, 58, 95, 0.25);
+        transform: scale(1.05);
+      }
+      #send-btn:disabled { opacity: 0.4; cursor: default; box-shadow: none; transform: none; }
 
       /* Gradient border pseudo for input bar */
       #input-bar { position: relative; }

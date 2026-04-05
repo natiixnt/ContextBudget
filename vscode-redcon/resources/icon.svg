@@ -5,12 +5,11 @@
       <stop offset="100%" stop-color="#1e3a5f"/>
     </linearGradient>
   </defs>
-  <!-- Background with rounded corners -->
   <rect width="128" height="128" rx="24" ry="24" fill="url(#bgGrad)"/>
-  <!-- Triple chevron mark pointing right, centered -->
-  <g transform="translate(22, 40)" fill="#ffffff">
-    <path d="M 0 0 L 10 0 L 22 16 L 10 32 L 0 32 L 12 16 Z"/>
-    <path d="M 18 0 L 28 0 L 40 16 L 28 32 L 18 32 L 30 16 Z"/>
-    <path d="M 36 0 L 46 0 L 58 16 L 46 32 L 36 32 L 48 16 Z"/>
+  <!-- Triple chevron mark pointing right, centered (h:64 v:64) -->
+  <g stroke="#ffffff" stroke-width="9" fill="none" stroke-linecap="round" stroke-linejoin="round">
+    <polyline points="30,44 50,64 30,84"/>
+    <polyline points="54,44 74,64 54,84"/>
+    <polyline points="78,44 98,64 78,84"/>
   </g>
 </svg>
