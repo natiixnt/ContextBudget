@@ -181,7 +181,64 @@ _redcon""")
 
 
 def cmd_mcp(args: argparse.Namespace) -> int:
-    """Run the Redcon MCP server over stdio."""
+    """Run the Redcon MCP server or manage MCP config for AI IDEs."""
+    action = args.action
+    project_root = Path(args.repo).resolve()
+
+    if action in ("install", "uninstall", "status"):
+        from redcon.mcp.install import (
+            install_all,
+            uninstall_for_target,
+            _target_paths,
+            _load_config,
+        )
+        target = args.target
+        targets = ["claude", "cursor", "windsurf"] if target == "all" else [target]
+
+        if action == "install":
+            results = install_all(project_root, targets)
+            for r in results:
+                status = r["status"]
+                icon = {
+                    "installed": "[OK]",
+                    "up_to_date": "[=]",
+                    "error": "[X]",
+                    "unknown": "[?]",
+                }.get(status, "[-]")
+                path = r.get("path") or "(none)"
+                print(f"{icon} {r['target']}: {r['message']} ({path})")
+            errors = sum(1 for r in results if r["status"] == "error")
+            if errors:
+                return 1
+            print()
+            print("Done. Restart your IDE to pick up the new MCP server.")
+            return 0
+
+        if action == "uninstall":
+            for t in targets:
+                r = uninstall_for_target(t, project_root)
+                icon = {"removed": "[OK]", "not_installed": "[-]", "error": "[X]"}.get(
+                    r["status"], "[-]"
+                )
+                path = r.get("path") or "(none)"
+                print(f"{icon} {r['target']}: {r['message']} ({path})")
+            return 0
+
+        # status
+        for t in targets:
+            paths = _target_paths(project_root).get(t, [])
+            found = False
+            for p in paths:
+                cfg = _load_config(p)
+                if "redcon" in cfg.get("mcpServers", {}):
+                    print(f"[OK] {t}: configured at {p}")
+                    found = True
+                    break
+            if not found:
+                print(f"[-]  {t}: not configured")
+        return 0
+
+    # action == "serve"
     try:
         import asyncio
         from redcon.mcp import serve
@@ -191,10 +248,6 @@ def cmd_mcp(args: argparse.Namespace) -> int:
             f"Install with: pip install redcon[mcp]",
             file=sys.stderr,
         )
-        return 1
-
-    if args.action != "serve":
-        print(f"Error: unknown mcp action: {args.action}", file=sys.stderr)
         return 1
 
     try:
@@ -1626,10 +1679,29 @@ jobs:
     print(f"  Code files found: {total_files}")
     print(f"  Estimated savings: ~{estimated_savings_pct}%  (~{estimated_saved:,} tokens saved per run)")
     print()
+    # ── Auto-install MCP config for AI IDEs ───────────────────────────────────
+    mcp_installed_targets: list[str] = []
+    if not getattr(args, "no_mcp", False):
+        try:
+            from redcon.mcp.install import install_all
+            mcp_results = install_all(repo_path)
+            for r in mcp_results:
+                if r["status"] in ("installed", "up_to_date"):
+                    mcp_installed_targets.append(r["target"])
+        except Exception:
+            # Don't fail init if MCP config step fails
+            pass
+        if mcp_installed_targets:
+            print(f"  MCP registered: {', '.join(mcp_installed_targets)}")
+
+    print()
     print("Next steps:")
     print("  redcon doctor                              # verify setup")
     print("  redcon pack 'describe your task' --repo .  # compress context")
     print("  redcon plan 'describe your task' --repo .  # rank files")
+    if mcp_installed_targets:
+        print()
+        print("MCP: restart your IDE to pick up the new redcon tools.")
     return 0
 
 
@@ -2134,12 +2206,28 @@ def build_parser() -> argparse.ArgumentParser:
 
     mcp_parser = sub.add_parser(
         "mcp",
-        help="Run the Redcon MCP server (stdio transport for Claude Code, Cursor, etc.)",
+        help="Redcon MCP server - auto-configure agents or run the server",
     )
     mcp_parser.add_argument(
         "action",
-        choices=["serve"],
-        help="Server action (currently only 'serve' is supported).",
+        choices=["serve", "install", "uninstall", "status"],
+        help=(
+            "'serve' runs the MCP server (stdio). "
+            "'install' auto-configures Claude Code, Cursor, and Windsurf. "
+            "'uninstall' removes the config. "
+            "'status' shows where redcon is currently configured."
+        ),
+    )
+    mcp_parser.add_argument(
+        "--target",
+        choices=["claude", "cursor", "windsurf", "all"],
+        default="all",
+        help="Which agent to configure (default: all).",
+    )
+    mcp_parser.add_argument(
+        "--repo",
+        default=".",
+        help="Project root for project-scoped configs (default: current directory).",
     )
     mcp_parser.set_defaults(func=cmd_mcp)
 
@@ -2992,6 +3080,12 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Overwrite existing configuration files.",
+    )
+    init_cmd.add_argument(
+        "--no-mcp",
+        action="store_true",
+        default=False,
+        help="Skip auto-registering Redcon as an MCP server for Claude Code/Cursor/Windsurf.",
     )
     init_cmd.set_defaults(func=cmd_init)
 
