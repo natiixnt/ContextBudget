@@ -1,0 +1,16 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e53935"/>
+      <stop offset="100%" stop-color="#1e3a5f"/>
+    </linearGradient>
+  </defs>
+  <!-- Background with rounded corners -->
+  <rect width="128" height="128" rx="24" ry="24" fill="url(#bgGrad)"/>
+  <!-- Triple chevron mark pointing right, centered -->
+  <g transform="translate(22, 40)" fill="#ffffff">
+    <path d="M 0 0 L 10 0 L 22 16 L 10 32 L 0 32 L 12 16 Z"/>
+    <path d="M 18 0 L 28 0 L 40 16 L 28 32 L 18 32 L 30 16 Z"/>
+    <path d="M 36 0 L 46 0 L 58 16 L 46 32 L 36 32 L 48 16 Z"/>
+  </g>
+</svg>
