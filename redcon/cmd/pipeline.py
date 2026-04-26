@@ -147,6 +147,7 @@ def compress_command(
             run_result.stdout, run_result.stderr, ctx
         )
         compressed = _normalise_whitespace(compressed)
+        compressed = _apply_subst_table(compressed)
 
     report = CompressionReport(
         output=compressed,
@@ -214,6 +215,45 @@ def _normalise_whitespace(output: CompressedOutput) -> CompressedOutput:
         schema=output.schema,
         original_tokens=output.original_tokens,
         compressed_tokens=estimate_tokens(cleaned),
+        must_preserve_ok=output.must_preserve_ok,
+        truncated=output.truncated,
+        notes=output.notes,
+    )
+
+
+def _apply_subst_table(output: CompressedOutput) -> CompressedOutput:
+    """Tokenizer-aware multi-token substitution.
+
+    Walks the per-schema SUBST_TABLE and accepts each rewrite only when
+    re-tokenisation shows a strict decrease. Monotone-safe by construction.
+    Skipped at VERBOSE because that tier is the human-readable surface.
+    """
+    if output.level == CompressionLevel.VERBOSE:
+        return output
+
+    from redcon.cmd._subst_table import SUBST_TABLE
+    from redcon.cmd._tokens_lite import estimate_tokens
+
+    text = output.text
+    cur = output.compressed_tokens or estimate_tokens(text)
+    for sub in SUBST_TABLE:
+        if sub.scope is not None and output.schema not in sub.scope:
+            continue
+        if sub.orig not in text:
+            continue
+        cand = text.replace(sub.orig, sub.repl)
+        ct = estimate_tokens(cand)
+        if ct < cur:
+            text, cur = cand, ct
+
+    if text == output.text:
+        return output
+    return CompressedOutput(
+        text=text,
+        level=output.level,
+        schema=output.schema,
+        original_tokens=output.original_tokens,
+        compressed_tokens=cur,
         must_preserve_ok=output.must_preserve_ok,
         truncated=output.truncated,
         notes=output.notes,
