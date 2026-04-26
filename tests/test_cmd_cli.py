@@ -262,3 +262,68 @@ def test_pipeline_record_history_writes_row(git_repo: Path, monkeypatch):
     assert len(rows) == 1
     assert rows[0]["schema"] == "git_diff"
     assert rows[0]["command"] == "git diff"
+
+
+# --- _meta convention + redcon_quality_check ---
+
+
+def test_tool_run_response_carries_meta_block(git_repo: Path):
+    """Every redcon_run response should include _meta.redcon for portability."""
+    from redcon.mcp.tools import tool_run
+
+    result = tool_run(command="git diff", cwd=str(git_repo))
+    assert "_meta" in result
+    meta = result["_meta"]["redcon"]
+    assert meta["tool"] == "redcon_run"
+    assert meta["schema_version"] == "1"
+    assert meta["schema"] == "git_diff"
+    assert "level" in meta
+    assert "compressed_tokens" in meta
+    assert "original_tokens" in meta
+
+
+def test_tool_quality_check_returns_structured_verdict(git_repo: Path):
+    """redcon_quality_check returns the M8 quality verdict, not raw text."""
+    from redcon.mcp.tools import tool_quality_check
+
+    result = tool_quality_check(command="git diff", cwd=str(git_repo))
+    assert "error" not in result
+    assert "passed" in result
+    assert "must_preserve_ok" in result
+    assert "threshold_met" in result
+    assert "deterministic" in result
+    assert isinstance(result["passed"], bool)
+    assert "_meta" in result
+    assert result["_meta"]["redcon"]["tool"] == "redcon_quality_check"
+
+
+def test_tool_quality_check_rejects_unallowed_command():
+    from redcon.mcp.tools import tool_quality_check
+
+    result = tool_quality_check(command="rm -rf /")
+    assert "error" in result
+
+
+def test_tool_quality_check_quality_dimensions_on_real_diff(git_repo: Path):
+    """Real git diff on a small fixture: must_preserve and determinism must hold."""
+    from redcon.mcp.tools import tool_quality_check
+
+    result = tool_quality_check(
+        command="git diff", cwd=str(git_repo), quality_floor="compact"
+    )
+    assert "error" not in result
+    assert result["must_preserve_ok"] is True
+    assert result["deterministic"] is True
+
+
+def test_tool_quality_check_passes_prefer_compact_output(git_repo: Path):
+    """The flag is plumbed through and respected on real commands."""
+    from redcon.mcp.tools import tool_quality_check
+
+    result = tool_quality_check(
+        command="git diff", cwd=str(git_repo), prefer_compact_output=True
+    )
+    # Same fixture, same compressor; just verifying the flag doesn't break
+    # the code path.
+    assert "error" not in result
+    assert result["schema"] == "git_diff"
