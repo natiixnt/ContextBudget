@@ -12,10 +12,16 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Protocol, runtime_checkable
 
 from redcon.cmd.budget import BudgetHint
 from redcon.cmd.types import CompressedOutput, CompressionLevel
+
+
+@lru_cache(maxsize=2048)
+def _compile_preserve(pattern: str, flags: int) -> re.Pattern[str]:
+    return re.compile(pattern, flags)
 
 
 @dataclass(frozen=True, slots=True)
@@ -67,7 +73,7 @@ def verify_must_preserve(
     facts that were actually present.
     """
     for pat in patterns:
-        regex = re.compile(pat, re.MULTILINE)
+        regex = _compile_preserve(pat, re.MULTILINE)
         if regex.search(original) and not regex.search(text):
             return False
     return True
