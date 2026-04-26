@@ -25,12 +25,18 @@ class BudgetHint:
     argv to runner-native compact flags (e.g. pytest --tb=line) before
     spawning. Trades a small amount of detail for ~60-80% upstream
     reduction on test-failure runs.
+
+    `semantic_fallback` when True enables the LLMLingua-2 semantic
+    compression fallback for unknown commands. Requires the optional
+    `redcon[heavy_compression]` extra; falls through to plain passthrough
+    when missing.
     """
 
     remaining_tokens: int
     max_output_tokens: int
     quality_floor: CompressionLevel = CompressionLevel.ULTRA
     prefer_compact_output: bool = False
+    semantic_fallback: bool = False
 
 
 # Approximate output size as a fraction of raw tokens for each level.

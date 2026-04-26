@@ -132,7 +132,9 @@ def compress_command(
             notes=run_result.notes,
         )
     elif compressor is None:
-        compressed = _passthrough(run_result.stdout, run_result.stderr, effective_hint)
+        compressed = _semantic_or_passthrough(
+            run_result.stdout, run_result.stderr, effective_hint
+        )
     else:
         ctx = CompressorContext(
             argv=argv,
@@ -301,6 +303,32 @@ def _spill_to_log(
         truncated=True,
         notes=notes,
     )
+
+
+def _semantic_or_passthrough(
+    stdout: bytes, stderr: bytes, hint: BudgetHint
+) -> CompressedOutput:
+    """When opt-in semantic_fallback is set and llmlingua is installed,
+    attempt LLMLingua-2 compression on the raw output. Falls through to
+    plain passthrough on any guard failure.
+    """
+    if hint.semantic_fallback:
+        try:
+            from redcon.cmd.semantic_fallback import maybe_compress
+
+            text = stdout.decode("utf-8", errors="replace")
+            if stderr:
+                err_text = stderr.decode("utf-8", errors="replace").strip()
+                if err_text:
+                    text = (
+                        f"{text}\n--- stderr ---\n{err_text}" if text else err_text
+                    )
+            attempt = maybe_compress(text)
+            if attempt is not None:
+                return attempt
+        except Exception as e:
+            logger.debug("semantic fallback skipped: %s", e)
+    return _passthrough(stdout, stderr, hint)
 
 
 def _passthrough(
