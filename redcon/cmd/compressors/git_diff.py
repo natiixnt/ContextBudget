@@ -257,6 +257,10 @@ def _format_ultra(result: DiffResult) -> str:
 
 
 def _format_compact(result: DiffResult) -> str:
+    # Indented continuation lines drop their three-space prefix: the file
+    # header above already provides the visual grouping and the leading
+    # @@ / +/-/binary tokens unambiguously identify the line type. Saves
+    # ~1 token per line on cl100k.
     lines: list[str] = [
         f"diff: {len(result.files)} files, "
         f"+{result.total_insertions} -{result.total_deletions}",
@@ -275,11 +279,11 @@ def _format_compact(result: DiffResult) -> str:
             header = first.header.strip()
             loc = f"@@ -{first.old_start},{first.old_lines} +{first.new_start},{first.new_lines}"
             if header:
-                lines.append(f"   {loc} {header}")
+                lines.append(f"{loc} {header}")
             else:
-                lines.append(f"   {loc}")
+                lines.append(loc)
             if len(f.hunks) > 1:
-                lines.append(f"   ... +{len(f.hunks) - 1} more hunks")
+                lines.append(f"+{len(f.hunks) - 1} more hunks")
     return "\n".join(lines)
 
 
@@ -294,20 +298,20 @@ def _format_verbose(result: DiffResult) -> str:
         rename = f" (from {f.old_path})" if f.status == "renamed" and f.old_path else ""
         lines.append(f"{marker} {f.path}{rename}: +{f.insertions} -{f.deletions}")
         if f.binary:
-            lines.append("   (binary file)")
+            lines.append("(binary file)")
             continue
         for hunk in f.hunks:
             loc = f"@@ -{hunk.old_start},{hunk.old_lines} +{hunk.new_start},{hunk.new_lines}"
             header = hunk.header.strip()
-            lines.append(f"   {loc}" + (f" {header}" if header else ""))
+            lines.append(loc + (f" {header}" if header else ""))
             for added in hunk.added[:5]:
-                lines.append(f"   +{added}")
+                lines.append(f"+{added}")
             if len(hunk.added) > 5:
-                lines.append(f"   +... ({len(hunk.added) - 5} more)")
+                lines.append(f"+... ({len(hunk.added) - 5} more)")
             for removed in hunk.removed[:5]:
-                lines.append(f"   -{removed}")
+                lines.append(f"-{removed}")
             if len(hunk.removed) > 5:
-                lines.append(f"   -... ({len(hunk.removed) - 5} more)")
+                lines.append(f"-... ({len(hunk.removed) - 5} more)")
     return "\n".join(lines)
 
 

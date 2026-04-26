@@ -205,10 +205,12 @@ def _format_verbose(result: LogResult) -> str:
         if e.date:
             head += f" ({e.date})"
         lines.append(head)
-        lines.append(f"   {e.subject}")
+        # Drop indent: subject + body lines are unambiguous after the commit
+        # header and we save one cl100k token per body line.
+        lines.append(e.subject)
         if e.body:
             for body_line in e.body.splitlines()[:3]:
-                lines.append(f"   {body_line}")
+                lines.append(body_line)
     return "\n".join(lines)
 
 

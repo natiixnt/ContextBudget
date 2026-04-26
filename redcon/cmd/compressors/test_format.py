@@ -50,21 +50,24 @@ def _format_ultra(r: TestRunResult) -> str:
 
 
 def _format_compact(r: TestRunResult) -> str:
+    # Body / message lines drop the leading two-space indent: the FAIL line
+    # immediately above provides context and dropping the prefix saves one
+    # cl100k token per body line on long failure listings.
     lines = [_summary_line(r)]
     if r.failures:
         lines.append("")
         for failure in r.failures:
             location = _format_location(failure)
-            head = f"FAIL {failure.name}" + (f"  ({location})" if location else "")
+            head = f"FAIL {failure.name}" + (f" ({location})" if location else "")
             lines.append(head)
             short_msg = _first_meaningful_line(failure.message)
             if short_msg:
-                lines.append(f"  {_clip(short_msg, 200)}")
+                lines.append(_clip(short_msg, 200))
     if r.warnings:
         lines.append("")
         lines.append(f"warnings: {len(r.warnings)}")
         for warning in r.warnings[:5]:
-            lines.append(f"  {_clip(warning, 200)}")
+            lines.append(_clip(warning, 200))
     return "\n".join(lines)
 
 
@@ -77,18 +80,18 @@ def _format_verbose(r: TestRunResult) -> str:
         lines.append("")
         for failure in r.failures:
             location = _format_location(failure)
-            head = f"FAIL {failure.name}" + (f"  ({location})" if location else "")
+            head = f"FAIL {failure.name}" + (f" ({location})" if location else "")
             lines.append(head)
             for msg_line in failure.message.splitlines()[:6]:
-                lines.append(f"  {msg_line}")
+                lines.append(msg_line)
             if failure.snippet:
                 for snip_line in failure.snippet[:8]:
-                    lines.append(f"  | {snip_line}")
+                    lines.append(f"| {snip_line}")
             lines.append("")
     if r.warnings:
         lines.append(f"warnings: {len(r.warnings)}")
         for warning in r.warnings[:20]:
-            lines.append(f"  {_clip(warning, 300)}")
+            lines.append(_clip(warning, 300))
     return "\n".join(lines).rstrip()
 
 

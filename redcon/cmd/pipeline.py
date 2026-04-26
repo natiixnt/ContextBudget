@@ -20,6 +20,7 @@ from redcon.cmd.budget import BudgetHint
 from redcon.cmd.cache import CommandCacheKey, build_cache_key
 from redcon.cmd.compressors.base import CompressorContext
 from redcon.cmd.registry import detect_compressor
+from redcon.cmd.rewriter import rewrite_argv
 from redcon.cmd.runner import (
     CommandNotAllowed,
     CommandTimeout,
@@ -64,8 +65,19 @@ def compress_command(
 
     Returns CompressionReport so callers can see cache hit, raw size, duration.
     """
-    argv = parse_command(command)
+    raw_argv = parse_command(command)
     cwd_path = Path(cwd)
+    effective_hint_for_rewrite = hint or BudgetHint(
+        remaining_tokens=10_000,
+        max_output_tokens=4_000,
+        quality_floor=CompressionLevel.COMPACT,
+    )
+    # Rewriting happens before cache lookup so compact-mode runs cache
+    # separately from default runs (different output, different key).
+    argv = rewrite_argv(
+        raw_argv,
+        prefer_compact=effective_hint_for_rewrite.prefer_compact_output,
+    )
 
     effective_cache = cache if cache is not None else (
         _DEFAULT_CACHE if use_default_cache else None
@@ -92,11 +104,7 @@ def compress_command(
     except CommandTimeout:
         raise
 
-    effective_hint = hint or BudgetHint(
-        remaining_tokens=10_000,
-        max_output_tokens=4_000,
-        quality_floor=CompressionLevel.COMPACT,
-    )
+    effective_hint = hint or effective_hint_for_rewrite
 
     if compressor is None:
         compressed = _passthrough(run_result.stdout, run_result.stderr, effective_hint)
@@ -111,6 +119,7 @@ def compress_command(
         compressed = compressor.compress(
             run_result.stdout, run_result.stderr, ctx
         )
+        compressed = _normalise_whitespace(compressed)
 
     report = CompressionReport(
         output=compressed,
@@ -138,6 +147,41 @@ def compress_command(
 def clear_default_cache() -> None:
     """Drop in-memory pipeline cache. Used by tests."""
     _DEFAULT_CACHE.clear()
+
+
+_TRIPLE_NEWLINE = None  # lazy-compiled below
+
+
+def _normalise_whitespace(output: CompressedOutput) -> CompressedOutput:
+    """Collapse 3+ consecutive newlines to 2 and re-tokenise.
+
+    Each blank line costs roughly one cl100k token. Compressors sometimes
+    emit double-blanks at section transitions; collapsing them is free
+    quality-wise and cheap. Re-counts compressed_tokens after the rewrite
+    so the reported reduction stays accurate.
+    """
+    global _TRIPLE_NEWLINE
+    import re
+
+    if _TRIPLE_NEWLINE is None:
+        _TRIPLE_NEWLINE = re.compile(r"\n{3,}")
+
+    cleaned = _TRIPLE_NEWLINE.sub("\n\n", output.text).rstrip()
+    if cleaned == output.text:
+        return output
+
+    from redcon.cmd._tokens_lite import estimate_tokens
+
+    return CompressedOutput(
+        text=cleaned,
+        level=output.level,
+        schema=output.schema,
+        original_tokens=output.original_tokens,
+        compressed_tokens=estimate_tokens(cleaned),
+        must_preserve_ok=output.must_preserve_ok,
+        truncated=output.truncated,
+        notes=output.notes,
+    )
 
 
 def _with_cache_hit(report: CompressionReport) -> CompressionReport:
