@@ -19,7 +19,7 @@ from redcon.cmd.types import (
     GrepMatch,
     GrepResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _INLINE = re.compile(
     r"^(?P<path>[^\s:][^:]*):(?P<line>\d+):"

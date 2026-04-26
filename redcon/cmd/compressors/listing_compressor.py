@@ -26,7 +26,7 @@ from redcon.cmd.types import (
     Listing,
     ListingResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _LS_LONG = re.compile(
     r"^(?P<perms>[\-dlcbps][\-rwxstST]{9,11})\s+\S+\s+\S+\s+\S+\s+(?P<size>\d+)"

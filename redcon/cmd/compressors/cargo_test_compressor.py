@@ -23,7 +23,7 @@ from redcon.cmd.types import (
     TestFailure,
     TestRunResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _TEST_LINE = re.compile(r"^test (?P<name>\S+)\s+\.\.\.\s+(?P<status>ok|FAILED|ignored)$")
 _FAILURE_HEADER = re.compile(r"^---- (?P<name>\S+) stdout ----$")

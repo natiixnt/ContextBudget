@@ -24,7 +24,7 @@ from redcon.cmd.types import (
     TestFailure,
     TestRunResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _FAILURES_HEADER = re.compile(r"^=+\s*FAILURES\s*=+$")
 _ERRORS_HEADER = re.compile(r"^=+\s*ERRORS\s*=+$")

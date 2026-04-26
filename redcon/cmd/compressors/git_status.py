@@ -25,7 +25,7 @@ from redcon.cmd.types import (
     StatusEntry,
     StatusResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _BRANCH_HEADER = re.compile(
     r"^## (?P<branch>[^\s.]+)"

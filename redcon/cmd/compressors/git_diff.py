@@ -23,7 +23,7 @@ from redcon.cmd.types import (
     DiffHunk,
     DiffResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _DIFF_HEADER = re.compile(r"^diff --git a/(?P<a>.+?) b/(?P<b>.+?)$")
 _HUNK_HEADER = re.compile(

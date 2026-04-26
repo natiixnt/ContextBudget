@@ -23,7 +23,7 @@ from redcon.cmd.types import (
     TestFailure,
     TestRunResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 # vitest markers
 _VITEST_FILE = re.compile(r"^(?P<status>FAIL|PASS)\s+(?P<file>\S+)")

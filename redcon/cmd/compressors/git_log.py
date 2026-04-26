@@ -22,7 +22,7 @@ from redcon.cmd.types import (
     LogEntry,
     LogResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _COMMIT_LINE = re.compile(r"^commit (?P<sha>[0-9a-f]{7,40})(?: \(.*\))?$")
 _AUTHOR_LINE = re.compile(r"^Author: (?P<author>.+)$")

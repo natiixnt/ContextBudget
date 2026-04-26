@@ -22,7 +22,7 @@ from redcon.cmd.types import (
     TestFailure,
     TestRunResult,
 )
-from redcon.core.tokens import estimate_tokens
+from redcon.cmd._tokens_lite import estimate_tokens
 
 _TEST_RUN = re.compile(r"^=== RUN\s+(?P<name>\S+)$")
 _TEST_RESULT = re.compile(
