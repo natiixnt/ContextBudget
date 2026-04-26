@@ -94,7 +94,7 @@ Every step is deterministic. Same input, same output. No embeddings, no random c
 
 ## MCP Integration (Pull Model)
 
-Instead of pushing a 30k-token blob to your agent, Redcon exposes 5 MCP tools the agent calls on demand:
+Instead of pushing a 30k-token blob to your agent, Redcon exposes 6 MCP tools the agent calls on demand:
 
 | Tool | What it does |
 |------|--------------|
@@ -103,6 +103,7 @@ Instead of pushing a 30k-token blob to your agent, Redcon exposes 5 MCP tools th
 | `redcon_compress` | Compressed single-file view for cheap inspection |
 | `redcon_search` | Regex search scoped to ranked files or full repo |
 | `redcon_budget` | Plan fitting files within a token budget |
+| `redcon_run` | Run a shell command, return its output compressed |
 
 Typical agent flow uses ~5k tokens for exploration instead of 30k for a blob. The agent itself decides what to read in full.
 
@@ -110,6 +111,30 @@ Config gets written automatically to:
 - `.mcp.json` (Claude Code)
 - `.cursor/mcp.json` (Cursor)
 - `~/.codeium/windsurf/mcp_config.json` (Windsurf)
+
+## Command Output Compression
+
+Source files are only half the bloat. The other half is command output: `git diff`, `pytest`, `cargo test`, `grep`, `ls -R`. Redcon's `redcon_run` MCP tool (and `redcon run` CLI) wraps the call, parses the output, and returns a budget-aware compressed view that preserves every fact the agent actually needs.
+
+Headline reductions on representative inputs (warm parse times in milliseconds):
+
+| Compressor | Fixture | Raw tokens | Compact | Ultra | Warm parse |
+|------------|---------|-----------:|---------|-------|------------|
+| `git diff` | 12 files, 240 hunks | 8,078 | **97.0%** | 99.5% | 0.84 ms |
+| `pytest` | 30 failures + 200 passes | 2,555 | **73.8%** | 99.2% | 0.43 ms |
+| `grep`/`rg` | 600 matches across 50 files | 7,015 | **76.9%** | 99.9% | 1.32 ms |
+| `find` | 500 paths | 3,398 | **81.3%** | 99.8% | 0.62 ms |
+| `ls -R` | 30 dirs x 15 files | 1,543 | **33.5%** | 99.0% | 0.81 ms |
+
+Quality is enforced separately. Every compressor declares `must_preserve_patterns` (file paths in a diff, failing test names in pytest, branch name in `git status`); the M8 quality harness rejects any compressor whose compact output drops a fact present in the raw input. Run it as a CI step:
+
+```bash
+redcon cmd-quality   # exits non-zero if any compressor regressed
+redcon cmd-bench     # markdown table; --json for CI baselines
+redcon run "git diff" --quality-floor compact --max-output-tokens 4000
+```
+
+Eleven compressors ship today: `git_diff`, `git_status`, `git_log`, `pytest`, `cargo_test`, `npm_test` (vitest+jest), `go_test`, `grep`, `ls`, `tree`, `find`. Full per-schema benchmarks: [`docs/benchmarks/cmd/`](docs/benchmarks/cmd/).
 
 ## VS Code Extension
 
@@ -182,10 +207,13 @@ Full reference: [docs/python-api.md](docs/python-api.md).
 
 - **Deterministic scoring**: keyword match, import graph, file role (test/docs/prod), git history
 - **Language-aware compression**: Python, TypeScript, JavaScript, Go, Rust, Java, and more
+- **Command output compression**: 11 compressors covering git, test runners, grep/rg, ls/tree/find with 70-99% reduction at compact level
 - **Incremental scanning**: cached file metadata with git-aware change detection
 - **Multi-repo workspaces**: single task, multiple repos, shared config
 - **Budget policies**: enforce max tokens, quality risk levels, file counts in CI
-- **Run history**: SQLite-backed artifact store, diff/heatmap/drift analysis
+- **Quality harness**: must-preserve regex assertions per compressor, deterministic, robust to truncated/binary input
+- **Streaming runner**: chunked Popen reader with bounded memory and early SIGTERM/SIGKILL when output cap is hit
+- **Run history**: SQLite-backed artifact store for both file packs and command runs, diff/heatmap/drift analysis
 - **Cost analysis**: estimate token costs across GPT-4o, Claude, and other models
 - **PR auditing**: detect context growth in pull requests
 - **Plugin system**: custom scorers, compressors, token estimators, summarizers
