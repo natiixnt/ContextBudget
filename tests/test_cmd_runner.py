@@ -61,3 +61,27 @@ def test_run_missing_cwd_raises(tmp_path: Path):
     request = RunRequest(argv=("git", "--version"), cwd=tmp_path / "does-not-exist")
     with pytest.raises(FileNotFoundError):
         run_command(request)
+
+
+def test_run_caps_output_and_kills_subprocess(tmp_path: Path):
+    """A producer that streams more than max_output_bytes is killed at the cap."""
+    custom_allow = DEFAULT_ALLOWLIST | {Path(sys.executable).name}
+    # Print 1 MiB worth of A's then sleep forever; runner should kill at cap.
+    program = (
+        "import sys, time; "
+        "sys.stdout.buffer.write(b'A' * (1024 * 1024)); "
+        "sys.stdout.flush(); "
+        "time.sleep(60)"
+    )
+    request = RunRequest(
+        argv=(sys.executable, "-c", program),
+        cwd=tmp_path,
+        timeout_seconds=10,
+        max_output_bytes=4096,
+    )
+    result = run_command(request, allowlist=custom_allow)
+    assert len(result.stdout) == 4096
+    assert result.truncated_stdout is True
+    assert any("output cap" in note for note in result.notes)
+    # Kill grace ensures we returned in well under the 60s sleep budget.
+    assert result.duration_seconds < 5
