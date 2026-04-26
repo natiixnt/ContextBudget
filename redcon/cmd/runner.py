@@ -39,6 +39,8 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
         "tree",
         "find",
         "grep",
+        "egrep",
+        "fgrep",
         "rg",
         "pytest",
         "cargo",
@@ -51,6 +53,15 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
         "tsc",
         "eslint",
         "docker",
+        "podman",
+        "pip",
+        "kubectl",
+        "vitest",
+        "jest",
+        "jq",
+        "python",
+        "python3",
+        "npx",
     }
 )
 

@@ -182,3 +182,106 @@ class ListingResult:
     source: str  # "ls" | "tree" | "find"
     entries: tuple[Listing, ...]
     truncated: bool
+
+
+# --- Lint canonical types (mypy, ruff, eslint-style) ---
+
+
+@dataclass(frozen=True, slots=True)
+class LintIssue:
+    """One reported issue from a linter."""
+
+    path: str
+    line: int
+    column: int | None
+    severity: str  # "error" | "warning" | "note" | "info"
+    code: str | None
+    message: str
+
+
+@dataclass(frozen=True, slots=True)
+class LintResult:
+    tool: str
+    issues: tuple[LintIssue, ...]
+    error_count: int
+    warning_count: int
+    note_count: int
+    file_count: int
+
+
+# --- Container / image canonical types (docker, podman) ---
+
+
+@dataclass(frozen=True, slots=True)
+class ContainerInfo:
+    container_id: str
+    image: str
+    status: str
+    name: str
+    ports: tuple[str, ...]
+    age: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class ContainerListResult:
+    containers: tuple[ContainerInfo, ...]
+    running_count: int
+
+
+@dataclass(frozen=True, slots=True)
+class ImageBuildStep:
+    instruction: str
+    cached: bool
+    duration_seconds: float | None
+
+
+@dataclass(frozen=True, slots=True)
+class ImageBuildResult:
+    steps: tuple[ImageBuildStep, ...]
+    final_image_id: str | None
+    final_tags: tuple[str, ...]
+    success: bool
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...]
+
+
+# --- Package install canonical types (pip / npm / pnpm / yarn) ---
+
+
+@dataclass(frozen=True, slots=True)
+class PackageOp:
+    name: str
+    version: str | None
+    op: str  # "added" | "removed" | "updated" | "deprecated"
+
+
+@dataclass(frozen=True, slots=True)
+class PackageInstallResult:
+    tool: str
+    operations: tuple[PackageOp, ...]
+    added: int
+    removed: int
+    updated: int
+    deprecated_count: int
+    vulnerabilities: tuple[str, ...]
+    duration_seconds: float | None
+    errors: tuple[str, ...]
+
+
+# --- Kubectl canonical types ---
+
+
+@dataclass(frozen=True, slots=True)
+class KubeResource:
+    kind: str
+    name: str
+    namespace: str | None
+    status: str
+    age: str | None
+    extra: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
+class KubeListResult:
+    resources: tuple[KubeResource, ...]
+    kind: str

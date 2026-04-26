@@ -159,6 +159,54 @@ def _is_find(argv: tuple[str, ...]) -> bool:
     return bool(argv) and argv[0] == "find"
 
 
+def _is_lint(argv: tuple[str, ...]) -> bool:
+    if not argv:
+        return False
+    if argv[0] in {"mypy", "ruff"}:
+        return True
+    if argv[0] in {"python", "python3"} and "-m" in argv and (
+        "mypy" in argv or "ruff" in argv
+    ):
+        return True
+    return False
+
+
+def _is_docker(argv: tuple[str, ...]) -> bool:
+    if len(argv) < 2:
+        return False
+    if argv[0] not in {"docker", "podman"}:
+        return False
+    return argv[1] in {"ps", "build", "image"}
+
+
+def _is_pkg_install(argv: tuple[str, ...]) -> bool:
+    if not argv:
+        return False
+    if argv[0] == "pip" and len(argv) >= 2 and argv[1] in {"install", "uninstall"}:
+        return True
+    if argv[0] in {"python", "python3"} and "-m" in argv and "pip" in argv:
+        if "install" in argv or "uninstall" in argv:
+            return True
+    if argv[0] in {"npm", "pnpm"} and len(argv) >= 2 and argv[1] in {
+        "install",
+        "i",
+        "ci",
+        "uninstall",
+        "remove",
+        "rm",
+    }:
+        return True
+    if argv[0] == "yarn" and len(argv) >= 2 and argv[1] in {"add", "remove", "install"}:
+        return True
+    return False
+
+
+def _is_kubectl_get(argv: tuple[str, ...]) -> bool:
+    if len(argv) < 2:
+        return False
+    return argv[0] == "kubectl" and argv[1] == "get"
+
+
 def _bootstrap_lazy() -> None:
     """Register every built-in compressor as a lazy entry."""
     register_lazy(
@@ -226,6 +274,30 @@ def _bootstrap_lazy() -> None:
         _is_find,
         "redcon.cmd.compressors.listing_compressor",
         "FindCompressor",
+    )
+    register_lazy(
+        "lint",
+        _is_lint,
+        "redcon.cmd.compressors.lint_compressor",
+        "LintCompressor",
+    )
+    register_lazy(
+        "docker",
+        _is_docker,
+        "redcon.cmd.compressors.docker_compressor",
+        "DockerCompressor",
+    )
+    register_lazy(
+        "pkg_install",
+        _is_pkg_install,
+        "redcon.cmd.compressors.pkg_install_compressor",
+        "PackageInstallCompressor",
+    )
+    register_lazy(
+        "kubectl_get",
+        _is_kubectl_get,
+        "redcon.cmd.compressors.kubectl_compressor",
+        "KubectlGetCompressor",
     )
 
 

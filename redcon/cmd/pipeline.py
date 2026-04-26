@@ -7,6 +7,14 @@ Wires runner + registry + cache + compressor into one call. The MCP tool
 Cache integration is deliberately optional - callers pass their own backend
 if they want persistence. The default in-memory dict per-process is enough
 for typical agent sessions where the same `git status` is hit many times.
+
+Log-pointer tier: when the raw subprocess output exceeds
+`LOG_POINTER_THRESHOLD_BYTES` (default 1 MiB) the pipeline spills the full
+captured bytes to ``.redcon/cmd_runs/<digest>.log`` and returns a
+CompressedOutput whose ``schema`` is ``log_pointer`` and whose text is a
+one-paragraph summary plus the path. Agents can fetch the full log if the
+summary isn't enough; the alternative would be a parser running on a 50 MB
+docker build log and producing a still-too-big result.
 """
 
 from __future__ import annotations
@@ -47,6 +55,12 @@ class CompressionReport:
 
 
 _DEFAULT_CACHE: MutableMapping[str, CompressionReport] = {}
+
+# Outputs above this are spilled to disk; pipeline returns a pointer
+# instead of attempting per-compressor parsing. 1 MiB is well above
+# typical command output and below the runner's 16 MiB cap.
+LOG_POINTER_THRESHOLD_BYTES: int = 1024 * 1024
+LOG_POINTER_SUMMARY_TAIL_LINES: int = 30
 
 
 def compress_command(
@@ -106,7 +120,18 @@ def compress_command(
 
     effective_hint = hint or effective_hint_for_rewrite
 
-    if compressor is None:
+    raw_bytes = len(run_result.stdout) + len(run_result.stderr)
+    if raw_bytes > LOG_POINTER_THRESHOLD_BYTES:
+        compressed = _spill_to_log(
+            run_result.stdout,
+            run_result.stderr,
+            argv=argv,
+            cwd=cwd_path,
+            cache_key=cache_key,
+            returncode=run_result.returncode,
+            notes=run_result.notes,
+        )
+    elif compressor is None:
         compressed = _passthrough(run_result.stdout, run_result.stderr, effective_hint)
     else:
         ctx = CompressorContext(
@@ -193,6 +218,88 @@ def _with_cache_hit(report: CompressionReport) -> CompressionReport:
         raw_stderr_bytes=report.raw_stderr_bytes,
         duration_seconds=report.duration_seconds,
         returncode=report.returncode,
+    )
+
+
+def _spill_to_log(
+    stdout: bytes,
+    stderr: bytes,
+    *,
+    argv: tuple[str, ...],
+    cwd: Path,
+    cache_key: CommandCacheKey,
+    returncode: int,
+    notes: tuple[str, ...],
+) -> CompressedOutput:
+    """Write full output to ``.redcon/cmd_runs/<digest>.log`` and return a pointer."""
+    from redcon.cmd._tokens_lite import estimate_tokens
+
+    log_dir = (cwd / ".redcon" / "cmd_runs").resolve()
+    try:
+        log_dir.mkdir(parents=True, exist_ok=True)
+    except OSError as e:
+        logger.warning("could not create log directory %s: %s", log_dir, e)
+
+    log_path = log_dir / f"{cache_key.short()}.log"
+    try:
+        with open(log_path, "wb") as f:
+            if stdout:
+                f.write(b"--- stdout ---\n")
+                f.write(stdout)
+                if not stdout.endswith(b"\n"):
+                    f.write(b"\n")
+            if stderr:
+                f.write(b"--- stderr ---\n")
+                f.write(stderr)
+        wrote = True
+    except OSError as e:
+        logger.warning("could not write spill log %s: %s", log_path, e)
+        wrote = False
+
+    raw_text = stdout.decode("utf-8", errors="replace") + (
+        "\n" + stderr.decode("utf-8", errors="replace") if stderr else ""
+    )
+    raw_tokens = estimate_tokens(raw_text)
+    raw_lines = raw_text.count("\n") + 1
+    raw_kb = (len(stdout) + len(stderr)) / 1024.0
+
+    tail_lines = raw_text.splitlines()[-LOG_POINTER_SUMMARY_TAIL_LINES:]
+    tail = "\n".join(tail_lines)
+
+    cmd_str = " ".join(argv)
+    if wrote:
+        try:
+            log_path_display = log_path.relative_to(cwd)
+        except ValueError:
+            log_path_display = log_path
+        summary = (
+            f"command output spilled to disk: {raw_lines} lines / "
+            f"{raw_kb:.1f} KiB exceeds in-context budget.\n"
+            f"command: {cmd_str}\n"
+            f"returncode: {returncode}\n"
+            f"log: {log_path_display}\n"
+            f"--- last {len(tail_lines)} lines ---\n"
+            f"{tail}"
+        )
+    else:
+        summary = (
+            f"command output too large for context "
+            f"({raw_lines} lines / {raw_kb:.1f} KiB) and the spill log "
+            f"could not be written.\ncommand: {cmd_str}\n"
+            f"returncode: {returncode}\n"
+            f"--- last {len(tail_lines)} lines ---\n{tail}"
+        )
+
+    compressed = estimate_tokens(summary)
+    return CompressedOutput(
+        text=summary,
+        level=CompressionLevel.ULTRA,
+        schema="log_pointer",
+        original_tokens=raw_tokens,
+        compressed_tokens=compressed,
+        must_preserve_ok=True,
+        truncated=True,
+        notes=notes,
     )
 
 
