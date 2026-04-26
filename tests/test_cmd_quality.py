@@ -27,6 +27,28 @@ from redcon.cmd.compressors.pytest_compressor import PytestCompressor
 from redcon.cmd.quality import run_quality_check
 
 
+def _make_lint():
+    from redcon.cmd.compressors.lint_compressor import LintCompressor
+    return LintCompressor()
+
+
+def _make_docker():
+    from redcon.cmd.compressors.docker_compressor import DockerCompressor
+    return DockerCompressor()
+
+
+def _make_pkg_install():
+    from redcon.cmd.compressors.pkg_install_compressor import (
+        PackageInstallCompressor,
+    )
+    return PackageInstallCompressor()
+
+
+def _make_kubectl():
+    from redcon.cmd.compressors.kubectl_compressor import KubectlGetCompressor
+    return KubectlGetCompressor()
+
+
 # --- synthetic fixture generators ---
 
 
@@ -231,6 +253,107 @@ _SMALL_GO_TEST = b"""\
 FAIL    github.com/foo/bar    0.012s
 """
 
+# --- Tier 2 fixtures ---
+
+
+_MYPY_LARGE = b"""\
+src/foo.py:42: error: Argument 1 to "process" has incompatible type "str"; expected "int"  [arg-type]
+src/foo.py:78: warning: Returning Any from function declared to return "int"  [no-any-return]
+src/foo.py:120: error: Cannot find module 'missing'  [import]
+src/bar.py:12: error: Cannot determine type of "result"  [name-defined]
+src/bar.py:45: error: Cannot determine type of "result"  [name-defined]
+src/bar.py:99: error: Missing return statement  [return]
+src/baz.py:10: error: Argument 1 to "save" has incompatible type "Optional[str]"; expected "str"  [arg-type]
+src/baz.py:32: warning: Unused import: 'os'  [unused-import]
+src/baz.py:55: error: Type annotation needed  [var-annotated]
+""" + b"\n".join(
+    f"src/big_module_{i}.py:{i + 10}: error: Test error {i} [code-{i}]".encode()
+    for i in range(40)
+) + b"\nFound 49 errors in 4 files\n"
+
+
+_RUFF_FIXTURE = b"\n".join(
+    [
+        b"src/api/auth.py:1:1: E402 module level import not at top of file",
+        b"src/api/auth.py:42:8: F401 'os' imported but unused",
+        b"src/api/handlers.py:55:1: D100 Missing docstring in public module",
+        b"src/api/handlers.py:78:5: E501 line too long (102 > 100 characters)",
+        b"src/api/handlers.py:128:1: F841 local variable 'x' is assigned to but never used",
+        b"src/api/handlers.py:200:1: B007 Loop control variable 'i' not used",
+        b"src/db/connection.py:10:5: E501 line too long (110 > 100 characters)",
+        b"src/db/connection.py:18:1: F841 local variable 'conn' is assigned to but never used",
+        b"src/utils/strings.py:5:1: D100 Missing docstring in public module",
+    ]
+    + [
+        f"src/big/module_{i}.py:{20 + i}:1: E501 line too long ({110 + i} > 100 characters)".encode()
+        for i in range(60)
+    ]
+    + [b"Found 69 errors."]
+) + b"\n"
+
+
+_DOCKER_BUILD_FIXTURE = b"""\
+Sending build context to Docker daemon  4.096kB
+Step 1/8 : FROM node:20-alpine
+ ---> abc123def456
+Step 2/8 : WORKDIR /app
+ ---> Using cache
+ ---> 4567abcdef01
+Step 3/8 : COPY package.json package-lock.json ./
+ ---> Using cache
+ ---> 89abcdef0123
+Step 4/8 : RUN npm ci --only=production
+ ---> Running in container1
+npm warn deprecated foo@1.0
+npm warn deprecated bar@2.0
+added 142 packages, audited 143 packages in 12s
+ ---> 234567890abc
+Step 5/8 : COPY src ./src
+ ---> def012345678
+Step 6/8 : COPY tsconfig.json ./
+ ---> Using cache
+ ---> aaa111222333
+Step 7/8 : RUN npm run build
+ ---> Running in container2
+> tsc -p tsconfig.json
+ ---> bbb222333444
+Step 8/8 : CMD ["node", "dist/server.js"]
+ ---> ccc333444555
+Successfully built ccc333444555
+Successfully tagged my-app:latest
+"""
+
+
+_PIP_INSTALL_FIXTURE = b"""\
+Collecting numpy>=1.24
+  Downloading numpy-1.26.4-cp311-cp311-macosx_11_0_arm64.whl (14.0 MB)
+Collecting pandas>=2.0
+  Downloading pandas-2.2.1-cp311-cp311-macosx_11_0_arm64.whl (11.4 MB)
+Collecting fastapi
+  Downloading fastapi-0.110.0-py3-none-any.whl (92 kB)
+Collecting uvicorn[standard]
+  Downloading uvicorn-0.29.0-py3-none-any.whl (60 kB)
+Collecting pydantic>=2.0
+  Downloading pydantic-2.6.4-py3-none-any.whl (394 kB)
+Installing collected packages: numpy, pandas, fastapi, uvicorn, pydantic
+Successfully installed fastapi-0.110.0 numpy-1.26.4 pandas-2.2.1 pydantic-2.6.4 uvicorn-0.29.0
+DEPRECATION: Loading egg at /path/to/old.egg is deprecated and will be removed in pip 25
+"""
+
+
+_KUBECTL_PODS_FIXTURE = b"""\
+NAME                                  READY   STATUS    RESTARTS   AGE
+nginx-deployment-66b6c48dd5-aaaaa     1/1     Running   0          5d
+nginx-deployment-66b6c48dd5-bbbbb     1/1     Running   0          5d
+nginx-deployment-66b6c48dd5-ccccc     1/1     Running   0          5d
+api-server-7d59c5f5b-ddddd            1/1     Running   2          1d
+api-server-7d59c5f5b-eeeee            0/1     Pending   3          1h
+worker-job-fffff                      0/1     Failed    0          10m
+worker-job-ggggg                      0/1     Failed    0          5m
+postgres-statefulset-0                1/1     Running   0          90d
+redis-master-7bc8b9ddc7-hhhhh         1/1     Running   0          30d
+"""
+
 _SMALL_JEST = b"""\
 PASS  src/widget.test.js
 FAIL  src/database.test.js
@@ -362,6 +485,42 @@ CASES = [
         _massive_find(),
         b"",
         ("find", ".", "-type", "f"),
+    ),
+    # Tier 2 compressors
+    (
+        "mypy_large",
+        _make_lint(),
+        _MYPY_LARGE,
+        b"",
+        ("mypy", "src/"),
+    ),
+    (
+        "ruff_typical",
+        _make_lint(),
+        _RUFF_FIXTURE,
+        b"",
+        ("ruff", "check", "."),
+    ),
+    (
+        "docker_build_typical",
+        _make_docker(),
+        _DOCKER_BUILD_FIXTURE,
+        b"",
+        ("docker", "build", "."),
+    ),
+    (
+        "pip_install_typical",
+        _make_pkg_install(),
+        _PIP_INSTALL_FIXTURE,
+        b"",
+        ("pip", "install", "fastapi"),
+    ),
+    (
+        "kubectl_pods_typical",
+        _make_kubectl(),
+        _KUBECTL_PODS_FIXTURE,
+        b"",
+        ("kubectl", "get", "pods"),
     ),
 ]
 
