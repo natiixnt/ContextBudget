@@ -275,16 +275,25 @@ def _format_compact(result: ListingResult) -> str:
 
 
 def _format_verbose(result: ListingResult) -> str:
+    """
+    Verbose for listings mirrors the raw form: dir header followed by basenames
+    of entries in that directory. Avoids per-entry full-path repetition which
+    would inflate the output beyond the raw `ls -R`.
+    """
     by_dir = _group_by_dir(result.entries)
     files = sum(1 for e in result.entries if e.kind == "file")
     dirs = sum(1 for e in result.entries if e.kind == "dir")
     lines = [f"{result.source}: {files} files, {dirs} dirs"]
     for directory, items in by_dir.items():
-        lines.append(f"{directory or '.'}/")
+        if directory:
+            lines.append(f"{directory}/:")
         for entry in items:
+            base = entry.path.rsplit("/", 1)[-1]
             mark = "/" if entry.kind == "dir" else ""
-            size = f" ({entry.size}B)" if entry.size is not None else ""
-            lines.append(f"   {entry.path.rsplit('/', 1)[-1]}{mark}{size}")
+            if entry.size is not None:
+                lines.append(f"{base}{mark} ({entry.size}B)")
+            else:
+                lines.append(f"{base}{mark}")
     return "\n".join(lines)
 
 
