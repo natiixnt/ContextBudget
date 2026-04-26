@@ -157,6 +157,48 @@ _TOOL_SCHEMAS = [
         },
     },
     {
+        "name": "redcon_structural_search",
+        "description": (
+            "Search code by AST pattern (ast-grep), not regex. Patterns "
+            "like `class $NAME { $$$ }` match real class declarations and "
+            "skip text occurrences inside comments / strings. Available "
+            "when ast-grep is on PATH or redcon[ast_grep] is installed; "
+            "returns backend=unavailable otherwise so callers can fall "
+            "back to redcon_search."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "pattern": {"type": "string"},
+                "scope": {"type": "string", "default": "."},
+                "language": {"type": "string", "description": "Language hint (python, javascript, rust, ...)"},
+                "max_results": {"type": "integer", "default": 200},
+            },
+            "required": ["pattern"],
+        },
+    },
+    {
+        "name": "redcon_repo_map",
+        "description": (
+            "Aider-style repo map: top ranked files plus their tree-sitter "
+            "class/function signatures fitted under a token budget. "
+            "Differentiates from redcon_overview by emitting actual code "
+            "structure (signatures with line numbers), not just paths. "
+            "When the redcon[symbols] extra is missing the map degrades "
+            "to a path-only listing rather than failing."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "task": {"type": "string"},
+                "repo": {"type": "string", "default": "."},
+                "budget": {"type": "integer", "default": 8000},
+                "top_files": {"type": "integer", "default": 60},
+            },
+            "required": ["task"],
+        },
+    },
+    {
         "name": "redcon_quality_check",
         "description": (
             "Run a shell command, compress its output, and verify the "
@@ -235,6 +277,19 @@ _TOOL_SCHEMAS = [
                     ),
                     "default": False,
                 },
+                "semantic_fallback": {
+                    "type": "boolean",
+                    "description": (
+                        "Enable the LLMLingua-2 semantic compression "
+                        "fallback for commands that no schema-specific "
+                        "compressor recognised. Requires the optional "
+                        "redcon[heavy_compression] extra (torch + "
+                        "transformers + ~280 MB BERT-base checkpoint). "
+                        "Silently falls through to plain passthrough "
+                        "when the extra is missing."
+                    ),
+                    "default": False,
+                },
             },
             "required": ["command"],
         },
@@ -288,6 +343,21 @@ def _dispatch_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
                 quality_floor=args.get("quality_floor", "compact"),
                 timeout_seconds=int(args.get("timeout_seconds", 120)),
                 prefer_compact_output=bool(args.get("prefer_compact_output", False)),
+                semantic_fallback=bool(args.get("semantic_fallback", False)),
+            )
+        if name == "redcon_structural_search":
+            return tools.tool_structural_search(
+                pattern=args.get("pattern", ""),
+                scope=args.get("scope", "."),
+                language=args.get("language"),
+                max_results=int(args.get("max_results", 200)),
+            )
+        if name == "redcon_repo_map":
+            return tools.tool_repo_map(
+                task=args.get("task", ""),
+                repo=args.get("repo", "."),
+                budget=int(args.get("budget", 8000)),
+                top_files=int(args.get("top_files", 60)),
             )
         if name == "redcon_quality_check":
             return tools.tool_quality_check(

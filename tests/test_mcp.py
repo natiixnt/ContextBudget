@@ -162,7 +162,7 @@ def test_server_creation():
     if not _MCP_AVAILABLE:
         pytest.skip("mcp package not installed")
 
-    assert len(_TOOL_SCHEMAS) == 7
+    assert len(_TOOL_SCHEMAS) == 9
     names = [s["name"] for s in _TOOL_SCHEMAS]
     assert "redcon_rank" in names
     assert "redcon_overview" in names
@@ -171,6 +171,8 @@ def test_server_creation():
     assert "redcon_budget" in names
     assert "redcon_run" in names
     assert "redcon_quality_check" in names
+    assert "redcon_repo_map" in names
+    assert "redcon_structural_search" in names
 
     server = create_server()
     assert server.name == "redcon"

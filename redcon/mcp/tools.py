@@ -354,6 +354,123 @@ def tool_search(
 
 # --- Tool: budget ---
 
+# --- Tool: structural_search ---
+
+
+def tool_structural_search(
+    pattern: str,
+    scope: str = ".",
+    language: str | None = None,
+    max_results: int = 200,
+) -> dict[str, Any]:
+    """Run an ast-grep structural search. Pattern matches the AST, not text."""
+    if not pattern or not pattern.strip():
+        return {"error": "pattern must be a non-empty string"}
+
+    try:
+        from redcon.structural_search import (
+            render_text,
+            structural_search,
+        )
+    except ImportError as e:
+        return {"error": f"redcon.structural_search unavailable: {e}"}
+
+    try:
+        result = structural_search(
+            pattern, scope=scope, language=language, max_results=max(1, max_results)
+        )
+    except Exception as e:
+        logger.exception("mcp.structural_search: search failed")
+        return {"error": f"structural_search failed: {e}"}
+
+    return {
+        "pattern": pattern,
+        "scope": result.scope,
+        "language": result.language,
+        "backend": result.backend,
+        "match_count": result.match_count,
+        "file_count": result.file_count,
+        "text": render_text(result),
+        "matches": [
+            {
+                "path": m.path,
+                "line": m.line,
+                "column": m.column,
+                "end_line": m.end_line,
+                "text": m.text,
+                "captures": [{"name": n, "text": t} for n, t in m.captures],
+            }
+            for m in result.matches[:max_results]
+        ],
+        "_meta": _meta_block(
+            "redcon_structural_search",
+            backend=result.backend,
+            match_count=result.match_count,
+            file_count=result.file_count,
+        ),
+    }
+
+
+# --- Tool: repo_map ---
+
+
+def tool_repo_map(
+    task: str,
+    repo: str = ".",
+    budget: int = 8000,
+    top_files: int = 60,
+) -> dict[str, Any]:
+    """
+    Aider-style repo map: top ranked files plus their tree-sitter signatures
+    fitted under a token budget. Differentiates from ``redcon_overview``
+    by emitting actual code structure, not just paths.
+    """
+    if not task or not task.strip():
+        return {"error": "task must be a non-empty string"}
+
+    try:
+        from redcon.repo_map import build_repo_map
+    except ImportError as e:
+        return {"error": f"redcon.repo_map unavailable: {e}"}
+
+    try:
+        repo_map = build_repo_map(
+            task=task,
+            repo=repo,
+            budget=max(100, budget),
+            top_files=max(1, top_files),
+        )
+    except Exception as e:
+        logger.exception("mcp.repo_map: build failed")
+        return {"error": f"repo_map failed: {e}"}
+
+    return {
+        "task": task,
+        "repo": repo_map.repo,
+        "budget": repo_map.budget,
+        "total_tokens": repo_map.total_tokens,
+        "files": [
+            {
+                "path": fm.path,
+                "score": round(fm.score, 2),
+                "signature_count": len(fm.signatures),
+            }
+            for fm in repo_map.files
+        ],
+        "text": repo_map.text,
+        "symbols_available": repo_map.symbols_available,
+        "truncated": repo_map.truncated,
+        "_meta": _meta_block(
+            "redcon_repo_map",
+            file_count=len(repo_map.files),
+            total_tokens=repo_map.total_tokens,
+            budget=repo_map.budget,
+            symbols_available=repo_map.symbols_available,
+            truncated=repo_map.truncated,
+        ),
+    }
+
+
 # --- Tool: quality_check ---
 
 def tool_quality_check(
@@ -502,6 +619,7 @@ def tool_run(
     quality_floor: str = "compact",
     timeout_seconds: int = 120,
     prefer_compact_output: bool = False,
+    semantic_fallback: bool = False,
 ) -> dict[str, Any]:
     """
     Run a shell command and return its compressed output.
@@ -540,6 +658,7 @@ def tool_run(
         max_output_tokens=max(1, max_output_tokens),
         quality_floor=floor,
         prefer_compact_output=bool(prefer_compact_output),
+        semantic_fallback=bool(semantic_fallback),
     )
 
     try:

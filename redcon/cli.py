@@ -2239,6 +2239,52 @@ def cmd_cmd_bench(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_repo_map(args: argparse.Namespace) -> int:
+    """Aider-style repo map: top ranked files plus their signatures."""
+    from redcon.repo_map import build_repo_map
+
+    try:
+        repo_map = build_repo_map(
+            task=args.task,
+            repo=args.repo,
+            budget=max(100, args.budget),
+            top_files=max(1, args.top_files),
+        )
+    except Exception as e:
+        print(f"Error: repo_map failed: {e}", file=sys.stderr)
+        return 2
+
+    if args.json:
+        payload = {
+            "task": args.task,
+            "repo": repo_map.repo,
+            "budget": repo_map.budget,
+            "total_tokens": repo_map.total_tokens,
+            "files": [
+                {
+                    "path": fm.path,
+                    "score": round(fm.score, 2),
+                    "signature_count": len(fm.signatures),
+                }
+                for fm in repo_map.files
+            ],
+            "symbols_available": repo_map.symbols_available,
+            "truncated": repo_map.truncated,
+            "text": repo_map.text,
+        }
+        print(_json_mod.dumps(payload, indent=2))
+    else:
+        if not args.quiet:
+            print(
+                f"redcon repo-map: {len(repo_map.files)} files, "
+                f"{repo_map.total_tokens}/{repo_map.budget} tokens, "
+                f"symbols={'on' if repo_map.symbols_available else 'off'}",
+                file=sys.stderr,
+            )
+        print(repo_map.text)
+    return 0
+
+
 def cmd_cmd_quality(args: argparse.Namespace) -> int:
     """Run the M8 quality harness; non-zero exit on any failure (for CI)."""
     from redcon.cmd.quality import run_quality_check
@@ -3375,6 +3421,40 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run the cmd-compressor quality gate; exits non-zero on any failure",
     )
     cmd_quality_parser.set_defaults(func=cmd_cmd_quality)
+
+    # --- redcon repo-map ---
+    repo_map_parser = sub.add_parser(
+        "repo-map",
+        help=(
+            "Aider-style repo map: top ranked files + tree-sitter signatures, "
+            "fitted under a token budget"
+        ),
+    )
+    repo_map_parser.add_argument(
+        "task", help="Task description used to rank file relevance"
+    )
+    repo_map_parser.add_argument(
+        "--repo", default=".", help="Repository path (default: current directory)"
+    )
+    repo_map_parser.add_argument(
+        "--budget",
+        type=int,
+        default=8000,
+        help="Maximum tokens to spend on the map (default: 8000)",
+    )
+    repo_map_parser.add_argument(
+        "--top-files",
+        type=int,
+        default=60,
+        help="How many ranked files to consider before fitting (default: 60)",
+    )
+    repo_map_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a structured JSON report instead of plain text",
+    )
+    repo_map_parser.set_defaults(func=cmd_repo_map)
 
     return parser
 
