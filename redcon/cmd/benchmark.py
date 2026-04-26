@@ -193,14 +193,118 @@ def _default_cases() -> list[tuple]:
     return list(CASES)
 
 
+def compare_to_baseline(
+    current: list[Benchmark],
+    baseline_path: str,
+    *,
+    tolerance_pp: float = 5.0,
+) -> tuple[list[str], dict]:
+    """Compare a current benchmark run against a saved JSON baseline.
+
+    Returns ``(regressions, summary)`` where ``regressions`` is a list of
+    human-readable strings (one per (schema, fixture, level) triple that
+    dropped more than ``tolerance_pp`` percentage points). ``summary``
+    has the per-axis breakdown for reporting.
+
+    The baseline file is the same shape as ``render_json`` output.
+    """
+    import json as _json
+
+    with open(baseline_path, "r", encoding="utf-8") as fh:
+        baseline_payload = _json.load(fh)
+
+    baseline_index: dict[tuple[str, str, str], float] = {}
+    for entry in baseline_payload:
+        schema = entry.get("schema", "")
+        fixture = entry.get("fixture", "")
+        for level_data in entry.get("levels", []):
+            key = (schema, fixture, level_data.get("level", ""))
+            baseline_index[key] = float(level_data.get("reduction_pct", 0.0))
+
+    regressions: list[str] = []
+    compared = 0
+    matched = 0
+    for benchmark in current:
+        for level_data in benchmark.levels:
+            key = (benchmark.schema, benchmark.fixture, level_data.level)
+            compared += 1
+            previous = baseline_index.get(key)
+            if previous is None:
+                continue
+            matched += 1
+            current_pct = float(level_data.reduction_pct)
+            delta = current_pct - previous
+            if delta < -abs(tolerance_pp):
+                regressions.append(
+                    f"{benchmark.schema}/{benchmark.fixture}/{level_data.level}: "
+                    f"{previous:+.1f}% -> {current_pct:+.1f}% "
+                    f"(delta {delta:+.1f}pp, tolerance {tolerance_pp:.1f}pp)"
+                )
+
+    summary = {
+        "compared": compared,
+        "matched": matched,
+        "missing_in_baseline": compared - matched,
+        "regressions": len(regressions),
+        "tolerance_pp": tolerance_pp,
+    }
+    return regressions, summary
+
+
 def main(argv: list[str] | None = None) -> int:
     import argparse
 
     parser = argparse.ArgumentParser(description="Run command-output compressor benchmarks.")
     parser.add_argument("--json", action="store_true", help="Emit JSON instead of markdown")
+    parser.add_argument(
+        "--baseline",
+        help=(
+            "Compare the current run against a saved JSON baseline (the "
+            "shape `--json` produces). Exits non-zero if any (schema, "
+            "fixture, level) reduction dropped more than --tolerance "
+            "percentage points."
+        ),
+    )
+    parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=5.0,
+        help="Tolerated regression in percentage points (default: 5.0)",
+    )
     args = parser.parse_args(argv)
 
     results = run_benchmarks(_default_cases())
+
+    if args.baseline:
+        regressions, summary = compare_to_baseline(
+            results, args.baseline, tolerance_pp=args.tolerance
+        )
+        if args.json:
+            import json as _json
+
+            print(
+                _json.dumps(
+                    {
+                        "summary": summary,
+                        "regressions": regressions,
+                        "results": [_to_dict(b) for b in results],
+                    },
+                    indent=2,
+                )
+            )
+        else:
+            print(
+                f"baseline-gate: matched {summary['matched']}/{summary['compared']} "
+                f"axes, regressions {summary['regressions']}, "
+                f"tolerance {summary['tolerance_pp']:.1f}pp"
+            )
+            if regressions:
+                print()
+                print("Regressions:")
+                for line in regressions:
+                    print(f"  - {line}")
+        return 1 if regressions else 0
+
     text = render_json(results) if args.json else render_markdown(results)
     print(text)
     return 0

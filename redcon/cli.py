@@ -2228,12 +2228,37 @@ def cmd_cmd_bench(args: argparse.Namespace) -> int:
     """Run the M9 benchmark harness against the registered fixture corpus."""
     from redcon.cmd.benchmark import (
         _default_cases,
+        compare_to_baseline,
         render_json,
         render_markdown,
         run_benchmarks,
     )
 
     results = run_benchmarks(_default_cases())
+
+    baseline = getattr(args, "baseline", None)
+    if baseline:
+        regressions, summary = compare_to_baseline(
+            results, baseline, tolerance_pp=getattr(args, "tolerance", 5.0)
+        )
+        if args.json:
+            payload = {
+                "summary": summary,
+                "regressions": regressions,
+            }
+            print(_json_mod.dumps(payload, indent=2))
+        else:
+            print(
+                f"baseline-gate: matched {summary['matched']}/{summary['compared']} "
+                f"axes, regressions {summary['regressions']}, "
+                f"tolerance {summary['tolerance_pp']:.1f}pp"
+            )
+            if regressions:
+                print("\nRegressions:")
+                for line in regressions:
+                    print(f"  - {line}")
+        return 1 if regressions else 0
+
     text = render_json(results) if args.json else render_markdown(results)
     print(text)
     return 0
@@ -3412,6 +3437,21 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Emit JSON instead of markdown (suitable for CI baselines).",
+    )
+    cmd_bench_parser.add_argument(
+        "--baseline",
+        default=None,
+        help=(
+            "Compare the current run against a saved JSON baseline; "
+            "exit non-zero when any (schema, fixture, level) reduction "
+            "regressed more than --tolerance percentage points."
+        ),
+    )
+    cmd_bench_parser.add_argument(
+        "--tolerance",
+        type=float,
+        default=5.0,
+        help="Allowed reduction drop in percentage points (default: 5.0)",
     )
     cmd_bench_parser.set_defaults(func=cmd_cmd_bench)
 

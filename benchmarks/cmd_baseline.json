@@ -1,0 +1,674 @@
+[
+  {
+    "schema": "git_diff",
+    "fixture": "git_diff_small",
+    "raw_bytes": 243,
+    "raw_tokens": 61,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 42,
+        "reduction_pct": 31.15,
+        "cold_seconds": 0.000152,
+        "warm_seconds": 2.4e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 24,
+        "reduction_pct": 60.66,
+        "cold_seconds": 2.5e-05,
+        "warm_seconds": 1.9e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 10,
+        "reduction_pct": 83.61,
+        "cold_seconds": 1.9e-05,
+        "warm_seconds": 1.7e-05,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "git_diff",
+    "fixture": "git_diff_huge",
+    "raw_bytes": 32312,
+    "raw_tokens": 8078,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 5525,
+        "reduction_pct": 31.6,
+        "cold_seconds": 0.001073,
+        "warm_seconds": 0.00102,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 214,
+        "reduction_pct": 97.35,
+        "cold_seconds": 0.000851,
+        "warm_seconds": 0.000842,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 43,
+        "reduction_pct": 99.47,
+        "cold_seconds": 0.000839,
+        "warm_seconds": 0.000837,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "git_status",
+    "fixture": "git_status",
+    "raw_bytes": 64,
+    "raw_tokens": 16,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 20,
+        "reduction_pct": -25.0,
+        "cold_seconds": 7.7e-05,
+        "warm_seconds": 1.2e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 20,
+        "reduction_pct": -25.0,
+        "cold_seconds": 1e-05,
+        "warm_seconds": 9e-06,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 28,
+        "reduction_pct": -75.0,
+        "cold_seconds": 1.7e-05,
+        "warm_seconds": 1.2e-05,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "git_log",
+    "fixture": "git_log",
+    "raw_bytes": 256,
+    "raw_tokens": 64,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 43,
+        "reduction_pct": 32.81,
+        "cold_seconds": 8e-05,
+        "warm_seconds": 1.7e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 14,
+        "reduction_pct": 78.12,
+        "cold_seconds": 1.7e-05,
+        "warm_seconds": 1.4e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 16,
+        "reduction_pct": 75.0,
+        "cold_seconds": 1.6e-05,
+        "warm_seconds": 1.4e-05,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "pytest",
+    "fixture": "pytest_small",
+    "raw_bytes": 830,
+    "raw_tokens": 208,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 70,
+        "reduction_pct": 66.35,
+        "cold_seconds": 0.000133,
+        "warm_seconds": 4.4e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 52,
+        "reduction_pct": 75.0,
+        "cold_seconds": 4.2e-05,
+        "warm_seconds": 3.8e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 20,
+        "reduction_pct": 90.38,
+        "cold_seconds": 3.8e-05,
+        "warm_seconds": 3.6e-05,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "pytest",
+    "fixture": "pytest_massive",
+    "raw_bytes": 10220,
+    "raw_tokens": 2555,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 1088,
+        "reduction_pct": 57.42,
+        "cold_seconds": 0.001014,
+        "warm_seconds": 0.000462,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 646,
+        "reduction_pct": 74.72,
+        "cold_seconds": 0.000436,
+        "warm_seconds": 0.000435,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 20,
+        "reduction_pct": 99.22,
+        "cold_seconds": 0.000318,
+        "warm_seconds": 0.000308,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "cargo_test",
+    "fixture": "cargo_test",
+    "raw_bytes": 336,
+    "raw_tokens": 84,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 32,
+        "reduction_pct": 61.9,
+        "cold_seconds": 7.8e-05,
+        "warm_seconds": 2.1e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 27,
+        "reduction_pct": 67.86,
+        "cold_seconds": 1.8e-05,
+        "warm_seconds": 1.8e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 18,
+        "reduction_pct": 78.57,
+        "cold_seconds": 2e-05,
+        "warm_seconds": 1.5e-05,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "go_test",
+    "fixture": "go_test",
+    "raw_bytes": 167,
+    "raw_tokens": 42,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 13,
+        "reduction_pct": 69.05,
+        "cold_seconds": 4.6e-05,
+        "warm_seconds": 1.3e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 13,
+        "reduction_pct": 69.05,
+        "cold_seconds": 1e-05,
+        "warm_seconds": 1e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 13,
+        "reduction_pct": 69.05,
+        "cold_seconds": 1e-05,
+        "warm_seconds": 9e-06,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "npm_test",
+    "fixture": "npm_test_jest",
+    "raw_bytes": 274,
+    "raw_tokens": 68,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 35,
+        "reduction_pct": 48.53,
+        "cold_seconds": 8.1e-05,
+        "warm_seconds": 2.1e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 35,
+        "reduction_pct": 48.53,
+        "cold_seconds": 1.9e-05,
+        "warm_seconds": 1.7e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 21,
+        "reduction_pct": 69.12,
+        "cold_seconds": 1.7e-05,
+        "warm_seconds": 1.6e-05,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "grep",
+    "fixture": "grep_small",
+    "raw_bytes": 75,
+    "raw_tokens": 19,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 24,
+        "reduction_pct": -26.32,
+        "cold_seconds": 7.4e-05,
+        "warm_seconds": 1.4e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 24,
+        "reduction_pct": -26.32,
+        "cold_seconds": 1.2e-05,
+        "warm_seconds": 1.1e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 25,
+        "reduction_pct": -31.58,
+        "cold_seconds": 1.6e-05,
+        "warm_seconds": 1.2e-05,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "grep",
+    "fixture": "grep_massive",
+    "raw_bytes": 28059,
+    "raw_tokens": 7015,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 4188,
+        "reduction_pct": 40.3,
+        "cold_seconds": 0.002453,
+        "warm_seconds": 0.001506,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 1423,
+        "reduction_pct": 79.71,
+        "cold_seconds": 0.00132,
+        "warm_seconds": 0.001388,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 8,
+        "reduction_pct": 99.89,
+        "cold_seconds": 0.000826,
+        "warm_seconds": 0.000811,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "ls",
+    "fixture": "ls",
+    "raw_bytes": 162,
+    "raw_tokens": 41,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 16,
+        "reduction_pct": 60.98,
+        "cold_seconds": 0.000129,
+        "warm_seconds": 1.9e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 16,
+        "reduction_pct": 60.98,
+        "cold_seconds": 1.6e-05,
+        "warm_seconds": 1.5e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 7,
+        "reduction_pct": 82.93,
+        "cold_seconds": 2.4e-05,
+        "warm_seconds": 1.5e-05,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "ls",
+    "fixture": "ls_huge",
+    "raw_bytes": 6169,
+    "raw_tokens": 1543,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 1548,
+        "reduction_pct": -0.32,
+        "cold_seconds": 0.000745,
+        "warm_seconds": 0.000711,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 1026,
+        "reduction_pct": 33.51,
+        "cold_seconds": 0.000805,
+        "warm_seconds": 0.000803,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 15,
+        "reduction_pct": 99.03,
+        "cold_seconds": 0.000689,
+        "warm_seconds": 0.000683,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "tree",
+    "fixture": "tree",
+    "raw_bytes": 57,
+    "raw_tokens": 10,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 13,
+        "reduction_pct": -30.0,
+        "cold_seconds": 3.4e-05,
+        "warm_seconds": 1.4e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 13,
+        "reduction_pct": -30.0,
+        "cold_seconds": 1.3e-05,
+        "warm_seconds": 1.2e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 26,
+        "reduction_pct": -160.0,
+        "cold_seconds": 2e-05,
+        "warm_seconds": 1.6e-05,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "find",
+    "fixture": "find",
+    "raw_bytes": 46,
+    "raw_tokens": 12,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 17,
+        "reduction_pct": -41.67,
+        "cold_seconds": 1.4e-05,
+        "warm_seconds": 9e-06,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 17,
+        "reduction_pct": -41.67,
+        "cold_seconds": 8e-06,
+        "warm_seconds": 8e-06,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 27,
+        "reduction_pct": -125.0,
+        "cold_seconds": 1.2e-05,
+        "warm_seconds": 1.1e-05,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "find",
+    "fixture": "find_massive",
+    "raw_bytes": 13589,
+    "raw_tokens": 3398,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 1914,
+        "reduction_pct": 43.67,
+        "cold_seconds": 0.000579,
+        "warm_seconds": 0.00056,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 636,
+        "reduction_pct": 81.28,
+        "cold_seconds": 0.000632,
+        "warm_seconds": 0.00063,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 8,
+        "reduction_pct": 99.76,
+        "cold_seconds": 0.000516,
+        "warm_seconds": 0.00051,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "lint",
+    "fixture": "mypy_large",
+    "raw_bytes": 2928,
+    "raw_tokens": 732,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 634,
+        "reduction_pct": 13.39,
+        "cold_seconds": 0.000838,
+        "warm_seconds": 0.000276,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 215,
+        "reduction_pct": 70.63,
+        "cold_seconds": 0.000273,
+        "warm_seconds": 0.000262,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 12,
+        "reduction_pct": 98.36,
+        "cold_seconds": 0.000187,
+        "warm_seconds": 0.000187,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "lint",
+    "fixture": "ruff_typical",
+    "raw_bytes": 4765,
+    "raw_tokens": 1192,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 1208,
+        "reduction_pct": -1.34,
+        "cold_seconds": 0.000931,
+        "warm_seconds": 0.000376,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 206,
+        "reduction_pct": 82.72,
+        "cold_seconds": 0.00036,
+        "warm_seconds": 0.000339,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 12,
+        "reduction_pct": 98.99,
+        "cold_seconds": 0.000263,
+        "warm_seconds": 0.000262,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "docker",
+    "fixture": "docker_build_typical",
+    "raw_bytes": 778,
+    "raw_tokens": 195,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 78,
+        "reduction_pct": 60.0,
+        "cold_seconds": 9.9e-05,
+        "warm_seconds": 4.7e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 78,
+        "reduction_pct": 60.0,
+        "cold_seconds": 4.7e-05,
+        "warm_seconds": 4.4e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 21,
+        "reduction_pct": 89.23,
+        "cold_seconds": 4.3e-05,
+        "warm_seconds": 4.2e-05,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "pkg_install",
+    "fixture": "pip_install_typical",
+    "raw_bytes": 682,
+    "raw_tokens": 171,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 27,
+        "reduction_pct": 84.21,
+        "cold_seconds": 0.000117,
+        "warm_seconds": 3.2e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 27,
+        "reduction_pct": 84.21,
+        "cold_seconds": 2.9e-05,
+        "warm_seconds": 2.8e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 5,
+        "reduction_pct": 97.08,
+        "cold_seconds": 2.4e-05,
+        "warm_seconds": 2.3e-05,
+        "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "kubectl_get",
+    "fixture": "kubectl_pods_typical",
+    "raw_bytes": 704,
+    "raw_tokens": 176,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 92,
+        "reduction_pct": 47.73,
+        "cold_seconds": 0.000359,
+        "warm_seconds": 5.7e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 92,
+        "reduction_pct": 47.73,
+        "cold_seconds": 5.2e-05,
+        "warm_seconds": 5.2e-05,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 14,
+        "reduction_pct": 92.05,
+        "cold_seconds": 4.4e-05,
+        "warm_seconds": 4e-05,
+        "must_preserve_ok": false
+      }
+    ]
+  }
+]
