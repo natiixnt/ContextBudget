@@ -12,6 +12,7 @@ from redcon.symbols.tree_sitter import (
     Signature,
     SUPPORTED_LANGUAGES,
     detect_language,
+    extract_imports,
     extract_signatures,
     is_available,
 )
@@ -20,6 +21,7 @@ __all__ = [
     "Signature",
     "SUPPORTED_LANGUAGES",
     "detect_language",
+    "extract_imports",
     "extract_signatures",
     "is_available",
 ]

@@ -44,6 +44,50 @@ class Signature:
 # Map (language, tree-sitter-node-kind) -> our canonical Signature.kind
 # plus a child-node-name to use as the symbol name. Entries are tried in
 # insertion order; the first match wins.
+# Per-language import-statement node kinds used by extract_imports().
+# Maps tree-sitter node type -> path-extraction strategy ("dotted" for
+# Python-style modules, "string" for ES module specifiers, "rust" for
+# `use a::b::c` paths). Languages without a sensible import statement
+# (bash) are deliberately omitted.
+_IMPORT_KINDS: dict[str, dict[str, str]] = {
+    "python": {
+        "import_statement": "dotted",
+        "import_from_statement": "dotted",
+    },
+    "typescript": {
+        "import_statement": "string",
+    },
+    "tsx": {
+        "import_statement": "string",
+    },
+    "javascript": {
+        "import_statement": "string",
+    },
+    "rust": {
+        "use_declaration": "rust",
+    },
+    # Only the inner import_spec - both single ("import \"fmt\"") and
+    # block ("import (\n \"fmt\"\n \"net/http\"\n)") forms have specs as
+    # leaf children. Registering import_declaration as well would stop
+    # the walker before it reaches the multi-import children.
+    "go": {
+        "import_spec": "go_string",
+    },
+    "java": {
+        "import_declaration": "dotted",
+    },
+    "ruby": {
+        "call": "ruby_require",
+    },
+    "c": {
+        "preproc_include": "include",
+    },
+    "cpp": {
+        "preproc_include": "include",
+    },
+}
+
+
 _NODE_KINDS: dict[str, dict[str, str]] = {
     "python": {
         "class_definition": "class",
@@ -387,6 +431,156 @@ def _node_name(node, language: str) -> str:
             if child.type in {"type_identifier", "scoped_type_identifier"}:
                 return child.text.decode("utf-8", errors="replace")
     return ""
+
+
+def extract_imports(
+    source: str,
+    *,
+    language: str | None = None,
+    path: str | Path | None = None,
+) -> list[str]:
+    """Return module / file paths imported by the source.
+
+    Strings are normalised to a stable form across languages:
+      - Python ``from a.b import c`` -> ``a.b``
+      - Python ``import a.b`` -> ``a.b``
+      - JS / TS ``import x from "./foo"`` -> ``./foo``
+      - Rust ``use a::b::c`` -> ``a.b.c``
+      - Go ``import "fmt"`` -> ``fmt``
+      - Java ``import a.b.C`` -> ``a.b.C``
+      - C/C++ ``#include "x.h"`` -> ``x.h``
+      - Ruby ``require 'foo'`` -> ``foo``
+
+    Returns an empty list when tree-sitter is unavailable or the language
+    has no import support in ``_IMPORT_KINDS``.
+    """
+    if not source:
+        return []
+    lang = language or (detect_language(path) if path is not None else None)
+    if lang is None or lang not in _IMPORT_KINDS:
+        return []
+    parser = _get_parser(lang)
+    if parser is None:
+        return []
+    try:
+        tree = parser.parse(source.encode("utf-8"))
+    except Exception:
+        return []
+
+    kinds = _IMPORT_KINDS[lang]
+    imports: list[str] = []
+    stack = [tree.root_node]
+    while stack:
+        node = stack.pop()
+        strategy = kinds.get(node.type)
+        if strategy is not None:
+            extracted = _extract_import(node, strategy)
+            if extracted:
+                imports.append(extracted)
+            # Don't recurse into the import - their bodies don't contain
+            # nested imports.
+            continue
+        for child in reversed(node.children):
+            stack.append(child)
+    # Deduplicate while preserving order.
+    seen: set[str] = set()
+    out: list[str] = []
+    for imp in imports:
+        if imp not in seen:
+            seen.add(imp)
+            out.append(imp)
+    return out
+
+
+def _extract_import(node, strategy: str) -> str | None:
+    """Pull a normalised module path out of a single import node."""
+    text = node.text.decode("utf-8", errors="replace")
+    if strategy == "dotted":
+        return _extract_dotted(node, text)
+    if strategy == "string":
+        return _extract_string_module(text)
+    if strategy == "rust":
+        return _extract_rust_use(text)
+    if strategy == "go_string":
+        return _extract_go_string(text)
+    if strategy == "include":
+        return _extract_include(text)
+    if strategy == "ruby_require":
+        return _extract_ruby_require(text)
+    return None
+
+
+def _extract_dotted(node, text: str) -> str | None:
+    """For Python / Java import statements, walk to the dotted_name child."""
+    # First try named child by field.
+    for field in ("module_name", "name"):
+        try:
+            child = node.child_by_field_name(field)
+        except Exception:
+            child = None
+        if child is not None:
+            module = child.text.decode("utf-8", errors="replace")
+            return module.split(" as ")[0].strip()
+    # Fallback: pick first dotted_name / scoped_identifier descendant.
+    stack = [node]
+    while stack:
+        cur = stack.pop()
+        if cur.type in {"dotted_name", "scoped_identifier"}:
+            module = cur.text.decode("utf-8", errors="replace")
+            return module.split(" as ")[0].strip()
+        for child in cur.children:
+            stack.append(child)
+    # Last resort: strip Python keywords from the textual form.
+    cleaned = text.strip()
+    for prefix in ("from ", "import "):
+        if cleaned.startswith(prefix):
+            cleaned = cleaned[len(prefix):]
+    cleaned = cleaned.split(" import ")[0].split(" as ")[0].strip()
+    return cleaned or None
+
+
+def _extract_string_module(text: str) -> str | None:
+    """Pull the quoted module specifier out of an ES import statement."""
+    import re
+
+    m = re.search(r"""['\"]([^'\"]+)['\"]""", text)
+    if m:
+        return m.group(1)
+    return None
+
+
+def _extract_rust_use(text: str) -> str | None:
+    """Convert ``use a::b::c`` into ``a.b.c``."""
+    cleaned = text.strip().rstrip(";")
+    if cleaned.startswith("use "):
+        cleaned = cleaned[len("use "):]
+    cleaned = cleaned.split(" as ")[0].strip()
+    cleaned = cleaned.split("::{")[0]
+    return cleaned.replace("::", ".") or None
+
+
+def _extract_go_string(text: str) -> str | None:
+    """Go imports are quoted strings; multi-import blocks have one per line."""
+    import re
+
+    m = re.search(r'"([^"]+)"', text)
+    return m.group(1) if m else None
+
+
+def _extract_include(text: str) -> str | None:
+    """C/C++ ``#include "foo.h"`` or ``<foo.h>``."""
+    import re
+
+    m = re.search(r'#\s*include\s*[<"]([^>"]+)[>"]', text)
+    return m.group(1) if m else None
+
+
+def _extract_ruby_require(text: str) -> str | None:
+    """Match ``require 'foo'`` and ``require_relative 'bar'``."""
+    import re
+
+    m = re.match(r"\s*(?:require|require_relative|load)\s+['\"]([^'\"]+)['\"]", text)
+    return m.group(1) if m else None
 
 
 _SNIPPET_END_CHARS = frozenset({":", "{", "{"})

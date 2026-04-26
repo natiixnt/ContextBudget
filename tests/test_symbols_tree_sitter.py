@@ -144,3 +144,55 @@ class TestWithTreeSitter:
         source = "def foo():\n    pass\n"
         sigs = extract_signatures(source, path="example.py")
         assert any(s.name == "foo" for s in sigs)
+
+    def test_extract_imports_python(self):
+        from redcon.symbols import extract_imports
+
+        source = (
+            "import os\n"
+            "from typing import List\n"
+            "import pandas as pd\n"
+            "from .relative import foo\n"
+        )
+        imps = extract_imports(source, language="python")
+        assert "os" in imps
+        assert "typing" in imps
+        # Alias must be stripped.
+        assert "pandas" in imps
+        assert "pandas as pd" not in imps
+        # Relative imports preserved.
+        assert ".relative" in imps
+
+    def test_extract_imports_typescript(self):
+        from redcon.symbols import extract_imports
+
+        source = (
+            "import { foo } from './auth';\n"
+            "import bar from 'react';\n"
+            "import * as utils from '../utils';\n"
+        )
+        imps = extract_imports(source, language="typescript")
+        assert "./auth" in imps
+        assert "react" in imps
+        assert "../utils" in imps
+
+    def test_extract_imports_rust(self):
+        from redcon.symbols import extract_imports
+
+        source = "use std::collections::HashMap;\nuse super::utils;\n"
+        imps = extract_imports(source, language="rust")
+        assert "std.collections.HashMap" in imps
+        assert "super.utils" in imps
+
+    def test_extract_imports_go_multi(self):
+        from redcon.symbols import extract_imports
+
+        source = 'import (\n  "fmt"\n  "net/http"\n  "strings"\n)\n'
+        imps = extract_imports(source, language="go")
+        assert imps == ["fmt", "net/http", "strings"]
+
+    def test_extract_imports_returns_empty_for_unknown(self):
+        from redcon.symbols import extract_imports
+
+        # Even with valid Python source, an unsupported language id returns [].
+        assert extract_imports("import os", language="cobol") == []
