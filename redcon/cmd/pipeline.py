@@ -56,6 +56,7 @@ def compress_command(
     timeout_seconds: int | None = None,
     cache: MutableMapping[str, CompressionReport] | None = None,
     use_default_cache: bool = True,
+    record_history: bool = False,
 ) -> CompressionReport:
     """
     Run a command, parse its output via the matching compressor, and return
@@ -122,6 +123,15 @@ def compress_command(
     )
     if effective_cache is not None:
         effective_cache[cache_key.digest] = report
+
+    if record_history:
+        from redcon.cmd import history
+
+        history.record_run(
+            report,
+            command=" ".join(argv) if isinstance(command, (list, tuple)) else str(command),
+            repo_root=cwd_path,
+        )
     return report
 
 

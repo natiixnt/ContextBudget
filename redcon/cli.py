@@ -2143,6 +2143,130 @@ def cmd_cost_analysis(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- redcon run / cmd-bench / cmd-quality ---
+
+
+def cmd_run(args: argparse.Namespace) -> int:
+    """Run a shell command, compress its output, and write the result."""
+    from redcon.cmd import (
+        BinaryNotFound,
+        BudgetHint,
+        CommandNotAllowed,
+        CommandTimeout,
+        CompressionLevel,
+        compress_command,
+    )
+
+    try:
+        floor = CompressionLevel(args.quality_floor.lower())
+    except ValueError:
+        print(
+            f"Error: --quality-floor must be one of verbose, compact, ultra "
+            f"(got {args.quality_floor})",
+            file=sys.stderr,
+        )
+        return 2
+
+    hint = BudgetHint(
+        remaining_tokens=max(0, args.remaining_tokens),
+        max_output_tokens=max(1, args.max_output_tokens),
+        quality_floor=floor,
+    )
+
+    try:
+        report = compress_command(
+            args.command,
+            cwd=args.cwd,
+            hint=hint,
+            timeout_seconds=args.timeout_seconds,
+            record_history=not args.no_history,
+        )
+    except CommandNotAllowed as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 2
+    except CommandTimeout as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 124
+    except BinaryNotFound as e:
+        print(f"Error: {e}", file=sys.stderr)
+        return 127
+
+    out = report.output
+    if args.json:
+        payload = {
+            "command": args.command,
+            "cwd": args.cwd,
+            "schema": out.schema,
+            "level": out.level.value,
+            "text": out.text,
+            "original_tokens": out.original_tokens,
+            "compressed_tokens": out.compressed_tokens,
+            "reduction_pct": round(out.reduction_pct, 2),
+            "must_preserve_ok": out.must_preserve_ok,
+            "truncated": out.truncated,
+            "cache_hit": report.cache_hit,
+            "returncode": report.returncode,
+            "duration_seconds": round(report.duration_seconds, 6),
+        }
+        print(_json_mod.dumps(payload, indent=2))
+        return report.returncode
+
+    if not args.quiet:
+        print(
+            f"redcon run [{out.schema}/{out.level.value}] "
+            f"raw={out.original_tokens} -> compressed={out.compressed_tokens} "
+            f"({out.reduction_pct:+.1f}%) "
+            f"cache_hit={report.cache_hit} returncode={report.returncode}",
+            file=sys.stderr,
+        )
+    print(out.text)
+    return report.returncode
+
+
+def cmd_cmd_bench(args: argparse.Namespace) -> int:
+    """Run the M9 benchmark harness against the registered fixture corpus."""
+    from redcon.cmd.benchmark import (
+        _default_cases,
+        render_json,
+        render_markdown,
+        run_benchmarks,
+    )
+
+    results = run_benchmarks(_default_cases())
+    text = render_json(results) if args.json else render_markdown(results)
+    print(text)
+    return 0
+
+
+def cmd_cmd_quality(args: argparse.Namespace) -> int:
+    """Run the M8 quality harness; non-zero exit on any failure (for CI)."""
+    from redcon.cmd.quality import run_quality_check
+    from tests.test_cmd_quality import CASES  # type: ignore
+
+    failures: list[str] = []
+    passed = 0
+    for name, compressor, stdout, stderr, argv in CASES:
+        check = run_quality_check(
+            compressor,
+            raw_stdout=stdout,
+            raw_stderr=stderr,
+            argv=argv,
+        )
+        if check.passed:
+            passed += 1
+        else:
+            for fail in check.failures():
+                failures.append(f"  [{name}] {fail}")
+
+    print(f"redcon cmd-quality: {passed}/{len(CASES)} cases passed")
+    if failures:
+        print("Failures:")
+        for f in failures:
+            print(f)
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         prog="redcon",
@@ -3166,6 +3290,79 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print raw JSON to stdout (shorthand for --format json).",
     )
     benchmark_report_cmd.set_defaults(func=cmd_benchmark_report)
+
+    # --- redcon run ---
+    run_parser = sub.add_parser(
+        "run",
+        help="Run a shell command and return its output compressed for the LLM context",
+    )
+    run_parser.add_argument(
+        "command",
+        help="Full command line, e.g. 'git diff HEAD' (quote it).",
+    )
+    run_parser.add_argument(
+        "--cwd",
+        default=".",
+        help="Working directory for the command (default: current directory).",
+    )
+    run_parser.add_argument(
+        "--max-output-tokens",
+        type=int,
+        default=4000,
+        help="Hard cap on tokens returned (default: 4000).",
+    )
+    run_parser.add_argument(
+        "--remaining-tokens",
+        type=int,
+        default=30000,
+        help="Remaining budget hint that drives compression aggressiveness "
+        "(default: 30000).",
+    )
+    run_parser.add_argument(
+        "--quality-floor",
+        choices=["verbose", "compact", "ultra"],
+        default="compact",
+        help="Lowest acceptable detail level (default: compact).",
+    )
+    run_parser.add_argument(
+        "--timeout-seconds",
+        type=int,
+        default=120,
+        help="Kill the command after this many seconds (default: 120).",
+    )
+    run_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit a structured JSON report instead of plain compressed text.",
+    )
+    run_parser.add_argument(
+        "--no-history",
+        action="store_true",
+        default=False,
+        help="Skip writing the run to .redcon/history.db.",
+    )
+    run_parser.set_defaults(func=cmd_run)
+
+    # --- redcon cmd-bench ---
+    cmd_bench_parser = sub.add_parser(
+        "cmd-bench",
+        help="Run the cmd-compressor benchmark harness over the fixture corpus",
+    )
+    cmd_bench_parser.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Emit JSON instead of markdown (suitable for CI baselines).",
+    )
+    cmd_bench_parser.set_defaults(func=cmd_cmd_bench)
+
+    # --- redcon cmd-quality ---
+    cmd_quality_parser = sub.add_parser(
+        "cmd-quality",
+        help="Run the cmd-compressor quality gate; exits non-zero on any failure",
+    )
+    cmd_quality_parser.set_defaults(func=cmd_cmd_quality)
 
     return parser
 
