@@ -103,3 +103,38 @@ class LogEntry:
 class LogResult:
     entries: tuple[LogEntry, ...]
     truncated_at: int | None
+
+
+# --- Test runner canonical types (pytest, cargo test, npm test, go test) ---
+
+
+@dataclass(frozen=True, slots=True)
+class TestFailure:
+    """One failing test. The snippet is up to ~5 lines of the actual failure context."""
+
+    # Mark these dataclasses as non-collectable by pytest, which otherwise
+    # warns about "Test*" classes that look like (but aren't) test classes.
+    __test__ = False
+
+    name: str
+    file: str | None
+    line: int | None
+    message: str
+    snippet: tuple[str, ...]
+
+
+@dataclass(frozen=True, slots=True)
+class TestRunResult:
+    """Aggregated test-run output across runners. Same shape for pytest/cargo/jest/etc."""
+
+    __test__ = False
+
+    runner: str
+    total: int
+    passed: int
+    failed: int
+    skipped: int
+    errored: int
+    duration_seconds: float | None
+    failures: tuple[TestFailure, ...]
+    warnings: tuple[str, ...]

@@ -34,6 +34,8 @@ from redcon.cmd.types import (
     LogResult,
     StatusEntry,
     StatusResult,
+    TestFailure,
+    TestRunResult,
 )
 
 __all__ = [
@@ -53,6 +55,8 @@ __all__ = [
     "RunResult",
     "StatusEntry",
     "StatusResult",
+    "TestFailure",
+    "TestRunResult",
     "build_cache_key",
     "clear_default_cache",
     "compress_command",

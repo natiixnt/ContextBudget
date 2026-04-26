@@ -36,11 +36,23 @@ def registered_schemas() -> tuple[str, ...]:
 
 def _bootstrap() -> None:
     """Import all built-in compressors so they self-register."""
-    from redcon.cmd.compressors import git_diff, git_log, git_status  # noqa: F401
+    from redcon.cmd.compressors import (  # noqa: F401
+        cargo_test_compressor,
+        git_diff,
+        git_log,
+        git_status,
+        go_test_compressor,
+        npm_test_compressor,
+        pytest_compressor,
+    )
 
     register_compressor(git_diff.GitDiffCompressor())
     register_compressor(git_status.GitStatusCompressor())
     register_compressor(git_log.GitLogCompressor())
+    register_compressor(pytest_compressor.PytestCompressor())
+    register_compressor(cargo_test_compressor.CargoTestCompressor())
+    register_compressor(npm_test_compressor.NpmTestCompressor())
+    register_compressor(go_test_compressor.GoTestCompressor())
 
 
 _bootstrap()
