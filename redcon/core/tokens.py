@@ -1,6 +1,12 @@
 from __future__ import annotations
 
-"""Token estimation helpers and built-in backend resolution."""
+"""Token estimation helpers and built-in backend resolution.
+
+Imports of `redcon.schemas.models` are deferred to the functions that need
+them. Pulling in that module costs ~7 ms at import time and the hot path
+(estimate_tokens / count_file_tokens / estimate_tokens_heuristic) doesn't
+need any schema types at all.
+"""
 
 from dataclasses import dataclass
 from functools import lru_cache
@@ -8,9 +14,10 @@ import importlib
 import logging
 import math
 import os
-from typing import Any, Callable, Mapping, Sequence
+from typing import Any, Callable, Mapping, Sequence, TYPE_CHECKING
 
-from redcon.schemas.models import TokenEstimatorReport
+if TYPE_CHECKING:
+    from redcon.schemas.models import TokenEstimatorReport
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +62,12 @@ class _ResolvedBuiltinTokenEstimator:
     fallback_reason: str
     notes: tuple[str, ...]
 
-    def to_report(self) -> TokenEstimatorReport:
+    def to_report(self) -> "TokenEstimatorReport":
+        # Imported lazily so the hot path (estimate_tokens / count_file_tokens)
+        # doesn't pay the redcon.schemas.models load cost just to define this
+        # rarely-called method.
+        from redcon.schemas.models import TokenEstimatorReport
+
         return TokenEstimatorReport(
             selected_backend=self.selected_backend,
             effective_backend=self.effective_backend,
@@ -160,7 +172,7 @@ def describe_builtin_token_estimator(
     model: str = DEFAULT_MODEL_ALIGNED_MODEL,
     encoding: str = "",
     fallback_backend: str = "heuristic",
-) -> TokenEstimatorReport:
+) -> "TokenEstimatorReport":
     """Return a stable report describing the configured built-in estimator backend."""
 
     resolved = _resolve_builtin_token_estimator(
