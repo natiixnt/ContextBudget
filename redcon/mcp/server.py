@@ -157,6 +157,34 @@ _TOOL_SCHEMAS = [
         },
     },
     {
+        "name": "redcon_quality_check",
+        "description": (
+            "Run a shell command, compress its output, and verify the "
+            "compression against the M8 quality harness (must-preserve "
+            "patterns, reduction floor, determinism). Use this instead "
+            "of redcon_run when you want a verdict before consuming the "
+            "compressed bytes - the response is small and the verdict is "
+            "structured."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "command": {"type": "string"},
+                "cwd": {"type": "string", "default": "."},
+                "max_output_tokens": {"type": "integer", "default": 4000},
+                "remaining_tokens": {"type": "integer", "default": 30000},
+                "quality_floor": {
+                    "type": "string",
+                    "enum": ["verbose", "compact", "ultra"],
+                    "default": "compact",
+                },
+                "timeout_seconds": {"type": "integer", "default": 120},
+                "prefer_compact_output": {"type": "boolean", "default": False},
+            },
+            "required": ["command"],
+        },
+    },
+    {
         "name": "redcon_run",
         "description": (
             "Run a shell command (git diff/status/log and others) and return its "
@@ -195,6 +223,17 @@ _TOOL_SCHEMAS = [
                     "type": "integer",
                     "description": "Kill the command after this many seconds",
                     "default": 120,
+                },
+                "prefer_compact_output": {
+                    "type": "boolean",
+                    "description": (
+                        "Rewrite known commands to runner-native compact "
+                        "flags (pytest --tb=line, cargo --quiet, jest "
+                        "--reporter=basic) before spawning. Trades full "
+                        "tracebacks for ~60-80% upstream reduction on "
+                        "test-failure runs."
+                    ),
+                    "default": False,
                 },
             },
             "required": ["command"],
@@ -248,6 +287,17 @@ def _dispatch_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
                 remaining_tokens=int(args.get("remaining_tokens", 30000)),
                 quality_floor=args.get("quality_floor", "compact"),
                 timeout_seconds=int(args.get("timeout_seconds", 120)),
+                prefer_compact_output=bool(args.get("prefer_compact_output", False)),
+            )
+        if name == "redcon_quality_check":
+            return tools.tool_quality_check(
+                command=args.get("command", ""),
+                cwd=args.get("cwd", "."),
+                max_output_tokens=int(args.get("max_output_tokens", 4000)),
+                remaining_tokens=int(args.get("remaining_tokens", 30000)),
+                quality_floor=args.get("quality_floor", "compact"),
+                timeout_seconds=int(args.get("timeout_seconds", 120)),
+                prefer_compact_output=bool(args.get("prefer_compact_output", False)),
             )
         return {"error": f"unknown tool: {name}"}
     except Exception as e:

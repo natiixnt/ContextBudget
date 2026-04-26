@@ -2171,6 +2171,7 @@ def cmd_run(args: argparse.Namespace) -> int:
         remaining_tokens=max(0, args.remaining_tokens),
         max_output_tokens=max(1, args.max_output_tokens),
         quality_floor=floor,
+        prefer_compact_output=bool(getattr(args, "prefer_compact_output", False)),
     )
 
     try:
@@ -3341,6 +3342,17 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Skip writing the run to .redcon/history.db.",
+    )
+    run_parser.add_argument(
+        "--prefer-compact-output",
+        action="store_true",
+        default=False,
+        help=(
+            "Rewrite known commands to compact flags before spawning "
+            "(pytest --tb=line, cargo --quiet, jest --reporter=basic). "
+            "Trades full tracebacks for 60-80%% upstream reduction on "
+            "test-failure runs."
+        ),
     )
     run_parser.set_defaults(func=cmd_run)
 

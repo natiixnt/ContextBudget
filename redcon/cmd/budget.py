@@ -20,11 +20,17 @@ class BudgetHint:
     `quality_floor` defaults to ULTRA (no guarantee) so the library picks
     whichever level fits. Higher-level callers (MCP, CLI) explicitly raise
     the floor when they want to protect quality.
+
+    `prefer_compact_output` when True asks the runner to rewrite known
+    argv to runner-native compact flags (e.g. pytest --tb=line) before
+    spawning. Trades a small amount of detail for ~60-80% upstream
+    reduction on test-failure runs.
     """
 
     remaining_tokens: int
     max_output_tokens: int
     quality_floor: CompressionLevel = CompressionLevel.ULTRA
+    prefer_compact_output: bool = False
 
 
 # Approximate output size as a fraction of raw tokens for each level.
