@@ -154,47 +154,59 @@ def _parse_file_block(block: list[str]) -> DiffFile | None:
     current_hunk: dict | None = None
 
     for line in block[1:]:
-        if _NEW_FILE_MODE.match(line):
+        # Fast path for diff content lines (the vast majority): they always
+        # start with '+', '-', ' '. Avoid every metadata regex check.
+        if current_hunk is not None and line:
+            first = line[0]
+            if first == "+":
+                if not line.startswith("+++"):
+                    insertions += 1
+                    current_hunk["added"].append(line[1:])
+                    continue
+            elif first == "-":
+                if not line.startswith("---"):
+                    deletions += 1
+                    current_hunk["removed"].append(line[1:])
+                    continue
+            elif first == " ":
+                # Context line: no insertion/deletion, no metadata.
+                continue
+
+        # Cheap prefix gates before each regex - most lines fail these so we
+        # skip the regex engine entirely.
+        if line.startswith("@@"):
+            hunk_match = _HUNK_HEADER.match(line)
+            if hunk_match:
+                if current_hunk is not None:
+                    hunks.append(_finalize_hunk(current_hunk))
+                current_hunk = {
+                    "old_start": int(hunk_match.group("old_start")),
+                    "old_lines": int(hunk_match.group("old_lines") or "1"),
+                    "new_start": int(hunk_match.group("new_start")),
+                    "new_lines": int(hunk_match.group("new_lines") or "1"),
+                    "header": hunk_match.group("header").strip(),
+                    "added": [],
+                    "removed": [],
+                }
+                continue
+        if line.startswith("new file mode"):
             status = "added"
             old_path = None
             continue
-        if _DELETED_FILE_MODE.match(line):
+        if line.startswith("deleted file mode"):
             status = "deleted"
             continue
-        rename_from = _RENAME_FROM.match(line)
-        if rename_from:
+        if line.startswith("rename from "):
             status = "renamed"
-            old_path = rename_from.group("p")
+            old_path = line[len("rename from "):]
             continue
-        rename_to = _RENAME_TO.match(line)
-        if rename_to:
-            path = rename_to.group("p")
+        if line.startswith("rename to "):
+            path = line[len("rename to "):]
             continue
-        if _BINARY.match(line):
-            binary = True
+        if line.startswith("Binary files"):
+            if _BINARY.match(line):
+                binary = True
             continue
-        hunk_match = _HUNK_HEADER.match(line)
-        if hunk_match:
-            if current_hunk is not None:
-                hunks.append(_finalize_hunk(current_hunk))
-            current_hunk = {
-                "old_start": int(hunk_match.group("old_start")),
-                "old_lines": int(hunk_match.group("old_lines") or "1"),
-                "new_start": int(hunk_match.group("new_start")),
-                "new_lines": int(hunk_match.group("new_lines") or "1"),
-                "header": hunk_match.group("header").strip(),
-                "added": [],
-                "removed": [],
-            }
-            continue
-        if current_hunk is None:
-            continue
-        if line.startswith("+") and not line.startswith("+++"):
-            insertions += 1
-            current_hunk["added"].append(line[1:])
-        elif line.startswith("-") and not line.startswith("---"):
-            deletions += 1
-            current_hunk["removed"].append(line[1:])
 
     if current_hunk is not None:
         hunks.append(_finalize_hunk(current_hunk))

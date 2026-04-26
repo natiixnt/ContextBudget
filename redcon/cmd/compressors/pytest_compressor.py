@@ -138,21 +138,26 @@ def _parse_failure_blocks(lines: list[str]) -> list[TestFailure]:
         current_block = []
 
     for line in lines:
-        if _FAILURES_HEADER.match(line) or _ERRORS_HEADER.match(line):
-            in_section = True
-            continue
+        # Fast path: section/divider lines start with '=' or '_'. The vast
+        # majority of body lines start with neither, so we skip three regex
+        # matches per line by checking the first character first.
+        first = line[:1]
+        if first == "=":
+            if _FAILURES_HEADER.match(line) or _ERRORS_HEADER.match(line):
+                in_section = True
+                continue
+            if in_section and _SHORT_SUMMARY_HEADER.match(line):
+                flush()
+                in_section = False
+                continue
+        elif first == "_" and in_section:
+            name_match = _FAIL_NAME_BLOCK.match(line)
+            if name_match:
+                flush()
+                current_name = name_match.group("name").strip()
+                current_block = []
+                continue
         if not in_section:
-            continue
-        if _SHORT_SUMMARY_HEADER.match(line):
-            flush()
-            in_section = False
-            continue
-        # New failure block starts with a heavy underscored name line.
-        name_match = _FAIL_NAME_BLOCK.match(line)
-        if name_match:
-            flush()
-            current_name = name_match.group("name").strip()
-            current_block = []
             continue
         if current_name is not None:
             current_block.append(line)

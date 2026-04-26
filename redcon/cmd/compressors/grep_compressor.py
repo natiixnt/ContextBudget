@@ -78,6 +78,21 @@ def parse_grep(text: str) -> GrepResult:
         if not line:
             current_file = None
             continue
+        # Fast path: indented form lines start with a digit (the line number).
+        # Try _INDENTED first when the first char is a digit, _INLINE otherwise.
+        first = line[0]
+        if first.isdigit():
+            indented = _INDENTED.match(line)
+            if indented and current_file is not None:
+                matches.append(
+                    GrepMatch(
+                        path=current_file,
+                        line=int(indented.group("line")),
+                        column=_safe_int(indented.group("col")),
+                        text=indented.group("text").rstrip(),
+                    )
+                )
+                continue
         inline = _INLINE.match(line)
         if inline:
             current_file = inline.group("path")
@@ -90,20 +105,11 @@ def parse_grep(text: str) -> GrepResult:
                 )
             )
             continue
-        indented = _INDENTED.match(line)
-        if indented and current_file is not None:
-            matches.append(
-                GrepMatch(
-                    path=current_file,
-                    line=int(indented.group("line")),
-                    column=_safe_int(indented.group("col")),
-                    text=indented.group("text").rstrip(),
-                )
-            )
-            continue
-        if _PATH_LIKE.match(line.strip()):
-            current_file = line.strip()
-            continue
+        # Path header line in grouped form. Cheap structural check before regex.
+        stripped = line.strip()
+        if stripped and "." in stripped and ":" not in stripped:
+            if _PATH_LIKE.match(stripped):
+                current_file = stripped
 
     paths = _unique_paths_from_matches(matches)
     return GrepResult(
