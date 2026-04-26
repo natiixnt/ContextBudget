@@ -18,6 +18,7 @@ from redcon.cmd.pipeline import (
 )
 from redcon.cmd.registry import detect_compressor, register_compressor
 from redcon.cmd.runner import (
+    BinaryNotFound,
     CommandNotAllowed,
     CommandTimeout,
     RunRequest,
@@ -30,6 +31,10 @@ from redcon.cmd.types import (
     DiffFile,
     DiffHunk,
     DiffResult,
+    GrepMatch,
+    GrepResult,
+    Listing,
+    ListingResult,
     LogEntry,
     LogResult,
     StatusEntry,
@@ -39,6 +44,7 @@ from redcon.cmd.types import (
 )
 
 __all__ = [
+    "BinaryNotFound",
     "BudgetHint",
     "CommandCacheKey",
     "CommandNotAllowed",
@@ -49,6 +55,10 @@ __all__ = [
     "DiffFile",
     "DiffHunk",
     "DiffResult",
+    "GrepMatch",
+    "GrepResult",
+    "Listing",
+    "ListingResult",
     "LogEntry",
     "LogResult",
     "RunRequest",

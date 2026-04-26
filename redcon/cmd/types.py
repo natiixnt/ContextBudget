@@ -138,3 +138,47 @@ class TestRunResult:
     duration_seconds: float | None
     failures: tuple[TestFailure, ...]
     warnings: tuple[str, ...]
+
+
+# --- Search canonical types (grep, ripgrep) ---
+
+
+@dataclass(frozen=True, slots=True)
+class GrepMatch:
+    """One regex match in a file."""
+
+    path: str
+    line: int
+    column: int | None
+    text: str
+
+
+@dataclass(frozen=True, slots=True)
+class GrepResult:
+    """Aggregated search output. Matches are grouped by path inside the same tuple."""
+
+    matches: tuple[GrepMatch, ...]
+    file_count: int
+    match_count: int
+
+
+# --- Listing canonical types (ls, tree, find) ---
+
+
+@dataclass(frozen=True, slots=True)
+class Listing:
+    """One entry produced by a listing tool."""
+
+    path: str
+    kind: str  # "file" | "dir" | "symlink" | "other"
+    size: int | None
+    depth: int
+
+
+@dataclass(frozen=True, slots=True)
+class ListingResult:
+    """Output of a directory listing or path search."""
+
+    source: str  # "ls" | "tree" | "find"
+    entries: tuple[Listing, ...]
+    truncated: bool

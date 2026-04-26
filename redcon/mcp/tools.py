@@ -342,6 +342,7 @@ def tool_run(
 
     try:
         from redcon.cmd import (
+            BinaryNotFound,
             BudgetHint,
             CommandNotAllowed,
             CommandTimeout,
@@ -378,6 +379,8 @@ def tool_run(
         return {"error": str(e), "kind": "not_allowed"}
     except CommandTimeout as e:
         return {"error": str(e), "kind": "timeout"}
+    except BinaryNotFound as e:
+        return {"error": str(e), "kind": "binary_not_found"}
     except FileNotFoundError as e:
         return {"error": str(e), "kind": "cwd_not_found"}
     except Exception as e:

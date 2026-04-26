@@ -42,6 +42,8 @@ def _bootstrap() -> None:
         git_log,
         git_status,
         go_test_compressor,
+        grep_compressor,
+        listing_compressor,
         npm_test_compressor,
         pytest_compressor,
     )
@@ -53,6 +55,10 @@ def _bootstrap() -> None:
     register_compressor(cargo_test_compressor.CargoTestCompressor())
     register_compressor(npm_test_compressor.NpmTestCompressor())
     register_compressor(go_test_compressor.GoTestCompressor())
+    register_compressor(grep_compressor.GrepCompressor())
+    register_compressor(listing_compressor.LsCompressor())
+    register_compressor(listing_compressor.TreeCompressor())
+    register_compressor(listing_compressor.FindCompressor())
 
 
 _bootstrap()

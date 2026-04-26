@@ -98,13 +98,16 @@ def test_compress_command_blocks_unallowed(git_repo: Path):
         compress_command("nonexistent_evil_cmd --foo", cwd=git_repo)
 
 
-def test_compress_command_unknown_command_passthrough(git_repo: Path):
-    # `ls` is on the allowlist but has no compressor in M1 -> raw passthrough.
+def test_compress_command_passthrough_when_no_compressor(git_repo: Path, monkeypatch):
+    # Force a passthrough by stubbing detect_compressor to return None.
+    from redcon.cmd import pipeline
+
+    monkeypatch.setattr(pipeline, "detect_compressor", lambda _argv: None)
     report = compress_command(
-        "ls", cwd=git_repo, hint=BudgetHint(remaining_tokens=10_000, max_output_tokens=4_000)
+        "git status", cwd=git_repo,
+        hint=BudgetHint(remaining_tokens=10_000, max_output_tokens=4_000),
     )
     assert report.output.schema == "raw_passthrough"
-    assert "foo.py" in report.output.text
 
 
 def test_build_cache_key_stable(tmp_path: Path):

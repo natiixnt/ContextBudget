@@ -56,6 +56,10 @@ class CommandTimeout(RuntimeError):
     pass
 
 
+class BinaryNotFound(RuntimeError):
+    pass
+
+
 @dataclass(frozen=True, slots=True)
 class RunRequest:
     argv: tuple[str, ...]
@@ -120,6 +124,12 @@ def run_command(
     except subprocess.TimeoutExpired as e:
         raise CommandTimeout(
             f"command timed out after {request.timeout_seconds}s: {request.argv[0]}"
+        ) from e
+    except FileNotFoundError as e:
+        # Distinguish missing binary from missing cwd: we already verified
+        # cwd above, so this must mean the binary isn't on PATH.
+        raise BinaryNotFound(
+            f"binary '{request.argv[0]}' not found on PATH"
         ) from e
     duration = time.monotonic() - started
 
