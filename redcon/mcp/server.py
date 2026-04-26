@@ -2,12 +2,13 @@
 Redcon MCP server - stdio transport for integration with Claude Code,
 Cursor, Windsurf, and other MCP-compatible agents.
 
-Exposes 5 tools that wrap RedconEngine:
+Exposes 6 tools:
   - redcon_rank: score and rank files by task relevance
   - redcon_overview: lightweight repo map grouped by directory
   - redcon_compress: compressed single-file content for cheap inspection
   - redcon_search: regex search scoped to ranked files or full repo
   - redcon_budget: plan file packing within a token budget
+  - redcon_run: run a shell command and return its output compressed
 """
 
 from __future__ import annotations
@@ -155,6 +156,50 @@ _TOOL_SCHEMAS = [
             "required": ["files", "task", "max_tokens"],
         },
     },
+    {
+        "name": "redcon_run",
+        "description": (
+            "Run a shell command (git diff/status/log and others) and return its "
+            "output compressed for the LLM. Use this instead of the raw shell when "
+            "the command would otherwise produce hundreds of lines of output."
+        ),
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "command": {
+                    "type": "string",
+                    "description": "Full command line, e.g. 'git diff HEAD'",
+                },
+                "cwd": {
+                    "type": "string",
+                    "description": "Working directory",
+                    "default": ".",
+                },
+                "max_output_tokens": {
+                    "type": "integer",
+                    "description": "Hard cap on tokens returned",
+                    "default": 4000,
+                },
+                "remaining_tokens": {
+                    "type": "integer",
+                    "description": "Remaining budget hint (drives compression aggressiveness)",
+                    "default": 30000,
+                },
+                "quality_floor": {
+                    "type": "string",
+                    "enum": ["verbose", "compact", "ultra"],
+                    "description": "Lowest acceptable detail level",
+                    "default": "compact",
+                },
+                "timeout_seconds": {
+                    "type": "integer",
+                    "description": "Kill the command after this many seconds",
+                    "default": 120,
+                },
+            },
+            "required": ["command"],
+        },
+    },
 ]
 
 
@@ -194,6 +239,15 @@ def _dispatch_tool(name: str, args: dict[str, Any]) -> dict[str, Any]:
                 task=args.get("task", ""),
                 max_tokens=int(args.get("max_tokens", 8000)),
                 repo=args.get("repo", "."),
+            )
+        if name == "redcon_run":
+            return tools.tool_run(
+                command=args.get("command", ""),
+                cwd=args.get("cwd", "."),
+                max_output_tokens=int(args.get("max_output_tokens", 4000)),
+                remaining_tokens=int(args.get("remaining_tokens", 30000)),
+                quality_floor=args.get("quality_floor", "compact"),
+                timeout_seconds=int(args.get("timeout_seconds", 120)),
             )
         return {"error": f"unknown tool: {name}"}
     except Exception as e:

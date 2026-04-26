@@ -320,6 +320,91 @@ def tool_search(
 
 # --- Tool: budget ---
 
+# --- Tool: run ---
+
+def tool_run(
+    command: str,
+    cwd: str = ".",
+    max_output_tokens: int = 4000,
+    remaining_tokens: int = 30000,
+    quality_floor: str = "compact",
+    timeout_seconds: int = 120,
+) -> dict[str, Any]:
+    """
+    Run a shell command and return its compressed output.
+
+    Wraps redcon.cmd.compress_command with MCP-friendly argument handling.
+    Falls back to raw passthrough (still token-budgeted) for unrecognised
+    commands. Refuses commands that are not in the runner allowlist.
+    """
+    if not command or not command.strip():
+        return {"error": "command must be a non-empty string"}
+
+    try:
+        from redcon.cmd import (
+            BudgetHint,
+            CommandNotAllowed,
+            CommandTimeout,
+            CompressionLevel,
+            compress_command,
+        )
+    except ImportError as e:
+        return {"error": f"redcon.cmd module unavailable: {e}"}
+
+    try:
+        floor = CompressionLevel(quality_floor.lower())
+    except ValueError:
+        return {
+            "error": (
+                f"quality_floor must be one of verbose, compact, ultra "
+                f"(got {quality_floor})"
+            )
+        }
+
+    hint = BudgetHint(
+        remaining_tokens=max(0, remaining_tokens),
+        max_output_tokens=max(1, max_output_tokens),
+        quality_floor=floor,
+    )
+
+    try:
+        report = compress_command(
+            command,
+            cwd=cwd,
+            hint=hint,
+            timeout_seconds=timeout_seconds,
+        )
+    except CommandNotAllowed as e:
+        return {"error": str(e), "kind": "not_allowed"}
+    except CommandTimeout as e:
+        return {"error": str(e), "kind": "timeout"}
+    except FileNotFoundError as e:
+        return {"error": str(e), "kind": "cwd_not_found"}
+    except Exception as e:
+        logger.exception("mcp.run: compress_command failed")
+        return {"error": f"run failed: {e}", "kind": "internal"}
+
+    out = report.output
+    return {
+        "command": command,
+        "cwd": cwd,
+        "schema": out.schema,
+        "level": out.level.value,
+        "text": out.text,
+        "original_tokens": out.original_tokens,
+        "compressed_tokens": out.compressed_tokens,
+        "reduction_pct": round(out.reduction_pct, 1),
+        "must_preserve_ok": out.must_preserve_ok,
+        "truncated": out.truncated,
+        "cache_hit": report.cache_hit,
+        "returncode": report.returncode,
+        "duration_seconds": round(report.duration_seconds, 4),
+        "raw_stdout_bytes": report.raw_stdout_bytes,
+        "raw_stderr_bytes": report.raw_stderr_bytes,
+        "notes": list(out.notes),
+    }
+
+
 def tool_budget(
     files: list[str],
     task: str,
