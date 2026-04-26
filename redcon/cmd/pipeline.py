@@ -177,23 +177,32 @@ def clear_default_cache() -> None:
 
 
 _TRIPLE_NEWLINE = None  # lazy-compiled below
+_COMMA_GAP = None
+_COLON_GAP = None
 
 
 def _normalise_whitespace(output: CompressedOutput) -> CompressedOutput:
-    """Collapse 3+ consecutive newlines to 2 and re-tokenise.
+    """Collapse 3+ newlines and tighten ', ' / ': ' gaps; re-tokenise on change.
 
     Each blank line costs roughly one cl100k token. Compressors sometimes
     emit double-blanks at section transitions; collapsing them is free
-    quality-wise and cheap. Re-counts compressed_tokens after the rewrite
-    so the reported reduction stays accurate.
+    quality-wise and cheap. The two extra rewrites cover ', ' to ',' between
+    non-space chars and 'word: word' to 'word:word' - both measured to be
+    must-preserve-safe in V32 research and net-positive on cl100k tokens.
+    Re-counts compressed_tokens after the rewrite so the reported reduction
+    stays accurate.
     """
-    global _TRIPLE_NEWLINE
+    global _TRIPLE_NEWLINE, _COMMA_GAP, _COLON_GAP
     import re
 
     if _TRIPLE_NEWLINE is None:
         _TRIPLE_NEWLINE = re.compile(r"\n{3,}")
+        _COMMA_GAP = re.compile(r",[ \t]+(?=\S)")
+        _COLON_GAP = re.compile(r"(?<=[A-Za-z]):[ \t]+(?=[A-Za-z0-9])")
 
     cleaned = _TRIPLE_NEWLINE.sub("\n\n", output.text).rstrip()
+    cleaned = _COMMA_GAP.sub(",", cleaned)
+    cleaned = _COLON_GAP.sub(":", cleaned)
     if cleaned == output.text:
         return output
 
