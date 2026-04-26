@@ -18,6 +18,27 @@ tokenizers = ["tiktoken>=0.7"]
 redis = ["redis>=5.0"]
 gateway = ["fastapi>=0.110", "uvicorn[standard]>=0.29"]
 mcp = ["mcp>=1.0"]
+# Tree-sitter symbol extraction for redcon repo-map / improved file context.
+# We list per-language wheels because tree-sitter-language-pack still ships
+# broken wheels on Python 3.14 ARM (RECORD-only, no package payload).
+symbols = [
+    "tree-sitter>=0.22",
+    "tree-sitter-python>=0.23",
+    "tree-sitter-typescript>=0.23",
+    "tree-sitter-javascript>=0.23",
+    "tree-sitter-rust>=0.23",
+    "tree-sitter-go>=0.23",
+    "tree-sitter-java>=0.23",
+    "tree-sitter-ruby>=0.23",
+    "tree-sitter-c>=0.23",
+    "tree-sitter-cpp>=0.23",
+]
+# Structural code search via ast-grep. The CLI binary on PATH (brew /
+# cargo install) is preferred; the python wheel is the backup.
+ast_grep = ["ast-grep-py>=0.30"]
+# LLMLingua-2 semantic compression fallback. Heavy: pulls torch +
+# transformers + a 280 MB BERT-base checkpoint at first use.
+heavy_compression = ["llmlingua>=0.2.0"]
 
 [project.scripts]
 redcon = "redcon.cli:main"
