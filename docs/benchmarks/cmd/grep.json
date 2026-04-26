@@ -1,0 +1,70 @@
+{
+  "schema": "grep",
+  "generated_at": "2026-04-26 19:55 UTC",
+  "benchmarks": [
+    {
+      "schema": "grep",
+      "fixture": "grep_small",
+      "raw_bytes": 75,
+      "raw_tokens": 19,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 27,
+          "reduction_pct": -42.11,
+          "cold_seconds": 7.5e-05,
+          "warm_seconds": 1.4e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 27,
+          "reduction_pct": -42.11,
+          "cold_seconds": 1.2e-05,
+          "warm_seconds": 1.1e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 28,
+          "reduction_pct": -47.37,
+          "cold_seconds": 1.5e-05,
+          "warm_seconds": 1.2e-05,
+          "must_preserve_ok": true
+        }
+      ]
+    },
+    {
+      "schema": "grep",
+      "fixture": "grep_massive",
+      "raw_bytes": 28059,
+      "raw_tokens": 7015,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 4638,
+          "reduction_pct": 33.88,
+          "cold_seconds": 0.002518,
+          "warm_seconds": 0.001554,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 1623,
+          "reduction_pct": 76.86,
+          "cold_seconds": 0.001369,
+          "warm_seconds": 0.001316,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 8,
+          "reduction_pct": 99.89,
+          "cold_seconds": 0.000792,
+          "warm_seconds": 0.000791,
+          "must_preserve_ok": false
+        }
+      ]
+    }
+  ]
+}

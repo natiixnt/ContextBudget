@@ -1,0 +1,70 @@
+{
+  "schema": "find",
+  "generated_at": "2026-04-26 19:55 UTC",
+  "benchmarks": [
+    {
+      "schema": "find",
+      "fixture": "find",
+      "raw_bytes": 46,
+      "raw_tokens": 12,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 17,
+          "reduction_pct": -41.67,
+          "cold_seconds": 1.4e-05,
+          "warm_seconds": 8e-06,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 17,
+          "reduction_pct": -41.67,
+          "cold_seconds": 8e-06,
+          "warm_seconds": 8e-06,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 27,
+          "reduction_pct": -125.0,
+          "cold_seconds": 1.3e-05,
+          "warm_seconds": 1e-05,
+          "must_preserve_ok": true
+        }
+      ]
+    },
+    {
+      "schema": "find",
+      "fixture": "find_massive",
+      "raw_bytes": 13589,
+      "raw_tokens": 3398,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 1914,
+          "reduction_pct": 43.67,
+          "cold_seconds": 0.00056,
+          "warm_seconds": 0.000542,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 636,
+          "reduction_pct": 81.28,
+          "cold_seconds": 0.00063,
+          "warm_seconds": 0.000629,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 8,
+          "reduction_pct": 99.76,
+          "cold_seconds": 0.000499,
+          "warm_seconds": 0.000501,
+          "must_preserve_ok": true
+        }
+      ]
+    }
+  ]
+}

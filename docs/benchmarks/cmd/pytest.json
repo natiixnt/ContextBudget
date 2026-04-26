@@ -1,0 +1,70 @@
+{
+  "schema": "pytest",
+  "generated_at": "2026-04-26 19:55 UTC",
+  "benchmarks": [
+    {
+      "schema": "pytest",
+      "fixture": "pytest_small",
+      "raw_bytes": 830,
+      "raw_tokens": 208,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 73,
+          "reduction_pct": 64.9,
+          "cold_seconds": 0.000147,
+          "warm_seconds": 4.5e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 53,
+          "reduction_pct": 74.52,
+          "cold_seconds": 4.7e-05,
+          "warm_seconds": 3.9e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 20,
+          "reduction_pct": 90.38,
+          "cold_seconds": 3.8e-05,
+          "warm_seconds": 3.5e-05,
+          "must_preserve_ok": false
+        }
+      ]
+    },
+    {
+      "schema": "pytest",
+      "fixture": "pytest_massive",
+      "raw_bytes": 10220,
+      "raw_tokens": 2555,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 1141,
+          "reduction_pct": 55.34,
+          "cold_seconds": 0.001042,
+          "warm_seconds": 0.000461,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 669,
+          "reduction_pct": 73.82,
+          "cold_seconds": 0.000438,
+          "warm_seconds": 0.00044,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 20,
+          "reduction_pct": 99.22,
+          "cold_seconds": 0.000309,
+          "warm_seconds": 0.000328,
+          "must_preserve_ok": false
+        }
+      ]
+    }
+  ]
+}

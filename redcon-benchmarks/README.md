@@ -148,6 +148,67 @@ latency and fewer timeout errors from oversized prompts.
 
 ---
 
+## Command output compressors
+
+Redcon's `redcon_run` MCP tool (and `redcon run` CLI) wraps shell command
+output the agent already calls into - `git diff`, `pytest`, `cargo test`,
+`grep`, `ls`, `tree`, and friends - and compresses it before it lands in
+the context window.
+
+### Headline reductions on large real-world fixtures
+
+| Compressor | Fixture | Raw tokens | Compact | Ultra | Warm parse |
+|------------|---------|-----------:|---------|-------|------------|
+| `git_diff` | 12 files, 240 hunks | 8,078 | **97.0%** | 99.5% | 0.84 ms |
+| `pytest`   | 30 failures + 200 passes | 2,555 | **73.8%** | 99.2% | 0.43 ms |
+| `grep`     | 600 matches across 50 files | 7,015 | **76.9%** | 99.9% | 1.32 ms |
+| `find`     | 500 paths | 3,398 | **81.3%** | 99.8% | 0.62 ms |
+| `ls`       | 30 dirs x 15 files | 1,543 | **33.5%** | 99.0% | 0.81 ms |
+
+**Quality is enforced separately**: every compressor declares
+`must_preserve_patterns` (e.g. file paths in a diff, failing test names in
+pytest). The M8 quality harness rejects any compressor whose compact-level
+output drops a fact that was present in the raw input.
+
+### Reductions per schema (averaged over the corpus)
+
+| Schema | Fixtures | Avg compact reduction | Warm parse |
+|--------|----------|-----------------------|------------|
+| `git_diff` | 2 | +78.0% | 0.43 ms |
+| `git_log` | 1 | +78.1% | 0.01 ms |
+| `pytest` | 2 | +74.2% | 0.24 ms |
+| `cargo_test` | 1 | +66.7% | 0.02 ms |
+| `go_test` | 1 | +69.0% | 0.01 ms |
+| `npm_test` | 1 | +47.1% | 0.02 ms |
+| `ls` | 2 | +47.2% | 0.42 ms |
+| `find` | 2 | +19.8% | 0.32 ms |
+| `grep` | 2 | +17.4% | 0.66 ms |
+
+Schema averages include tiny fixtures (under 80 raw tokens) where the
+format header dominates the output - the M8 quality gate exempts those
+from its reduction floor for that reason. The headline table above
+isolates the realistic large fixtures so you can see where the
+compression actually buys you a context-window slot.
+
+Per-schema detail: see [`docs/benchmarks/cmd/`](../docs/benchmarks/cmd/).
+JSON suitable for CI baselines is alongside each schema's markdown.
+
+### Reproducing the cmd-compressor numbers
+
+```bash
+python benchmarks/run_cmd_benchmarks.py
+```
+
+Or use the CLI directly:
+
+```bash
+redcon cmd-bench           # markdown table to stdout
+redcon cmd-bench --json    # JSON, suitable for diffing against a baseline
+redcon cmd-quality         # information-preservation gate; non-zero on failure
+```
+
+---
+
 ## Reproducing these benchmarks
 
 ```bash
