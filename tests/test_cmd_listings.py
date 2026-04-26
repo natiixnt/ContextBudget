@@ -111,6 +111,58 @@ def test_parse_grep_grouped_form():
     assert result.file_count == 3
 
 
+RG_JSON = b"""\
+{"type":"begin","data":{"path":{"text":"src/foo.py"}}}
+{"type":"match","data":{"path":{"text":"src/foo.py"},"lines":{"text":"def foo():\\n"},"line_number":10,"absolute_offset":120,"submatches":[{"match":{"text":"foo"},"start":4,"end":7}]}}
+{"type":"match","data":{"path":{"text":"src/foo.py"},"lines":{"text":"    return foo\\n"},"line_number":42,"absolute_offset":900,"submatches":[{"match":{"text":"foo"},"start":11,"end":14}]}}
+{"type":"end","data":{"path":{"text":"src/foo.py"},"binary_offset":null,"stats":{"bytes_searched":2000,"bytes_printed":40,"matches":2,"matched_lines":2}}}
+{"type":"begin","data":{"path":{"text":"tests/test_foo.py"}}}
+{"type":"match","data":{"path":{"text":"tests/test_foo.py"},"lines":{"text":"from foo import foo\\n"},"line_number":3,"absolute_offset":0,"submatches":[{"match":{"text":"foo"},"start":5,"end":8}]}}
+{"type":"end","data":{"path":{"text":"tests/test_foo.py"},"binary_offset":null,"stats":{}}}
+{"type":"summary","data":{"stats":{}}}
+"""
+
+
+def test_parse_grep_json_form():
+    """rg --json output should be detected and parsed without falling back to text."""
+    result = parse_grep(RG_JSON.decode())
+    assert result.match_count == 3
+    assert result.file_count == 2
+    paths = {m.path for m in result.matches}
+    assert paths == {"src/foo.py", "tests/test_foo.py"}
+    by_line = {(m.path, m.line): m.text for m in result.matches}
+    assert by_line[("src/foo.py", 10)] == "def foo():"
+    assert by_line[("tests/test_foo.py", 3)] == "from foo import foo"
+
+
+def test_grep_compressor_handles_rg_json_at_compact():
+    """End-to-end: feed rg --json bytes to the compressor and verify output."""
+    from redcon.cmd.compressors.grep_compressor import GrepCompressor
+
+    comp = GrepCompressor()
+    ctx = _ctx(("rg", "--json", "foo"), CompressionLevel.COMPACT)
+    out = comp.compress(RG_JSON, b"", ctx)
+    assert "src/foo.py" in out.text
+    assert "tests/test_foo.py" in out.text
+    assert out.must_preserve_ok is True
+
+
+def test_rg_json_strictly_smaller_than_text_for_same_query():
+    """JSON form is verbose; our compressed re-emit must shrink it.
+
+    The point of parsing rg --json is to drop redundant offsets/stats.
+    Asserting compressed_tokens < raw_tokens by a wide margin guards against
+    accidentally passing JSON through unchanged.
+    """
+    from redcon.cmd.compressors.grep_compressor import GrepCompressor
+
+    comp = GrepCompressor()
+    ctx = _ctx(("rg", "--json", "foo"), CompressionLevel.COMPACT)
+    out = comp.compress(RG_JSON, b"", ctx)
+    # Raw JSON Lines is heavy; compact-mode output should be at least 50% smaller.
+    assert out.reduction_pct >= 50.0
+
+
 def test_grep_compressor_compact_keeps_paths():
     comp = GrepCompressor()
     ctx = _ctx(("rg", "foo"), CompressionLevel.COMPACT)
