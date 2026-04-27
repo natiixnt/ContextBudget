@@ -280,6 +280,48 @@ def test_structured_renderer_returns_empty_on_unparseable_input():
     assert render_git_diff_delta(junk, junk) == ""
 
 
+def test_structured_coverage_delta_emits_per_file_moves():
+    """Coverage delta renderer emits aggregate move + per-file pp shifts."""
+    from redcon.cmd.compressors.coverage_compressor import render_coverage_delta
+
+    base_raw = (
+        "Name                          Stmts   Miss  Cover\n"
+        "----------------\n"
+        "redcon/cmd/pipeline.py            100      8  92.0%\n"
+        "redcon/cmd/runner.py              200     20  90.0%\n"
+        "redcon/cmd/quality.py             150     30  80.0%\n"
+        "tests/test_a.py                    50      0 100.0%\n"
+        "----------------\n"
+        "TOTAL                             500     58  88.4%\n"
+    )
+    follow_raw = (
+        "Name                          Stmts   Miss  Cover\n"
+        "----------------\n"
+        "redcon/cmd/pipeline.py            100     12  88.0%\n"
+        "redcon/cmd/runner.py              200     20  90.0%\n"
+        "redcon/cmd/quality.py             150     45  70.0%\n"
+        "tests/test_a.py                    50      0 100.0%\n"
+        "----------------\n"
+        "TOTAL                             500     77  84.6%\n"
+    )
+    delta = render_coverage_delta(base_raw, follow_raw)
+    assert "vs baseline 88.4%" in delta
+    # quality.py dropped 10pp - should appear with negative delta.
+    assert "redcon/cmd/quality.py" in delta
+    assert "-10.0pp" in delta or "-10pp" in delta or "-10.0 pp" in delta
+    # pipeline.py dropped 4pp - should also appear.
+    assert "redcon/cmd/pipeline.py" in delta
+    # runner.py unchanged (within threshold) - not in body.
+    assert "redcon/cmd/runner.py: " not in delta
+
+
+def test_structured_coverage_delta_returns_empty_on_unparseable():
+    from redcon.cmd.compressors.coverage_compressor import render_coverage_delta
+
+    junk = "this is not a coverage report"
+    assert render_coverage_delta(junk, junk) == ""
+
+
 def test_dispatcher_uses_structured_then_falls_back():
     """Dispatcher path: structured wins on real raw; fallback returns
     line-delta when structured returns sentinel."""

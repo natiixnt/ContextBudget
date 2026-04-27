@@ -179,3 +179,4 @@ def _ensure_default_renderers() -> None:
     # is populated even if the compressor was loaded lazily before.
     from redcon.cmd.compressors import git_diff as _gd  # noqa: F401
     from redcon.cmd.compressors import pytest_compressor as _pc  # noqa: F401
+    from redcon.cmd.compressors import coverage_compressor as _cc  # noqa: F401

@@ -256,3 +256,79 @@ def _must_preserve_for(
         if len(patterns) >= 50:
             break
     return tuple(patterns)
+
+
+# --- V47 schema-aware delta renderer ---
+
+
+_DELTA_THRESHOLD_PP = 0.5
+_DELTA_TOP_K = 12
+
+
+def render_coverage_delta(baseline_raw: str, current_raw: str) -> str:
+    """Per-file coverage move vs baseline (V47 dispatcher hook).
+
+    Wins over generic line-delta because the alphabetical row order means
+    a single regression ripples into a noisy line-diff; here we emit only
+    files whose coverage moved by >= 0.5pp plus the aggregate move.
+    Returns "" sentinel when neither side parses to a non-empty
+    CoverageResult; dispatcher falls back to line-delta.
+    """
+    prior = parse_coverage(baseline_raw)
+    curr = parse_coverage(current_raw)
+    if not prior.rows and not curr.rows:
+        return ""
+
+    prior_map = {row.path: row for row in prior.rows}
+    curr_map = {row.path: row for row in curr.rows}
+
+    moved: list[tuple[float, str, float, float]] = []  # (delta, path, before, after)
+    for path, c_row in curr_map.items():
+        p_row = prior_map.get(path)
+        if p_row is None:
+            continue  # new file -> reported separately
+        delta = c_row.cover_pct - p_row.cover_pct
+        if abs(delta) >= _DELTA_THRESHOLD_PP:
+            moved.append((delta, path, p_row.cover_pct, c_row.cover_pct))
+    moved.sort(key=lambda t: (t[0], t[1]))  # most-dropped first, ties on path
+
+    new_files = sorted(curr_map.keys() - prior_map.keys())
+    gone_files = sorted(prior_map.keys() - curr_map.keys())
+
+    aggregate_delta = curr.total_cover_pct - prior.total_cover_pct
+    head = (
+        f"coverage: {curr.total_cover_pct:.1f}% "
+        f"(vs baseline {prior.total_cover_pct:.1f}%, "
+        f"{aggregate_delta:+.1f}pp; "
+        f"{len(curr.rows)} files, {len(moved)} moved)"
+    )
+    parts = [head]
+    if moved:
+        parts.append("---")
+        for delta, path, before, after in moved[:_DELTA_TOP_K]:
+            parts.append(
+                f"{delta:+.1f}pp {path}: {before:.1f} -> {after:.1f}"
+            )
+        if len(moved) > _DELTA_TOP_K:
+            parts.append(f"... +{len(moved) - _DELTA_TOP_K} more files moved")
+    if new_files:
+        parts.append(
+            f"new: {len(new_files)} files ({', '.join(new_files[:5])}"
+            + ("..." if len(new_files) > 5 else "")
+            + ")"
+        )
+    if gone_files:
+        parts.append(
+            f"gone: {len(gone_files)} files ({', '.join(gone_files[:5])}"
+            + ("..." if len(gone_files) > 5 else "")
+            + ")"
+        )
+    return "\n".join(parts)
+
+
+try:
+    from redcon.cmd.delta import register_schema_renderer as _register
+
+    _register("coverage", render_coverage_delta)
+except ImportError:
+    pass
