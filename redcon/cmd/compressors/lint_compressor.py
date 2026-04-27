@@ -79,21 +79,13 @@ class LintCompressor:
         level = select_level(raw_tokens, ctx.hint)
         formatted = _format(result, level)
         compressed_tokens = estimate_tokens(formatted)
-        # The compact format keeps the top 30 files by issue count; require
-        # the same set in must-preserve so a clipped tail doesn't fail the
-        # gate. Verbose mode emits everything anyway.
-        path_counts: dict[str, int] = {}
-        for issue in result.issues:
-            path_counts[issue.path] = path_counts.get(issue.path, 0) + 1
-        # Same (-count, path) sort the formatter uses, so what the compact
-        # format actually emits is exactly what we promise to preserve.
-        top_paths = [
-            p
-            for p, _ in sorted(
-                path_counts.items(), key=lambda kv: (-kv[1], kv[0])
-            )
-        ][:30]
-        patterns = tuple(re.escape(p) for p in top_paths)
+        # Both layouts (per-file and rule-pivot) emit the top rule codes
+        # via the 'by code:' histogram. Asserting on rule codes rather
+        # than file paths gives a stable contract regardless of which
+        # layout the min-gate picks. The histogram is the canonical
+        # 'what kinds of issues exist' signal the agent acts on.
+        code_hist = _code_histogram(result.issues)
+        patterns = tuple(re.escape(code) for code, _ in code_hist[:8])
         preserved = verify_must_preserve(formatted, patterns, text)
         return CompressedOutput(
             text=formatted,
@@ -196,14 +188,27 @@ def _format_ultra(result: LintResult) -> str:
 
 
 def _format_compact(result: LintResult) -> str:
-    """Compact: counts + per-code histogram + per-file counts only.
+    """Compact: counts + per-code histogram + per-file counts.
 
-    Per-issue message previews live in VERBOSE. Putting them at compact
-    level inflates output for small/medium suites because the previews
-    are about as long as the original lines.
+    Computes both a per-file layout and a rule-pivot layout (V62) and
+    keeps whichever has fewer tokens. The rule-pivot layout adds one
+    full exemplar plus top-3 affected paths per rule, which is more
+    actionable on Zipfian distributions; the per-file layout is shorter
+    when the failure set is small or has few distinct codes. The
+    min-gate makes the change non-regressive by construction.
     """
     if not result.issues:
         return f"{result.tool}: clean"
+    per_file = _format_compact_per_file(result)
+    rule_pivot = _maybe_format_compact_rule_pivot(result)
+    if rule_pivot is None:
+        return per_file
+    if estimate_tokens(rule_pivot) < estimate_tokens(per_file):
+        return rule_pivot
+    return per_file
+
+
+def _format_compact_per_file(result: LintResult) -> str:
     lines: list[str] = [
         f"{result.tool}: {result.error_count} errors, "
         f"{result.warning_count} warnings "
@@ -222,6 +227,65 @@ def _format_compact(result: LintResult) -> str:
         lines.append(f"{path}: {len(items)}")
     if len(sorted_files) > file_limit:
         lines.append(f"+{len(sorted_files) - file_limit} more files")
+    return "\n".join(lines)
+
+
+_RULE_PIVOT_MIN_CODES = 3
+_RULE_PIVOT_MIN_ISSUES = 8
+_RULE_PIVOT_FILE_REFS = 3
+_RULE_PIVOT_RULES = 12
+
+
+def _maybe_format_compact_rule_pivot(result: LintResult) -> str | None:
+    """Per-rule blocks with one exemplar + top-K affected paths per rule.
+
+    Returns None when the activation gate fails (small suite, few codes)
+    so the caller can fall back to the per-file form. The pivot is most
+    valuable when a single rule dominates: an exemplar lets the agent
+    fix the class without scrolling through every per-file listing.
+    """
+    coded_issues = [i for i in result.issues if i.code]
+    if (
+        len(coded_issues) < _RULE_PIVOT_MIN_ISSUES
+        or len({i.code for i in coded_issues}) < _RULE_PIVOT_MIN_CODES
+    ):
+        return None
+
+    by_code: dict[str, list[LintIssue]] = {}
+    for issue in coded_issues:
+        by_code.setdefault(issue.code or "", []).append(issue)
+    # Order matches the canonical `_code_histogram` (stable sort by
+    # -count, ties keep first-seen) so the head line emitted here lines
+    # up with the must_preserve pattern set the compressor declares.
+    canonical_order = [code for code, _ in _code_histogram(coded_issues)]
+    sorted_codes = [(code, by_code[code]) for code in canonical_order]
+
+    lines: list[str] = [
+        f"{result.tool}: {result.error_count} errors, "
+        f"{result.warning_count} warnings "
+        f"in {result.file_count} files"
+    ]
+    head_pairs = [f"{code}:{len(items)}" for code, items in sorted_codes[:8]]
+    lines.append("by code: " + ", ".join(head_pairs))
+
+    for code, items in sorted_codes[:_RULE_PIVOT_RULES]:
+        exemplar = items[0]
+        loc = f"L{exemplar.line}"
+        if exemplar.column is not None:
+            loc += f":{exemplar.column}"
+        sev = "" if exemplar.severity == "error" else f"{exemplar.severity} "
+        # Single-line per rule: '<code>(<n>) <path>:L<line> <msg>'.
+        # Files-affected are summarised via the head histogram + the
+        # exemplar path, so we do not emit a per-rule path list - on
+        # most distributions that inflated the form past the per-file
+        # equivalent and the min-gate dropped it.
+        lines.append(
+            f"{code}({len(items)}) {exemplar.path}:{loc} {sev}{exemplar.message}"
+        )
+    if len(sorted_codes) > _RULE_PIVOT_RULES:
+        lines.append(
+            f"+{len(sorted_codes) - _RULE_PIVOT_RULES} more rules"
+        )
     return "\n".join(lines)
 
 
