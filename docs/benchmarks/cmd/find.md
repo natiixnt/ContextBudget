@@ -1,11 +1,11 @@
 # Compressor: find
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `find` | 12 | -41.7% (cold 0.04 ms, warm 0.01 ms) | -41.7% (cold 0.01 ms, warm 0.01 ms) | -125.0% (cold 0.02 ms, warm 0.01 ms) |
-| `find_massive` | 3,398 | +43.7% (cold 1.37 ms, warm 0.72 ms) | +81.3% (cold 0.80 ms, warm 0.80 ms) | +99.8% (cold 0.50 ms, warm 0.50 ms) |
+| `find` | 12 | -41.7% (cold 0.05 ms, warm 0.01 ms) | -41.7% (cold 0.01 ms, warm 0.01 ms) | -125.0% (cold 0.02 ms, warm 0.01 ms) |
+| `find_massive` | 3,398 | +43.7% (cold 1.43 ms, warm 0.73 ms) | +81.3% (cold 0.82 ms, warm 0.82 ms) | +99.8% (cold 0.51 ms, warm 0.51 ms) |
 
 ## Notes
 

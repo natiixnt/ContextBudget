@@ -1,6 +1,6 @@
 {
   "schema": "profiler",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "profiler",
@@ -12,24 +12,24 @@
           "level": "verbose",
           "compressed_tokens": 605,
           "reduction_pct": 74.43,
-          "cold_seconds": 0.00098,
-          "warm_seconds": 0.000481,
+          "cold_seconds": 0.000968,
+          "warm_seconds": 0.000477,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
           "compressed_tokens": 255,
           "reduction_pct": 89.22,
-          "cold_seconds": 0.000421,
-          "warm_seconds": 0.00042,
+          "cold_seconds": 0.000439,
+          "warm_seconds": 0.000491,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
           "compressed_tokens": 23,
           "reduction_pct": 99.03,
-          "cold_seconds": 0.000386,
-          "warm_seconds": 0.000383,
+          "cold_seconds": 0.000401,
+          "warm_seconds": 0.000395,
           "must_preserve_ok": true
         }
       ]

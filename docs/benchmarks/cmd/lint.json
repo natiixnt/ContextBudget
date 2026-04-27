@@ -1,6 +1,6 @@
 {
   "schema": "lint",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "lint",
@@ -12,24 +12,24 @@
           "level": "verbose",
           "compressed_tokens": 634,
           "reduction_pct": 13.39,
-          "cold_seconds": 0.000844,
-          "warm_seconds": 0.000281,
+          "cold_seconds": 0.000396,
+          "warm_seconds": 0.000212,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
           "compressed_tokens": 215,
           "reduction_pct": 70.63,
-          "cold_seconds": 0.000277,
-          "warm_seconds": 0.000269,
+          "cold_seconds": 0.000262,
+          "warm_seconds": 0.000242,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
           "compressed_tokens": 12,
           "reduction_pct": 98.36,
-          "cold_seconds": 0.000193,
-          "warm_seconds": 0.000191,
+          "cold_seconds": 0.000196,
+          "warm_seconds": 0.000185,
           "must_preserve_ok": false
         }
       ]
@@ -44,24 +44,24 @@
           "level": "verbose",
           "compressed_tokens": 1208,
           "reduction_pct": -1.34,
-          "cold_seconds": 0.000932,
-          "warm_seconds": 0.000378,
+          "cold_seconds": 0.000386,
+          "warm_seconds": 0.000304,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
-          "compressed_tokens": 206,
-          "reduction_pct": 82.72,
-          "cold_seconds": 0.000345,
-          "warm_seconds": 0.00034,
+          "compressed_tokens": 129,
+          "reduction_pct": 89.18,
+          "cold_seconds": 0.000322,
+          "warm_seconds": 0.000296,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
           "compressed_tokens": 12,
           "reduction_pct": 98.99,
-          "cold_seconds": 0.000265,
-          "warm_seconds": 0.000266,
+          "cold_seconds": 0.00025,
+          "warm_seconds": 0.00024,
           "must_preserve_ok": false
         }
       ]

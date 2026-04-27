@@ -1,11 +1,11 @@
 # Compressor: git_diff
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `git_diff_small` | 61 | +31.1% (cold 0.17 ms, warm 0.02 ms) | +60.7% (cold 0.03 ms, warm 0.02 ms) | +83.6% (cold 0.02 ms, warm 0.02 ms) |
-| `git_diff_huge` | 8,078 | +31.6% (cold 1.06 ms, warm 0.99 ms) | +97.3% (cold 0.83 ms, warm 0.82 ms) | +99.5% (cold 0.81 ms, warm 0.81 ms) |
+| `git_diff_small` | 61 | +31.1% (cold 0.12 ms, warm 0.03 ms) | +60.7% (cold 0.02 ms, warm 0.02 ms) | +83.6% (cold 0.02 ms, warm 0.02 ms) |
+| `git_diff_huge` | 8,078 | +31.6% (cold 1.39 ms, warm 1.15 ms) | +97.3% (cold 0.91 ms, warm 0.91 ms) | +99.5% (cold 0.87 ms, warm 0.95 ms) |
 
 ## Notes
 

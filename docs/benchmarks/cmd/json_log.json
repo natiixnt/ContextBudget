@@ -1,6 +1,6 @@
 {
   "schema": "json_log",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "json_log",
@@ -12,24 +12,24 @@
           "level": "verbose",
           "compressed_tokens": 3298,
           "reduction_pct": 45.16,
-          "cold_seconds": 0.001974,
-          "warm_seconds": 0.001683,
+          "cold_seconds": 0.002091,
+          "warm_seconds": 0.001762,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
           "compressed_tokens": 532,
           "reduction_pct": 91.15,
-          "cold_seconds": 0.001616,
-          "warm_seconds": 0.001601,
+          "cold_seconds": 0.001685,
+          "warm_seconds": 0.001611,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
           "compressed_tokens": 24,
           "reduction_pct": 99.6,
-          "cold_seconds": 0.00084,
-          "warm_seconds": 0.000833,
+          "cold_seconds": 0.000843,
+          "warm_seconds": 0.000853,
           "must_preserve_ok": true
         }
       ]

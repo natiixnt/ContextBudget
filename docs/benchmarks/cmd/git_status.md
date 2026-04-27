@@ -1,10 +1,10 @@
 # Compressor: git_status
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `git_status` | 16 | +0.0% (cold 0.08 ms, warm 0.01 ms) | +0.0% (cold 0.01 ms, warm 0.01 ms) | +0.0% (cold 0.02 ms, warm 0.01 ms) |
+| `git_status` | 16 | +0.0% (cold 0.13 ms, warm 0.01 ms) | +0.0% (cold 0.01 ms, warm 0.01 ms) | +0.0% (cold 0.02 ms, warm 0.01 ms) |
 
 ## Notes
 

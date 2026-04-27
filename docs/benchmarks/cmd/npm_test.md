@@ -1,10 +1,10 @@
 # Compressor: npm_test
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `npm_test_jest` | 68 | +48.5% (cold 0.08 ms, warm 0.02 ms) | +48.5% (cold 0.02 ms, warm 0.02 ms) | +69.1% (cold 0.02 ms, warm 0.02 ms) |
+| `npm_test_jest` | 68 | +48.5% (cold 0.11 ms, warm 0.02 ms) | +48.5% (cold 0.02 ms, warm 0.02 ms) | +69.1% (cold 0.02 ms, warm 0.02 ms) |
 
 ## Notes
 

@@ -1,11 +1,11 @@
 # Compressor: ls
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `ls` | 41 | +61.0% (cold 0.09 ms, warm 0.02 ms) | +61.0% (cold 0.02 ms, warm 0.02 ms) | +82.9% (cold 0.02 ms, warm 0.01 ms) |
-| `ls_huge` | 1,543 | -0.3% (cold 1.55 ms, warm 0.87 ms) | +33.5% (cold 1.26 ms, warm 0.97 ms) | +99.0% (cold 0.71 ms, warm 0.69 ms) |
+| `ls` | 41 | +61.0% (cold 0.08 ms, warm 0.02 ms) | +61.0% (cold 0.02 ms, warm 0.02 ms) | +82.9% (cold 0.02 ms, warm 0.01 ms) |
+| `ls_huge` | 1,543 | -0.3% (cold 1.56 ms, warm 0.91 ms) | +33.5% (cold 1.37 ms, warm 1.00 ms) | +99.0% (cold 0.75 ms, warm 0.75 ms) |
 
 ## Notes
 

@@ -1,10 +1,10 @@
 # Compressor: git_log
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `git_log` | 64 | +32.8% (cold 0.11 ms, warm 0.02 ms) | +78.1% (cold 0.02 ms, warm 0.01 ms) | +75.0% (cold 0.02 ms, warm 0.01 ms) |
+| `git_log` | 64 | +32.8% (cold 0.08 ms, warm 0.02 ms) | +78.1% (cold 0.02 ms, warm 0.01 ms) | +75.0% (cold 0.02 ms, warm 0.01 ms) |
 
 ## Notes
 

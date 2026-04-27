@@ -1,6 +1,6 @@
 {
   "schema": "coverage",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "coverage",
@@ -12,7 +12,7 @@
           "level": "verbose",
           "compressed_tokens": 448,
           "reduction_pct": 39.3,
-          "cold_seconds": 0.001231,
+          "cold_seconds": 0.001272,
           "warm_seconds": 0.0003,
           "must_preserve_ok": true
         },
@@ -28,8 +28,8 @@
           "level": "ultra",
           "compressed_tokens": 31,
           "reduction_pct": 95.8,
-          "cold_seconds": 0.000167,
-          "warm_seconds": 0.000162,
+          "cold_seconds": 0.00017,
+          "warm_seconds": 0.000165,
           "must_preserve_ok": true
         }
       ]

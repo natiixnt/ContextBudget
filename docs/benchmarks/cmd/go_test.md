@@ -1,10 +1,10 @@
 # Compressor: go_test
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `go_test` | 42 | +69.0% (cold 0.04 ms, warm 0.01 ms) | +69.0% (cold 0.01 ms, warm 0.01 ms) | +69.0% (cold 0.01 ms, warm 0.01 ms) |
+| `go_test` | 42 | +69.0% (cold 0.05 ms, warm 0.01 ms) | +69.0% (cold 0.01 ms, warm 0.01 ms) | +69.0% (cold 0.01 ms, warm 0.01 ms) |
 
 ## Notes
 

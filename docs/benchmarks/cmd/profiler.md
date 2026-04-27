@@ -1,10 +1,10 @@
 # Compressor: profiler
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `profiler_typical` | 2,366 | +74.4% (cold 0.98 ms, warm 0.48 ms) | +89.2% (cold 0.42 ms, warm 0.42 ms) | +99.0% (cold 0.39 ms, warm 0.38 ms) |
+| `profiler_typical` | 2,366 | +74.4% (cold 0.97 ms, warm 0.48 ms) | +89.2% (cold 0.44 ms, warm 0.49 ms) | +99.0% (cold 0.40 ms, warm 0.40 ms) |
 
 ## Notes
 

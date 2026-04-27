@@ -1,10 +1,10 @@
 # Compressor: kubectl_get
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `kubectl_pods_typical` | 176 | +47.7% (cold 0.35 ms, warm 0.06 ms) | +47.7% (cold 0.06 ms, warm 0.06 ms) | +92.0% (cold 0.05 ms, warm 0.04 ms) |
+| `kubectl_pods_typical` | 176 | +47.7% (cold 0.37 ms, warm 0.06 ms) | +47.7% (cold 0.05 ms, warm 0.05 ms) | +92.0% (cold 0.05 ms, warm 0.04 ms) |
 
 ## Notes
 

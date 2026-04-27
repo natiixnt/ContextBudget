@@ -1,6 +1,6 @@
 {
   "schema": "docker",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "docker",
@@ -12,8 +12,8 @@
           "level": "verbose",
           "compressed_tokens": 78,
           "reduction_pct": 60.0,
-          "cold_seconds": 9.9e-05,
-          "warm_seconds": 4.6e-05,
+          "cold_seconds": 0.000112,
+          "warm_seconds": 4.7e-05,
           "must_preserve_ok": true
         },
         {
@@ -21,7 +21,7 @@
           "compressed_tokens": 78,
           "reduction_pct": 60.0,
           "cold_seconds": 4.6e-05,
-          "warm_seconds": 4.3e-05,
+          "warm_seconds": 4.4e-05,
           "must_preserve_ok": true
         },
         {
@@ -29,7 +29,7 @@
           "compressed_tokens": 21,
           "reduction_pct": 89.23,
           "cold_seconds": 4.2e-05,
-          "warm_seconds": 4.1e-05,
+          "warm_seconds": 4.2e-05,
           "must_preserve_ok": true
         }
       ]

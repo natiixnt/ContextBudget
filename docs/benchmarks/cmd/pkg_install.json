@@ -1,6 +1,6 @@
 {
   "schema": "pkg_install",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "pkg_install",
@@ -12,16 +12,16 @@
           "level": "verbose",
           "compressed_tokens": 27,
           "reduction_pct": 84.21,
-          "cold_seconds": 0.000119,
-          "warm_seconds": 3.2e-05,
+          "cold_seconds": 0.000124,
+          "warm_seconds": 3.1e-05,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
           "compressed_tokens": 27,
           "reduction_pct": 84.21,
-          "cold_seconds": 2.9e-05,
-          "warm_seconds": 2.7e-05,
+          "cold_seconds": 3.1e-05,
+          "warm_seconds": 2.8e-05,
           "must_preserve_ok": true
         },
         {

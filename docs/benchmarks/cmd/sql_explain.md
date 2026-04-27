@@ -1,10 +1,10 @@
 # Compressor: sql_explain
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `sql_explain_postgres` | 421 | +31.1% (cold 0.28 ms, warm 0.15 ms) | +70.3% (cold 0.14 ms, warm 0.13 ms) | +93.6% (cold 0.13 ms, warm 0.12 ms) |
+| `sql_explain_postgres` | 421 | +31.1% (cold 0.31 ms, warm 0.16 ms) | +70.3% (cold 0.15 ms, warm 0.14 ms) | +93.6% (cold 0.13 ms, warm 0.12 ms) |
 
 ## Notes
 

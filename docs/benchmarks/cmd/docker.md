@@ -1,10 +1,10 @@
 # Compressor: docker
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `docker_build_typical` | 195 | +60.0% (cold 0.10 ms, warm 0.05 ms) | +60.0% (cold 0.05 ms, warm 0.04 ms) | +89.2% (cold 0.04 ms, warm 0.04 ms) |
+| `docker_build_typical` | 195 | +60.0% (cold 0.11 ms, warm 0.05 ms) | +60.0% (cold 0.05 ms, warm 0.04 ms) | +89.2% (cold 0.04 ms, warm 0.04 ms) |
 
 ## Notes
 

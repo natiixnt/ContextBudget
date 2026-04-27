@@ -1,0 +1,38 @@
+{
+  "schema": "bundle_stats",
+  "generated_at": "2026-04-27 08:46 UTC",
+  "benchmarks": [
+    {
+      "schema": "bundle_stats",
+      "fixture": "bundle_stats_webpack",
+      "raw_bytes": 3176,
+      "raw_tokens": 794,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 346,
+          "reduction_pct": 56.42,
+          "cold_seconds": 0.000154,
+          "warm_seconds": 6.9e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 131,
+          "reduction_pct": 83.5,
+          "cold_seconds": 5.3e-05,
+          "warm_seconds": 5.2e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 18,
+          "reduction_pct": 97.73,
+          "cold_seconds": 4.6e-05,
+          "warm_seconds": 4.4e-05,
+          "must_preserve_ok": true
+        }
+      ]
+    }
+  ]
+}

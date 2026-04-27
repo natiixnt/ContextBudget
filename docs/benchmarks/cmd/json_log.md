@@ -1,10 +1,10 @@
 # Compressor: json_log
 
-_Generated 2026-04-27 08:11 UTC_
+_Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `json_log_typical` | 6,014 | +45.2% (cold 1.97 ms, warm 1.68 ms) | +91.2% (cold 1.62 ms, warm 1.60 ms) | +99.6% (cold 0.84 ms, warm 0.83 ms) |
+| `json_log_typical` | 6,014 | +45.2% (cold 2.09 ms, warm 1.76 ms) | +91.2% (cold 1.69 ms, warm 1.61 ms) | +99.6% (cold 0.84 ms, warm 0.85 ms) |
 
 ## Notes
 

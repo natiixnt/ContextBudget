@@ -1,6 +1,6 @@
 {
   "schema": "git_log",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "git_log",
@@ -12,16 +12,16 @@
           "level": "verbose",
           "compressed_tokens": 43,
           "reduction_pct": 32.81,
-          "cold_seconds": 0.000114,
-          "warm_seconds": 1.7e-05,
+          "cold_seconds": 8.1e-05,
+          "warm_seconds": 1.8e-05,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
           "compressed_tokens": 14,
           "reduction_pct": 78.12,
-          "cold_seconds": 1.6e-05,
-          "warm_seconds": 1.3e-05,
+          "cold_seconds": 1.7e-05,
+          "warm_seconds": 1.4e-05,
           "must_preserve_ok": true
         },
         {
@@ -30,7 +30,7 @@
           "reduction_pct": 75.0,
           "cold_seconds": 1.5e-05,
           "warm_seconds": 1.3e-05,
-          "must_preserve_ok": false
+          "must_preserve_ok": true
         }
       ]
     }

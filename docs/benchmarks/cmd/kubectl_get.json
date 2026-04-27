@@ -1,6 +1,6 @@
 {
   "schema": "kubectl_get",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "kubectl_get",
@@ -12,16 +12,16 @@
           "level": "verbose",
           "compressed_tokens": 92,
           "reduction_pct": 47.73,
-          "cold_seconds": 0.00035,
-          "warm_seconds": 6.2e-05,
+          "cold_seconds": 0.000366,
+          "warm_seconds": 5.9e-05,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
           "compressed_tokens": 92,
           "reduction_pct": 47.73,
-          "cold_seconds": 5.7e-05,
-          "warm_seconds": 5.6e-05,
+          "cold_seconds": 5.4e-05,
+          "warm_seconds": 5.4e-05,
           "must_preserve_ok": true
         },
         {

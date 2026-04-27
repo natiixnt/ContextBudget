@@ -1,6 +1,6 @@
 {
   "schema": "git_status",
-  "generated_at": "2026-04-27 08:11 UTC",
+  "generated_at": "2026-04-27 08:46 UTC",
   "benchmarks": [
     {
       "schema": "git_status",
@@ -12,7 +12,7 @@
           "level": "verbose",
           "compressed_tokens": 16,
           "reduction_pct": 0.0,
-          "cold_seconds": 7.6e-05,
+          "cold_seconds": 0.000128,
           "warm_seconds": 1.2e-05,
           "must_preserve_ok": true
         },
@@ -28,7 +28,7 @@
           "level": "ultra",
           "compressed_tokens": 16,
           "reduction_pct": 0.0,
-          "cold_seconds": 1.8e-05,
+          "cold_seconds": 1.9e-05,
           "warm_seconds": 1.2e-05,
           "must_preserve_ok": true
         }

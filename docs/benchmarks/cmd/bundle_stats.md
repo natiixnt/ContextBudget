@@ -1,11 +1,10 @@
-# Compressor: lint
+# Compressor: bundle_stats
 
 _Generated 2026-04-27 08:46 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `mypy_large` | 732 | +13.4% (cold 0.40 ms, warm 0.21 ms) | +70.6% (cold 0.26 ms, warm 0.24 ms) | +98.4% (cold 0.20 ms, warm 0.18 ms) |
-| `ruff_typical` | 1,192 | -1.3% (cold 0.39 ms, warm 0.30 ms) | +89.2% (cold 0.32 ms, warm 0.30 ms) | +99.0% (cold 0.25 ms, warm 0.24 ms) |
+| `bundle_stats_webpack` | 794 | +56.4% (cold 0.15 ms, warm 0.07 ms) | +83.5% (cold 0.05 ms, warm 0.05 ms) | +97.7% (cold 0.05 ms, warm 0.04 ms) |
 
 ## Notes
 
@@ -18,4 +17,4 @@ _Generated 2026-04-27 08:46 UTC_
 
 ## Raw data
 
-See [`lint.json`](./lint.json) for the full structured payload.
+See [`bundle_stats.json`](./bundle_stats.json) for the full structured payload.
