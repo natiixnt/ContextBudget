@@ -13,16 +13,15 @@ import re
 from redcon.cmd.types import CompressionLevel, TestFailure, TestRunResult
 
 
+from redcon.cmd.compressors._skeletons import (
+    PYTHON_TRACE_MASK as _CLUSTER_MASKS,
+    cluster_by_skeleton,
+    mask as _mask_text,
+)
+
+
 _CLUSTER_MIN_FAILURES = 10
 _CLUSTER_MIN_SIZE = 3
-_CLUSTER_MASKS: tuple[tuple[re.Pattern[str], str], ...] = (
-    (re.compile(r"\b0x[0-9a-fA-F]+\b"), "<hex>"),
-    (re.compile(r"\b[0-9a-f]{12,}\b"), "<id>"),
-    (re.compile(r"\b\d+\.\d+\b"), "<f>"),
-    (re.compile(r"\b\d{2,}\b"), "<n>"),
-    (re.compile(r"'[^']*'"), "'<s>'"),
-    (re.compile(r'"[^"]*"'), '"<s>"'),
-)
 
 
 def format_test_result(result: TestRunResult, level: CompressionLevel) -> str:
@@ -223,25 +222,18 @@ def _clip(text: str, limit: int) -> str:
 
 def _failure_skeleton(failure: TestFailure) -> str:
     """Mask values out of the first message line; equal masks share a cluster."""
-    msg = _first_meaningful_line(failure.message)
-    for pattern, replacement in _CLUSTER_MASKS:
-        msg = pattern.sub(replacement, msg)
-    return msg
+    return _mask_text(_first_meaningful_line(failure.message), _CLUSTER_MASKS)
 
 
 def cluster_failures_by_template(
     failures: tuple[TestFailure, ...],
 ) -> list[list[TestFailure]]:
     """Group failures by masked-message skeleton, preserving first-seen order."""
-    bucket: dict[str, list[TestFailure]] = {}
-    order: list[str] = []
-    for f in failures:
-        key = _failure_skeleton(f)
-        if key not in bucket:
-            bucket[key] = []
-            order.append(key)
-        bucket[key].append(f)
-    return [bucket[k] for k in order]
+    return cluster_by_skeleton(
+        list(failures),
+        key=lambda f: _first_meaningful_line(f.message),
+        rules=_CLUSTER_MASKS,
+    )
 
 
 def _maybe_format_compact_clustered(r: TestRunResult) -> str | None:
