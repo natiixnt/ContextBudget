@@ -143,7 +143,11 @@ def _symbol_refs(text: str, min_len: int = 6) -> collections.Counter:
 
 
 def run_session(
-    name: str, argvs: list[list[str]], cwd: Path
+    name: str,
+    argvs: list[list[str]],
+    cwd: Path,
+    *,
+    cross_call_layers: bool = False,
 ) -> list[CallRecord]:
     records: list[CallRecord] = []
     clear_default_cache()
@@ -153,6 +157,17 @@ def run_session(
         max_output_tokens=4_000,
         quality_floor=CompressionLevel.COMPACT,
     )
+    extra_kwargs: dict = {}
+    if cross_call_layers:
+        from redcon.cmd.aliasing import (
+            PathAliaser,
+            RefLedger,
+            SymbolAliaser,
+        )
+
+        extra_kwargs["aliaser"] = PathAliaser()
+        extra_kwargs["ref_ledger"] = RefLedger()
+        extra_kwargs["symbol_aliaser"] = SymbolAliaser()
     for turn, argv in enumerate(argvs, start=1):
         try:
             report: CompressionReport = compress_command(
@@ -161,6 +176,7 @@ def run_session(
                 hint=hint,
                 cache=cache,
                 use_default_cache=False,
+                **extra_kwargs,
             )
         except Exception as exc:  # pragma: no cover
             print(f"  [skip] {' '.join(argv)}: {type(exc).__name__}: {exc}")
@@ -347,10 +363,14 @@ def main() -> int:
     print(f"Running {len(SESSIONS)} simulated agent sessions in {cwd}")
     started = time.monotonic()
     per_session_records: dict[str, list[CallRecord]] = {}
+    per_session_records_layered: dict[str, list[CallRecord]] = {}
     for name, argvs in SESSIONS:
-        print(f"  [{name}] {len(argvs)} calls")
-        records = run_session(name, argvs, cwd)
-        per_session_records[name] = records
+        print(f"  [{name}] {len(argvs)} calls (baseline)")
+        per_session_records[name] = run_session(name, argvs, cwd)
+        print(f"  [{name}] {len(argvs)} calls (V41+V43+V49 enabled)")
+        per_session_records_layered[name] = run_session(
+            name, argvs, cwd, cross_call_layers=True
+        )
     elapsed = time.monotonic() - started
     print(f"Done in {elapsed:.1f}s")
 
@@ -359,6 +379,40 @@ def main() -> int:
         for name, records in per_session_records.items()
     }
     agg = aggregate(per_session_stats)
+
+    # Cross-call savings comparison: per-session sum of compressed_tokens
+    # baseline vs layered. Difference is what V41+V43+V49 actually buy
+    # on this corpus.
+    layered_savings: dict[str, dict] = {}
+    for name in per_session_records:
+        baseline_total = sum(
+            r.compressed_tokens for r in per_session_records[name]
+        )
+        layered_total = sum(
+            r.compressed_tokens for r in per_session_records_layered[name]
+        )
+        delta = baseline_total - layered_total
+        pct = (delta / baseline_total * 100) if baseline_total else 0.0
+        layered_savings[name] = {
+            "baseline_tokens": baseline_total,
+            "layered_tokens": layered_total,
+            "saved_tokens": delta,
+            "saved_pct": pct,
+        }
+    layered_total_baseline = sum(s["baseline_tokens"] for s in layered_savings.values())
+    layered_total_layered = sum(s["layered_tokens"] for s in layered_savings.values())
+    overall_pct = (
+        (layered_total_baseline - layered_total_layered)
+        / layered_total_baseline
+        * 100
+        if layered_total_baseline
+        else 0.0
+    )
+    print()
+    print(f"Cross-call layers (V41+V43+V49) saving:")
+    for name, s in layered_savings.items():
+        print(f"  [{name}] {s['baseline_tokens']:5d} -> {s['layered_tokens']:5d} ({s['saved_pct']:+.1f}%)")
+    print(f"  TOTAL: {layered_total_baseline} -> {layered_total_layered} ({overall_pct:+.1f}%)")
 
     payload = {
         "sessions": {
@@ -379,6 +433,14 @@ def main() -> int:
             for name, stats in per_session_stats.items()
         },
         "aggregate": agg,
+        "cross_call_savings": {
+            "per_session": layered_savings,
+            "totals": {
+                "baseline": layered_total_baseline,
+                "layered": layered_total_layered,
+                "saved_pct": overall_pct,
+            },
+        },
     }
 
     out_dir = _repo_root / "benchmarks"

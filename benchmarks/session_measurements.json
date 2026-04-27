@@ -29,14 +29,14 @@
             1
           ]
         ],
-        "shingle_overlap_rate": 0.3125,
-        "total_shingles": 16,
+        "shingle_overlap_rate": 0.35,
+        "total_shingles": 20,
         "repeated_paths": 1,
         "distinct_paths": 2,
-        "recurring_symbol_refs": 27,
-        "distinct_symbols": 42,
-        "total_raw_tokens": 565,
-        "total_compressed_tokens": 270
+        "recurring_symbol_refs": 40,
+        "distinct_symbols": 41,
+        "total_raw_tokens": 655,
+        "total_compressed_tokens": 331
       },
       "calls": [
         {
@@ -46,8 +46,8 @@
             "status"
           ],
           "schema": "git_status",
-          "raw_tokens": 64,
-          "compressed_tokens": 64,
+          "raw_tokens": 98,
+          "compressed_tokens": 97,
           "cache_hit": false
         },
         {
@@ -59,8 +59,8 @@
             "--oneline"
           ],
           "schema": "git_log",
-          "raw_tokens": 98,
-          "compressed_tokens": 101,
+          "raw_tokens": 87,
+          "compressed_tokens": 90,
           "cache_hit": false
         },
         {
@@ -108,8 +108,8 @@
             "--stat"
           ],
           "schema": "git_diff",
-          "raw_tokens": 0,
-          "compressed_tokens": 2,
+          "raw_tokens": 33,
+          "compressed_tokens": 8,
           "cache_hit": false
         },
         {
@@ -119,8 +119,8 @@
             "status"
           ],
           "schema": "git_status",
-          "raw_tokens": 64,
-          "compressed_tokens": 64,
+          "raw_tokens": 98,
+          "compressed_tokens": 97,
           "cache_hit": true
         }
       ]
@@ -154,14 +154,14 @@
             1
           ]
         ],
-        "shingle_overlap_rate": 0.2857142857142857,
-        "total_shingles": 21,
-        "repeated_paths": 1,
+        "shingle_overlap_rate": 0.44660194174757284,
+        "total_shingles": 103,
+        "repeated_paths": 3,
         "distinct_paths": 1,
-        "recurring_symbol_refs": 23,
-        "distinct_symbols": 54,
-        "total_raw_tokens": 461,
-        "total_compressed_tokens": 336
+        "recurring_symbol_refs": 109,
+        "distinct_symbols": 93,
+        "total_raw_tokens": 2762,
+        "total_compressed_tokens": 1218
       },
       "calls": [
         {
@@ -171,8 +171,8 @@
             "status"
           ],
           "schema": "git_status",
-          "raw_tokens": 64,
-          "compressed_tokens": 64,
+          "raw_tokens": 98,
+          "compressed_tokens": 97,
           "cache_hit": false
         },
         {
@@ -182,8 +182,8 @@
             "diff"
           ],
           "schema": "git_diff",
-          "raw_tokens": 0,
-          "compressed_tokens": 2,
+          "raw_tokens": 1104,
+          "compressed_tokens": 411,
           "cache_hit": false
         },
         {
@@ -195,8 +195,8 @@
             "--oneline"
           ],
           "schema": "git_log",
-          "raw_tokens": 190,
-          "compressed_tokens": 193,
+          "raw_tokens": 182,
+          "compressed_tokens": 185,
           "cache_hit": false
         },
         {
@@ -207,8 +207,8 @@
             "--stat"
           ],
           "schema": "git_diff",
-          "raw_tokens": 0,
-          "compressed_tokens": 2,
+          "raw_tokens": 33,
+          "compressed_tokens": 8,
           "cache_hit": false
         },
         {
@@ -229,8 +229,8 @@
             "diff"
           ],
           "schema": "git_diff",
-          "raw_tokens": 0,
-          "compressed_tokens": 2,
+          "raw_tokens": 1104,
+          "compressed_tokens": 411,
           "cache_hit": true
         },
         {
@@ -240,8 +240,8 @@
             "status"
           ],
           "schema": "git_status",
-          "raw_tokens": 64,
-          "compressed_tokens": 64,
+          "raw_tokens": 98,
+          "compressed_tokens": 97,
           "cache_hit": true
         }
       ]
@@ -275,14 +275,14 @@
             1
           ]
         ],
-        "shingle_overlap_rate": 0.12025316455696203,
-        "total_shingles": 158,
+        "shingle_overlap_rate": 0.1044776119402985,
+        "total_shingles": 201,
         "repeated_paths": 5,
-        "distinct_paths": 24,
-        "recurring_symbol_refs": 107,
-        "distinct_symbols": 68,
-        "total_raw_tokens": 2704,
-        "total_compressed_tokens": 1591
+        "distinct_paths": 25,
+        "recurring_symbol_refs": 115,
+        "distinct_symbols": 99,
+        "total_raw_tokens": 3918,
+        "total_compressed_tokens": 2054
       },
       "calls": [
         {
@@ -294,8 +294,8 @@
             "redcon/"
           ],
           "schema": "grep",
-          "raw_tokens": 327,
-          "compressed_tokens": 225,
+          "raw_tokens": 382,
+          "compressed_tokens": 252,
           "cache_hit": false
         },
         {
@@ -344,8 +344,8 @@
             "redcon/"
           ],
           "schema": "grep",
-          "raw_tokens": 327,
-          "compressed_tokens": 225,
+          "raw_tokens": 382,
+          "compressed_tokens": 252,
           "cache_hit": true
         },
         {
@@ -367,8 +367,8 @@
             "diff"
           ],
           "schema": "git_diff",
-          "raw_tokens": 0,
-          "compressed_tokens": 2,
+          "raw_tokens": 1104,
+          "compressed_tokens": 411,
           "cache_hit": false
         }
       ]
@@ -406,8 +406,8 @@
         "total_shingles": 237,
         "repeated_paths": 0,
         "distinct_paths": 18,
-        "recurring_symbol_refs": 83,
-        "distinct_symbols": 181,
+        "recurring_symbol_refs": 78,
+        "distinct_symbols": 185,
         "total_raw_tokens": 1844,
         "total_compressed_tokens": 1406
       },
@@ -495,14 +495,14 @@
             1
           ]
         ],
-        "shingle_overlap_rate": 0.4369369369369369,
-        "total_shingles": 222,
+        "shingle_overlap_rate": 0.4330357142857143,
+        "total_shingles": 224,
         "repeated_paths": 20,
         "distinct_paths": 21,
-        "recurring_symbol_refs": 96,
-        "distinct_symbols": 124,
-        "total_raw_tokens": 8725,
-        "total_compressed_tokens": 2739
+        "recurring_symbol_refs": 100,
+        "distinct_symbols": 128,
+        "total_raw_tokens": 8759,
+        "total_compressed_tokens": 2772
       },
       "calls": [
         {
@@ -587,8 +587,8 @@
             "status"
           ],
           "schema": "git_status",
-          "raw_tokens": 64,
-          "compressed_tokens": 64,
+          "raw_tokens": 98,
+          "compressed_tokens": 97,
           "cache_hit": false
         }
       ]
@@ -599,12 +599,51 @@
     "avg_total_calls": 6.4,
     "avg_cache_hit_rate": 0.19999999999999998,
     "avg_argv_repeat_rate": 0.19999999999999998,
-    "avg_shingle_overlap_rate": 0.23108087744163694,
-    "avg_repeated_paths_per_session": 5.4,
-    "avg_distinct_paths_per_session": 13.2,
-    "avg_recurring_symbol_refs": 67.2,
-    "avg_distinct_symbols": 93.8,
-    "total_raw_tokens": 14299,
-    "total_compressed_tokens": 6342
+    "avg_shingle_overlap_rate": 0.26682305359471714,
+    "avg_repeated_paths_per_session": 5.8,
+    "avg_distinct_paths_per_session": 13.4,
+    "avg_recurring_symbol_refs": 88.4,
+    "avg_distinct_symbols": 109.2,
+    "total_raw_tokens": 17938,
+    "total_compressed_tokens": 7781
+  },
+  "cross_call_savings": {
+    "per_session": {
+      "investigate-failing-tests": {
+        "baseline_tokens": 331,
+        "layered_tokens": 337,
+        "saved_tokens": -6,
+        "saved_pct": -1.812688821752266
+      },
+      "code-review": {
+        "baseline_tokens": 1218,
+        "layered_tokens": 1220,
+        "saved_tokens": -2,
+        "saved_pct": -0.16420361247947454
+      },
+      "search-and-edit": {
+        "baseline_tokens": 2054,
+        "layered_tokens": 1830,
+        "saved_tokens": 224,
+        "saved_pct": 10.905550146056475
+      },
+      "explore-codebase": {
+        "baseline_tokens": 1406,
+        "layered_tokens": 1396,
+        "saved_tokens": 10,
+        "saved_pct": 0.7112375533428165
+      },
+      "deep-debug": {
+        "baseline_tokens": 2772,
+        "layered_tokens": 2356,
+        "saved_tokens": 416,
+        "saved_pct": 15.007215007215008
+      }
+    },
+    "totals": {
+      "baseline": 7781,
+      "layered": 7139,
+      "saved_pct": 8.250867497750932
+    }
   }
 }
