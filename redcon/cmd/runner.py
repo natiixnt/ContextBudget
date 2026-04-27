@@ -70,6 +70,7 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
         "less",
         "more",
         "journalctl",
+        "coverage",
     }
 )
 

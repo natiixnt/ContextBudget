@@ -350,3 +350,24 @@ class JsonLogResult:
     outliers: tuple[str, ...]  # raw lines that failed to parse or fit the schema
     total_lines: int
     level_histogram: tuple[tuple[str, int], ...]  # sorted desc by count
+
+
+# --- Coverage report canonical types ---
+
+
+@dataclass(frozen=True, slots=True)
+class CoverageRow:
+    path: str
+    stmts: int
+    miss: int
+    cover_pct: float
+    missing: str | None  # `--show-missing` column when present
+
+
+@dataclass(frozen=True, slots=True)
+class CoverageResult:
+    rows: tuple[CoverageRow, ...]  # excludes the TOTAL row
+    total_stmts: int
+    total_miss: int
+    total_cover_pct: float
+    has_missing_column: bool

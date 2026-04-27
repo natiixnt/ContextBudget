@@ -23,6 +23,7 @@ from redcon.cmd.compressors.listing_compressor import (
     TreeCompressor,
 )
 from redcon.cmd.compressors.npm_test_compressor import NpmTestCompressor
+from redcon.cmd.compressors.coverage_compressor import CoverageCompressor
 from redcon.cmd.compressors.json_log_compressor import JsonLogCompressor
 from redcon.cmd.compressors.profiler_compressor import ProfilerCompressor
 from redcon.cmd.compressors.pytest_compressor import PytestCompressor
@@ -410,6 +411,54 @@ def _json_log_fixture() -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+def _coverage_fixture() -> bytes:
+    """Synthetic 50-file coverage report grid, deterministic seed."""
+    import random
+
+    rng = random.Random(0)
+    files = [
+        f"redcon/cmd/{name}.py"
+        for name in [
+            "pipeline",
+            "runner",
+            "types",
+            "aliasing",
+            "delta",
+            "budget",
+            "cache",
+            "quality",
+            "rewriter",
+            "history",
+        ]
+    ]
+    files += [
+        f"redcon/scorers/{name}.py"
+        for name in [
+            "relevance",
+            "import_graph",
+            "file_roles",
+            "history",
+            "call_graph",
+        ]
+    ]
+    files += [f"tests/test_{i}.py" for i in range(35)]
+
+    lines = ["Name                          Stmts   Miss  Cover", "-" * 50]
+    total_stmts = 0
+    total_miss = 0
+    for path in files:
+        stmts = rng.randint(20, 500)
+        miss = rng.randint(0, max(1, stmts // 3))
+        cover = 100.0 * (stmts - miss) / stmts
+        lines.append(f"{path:30s}    {stmts:5d}  {miss:5d}  {cover:5.1f}%")
+        total_stmts += stmts
+        total_miss += miss
+    lines.append("-" * 50)
+    cover = 100.0 * (total_stmts - total_miss) / total_stmts
+    lines.append(f"TOTAL                        {total_stmts:5d}  {total_miss:5d}  {cover:5.1f}%")
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
 # --- parametrized fixtures ---
 
 
@@ -575,6 +624,13 @@ CASES = [
         _json_log_fixture(),
         b"",
         ("cat", "/var/log/app.log"),
+    ),
+    (
+        "coverage_typical",
+        CoverageCompressor(),
+        _coverage_fixture(),
+        b"",
+        ("coverage", "report"),
     ),
 ]
 

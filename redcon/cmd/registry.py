@@ -219,6 +219,21 @@ def _is_profiler(argv: tuple[str, ...]) -> bool:
     return False
 
 
+def _is_coverage_report(argv: tuple[str, ...]) -> bool:
+    if not argv:
+        return False
+    if argv[0] == "coverage" and len(argv) >= 2 and argv[1] == "report":
+        return True
+    if (
+        argv[0] in {"python", "python3"}
+        and "-m" in argv
+        and "coverage" in argv
+        and "report" in argv
+    ):
+        return True
+    return False
+
+
 def _is_json_log(argv: tuple[str, ...]) -> bool:
     if not argv:
         return False
@@ -354,6 +369,12 @@ def _bootstrap_lazy() -> None:
         _is_json_log,
         "redcon.cmd.compressors.json_log_compressor",
         "JsonLogCompressor",
+    )
+    register_lazy(
+        "coverage",
+        _is_coverage_report,
+        "redcon.cmd.compressors.coverage_compressor",
+        "CoverageCompressor",
     )
 
 
