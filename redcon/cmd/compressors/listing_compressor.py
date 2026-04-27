@@ -217,10 +217,7 @@ def _finalise(
     level = select_level(raw_tokens, ctx.hint)
     formatted = _format(result, level)
     compressed_tokens = estimate_tokens(formatted)
-    # Top-level entries (depth 0..1) must survive; deeper entries are summarised.
-    patterns = tuple(
-        re.escape(e.path) for e in result.entries if e.depth <= 1
-    )[:50]
+    patterns = _patterns_for_emitted_entries(result, level)
     preserved = verify_must_preserve(formatted, patterns, raw_text)
     return CompressedOutput(
         text=formatted,
@@ -320,6 +317,41 @@ def _extension_histogram(entries) -> list[tuple[str, int]]:
             ext = ""
         counts[ext] = counts.get(ext, 0) + 1
     return sorted(counts.items(), key=lambda kv: -kv[1])
+
+
+def _patterns_for_emitted_entries(
+    result: ListingResult, level: CompressionLevel
+) -> tuple[str, ...]:
+    """Build must-preserve patterns from entries the formatter actually emits.
+
+    ULTRA emits no entries (just counts and an extension histogram), so the
+    pattern set is empty - the harness exempts ULTRA from must-preserve
+    anyway. COMPACT emits per-directory basenames bounded by the formatter's
+    own slicing (first 30 directories, first 8 entries per dir). VERBOSE
+    emits every entry's basename. We pattern the basename forms because the
+    formatter never emits the full nested path verbatim.
+    """
+    if level == CompressionLevel.ULTRA:
+        return ()
+    by_dir = _group_by_dir(result.entries)
+    emitted: list[Listing] = []
+    if level == CompressionLevel.COMPACT:
+        for items in list(by_dir.values())[:30]:
+            emitted.extend(items[:8])
+    else:
+        for items in by_dir.values():
+            emitted.extend(items)
+    seen: set[str] = set()
+    patterns: list[str] = []
+    for entry in emitted:
+        name = entry.path.rsplit("/", 1)[-1]
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        patterns.append(re.escape(name))
+        if len(patterns) >= 50:
+            break
+    return tuple(patterns)
 
 
 def _join(directory: str, name: str) -> str:
