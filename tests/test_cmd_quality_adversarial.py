@@ -467,7 +467,16 @@ def test_v85_genetic_hunt(name, factory, argv, capsys):
     REDCON_V85_ENFORCE=1 is set, because we are documenting attack surface
     on first integration, not gating CI.
     """
-    rng = random.Random(0x85_85 + hash(name) % 10_000)
+    # `hash(name)` is salted by PYTHONHASHSEED so the seed varies between
+    # Python invocations. Use a stable hash so REDCON_V85_ENFORCE=1 is a
+    # real CI gate, not a flaky one. The 0x85_85 base offset stays so
+    # seeds never collide with the smoke test's 0xC0FFEE.
+    import hashlib
+
+    rng = random.Random(
+        0x85_85
+        + int(hashlib.sha1(name.encode("utf-8")).hexdigest()[:8], 16) % 10_000
+    )
     compressor = factory()
     findings = genetic_hunt(
         compressor,
