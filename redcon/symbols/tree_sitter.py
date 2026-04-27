@@ -23,11 +23,23 @@ Architecture:
 from __future__ import annotations
 
 import logging
+import re
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
 logger = logging.getLogger(__name__)
+
+
+# Pre-compiled patterns for the dependency-extraction helpers below.
+# Hot when scanning a multi-language repo; the function-local
+# 'import re' + re.search/re.match form recompiles on every call.
+_DEP_QUOTED_RE = re.compile(r"""['\"]([^'\"]+)['\"]""")
+_DEP_GO_QUOTED_RE = re.compile(r'"([^"]+)"')
+_DEP_INCLUDE_RE = re.compile(r'#\s*include\s*[<"]([^>"]+)[>"]')
+_DEP_RUBY_REQUIRE_RE = re.compile(
+    r"\s*(?:require|require_relative|load)\s+['\"]([^'\"]+)['\"]"
+)
 
 
 @dataclass(frozen=True, slots=True)
@@ -541,9 +553,7 @@ def _extract_dotted(node, text: str) -> str | None:
 
 def _extract_string_module(text: str) -> str | None:
     """Pull the quoted module specifier out of an ES import statement."""
-    import re
-
-    m = re.search(r"""['\"]([^'\"]+)['\"]""", text)
+    m = _DEP_QUOTED_RE.search(text)
     if m:
         return m.group(1)
     return None
@@ -561,25 +571,19 @@ def _extract_rust_use(text: str) -> str | None:
 
 def _extract_go_string(text: str) -> str | None:
     """Go imports are quoted strings; multi-import blocks have one per line."""
-    import re
-
-    m = re.search(r'"([^"]+)"', text)
+    m = _DEP_GO_QUOTED_RE.search(text)
     return m.group(1) if m else None
 
 
 def _extract_include(text: str) -> str | None:
     """C/C++ ``#include "foo.h"`` or ``<foo.h>``."""
-    import re
-
-    m = re.search(r'#\s*include\s*[<"]([^>"]+)[>"]', text)
+    m = _DEP_INCLUDE_RE.search(text)
     return m.group(1) if m else None
 
 
 def _extract_ruby_require(text: str) -> str | None:
     """Match ``require 'foo'`` and ``require_relative 'bar'``."""
-    import re
-
-    m = re.match(r"\s*(?:require|require_relative|load)\s+['\"]([^'\"]+)['\"]", text)
+    m = _DEP_RUBY_REQUIRE_RE.match(text)
     return m.group(1) if m else None
 
 

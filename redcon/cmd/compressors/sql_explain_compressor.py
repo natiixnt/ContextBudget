@@ -66,6 +66,7 @@ _MYSQL_TREE_NODE = re.compile(
 
 _PLAN_TIME = re.compile(r"^\s*Planning Time:\s+(?P<ms>[\d.]+)\s+ms\s*$")
 _EXEC_TIME = re.compile(r"^\s*Execution Time:\s+(?P<ms>[\d.]+)\s+ms\s*$")
+_PG_COST_RANGE = re.compile(r"cost=[\d.]+\.\.[\d.]+")
 _DETAIL_PREFIXES = (
     "Sort Key:",
     "Sort Method:",
@@ -265,7 +266,7 @@ def _sniff_dialect(text: str) -> str:
     if "(cost=" in sample and "(actual time=" in sample and "rows=" in sample:
         # Either dialect; pick by cost-shape: PG uses A..B, MySQL is a single
         # number.
-        if re.search(r"cost=[\d.]+\.\.[\d.]+", sample):
+        if _PG_COST_RANGE.search(sample):
             return "postgres"
     return "mysql_tree"
 

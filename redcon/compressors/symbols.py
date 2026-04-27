@@ -23,6 +23,19 @@ TS_EXPORT_VALUE_RE = re.compile(r"^export\s+(const|let|var)\s+([A-Za-z_$][\w$]*)
 
 GO_FUNC_RE = re.compile(r"^func\s+(\([^)]*\)\s*)?([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 GO_TYPE_RE = re.compile(r"^type\s+([A-Za-z_][A-Za-z0-9_]*)\s+(struct|interface)\b")
+
+# Pre-compiled signature normalisers used in the per-method symbol
+# extraction hot path. Pulled to module scope per the V78 audit so we
+# do not pay a re._cache lookup on every signature.
+_SIG_OPEN_PAREN_WS = re.compile(r"\(\s+")
+_SIG_CLOSE_PAREN_WS = re.compile(r"\s+\)")
+_SIG_COMMA_WS = re.compile(r",\s+")
+
+
+def _normalise_signature_spacing(joined: str) -> str:
+    joined = _SIG_OPEN_PAREN_WS.sub("(", joined)
+    joined = _SIG_CLOSE_PAREN_WS.sub(")", joined)
+    return _SIG_COMMA_WS.sub(", ", joined)
 GO_VAR_CONST_RE = re.compile(r"^(var|const)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
 
 
@@ -677,9 +690,7 @@ def _condense_class_body(body_lines: list[str], max_lines: int, method_re: re.Pa
                     parts.append(sl)
                     j += 1
                 joined = " ".join(parts)
-                joined = re.sub(r"\(\s+", "(", joined)
-                joined = re.sub(r"\s+\)", ")", joined)
-                joined = re.sub(r",\s+", ", ", joined)
+                joined = _normalise_signature_spacing(joined)
                 sig = _strip_py_annotations(indent + joined)
                 i = j
             else:
@@ -787,9 +798,7 @@ def _collapse_multiline_py_signatures(body_lines: list[str]) -> list[str]:
                 indent = " " * (len(line) - len(line.lstrip()))
                 joined = " ".join(parts)
                 # Normalise internal spacing.
-                joined = re.sub(r"\(\s+", "(", joined)
-                joined = re.sub(r"\s+\)", ")", joined)
-                joined = re.sub(r",\s+", ", ", joined)
+                joined = _normalise_signature_spacing(joined)
                 result.append(_strip_py_annotations(indent + joined))
                 i = j
                 continue
