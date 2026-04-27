@@ -1,0 +1,610 @@
+{
+  "sessions": {
+    "investigate-failing-tests": {
+      "stats": {
+        "total_calls": 7,
+        "cache_hit_rate": 0.2857142857142857,
+        "distinct_argvs": 5,
+        "argv_repeat_rate": 0.2857142857142857,
+        "transitions_top": [
+          [
+            [
+              "git status",
+              "git log -5 --oneline"
+            ],
+            1
+          ],
+          [
+            [
+              "git log -5 --oneline",
+              "pytest tests/test_cmd_quality.py -x"
+            ],
+            1
+          ],
+          [
+            [
+              "pytest tests/test_cmd_quality.py -x",
+              "grep -rn test_quality_check tests/"
+            ],
+            1
+          ]
+        ],
+        "shingle_overlap_rate": 0.3125,
+        "total_shingles": 16,
+        "repeated_paths": 1,
+        "distinct_paths": 2,
+        "recurring_symbol_refs": 27,
+        "distinct_symbols": 42,
+        "total_raw_tokens": 565,
+        "total_compressed_tokens": 270
+      },
+      "calls": [
+        {
+          "turn": 1,
+          "argv": [
+            "git",
+            "status"
+          ],
+          "schema": "git_status",
+          "raw_tokens": 64,
+          "compressed_tokens": 64,
+          "cache_hit": false
+        },
+        {
+          "turn": 2,
+          "argv": [
+            "git",
+            "log",
+            "-5",
+            "--oneline"
+          ],
+          "schema": "git_log",
+          "raw_tokens": 98,
+          "compressed_tokens": 101,
+          "cache_hit": false
+        },
+        {
+          "turn": 3,
+          "argv": [
+            "pytest",
+            "tests/test_cmd_quality.py",
+            "-x"
+          ],
+          "schema": "pytest",
+          "raw_tokens": 143,
+          "compressed_tokens": 9,
+          "cache_hit": false
+        },
+        {
+          "turn": 4,
+          "argv": [
+            "grep",
+            "-rn",
+            "test_quality_check",
+            "tests/"
+          ],
+          "schema": "grep",
+          "raw_tokens": 53,
+          "compressed_tokens": 21,
+          "cache_hit": false
+        },
+        {
+          "turn": 5,
+          "argv": [
+            "pytest",
+            "tests/test_cmd_quality.py",
+            "-x"
+          ],
+          "schema": "pytest",
+          "raw_tokens": 143,
+          "compressed_tokens": 9,
+          "cache_hit": true
+        },
+        {
+          "turn": 6,
+          "argv": [
+            "git",
+            "diff",
+            "--stat"
+          ],
+          "schema": "git_diff",
+          "raw_tokens": 0,
+          "compressed_tokens": 2,
+          "cache_hit": false
+        },
+        {
+          "turn": 7,
+          "argv": [
+            "git",
+            "status"
+          ],
+          "schema": "git_status",
+          "raw_tokens": 64,
+          "compressed_tokens": 64,
+          "cache_hit": true
+        }
+      ]
+    },
+    "code-review": {
+      "stats": {
+        "total_calls": 7,
+        "cache_hit_rate": 0.2857142857142857,
+        "distinct_argvs": 5,
+        "argv_repeat_rate": 0.2857142857142857,
+        "transitions_top": [
+          [
+            [
+              "git status",
+              "git diff"
+            ],
+            1
+          ],
+          [
+            [
+              "git diff",
+              "git log -10 --oneline"
+            ],
+            1
+          ],
+          [
+            [
+              "git log -10 --oneline",
+              "git diff --stat"
+            ],
+            1
+          ]
+        ],
+        "shingle_overlap_rate": 0.2857142857142857,
+        "total_shingles": 21,
+        "repeated_paths": 1,
+        "distinct_paths": 1,
+        "recurring_symbol_refs": 23,
+        "distinct_symbols": 54,
+        "total_raw_tokens": 461,
+        "total_compressed_tokens": 336
+      },
+      "calls": [
+        {
+          "turn": 1,
+          "argv": [
+            "git",
+            "status"
+          ],
+          "schema": "git_status",
+          "raw_tokens": 64,
+          "compressed_tokens": 64,
+          "cache_hit": false
+        },
+        {
+          "turn": 2,
+          "argv": [
+            "git",
+            "diff"
+          ],
+          "schema": "git_diff",
+          "raw_tokens": 0,
+          "compressed_tokens": 2,
+          "cache_hit": false
+        },
+        {
+          "turn": 3,
+          "argv": [
+            "git",
+            "log",
+            "-10",
+            "--oneline"
+          ],
+          "schema": "git_log",
+          "raw_tokens": 190,
+          "compressed_tokens": 193,
+          "cache_hit": false
+        },
+        {
+          "turn": 4,
+          "argv": [
+            "git",
+            "diff",
+            "--stat"
+          ],
+          "schema": "git_diff",
+          "raw_tokens": 0,
+          "compressed_tokens": 2,
+          "cache_hit": false
+        },
+        {
+          "turn": 5,
+          "argv": [
+            "pytest",
+            "tests/test_cmd_pipeline.py"
+          ],
+          "schema": "pytest",
+          "raw_tokens": 143,
+          "compressed_tokens": 9,
+          "cache_hit": false
+        },
+        {
+          "turn": 6,
+          "argv": [
+            "git",
+            "diff"
+          ],
+          "schema": "git_diff",
+          "raw_tokens": 0,
+          "compressed_tokens": 2,
+          "cache_hit": true
+        },
+        {
+          "turn": 7,
+          "argv": [
+            "git",
+            "status"
+          ],
+          "schema": "git_status",
+          "raw_tokens": 64,
+          "compressed_tokens": 64,
+          "cache_hit": true
+        }
+      ]
+    },
+    "search-and-edit": {
+      "stats": {
+        "total_calls": 7,
+        "cache_hit_rate": 0.14285714285714285,
+        "distinct_argvs": 6,
+        "argv_repeat_rate": 0.14285714285714285,
+        "transitions_top": [
+          [
+            [
+              "grep -rn compress_command redcon/",
+              "grep -rn verify_must_preserve redcon/"
+            ],
+            1
+          ],
+          [
+            [
+              "grep -rn verify_must_preserve redcon/",
+              "ls redcon/cmd/compressors/"
+            ],
+            1
+          ],
+          [
+            [
+              "ls redcon/cmd/compressors/",
+              "find redcon/cmd -name *.py"
+            ],
+            1
+          ]
+        ],
+        "shingle_overlap_rate": 0.12025316455696203,
+        "total_shingles": 158,
+        "repeated_paths": 5,
+        "distinct_paths": 24,
+        "recurring_symbol_refs": 107,
+        "distinct_symbols": 68,
+        "total_raw_tokens": 2704,
+        "total_compressed_tokens": 1591
+      },
+      "calls": [
+        {
+          "turn": 1,
+          "argv": [
+            "grep",
+            "-rn",
+            "compress_command",
+            "redcon/"
+          ],
+          "schema": "grep",
+          "raw_tokens": 327,
+          "compressed_tokens": 225,
+          "cache_hit": false
+        },
+        {
+          "turn": 2,
+          "argv": [
+            "grep",
+            "-rn",
+            "verify_must_preserve",
+            "redcon/"
+          ],
+          "schema": "grep",
+          "raw_tokens": 1470,
+          "compressed_tokens": 844,
+          "cache_hit": false
+        },
+        {
+          "turn": 3,
+          "argv": [
+            "ls",
+            "redcon/cmd/compressors/"
+          ],
+          "schema": "ls",
+          "raw_tokens": 110,
+          "compressed_tokens": 115,
+          "cache_hit": false
+        },
+        {
+          "turn": 4,
+          "argv": [
+            "find",
+            "redcon/cmd",
+            "-name",
+            "*.py"
+          ],
+          "schema": "find",
+          "raw_tokens": 327,
+          "compressed_tokens": 171,
+          "cache_hit": false
+        },
+        {
+          "turn": 5,
+          "argv": [
+            "grep",
+            "-rn",
+            "compress_command",
+            "redcon/"
+          ],
+          "schema": "grep",
+          "raw_tokens": 327,
+          "compressed_tokens": 225,
+          "cache_hit": true
+        },
+        {
+          "turn": 6,
+          "argv": [
+            "pytest",
+            "tests/test_cmd_pipeline.py",
+            "-x"
+          ],
+          "schema": "pytest",
+          "raw_tokens": 143,
+          "compressed_tokens": 9,
+          "cache_hit": false
+        },
+        {
+          "turn": 7,
+          "argv": [
+            "git",
+            "diff"
+          ],
+          "schema": "git_diff",
+          "raw_tokens": 0,
+          "compressed_tokens": 2,
+          "cache_hit": false
+        }
+      ]
+    },
+    "explore-codebase": {
+      "stats": {
+        "total_calls": 4,
+        "cache_hit_rate": 0.0,
+        "distinct_argvs": 4,
+        "argv_repeat_rate": 0.0,
+        "transitions_top": [
+          [
+            [
+              "ls redcon/cmd/compressors/",
+              "find redcon -name *.py -type f"
+            ],
+            1
+          ],
+          [
+            [
+              "find redcon -name *.py -type f",
+              "grep -rn schema = redcon/cmd/compressors/"
+            ],
+            1
+          ],
+          [
+            [
+              "grep -rn schema = redcon/cmd/compressors/",
+              "git log -20 --oneline"
+            ],
+            1
+          ]
+        ],
+        "shingle_overlap_rate": 0.0,
+        "total_shingles": 237,
+        "repeated_paths": 0,
+        "distinct_paths": 18,
+        "recurring_symbol_refs": 83,
+        "distinct_symbols": 181,
+        "total_raw_tokens": 1844,
+        "total_compressed_tokens": 1406
+      },
+      "calls": [
+        {
+          "turn": 2,
+          "argv": [
+            "ls",
+            "redcon/cmd/compressors/"
+          ],
+          "schema": "ls",
+          "raw_tokens": 110,
+          "compressed_tokens": 115,
+          "cache_hit": false
+        },
+        {
+          "turn": 3,
+          "argv": [
+            "find",
+            "redcon",
+            "-name",
+            "*.py",
+            "-type",
+            "f"
+          ],
+          "schema": "find",
+          "raw_tokens": 1024,
+          "compressed_tokens": 584,
+          "cache_hit": false
+        },
+        {
+          "turn": 4,
+          "argv": [
+            "grep",
+            "-rn",
+            "schema =",
+            "redcon/cmd/compressors/"
+          ],
+          "schema": "grep",
+          "raw_tokens": 354,
+          "compressed_tokens": 348,
+          "cache_hit": false
+        },
+        {
+          "turn": 5,
+          "argv": [
+            "git",
+            "log",
+            "-20",
+            "--oneline"
+          ],
+          "schema": "git_log",
+          "raw_tokens": 356,
+          "compressed_tokens": 359,
+          "cache_hit": false
+        }
+      ]
+    },
+    "deep-debug": {
+      "stats": {
+        "total_calls": 7,
+        "cache_hit_rate": 0.2857142857142857,
+        "distinct_argvs": 5,
+        "argv_repeat_rate": 0.2857142857142857,
+        "transitions_top": [
+          [
+            [
+              "pytest tests/test_cmd_quality.py -x",
+              "grep -rn must_preserve redcon/cmd/compressors/"
+            ],
+            2
+          ],
+          [
+            [
+              "grep -rn must_preserve redcon/cmd/compressors/",
+              "git log -5 redcon/cmd/compressors/git_log.py"
+            ],
+            1
+          ],
+          [
+            [
+              "git log -5 redcon/cmd/compressors/git_log.py",
+              "git diff redcon/cmd/compressors/git_log.py"
+            ],
+            1
+          ]
+        ],
+        "shingle_overlap_rate": 0.4369369369369369,
+        "total_shingles": 222,
+        "repeated_paths": 20,
+        "distinct_paths": 21,
+        "recurring_symbol_refs": 96,
+        "distinct_symbols": 124,
+        "total_raw_tokens": 8725,
+        "total_compressed_tokens": 2739
+      },
+      "calls": [
+        {
+          "turn": 1,
+          "argv": [
+            "pytest",
+            "tests/test_cmd_quality.py",
+            "-x"
+          ],
+          "schema": "pytest",
+          "raw_tokens": 143,
+          "compressed_tokens": 9,
+          "cache_hit": false
+        },
+        {
+          "turn": 2,
+          "argv": [
+            "grep",
+            "-rn",
+            "must_preserve",
+            "redcon/cmd/compressors/"
+          ],
+          "schema": "grep",
+          "raw_tokens": 3080,
+          "compressed_tokens": 1107,
+          "cache_hit": false
+        },
+        {
+          "turn": 3,
+          "argv": [
+            "git",
+            "log",
+            "-5",
+            "redcon/cmd/compressors/git_log.py"
+          ],
+          "schema": "git_log",
+          "raw_tokens": 2215,
+          "compressed_tokens": 441,
+          "cache_hit": false
+        },
+        {
+          "turn": 4,
+          "argv": [
+            "git",
+            "diff",
+            "redcon/cmd/compressors/git_log.py"
+          ],
+          "schema": "git_diff",
+          "raw_tokens": 0,
+          "compressed_tokens": 2,
+          "cache_hit": false
+        },
+        {
+          "turn": 5,
+          "argv": [
+            "pytest",
+            "tests/test_cmd_quality.py",
+            "-x"
+          ],
+          "schema": "pytest",
+          "raw_tokens": 143,
+          "compressed_tokens": 9,
+          "cache_hit": true
+        },
+        {
+          "turn": 6,
+          "argv": [
+            "grep",
+            "-rn",
+            "must_preserve",
+            "redcon/cmd/compressors/"
+          ],
+          "schema": "grep",
+          "raw_tokens": 3080,
+          "compressed_tokens": 1107,
+          "cache_hit": true
+        },
+        {
+          "turn": 7,
+          "argv": [
+            "git",
+            "status"
+          ],
+          "schema": "git_status",
+          "raw_tokens": 64,
+          "compressed_tokens": 64,
+          "cache_hit": false
+        }
+      ]
+    }
+  },
+  "aggregate": {
+    "session_count": 5,
+    "avg_total_calls": 6.4,
+    "avg_cache_hit_rate": 0.19999999999999998,
+    "avg_argv_repeat_rate": 0.19999999999999998,
+    "avg_shingle_overlap_rate": 0.23108087744163694,
+    "avg_repeated_paths_per_session": 5.4,
+    "avg_distinct_paths_per_session": 13.2,
+    "avg_recurring_symbol_refs": 67.2,
+    "avg_distinct_symbols": 93.8,
+    "total_raw_tokens": 14299,
+    "total_compressed_tokens": 6342
+  }
+}
