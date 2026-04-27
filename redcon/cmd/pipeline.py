@@ -72,6 +72,7 @@ def compress_command(
     cache: MutableMapping[str, CompressionReport] | None = None,
     use_default_cache: bool = True,
     record_history: bool = False,
+    aliaser=None,
 ) -> CompressionReport:
     """
     Run a command, parse its output via the matching compressor, and return
@@ -150,6 +151,8 @@ def compress_command(
         compressed = _normalise_whitespace(compressed)
         compressed = _apply_subst_table(compressed)
         compressed = _stamp_invariant_cert(compressed, stdout, compressor)
+        if aliaser is not None:
+            compressed = _apply_aliaser(compressed, aliaser)
 
     report = CompressionReport(
         output=compressed,
@@ -260,6 +263,32 @@ def _neutralise_terminal(blob: bytes) -> bytes:
         else:
             out_lines.append(line)
     return b"\n".join(out_lines)
+
+
+def _apply_aliaser(output: CompressedOutput, aliaser) -> CompressedOutput:
+    """Apply session-scoped path aliasing post all other rewrites.
+
+    Re-tokenises after the rewrite so reported counts stay accurate.
+    Keeps cache-friendly: caller passes the aliaser, cache holds canonical
+    pre-alias text, so identical underlying output replays the same alias
+    decisions across hits.
+    """
+    new_text = aliaser.apply(output.text)
+    if new_text == output.text:
+        return output
+
+    from redcon.cmd._tokens_lite import estimate_tokens
+
+    return CompressedOutput(
+        text=new_text,
+        level=output.level,
+        schema=output.schema,
+        original_tokens=output.original_tokens,
+        compressed_tokens=estimate_tokens(new_text),
+        must_preserve_ok=output.must_preserve_ok,
+        truncated=output.truncated,
+        notes=output.notes,
+    )
 
 
 def _stamp_invariant_cert(
