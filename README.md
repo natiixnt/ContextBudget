@@ -116,17 +116,22 @@ Config gets written automatically to:
 
 Source files are only half the bloat. The other half is command output: `git diff`, `pytest`, `cargo test`, `grep`, `ls -R`. Redcon's `redcon_run` MCP tool (and `redcon run` CLI) wraps the call, parses the output, and returns a budget-aware compressed view that preserves every fact the agent actually needs.
 
-Headline reductions on representative inputs (warm parse times in milliseconds):
+Headline reductions on representative inputs:
 
-| Compressor | Fixture | Raw tokens | Compact | Ultra | Warm parse |
-|------------|---------|-----------:|---------|-------|------------|
-| `git diff` | 12 files, 240 hunks | 8,078 | **97.0%** | 99.5% | 0.84 ms |
-| `pytest` | 30 failures + 200 passes | 2,555 | **73.8%** | 99.2% | 0.43 ms |
-| `grep`/`rg` | 600 matches across 50 files | 7,015 | **76.9%** | 99.9% | 1.32 ms |
-| `find` | 500 paths | 3,398 | **81.3%** | 99.8% | 0.62 ms |
-| `ls -R` | 30 dirs x 15 files | 1,543 | **33.5%** | 99.0% | 0.81 ms |
+| Compressor | Fixture | Raw tokens | Compact | Ultra |
+|------------|---------|-----------:|---------|-------|
+| `git diff` | 12 files, 240 hunks | 8,078 | **97.0%** | 99.5% |
+| `pytest` | 30 failures + 200 passes | 2,555 | **73.8%** | 99.2% |
+| `grep`/`rg` | 600 matches across 50 files | 7,015 | **76.9%** | 99.9% |
+| `find` | 500 paths | 3,398 | **81.3%** | 99.8% |
+| `ls -R` | 30 dirs x 15 files | 1,543 | **33.5%** | 99.0% |
+| `kubectl events` | 200-row CrashLoopBackOff | ~5,000 | **91.5%** | 99.5% |
+| `py-spy collapsed` | 200 stacks | 2,385 | **90.0%** | 99.0% |
+| `json-line log` | 200 NDJSON records | 6,038 | **91.1%** | 98.0% |
+| `coverage report` | 50-file grid | 738 | **73.2%** | 95.0% |
+| `psql EXPLAIN ANALYZE` | 11-node Postgres plan | 435 | **71.3%** | 93.3% |
 
-Quality is enforced separately. Every compressor declares `must_preserve_patterns` (file paths in a diff, failing test names in pytest, branch name in `git status`); the M8 quality harness rejects any compressor whose compact output drops a fact present in the raw input. Run it as a CI step:
+Quality is enforced separately. Every compressor declares `must_preserve_patterns` (file paths in a diff, failing test names in pytest, branch name in `git status`, slowest node operator in EXPLAIN); the M8 quality harness rejects any compressor whose compact output drops a fact present in the raw input. Run it as a CI step:
 
 ```bash
 redcon cmd-quality   # exits non-zero if any compressor regressed
@@ -134,7 +139,17 @@ redcon cmd-bench     # markdown table; --json for CI baselines
 redcon run "git diff" --quality-floor compact --max-output-tokens 4000
 ```
 
-Eleven compressors ship today: `git_diff`, `git_status`, `git_log`, `pytest`, `cargo_test`, `npm_test` (vitest+jest), `go_test`, `grep`, `ls`, `tree`, `find`. Full per-schema benchmarks: [`docs/benchmarks/cmd/`](docs/benchmarks/cmd/).
+**Fifteen compressors** ship today: `git_diff`, `git_status`, `git_log`, `pytest`, `cargo_test`, `npm_test` (vitest+jest), `go_test`, `grep`, `ls`, `tree`, `find`, `lint` (ruff+mypy), `docker`, `pkg_install` (pip+npm+yarn), `kubectl_get`/`kubectl_events`, `profiler` (py-spy+perf), `json_log`, `coverage`, `sql_explain` (Postgres+MySQL TREE). Full per-schema benchmarks: [`docs/benchmarks/cmd/`](docs/benchmarks/cmd/).
+
+### Cross-call dimension
+
+Beyond per-call compression, three layers compose across an agent session:
+
+- **Session-scoped path aliases** (V41): repeated paths like `redcon/cmd/pipeline.py` collapse to `f001` on later mentions. Lazy first-use, never net-negative.
+- **Snapshot delta vs prior call** (V47): when the same argv runs twice, ship only the delta. Schema-aware renderers for `pytest` (set-diff over failure names), `git_diff` (file-set with per-file +/- counts), and `coverage` (per-file pp moves) win meaningfully over generic line-diff. Always picks `min(cost_delta, cost_abs)` so non-regressive by construction.
+- **Invariant cert** (V93): every COMPACT/VERBOSE output stamps `mp_sha=<16hex>` over the sorted multiset of `(pattern, capture)` extracted from raw. Auditors recompute the cert against the compressed text to detect spurious additions or capture thinning - upgrades the existing must-preserve boolean to set-equality.
+
+Together these turn the 15 stateless compressors into a session-aware pipeline that compounds to 30-50pp additional reduction on repeat-heavy workflows beyond per-call savings.
 
 ## VS Code Extension
 
