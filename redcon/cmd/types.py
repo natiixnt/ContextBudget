@@ -371,3 +371,32 @@ class CoverageResult:
     total_miss: int
     total_cover_pct: float
     has_missing_column: bool
+
+
+# --- SQL EXPLAIN canonical types (Postgres + MySQL TREE) ---
+
+
+@dataclass(frozen=True, slots=True)
+class ExplainNode:
+    op: str  # "Seq Scan", "Hash Join", "Index Scan", ...
+    relation: str | None
+    cost_total: float | None
+    rows_est: int | None
+    actual_ms: float | None  # cumulative end-of-node time
+    self_ms: float | None  # actual_ms minus children, derived
+    rows_actual: int | None
+    loops: int | None
+    detail: str | None  # "Index Cond: ..." attached predicate / filter
+    depth: int  # indentation depth, 0 == root
+
+
+@dataclass(frozen=True, slots=True)
+class ExplainResult:
+    dialect: str  # "postgres" | "mysql_tree"
+    nodes: tuple[ExplainNode, ...]  # in source order
+    plan_time_ms: float | None
+    exec_time_ms: float | None
+    root: ExplainNode | None
+    slowest: tuple[ExplainNode, ...]  # top 3 by self_ms desc
+    flag_counts: tuple[tuple[str, int], ...]  # ("seq_scan", 2), sorted desc
+    warnings: tuple[str, ...]

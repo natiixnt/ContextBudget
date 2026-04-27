@@ -71,6 +71,10 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
         "more",
         "journalctl",
         "coverage",
+        "psql",
+        "mysql",
+        "mysqlsh",
+        "mariadb",
     }
 )
 

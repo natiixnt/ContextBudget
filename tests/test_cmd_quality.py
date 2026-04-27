@@ -27,6 +27,7 @@ from redcon.cmd.compressors.coverage_compressor import CoverageCompressor
 from redcon.cmd.compressors.json_log_compressor import JsonLogCompressor
 from redcon.cmd.compressors.profiler_compressor import ProfilerCompressor
 from redcon.cmd.compressors.pytest_compressor import PytestCompressor
+from redcon.cmd.compressors.sql_explain_compressor import SqlExplainCompressor
 from redcon.cmd.quality import run_quality_check
 
 
@@ -411,6 +412,29 @@ def _json_log_fixture() -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+_SQL_EXPLAIN_PG_FIXTURE = b"""\
+                                                                       QUERY PLAN
+-----------------------------------------------------------------------------------------------------------------------------------------------
+ Limit  (cost=2456.78..2456.83 rows=20 width=224) (actual time=128.451..128.467 rows=20 loops=1)
+   ->  Sort  (cost=2456.78..2461.22 rows=1776 width=224) (actual time=128.449..128.460 rows=20 loops=1)
+         Sort Key: o.created_at DESC
+         Sort Method: top-N heapsort  Memory: 31kB
+         ->  Hash Join  (cost=412.35..2389.04 rows=1776 width=224) (actual time=12.004..127.812 rows=4523 loops=1)
+               Hash Cond: (o.customer_id = c.id)
+               ->  Hash Join  (cost=204.55..2078.50 rows=1776 width=180) (actual time=6.221..120.331 rows=4523 loops=1)
+                     Hash Cond: (oi.order_id = o.id)
+                     ->  Seq Scan on order_items  (cost=0.00..1721.40 rows=88240 width=44) (actual time=0.018..62.443 rows=88240 loops=1)
+                           Filter: (quantity > 0)
+                     ->  Hash  (cost=180.10..180.10 rows=1956 width=144) (actual time=5.998..6.001 rows=1956 loops=1)
+                           ->  Index Scan using orders_status_idx on orders  (cost=0.29..180.10 rows=1956 width=144) (actual time=0.061..5.234 rows=1956 loops=1)
+                                 Index Cond: (status = 'shipped')
+               ->  Hash  (cost=159.80..159.80 rows=3840 width=52) (actual time=5.572..5.574 rows=3840 loops=1)
+                     ->  Seq Scan on customers  (cost=0.00..159.80 rows=3840 width=52) (actual time=0.011..3.815 rows=3840 loops=1)
+ Planning Time: 0.412 ms
+ Execution Time: 128.512 ms
+"""
+
+
 def _coverage_fixture() -> bytes:
     """Synthetic 50-file coverage report grid, deterministic seed."""
     import random
@@ -631,6 +655,13 @@ CASES = [
         _coverage_fixture(),
         b"",
         ("coverage", "report"),
+    ),
+    (
+        "sql_explain_postgres",
+        SqlExplainCompressor(),
+        _SQL_EXPLAIN_PG_FIXTURE,
+        b"",
+        ("psql", "-c", "EXPLAIN ANALYZE SELECT 1"),
     ),
 ]
 

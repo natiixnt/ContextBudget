@@ -219,6 +219,18 @@ def _is_profiler(argv: tuple[str, ...]) -> bool:
     return False
 
 
+def _is_sql_explain(argv: tuple[str, ...]) -> bool:
+    if not argv:
+        return False
+    head = argv[0].rsplit("/", 1)[-1]
+    if head in {"psql", "mysql", "mysqlsh", "mariadb"}:
+        return True
+    for token in argv[1:]:
+        if token.upper().startswith("EXPLAIN"):
+            return True
+    return False
+
+
 def _is_coverage_report(argv: tuple[str, ...]) -> bool:
     if not argv:
         return False
@@ -375,6 +387,12 @@ def _bootstrap_lazy() -> None:
         _is_coverage_report,
         "redcon.cmd.compressors.coverage_compressor",
         "CoverageCompressor",
+    )
+    register_lazy(
+        "sql_explain",
+        _is_sql_explain,
+        "redcon.cmd.compressors.sql_explain_compressor",
+        "SqlExplainCompressor",
     )
 
 
