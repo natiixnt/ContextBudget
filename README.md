@@ -139,17 +139,19 @@ redcon cmd-bench     # markdown table; --json for CI baselines
 redcon run "git diff" --quality-floor compact --max-output-tokens 4000
 ```
 
-**Fifteen compressors** ship today: `git_diff`, `git_status`, `git_log`, `pytest`, `cargo_test`, `npm_test` (vitest+jest), `go_test`, `grep`, `ls`, `tree`, `find`, `lint` (ruff+mypy), `docker`, `pkg_install` (pip+npm+yarn), `kubectl_get`/`kubectl_events`, `profiler` (py-spy+perf), `json_log`, `coverage`, `sql_explain` (Postgres+MySQL TREE). Full per-schema benchmarks: [`docs/benchmarks/cmd/`](docs/benchmarks/cmd/).
+**Sixteen compressors** ship today: `git_diff`, `git_status`, `git_log`, `pytest`, `cargo_test`, `npm_test` (vitest+jest), `go_test`, `grep`, `ls`, `tree`, `find`, `lint` (ruff+mypy), `docker`, `pkg_install` (pip+npm+yarn), `kubectl_get`/`kubectl_events`, `profiler` (py-spy+perf), `json_log`, `coverage`, `sql_explain` (Postgres+MySQL TREE), `bundle_stats` (webpack + esbuild metafiles). Full per-schema benchmarks: [`docs/benchmarks/cmd/`](docs/benchmarks/cmd/).
 
 ### Cross-call dimension
 
-Beyond per-call compression, three layers compose across an agent session:
+Beyond per-call compression, four layers compose across an agent session:
 
-- **Session-scoped path aliases** (V41): repeated paths like `redcon/cmd/pipeline.py` collapse to `f001` on later mentions. Lazy first-use, never net-negative.
+- **Path aliases** (V41): repeated paths like `redcon/cmd/pipeline.py` collapse to `f001` on later mentions. Lazy first-use, never net-negative.
+- **Content reference ledger** (V43): paragraph-shaped blocks above 6 cl100k tokens get session-stable `{ref:001}` aliases on second-and-later occurrences. Empirically 23% of session output had block-level overlap.
+- **Symbol aliases** (V49): CamelCase types / multi-word snake_case identifiers (>=8 chars) collapse to `c001` aliases the same way paths do. Empirically 72% of distinct symbols recur >=2 times per session.
 - **Snapshot delta vs prior call** (V47): when the same argv runs twice, ship only the delta. Schema-aware renderers for `pytest` (set-diff over failure names), `git_diff` (file-set with per-file +/- counts), and `coverage` (per-file pp moves) win meaningfully over generic line-diff. Always picks `min(cost_delta, cost_abs)` so non-regressive by construction.
 - **Invariant cert** (V93): every COMPACT/VERBOSE output stamps `mp_sha=<16hex>` over the sorted multiset of `(pattern, capture)` extracted from raw. Auditors recompute the cert against the compressed text to detect spurious additions or capture thinning - upgrades the existing must-preserve boolean to set-equality.
 
-Together these turn the 15 stateless compressors into a session-aware pipeline that compounds to 30-50pp additional reduction on repeat-heavy workflows beyond per-call savings.
+Empirical measurement on 5 simulated agent sessions (`benchmarks/measure_sessions.py`): the cross-call layers add **+8.3% session-level saving** on top of the per-call compressors, with **+15% on heavy-overlap sessions** (debugging, search-and-edit) and near-zero on distinct-content sessions. V85 adversarial GA fuzzer ratchets all 16 schemas as a hard CI gate (`REDCON_V85_ENFORCE=1`).
 
 ## VS Code Extension
 
@@ -222,7 +224,7 @@ Full reference: [docs/python-api.md](docs/python-api.md).
 
 - **Deterministic scoring**: keyword match, import graph, file role (test/docs/prod), git history
 - **Language-aware compression**: Python, TypeScript, JavaScript, Go, Rust, Java, and more
-- **Command output compression**: 11 compressors covering git, test runners, grep/rg, ls/tree/find with 70-99% reduction at compact level
+- **Command output compression**: 16 compressors covering git, test runners, grep/rg, listings, lint, docker, pkg-install, kubectl, profilers, JSON logs, coverage, SQL EXPLAIN, and bundle stats - 70-99% reduction at compact level
 - **Incremental scanning**: cached file metadata with git-aware change detection
 - **Multi-repo workspaces**: single task, multiple repos, shared config
 - **Budget policies**: enforce max tokens, quality risk levels, file counts in CI

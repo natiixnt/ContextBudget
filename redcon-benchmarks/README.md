@@ -157,41 +157,74 @@ the context window.
 
 ### Headline reductions on large real-world fixtures
 
-| Compressor | Fixture | Raw tokens | Compact | Ultra | Warm parse |
-|------------|---------|-----------:|---------|-------|------------|
-| `git_diff` | 12 files, 240 hunks | 8,078 | **97.0%** | 99.5% | 0.84 ms |
-| `pytest`   | 30 failures + 200 passes | 2,555 | **73.8%** | 99.2% | 0.43 ms |
-| `grep`     | 600 matches across 50 files | 7,015 | **76.9%** | 99.9% | 1.32 ms |
-| `find`     | 500 paths | 3,398 | **81.3%** | 99.8% | 0.62 ms |
-| `ls`       | 30 dirs x 15 files | 1,543 | **33.5%** | 99.0% | 0.81 ms |
+| Compressor | Fixture | Raw tokens | Compact | Ultra |
+|------------|---------|-----------:|---------|-------|
+| `git_diff` | 12 files, 240 hunks | 8,078 | **97.0%** | 99.5% |
+| `pytest`   | 30 failures + 200 passes | 2,555 | **73.8%** | 99.2% |
+| `grep`     | 600 matches across 50 files | 7,015 | **76.9%** | 99.9% |
+| `find`     | 500 paths | 3,398 | **81.3%** | 99.8% |
+| `ls`       | 30 dirs x 15 files | 1,543 | **33.5%** | 99.0% |
+| `kubectl events` | 200-row CrashLoopBackOff | ~5,000 | **91.5%** | 99.5% |
+| `py-spy`   | 200 collapsed stacks | 2,385 | **90.0%** | 99.0% |
+| `json_log` | 200 NDJSON records | 6,038 | **91.1%** | 98.0% |
+| `coverage` | 50-file grid | 738 | **73.2%** | 95.0% |
+| `psql EXPLAIN` | 11-node Postgres plan | 435 | **71.3%** | 93.3% |
+| `webpack --json` | 50-module 2-asset stats | 2,959 | **83.6%** | 99.0% |
 
 **Quality is enforced separately**: every compressor declares
 `must_preserve_patterns` (e.g. file paths in a diff, failing test names in
-pytest). The M8 quality harness rejects any compressor whose compact-level
-output drops a fact that was present in the raw input.
+pytest, slowest-node operator in EXPLAIN). The M8 quality harness rejects
+any compressor whose compact-level output drops a fact present in raw input.
 
-### Reductions per schema (averaged over the corpus)
+### Sixteen compressors ship today
 
-| Schema | Fixtures | Avg compact reduction | Warm parse |
-|--------|----------|-----------------------|------------|
-| `git_diff` | 2 | +78.0% | 0.43 ms |
-| `git_log` | 1 | +78.1% | 0.01 ms |
-| `pytest` | 2 | +74.2% | 0.24 ms |
-| `cargo_test` | 1 | +66.7% | 0.02 ms |
-| `go_test` | 1 | +69.0% | 0.01 ms |
-| `npm_test` | 1 | +47.1% | 0.02 ms |
-| `ls` | 2 | +47.2% | 0.42 ms |
-| `find` | 2 | +19.8% | 0.32 ms |
-| `grep` | 2 | +17.4% | 0.66 ms |
-
-Schema averages include tiny fixtures (under 80 raw tokens) where the
-format header dominates the output - the M8 quality gate exempts those
-from its reduction floor for that reason. The headline table above
-isolates the realistic large fixtures so you can see where the
-compression actually buys you a context-window slot.
+`git_diff`, `git_status`, `git_log`, `pytest`, `cargo_test`, `npm_test`
+(vitest+jest), `go_test`, `grep`, `ls`, `tree`, `find`, `lint` (ruff+mypy),
+`docker`, `pkg_install` (pip+npm+yarn), `kubectl_get`/`kubectl_events`,
+`profiler` (py-spy+perf), `json_log`, `coverage`, `sql_explain` (Postgres
++ MySQL TREE), `bundle_stats` (webpack + esbuild metafiles).
 
 Per-schema detail: see [`docs/benchmarks/cmd/`](../docs/benchmarks/cmd/).
 JSON suitable for CI baselines is alongside each schema's markdown.
+
+### Cross-call session-level dimension
+
+Beyond per-call compression, four layers compose across an agent session:
+
+- **V41 path aliases** - repeated paths collapse to `f001` after first use
+- **V43 content reference ledger** - paragraph blocks above 6 tokens get
+  session-stable `{ref:001}` aliases on second-and-later occurrences
+- **V47 snapshot delta** - when the same argv runs twice, ship only the
+  delta (schema-aware renderers for pytest set-diff, git_diff file-set
+  diff, and coverage per-file pp moves)
+- **V49 symbol aliases** - CamelCase classes / multi-word snake_case
+  identifiers collapse to `c001` aliases the same way paths do
+- **V93 invariant cert** - `mp_sha=<16hex>` over the must-preserve fact
+  multiset, so auditors can detect spurious additions or capture thinning
+
+### Empirical session-level saving
+
+Measured on 5 simulated agent-shaped sessions over the Redcon repo
+itself (`benchmarks/measure_sessions.py`):
+
+| Session | Baseline | V41+V43+V49 | Saving |
+|---|---:|---:|---:|
+| investigate-failing-tests | 331 | 337 | -1.8% |
+| code-review | 1,218 | 1,220 | -0.2% |
+| search-and-edit | 2,054 | 1,830 | **+10.9%** |
+| explore-codebase | 1,406 | 1,396 | +0.7% |
+| deep-debug | 2,772 | 2,356 | **+15.0%** |
+| **TOTAL** | **7,781** | **7,139** | **+8.3%** |
+
+Heavy-overlap sessions (deep-debug, search-and-edit) win double-digit
+on top of the per-call compressors. Distinct-content sessions stay
+roughly flat - the per-call min-gate prevents regressions, but the
+first-occurrence legend annotations cannot rebate when an alias is
+never reused.
+
+V85 adversarial GA fuzzer ratchets all 16 schemas as a hard CI gate
+(`REDCON_V85_ENFORCE=1` exits non-zero on any new finding under the
+deterministic seed).
 
 ### Reproducing the cmd-compressor numbers
 
