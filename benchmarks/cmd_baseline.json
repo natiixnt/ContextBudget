@@ -9,23 +9,23 @@
         "level": "verbose",
         "compressed_tokens": 42,
         "reduction_pct": 31.15,
-        "cold_seconds": 0.000152,
-        "warm_seconds": 2.4e-05,
+        "cold_seconds": 0.000327,
+        "warm_seconds": 2.3e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 24,
         "reduction_pct": 60.66,
-        "cold_seconds": 2.5e-05,
-        "warm_seconds": 1.9e-05,
+        "cold_seconds": 2.6e-05,
+        "warm_seconds": 1.8e-05,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 10,
         "reduction_pct": 83.61,
-        "cold_seconds": 1.9e-05,
+        "cold_seconds": 2e-05,
         "warm_seconds": 1.7e-05,
         "must_preserve_ok": false
       }
@@ -41,24 +41,24 @@
         "level": "verbose",
         "compressed_tokens": 5525,
         "reduction_pct": 31.6,
-        "cold_seconds": 0.001073,
-        "warm_seconds": 0.00102,
+        "cold_seconds": 0.00106,
+        "warm_seconds": 0.000993,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 214,
         "reduction_pct": 97.35,
-        "cold_seconds": 0.000851,
-        "warm_seconds": 0.000842,
+        "cold_seconds": 0.000831,
+        "warm_seconds": 0.000825,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 43,
         "reduction_pct": 99.47,
-        "cold_seconds": 0.000839,
-        "warm_seconds": 0.000837,
+        "cold_seconds": 0.000816,
+        "warm_seconds": 0.000824,
         "must_preserve_ok": false
       }
     ]
@@ -71,25 +71,25 @@
     "levels": [
       {
         "level": "verbose",
-        "compressed_tokens": 20,
-        "reduction_pct": -25.0,
-        "cold_seconds": 7.7e-05,
+        "compressed_tokens": 16,
+        "reduction_pct": 0.0,
+        "cold_seconds": 8.1e-05,
         "warm_seconds": 1.2e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
-        "compressed_tokens": 20,
-        "reduction_pct": -25.0,
+        "compressed_tokens": 16,
+        "reduction_pct": 0.0,
         "cold_seconds": 1e-05,
         "warm_seconds": 9e-06,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
-        "compressed_tokens": 28,
-        "reduction_pct": -75.0,
-        "cold_seconds": 1.7e-05,
+        "compressed_tokens": 16,
+        "reduction_pct": 0.0,
+        "cold_seconds": 1.8e-05,
         "warm_seconds": 1.2e-05,
         "must_preserve_ok": true
       }
@@ -105,7 +105,7 @@
         "level": "verbose",
         "compressed_tokens": 43,
         "reduction_pct": 32.81,
-        "cold_seconds": 8e-05,
+        "cold_seconds": 0.000127,
         "warm_seconds": 1.7e-05,
         "must_preserve_ok": true
       },
@@ -113,15 +113,15 @@
         "level": "compact",
         "compressed_tokens": 14,
         "reduction_pct": 78.12,
-        "cold_seconds": 1.7e-05,
-        "warm_seconds": 1.4e-05,
+        "cold_seconds": 1.6e-05,
+        "warm_seconds": 1.3e-05,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 16,
         "reduction_pct": 75.0,
-        "cold_seconds": 1.6e-05,
+        "cold_seconds": 1.4e-05,
         "warm_seconds": 1.4e-05,
         "must_preserve_ok": false
       }
@@ -137,7 +137,7 @@
         "level": "verbose",
         "compressed_tokens": 70,
         "reduction_pct": 66.35,
-        "cold_seconds": 0.000133,
+        "cold_seconds": 0.000138,
         "warm_seconds": 4.4e-05,
         "must_preserve_ok": true
       },
@@ -145,16 +145,16 @@
         "level": "compact",
         "compressed_tokens": 52,
         "reduction_pct": 75.0,
-        "cold_seconds": 4.2e-05,
-        "warm_seconds": 3.8e-05,
+        "cold_seconds": 4.3e-05,
+        "warm_seconds": 3.7e-05,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 20,
         "reduction_pct": 90.38,
-        "cold_seconds": 3.8e-05,
-        "warm_seconds": 3.6e-05,
+        "cold_seconds": 3.7e-05,
+        "warm_seconds": 3.5e-05,
         "must_preserve_ok": false
       }
     ]
@@ -169,24 +169,24 @@
         "level": "verbose",
         "compressed_tokens": 1088,
         "reduction_pct": 57.42,
-        "cold_seconds": 0.001014,
-        "warm_seconds": 0.000462,
+        "cold_seconds": 0.001029,
+        "warm_seconds": 0.000451,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
-        "compressed_tokens": 646,
-        "reduction_pct": 74.72,
-        "cold_seconds": 0.000436,
-        "warm_seconds": 0.000435,
+        "compressed_tokens": 415,
+        "reduction_pct": 83.76,
+        "cold_seconds": 0.000528,
+        "warm_seconds": 0.000514,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 20,
         "reduction_pct": 99.22,
-        "cold_seconds": 0.000318,
-        "warm_seconds": 0.000308,
+        "cold_seconds": 0.00032,
+        "warm_seconds": 0.000312,
         "must_preserve_ok": false
       }
     ]
@@ -201,23 +201,23 @@
         "level": "verbose",
         "compressed_tokens": 32,
         "reduction_pct": 61.9,
-        "cold_seconds": 7.8e-05,
-        "warm_seconds": 2.1e-05,
+        "cold_seconds": 6.4e-05,
+        "warm_seconds": 2e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 27,
         "reduction_pct": 67.86,
-        "cold_seconds": 1.8e-05,
-        "warm_seconds": 1.8e-05,
+        "cold_seconds": 1.9e-05,
+        "warm_seconds": 1.7e-05,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 18,
         "reduction_pct": 78.57,
-        "cold_seconds": 2e-05,
+        "cold_seconds": 1.6e-05,
         "warm_seconds": 1.5e-05,
         "must_preserve_ok": true
       }
@@ -233,8 +233,8 @@
         "level": "verbose",
         "compressed_tokens": 13,
         "reduction_pct": 69.05,
-        "cold_seconds": 4.6e-05,
-        "warm_seconds": 1.3e-05,
+        "cold_seconds": 4.1e-05,
+        "warm_seconds": 1.2e-05,
         "must_preserve_ok": true
       },
       {
@@ -265,15 +265,15 @@
         "level": "verbose",
         "compressed_tokens": 35,
         "reduction_pct": 48.53,
-        "cold_seconds": 8.1e-05,
-        "warm_seconds": 2.1e-05,
+        "cold_seconds": 7.4e-05,
+        "warm_seconds": 2e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 35,
         "reduction_pct": 48.53,
-        "cold_seconds": 1.9e-05,
+        "cold_seconds": 2e-05,
         "warm_seconds": 1.7e-05,
         "must_preserve_ok": true
       },
@@ -297,15 +297,15 @@
         "level": "verbose",
         "compressed_tokens": 24,
         "reduction_pct": -26.32,
-        "cold_seconds": 7.4e-05,
-        "warm_seconds": 1.4e-05,
+        "cold_seconds": 7e-05,
+        "warm_seconds": 1.3e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 24,
         "reduction_pct": -26.32,
-        "cold_seconds": 1.2e-05,
+        "cold_seconds": 1.1e-05,
         "warm_seconds": 1.1e-05,
         "must_preserve_ok": true
       },
@@ -313,8 +313,8 @@
         "level": "ultra",
         "compressed_tokens": 25,
         "reduction_pct": -31.58,
-        "cold_seconds": 1.6e-05,
-        "warm_seconds": 1.2e-05,
+        "cold_seconds": 1.5e-05,
+        "warm_seconds": 1.3e-05,
         "must_preserve_ok": true
       }
     ]
@@ -329,16 +329,16 @@
         "level": "verbose",
         "compressed_tokens": 4188,
         "reduction_pct": 40.3,
-        "cold_seconds": 0.002453,
-        "warm_seconds": 0.001506,
+        "cold_seconds": 0.00248,
+        "warm_seconds": 0.001505,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 1423,
         "reduction_pct": 79.71,
-        "cold_seconds": 0.00132,
-        "warm_seconds": 0.001388,
+        "cold_seconds": 0.001322,
+        "warm_seconds": 0.001335,
         "must_preserve_ok": true
       },
       {
@@ -346,7 +346,7 @@
         "compressed_tokens": 8,
         "reduction_pct": 99.89,
         "cold_seconds": 0.000826,
-        "warm_seconds": 0.000811,
+        "warm_seconds": 0.000832,
         "must_preserve_ok": false
       }
     ]
@@ -361,7 +361,7 @@
         "level": "verbose",
         "compressed_tokens": 16,
         "reduction_pct": 60.98,
-        "cold_seconds": 0.000129,
+        "cold_seconds": 0.000136,
         "warm_seconds": 1.9e-05,
         "must_preserve_ok": true
       },
@@ -377,9 +377,9 @@
         "level": "ultra",
         "compressed_tokens": 7,
         "reduction_pct": 82.93,
-        "cold_seconds": 2.4e-05,
-        "warm_seconds": 1.5e-05,
-        "must_preserve_ok": false
+        "cold_seconds": 2.3e-05,
+        "warm_seconds": 1.4e-05,
+        "must_preserve_ok": true
       }
     ]
   },
@@ -393,24 +393,24 @@
         "level": "verbose",
         "compressed_tokens": 1548,
         "reduction_pct": -0.32,
-        "cold_seconds": 0.000745,
-        "warm_seconds": 0.000711,
+        "cold_seconds": 0.001614,
+        "warm_seconds": 0.000901,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 1026,
         "reduction_pct": 33.51,
-        "cold_seconds": 0.000805,
-        "warm_seconds": 0.000803,
+        "cold_seconds": 0.001318,
+        "warm_seconds": 0.001014,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 15,
         "reduction_pct": 99.03,
-        "cold_seconds": 0.000689,
-        "warm_seconds": 0.000683,
+        "cold_seconds": 0.00073,
+        "warm_seconds": 0.000716,
         "must_preserve_ok": true
       }
     ]
@@ -425,24 +425,24 @@
         "level": "verbose",
         "compressed_tokens": 13,
         "reduction_pct": -30.0,
-        "cold_seconds": 3.4e-05,
-        "warm_seconds": 1.4e-05,
+        "cold_seconds": 5.7e-05,
+        "warm_seconds": 1.6e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 13,
         "reduction_pct": -30.0,
-        "cold_seconds": 1.3e-05,
-        "warm_seconds": 1.2e-05,
+        "cold_seconds": 1.4e-05,
+        "warm_seconds": 1.4e-05,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 26,
         "reduction_pct": -160.0,
-        "cold_seconds": 2e-05,
-        "warm_seconds": 1.6e-05,
+        "cold_seconds": 2.9e-05,
+        "warm_seconds": 1.9e-05,
         "must_preserve_ok": true
       }
     ]
@@ -457,24 +457,24 @@
         "level": "verbose",
         "compressed_tokens": 17,
         "reduction_pct": -41.67,
-        "cold_seconds": 1.4e-05,
-        "warm_seconds": 9e-06,
+        "cold_seconds": 4.7e-05,
+        "warm_seconds": 1.2e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 17,
         "reduction_pct": -41.67,
-        "cold_seconds": 8e-06,
-        "warm_seconds": 8e-06,
+        "cold_seconds": 1.1e-05,
+        "warm_seconds": 1.1e-05,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 27,
         "reduction_pct": -125.0,
-        "cold_seconds": 1.2e-05,
-        "warm_seconds": 1.1e-05,
+        "cold_seconds": 1.9e-05,
+        "warm_seconds": 1.5e-05,
         "must_preserve_ok": true
       }
     ]
@@ -489,24 +489,24 @@
         "level": "verbose",
         "compressed_tokens": 1914,
         "reduction_pct": 43.67,
-        "cold_seconds": 0.000579,
-        "warm_seconds": 0.00056,
+        "cold_seconds": 0.001415,
+        "warm_seconds": 0.000737,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 636,
         "reduction_pct": 81.28,
-        "cold_seconds": 0.000632,
-        "warm_seconds": 0.00063,
+        "cold_seconds": 0.000821,
+        "warm_seconds": 0.000802,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 8,
         "reduction_pct": 99.76,
-        "cold_seconds": 0.000516,
-        "warm_seconds": 0.00051,
+        "cold_seconds": 0.000503,
+        "warm_seconds": 0.000504,
         "must_preserve_ok": true
       }
     ]
@@ -521,24 +521,24 @@
         "level": "verbose",
         "compressed_tokens": 634,
         "reduction_pct": 13.39,
-        "cold_seconds": 0.000838,
-        "warm_seconds": 0.000276,
+        "cold_seconds": 0.000837,
+        "warm_seconds": 0.000272,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 215,
         "reduction_pct": 70.63,
-        "cold_seconds": 0.000273,
-        "warm_seconds": 0.000262,
+        "cold_seconds": 0.000276,
+        "warm_seconds": 0.000258,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 12,
         "reduction_pct": 98.36,
-        "cold_seconds": 0.000187,
-        "warm_seconds": 0.000187,
+        "cold_seconds": 0.000191,
+        "warm_seconds": 0.000188,
         "must_preserve_ok": false
       }
     ]
@@ -553,24 +553,24 @@
         "level": "verbose",
         "compressed_tokens": 1208,
         "reduction_pct": -1.34,
-        "cold_seconds": 0.000931,
-        "warm_seconds": 0.000376,
+        "cold_seconds": 0.000929,
+        "warm_seconds": 0.000362,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 206,
         "reduction_pct": 82.72,
-        "cold_seconds": 0.00036,
-        "warm_seconds": 0.000339,
+        "cold_seconds": 0.000333,
+        "warm_seconds": 0.000333,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 12,
         "reduction_pct": 98.99,
-        "cold_seconds": 0.000263,
-        "warm_seconds": 0.000262,
+        "cold_seconds": 0.000257,
+        "warm_seconds": 0.000261,
         "must_preserve_ok": false
       }
     ]
@@ -585,7 +585,7 @@
         "level": "verbose",
         "compressed_tokens": 78,
         "reduction_pct": 60.0,
-        "cold_seconds": 9.9e-05,
+        "cold_seconds": 0.000108,
         "warm_seconds": 4.7e-05,
         "must_preserve_ok": true
       },
@@ -601,7 +601,7 @@
         "level": "ultra",
         "compressed_tokens": 21,
         "reduction_pct": 89.23,
-        "cold_seconds": 4.3e-05,
+        "cold_seconds": 4.2e-05,
         "warm_seconds": 4.2e-05,
         "must_preserve_ok": true
       }
@@ -617,15 +617,15 @@
         "level": "verbose",
         "compressed_tokens": 27,
         "reduction_pct": 84.21,
-        "cold_seconds": 0.000117,
-        "warm_seconds": 3.2e-05,
+        "cold_seconds": 0.000122,
+        "warm_seconds": 3.1e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 27,
         "reduction_pct": 84.21,
-        "cold_seconds": 2.9e-05,
+        "cold_seconds": 2.8e-05,
         "warm_seconds": 2.8e-05,
         "must_preserve_ok": true
       },
@@ -633,8 +633,8 @@
         "level": "ultra",
         "compressed_tokens": 5,
         "reduction_pct": 97.08,
-        "cold_seconds": 2.4e-05,
-        "warm_seconds": 2.3e-05,
+        "cold_seconds": 2.6e-05,
+        "warm_seconds": 2.4e-05,
         "must_preserve_ok": false
       }
     ]
@@ -649,25 +649,153 @@
         "level": "verbose",
         "compressed_tokens": 92,
         "reduction_pct": 47.73,
-        "cold_seconds": 0.000359,
-        "warm_seconds": 5.7e-05,
+        "cold_seconds": 0.00035,
+        "warm_seconds": 5.9e-05,
         "must_preserve_ok": true
       },
       {
         "level": "compact",
         "compressed_tokens": 92,
         "reduction_pct": 47.73,
-        "cold_seconds": 5.2e-05,
-        "warm_seconds": 5.2e-05,
+        "cold_seconds": 5.6e-05,
+        "warm_seconds": 5.3e-05,
         "must_preserve_ok": true
       },
       {
         "level": "ultra",
         "compressed_tokens": 14,
         "reduction_pct": 92.05,
-        "cold_seconds": 4.4e-05,
-        "warm_seconds": 4e-05,
+        "cold_seconds": 4.5e-05,
+        "warm_seconds": 4.4e-05,
         "must_preserve_ok": false
+      }
+    ]
+  },
+  {
+    "schema": "profiler",
+    "fixture": "profiler_typical",
+    "raw_bytes": 9463,
+    "raw_tokens": 2366,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 605,
+        "reduction_pct": 74.43,
+        "cold_seconds": 0.000974,
+        "warm_seconds": 0.000481,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 255,
+        "reduction_pct": 89.22,
+        "cold_seconds": 0.000431,
+        "warm_seconds": 0.000429,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 23,
+        "reduction_pct": 99.03,
+        "cold_seconds": 0.000405,
+        "warm_seconds": 0.000389,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "json_log",
+    "fixture": "json_log_typical",
+    "raw_bytes": 24053,
+    "raw_tokens": 6014,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 3298,
+        "reduction_pct": 45.16,
+        "cold_seconds": 0.001967,
+        "warm_seconds": 0.001688,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 532,
+        "reduction_pct": 91.15,
+        "cold_seconds": 0.001638,
+        "warm_seconds": 0.001604,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 24,
+        "reduction_pct": 99.6,
+        "cold_seconds": 0.000845,
+        "warm_seconds": 0.000839,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "coverage",
+    "fixture": "coverage_typical",
+    "raw_bytes": 2952,
+    "raw_tokens": 738,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 448,
+        "reduction_pct": 39.3,
+        "cold_seconds": 0.001255,
+        "warm_seconds": 0.0003,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 198,
+        "reduction_pct": 73.17,
+        "cold_seconds": 0.000217,
+        "warm_seconds": 0.000212,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 31,
+        "reduction_pct": 95.8,
+        "cold_seconds": 0.000168,
+        "warm_seconds": 0.000162,
+        "must_preserve_ok": true
+      }
+    ]
+  },
+  {
+    "schema": "sql_explain",
+    "fixture": "sql_explain_postgres",
+    "raw_bytes": 1682,
+    "raw_tokens": 421,
+    "levels": [
+      {
+        "level": "verbose",
+        "compressed_tokens": 290,
+        "reduction_pct": 31.12,
+        "cold_seconds": 0.000288,
+        "warm_seconds": 0.000154,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "compact",
+        "compressed_tokens": 125,
+        "reduction_pct": 70.31,
+        "cold_seconds": 0.000145,
+        "warm_seconds": 0.000134,
+        "must_preserve_ok": true
+      },
+      {
+        "level": "ultra",
+        "compressed_tokens": 27,
+        "reduction_pct": 93.59,
+        "cold_seconds": 0.000132,
+        "warm_seconds": 0.000124,
+        "must_preserve_ok": true
       }
     ]
   }

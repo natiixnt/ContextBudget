@@ -1,10 +1,10 @@
-# Compressor: git_status
+# Compressor: docker
 
 _Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `git_status` | 16 | +0.0% (cold 0.08 ms, warm 0.01 ms) | +0.0% (cold 0.01 ms, warm 0.01 ms) | +0.0% (cold 0.02 ms, warm 0.01 ms) |
+| `docker_build_typical` | 195 | +60.0% (cold 0.10 ms, warm 0.05 ms) | +60.0% (cold 0.05 ms, warm 0.04 ms) | +89.2% (cold 0.04 ms, warm 0.04 ms) |
 
 ## Notes
 
@@ -17,4 +17,4 @@ _Generated 2026-04-27 08:11 UTC_
 
 ## Raw data
 
-See [`git_status.json`](./git_status.json) for the full structured payload.
+See [`docker.json`](./docker.json) for the full structured payload.

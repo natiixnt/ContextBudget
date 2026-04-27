@@ -1,11 +1,11 @@
 # Compressor: pytest
 
-_Generated 2026-04-26 19:55 UTC_
+_Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `pytest_small` | 208 | +64.9% (cold 0.15 ms, warm 0.05 ms) | +74.5% (cold 0.05 ms, warm 0.04 ms) | +90.4% (cold 0.04 ms, warm 0.03 ms) |
-| `pytest_massive` | 2,555 | +55.3% (cold 1.04 ms, warm 0.46 ms) | +73.8% (cold 0.44 ms, warm 0.44 ms) | +99.2% (cold 0.31 ms, warm 0.33 ms) |
+| `pytest_small` | 208 | +66.3% (cold 0.13 ms, warm 0.04 ms) | +75.0% (cold 0.04 ms, warm 0.04 ms) | +90.4% (cold 0.04 ms, warm 0.03 ms) |
+| `pytest_massive` | 2,555 | +57.4% (cold 1.04 ms, warm 0.46 ms) | +83.8% (cold 0.53 ms, warm 0.51 ms) | +99.2% (cold 0.32 ms, warm 0.31 ms) |
 
 ## Notes
 

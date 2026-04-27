@@ -1,0 +1,38 @@
+{
+  "schema": "coverage",
+  "generated_at": "2026-04-27 08:11 UTC",
+  "benchmarks": [
+    {
+      "schema": "coverage",
+      "fixture": "coverage_typical",
+      "raw_bytes": 2952,
+      "raw_tokens": 738,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 448,
+          "reduction_pct": 39.3,
+          "cold_seconds": 0.001231,
+          "warm_seconds": 0.0003,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 198,
+          "reduction_pct": 73.17,
+          "cold_seconds": 0.000218,
+          "warm_seconds": 0.000213,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 31,
+          "reduction_pct": 95.8,
+          "cold_seconds": 0.000167,
+          "warm_seconds": 0.000162,
+          "must_preserve_ok": true
+        }
+      ]
+    }
+  ]
+}

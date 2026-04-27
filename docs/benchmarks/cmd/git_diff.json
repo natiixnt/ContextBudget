@@ -1,6 +1,6 @@
 {
   "schema": "git_diff",
-  "generated_at": "2026-04-26 19:55 UTC",
+  "generated_at": "2026-04-27 08:11 UTC",
   "benchmarks": [
     {
       "schema": "git_diff",
@@ -10,26 +10,26 @@
       "levels": [
         {
           "level": "verbose",
-          "compressed_tokens": 48,
-          "reduction_pct": 21.31,
-          "cold_seconds": 0.000179,
-          "warm_seconds": 2.6e-05,
+          "compressed_tokens": 42,
+          "reduction_pct": 31.15,
+          "cold_seconds": 0.000168,
+          "warm_seconds": 2.3e-05,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
-          "compressed_tokens": 25,
-          "reduction_pct": 59.02,
-          "cold_seconds": 2.6e-05,
-          "warm_seconds": 1.9e-05,
+          "compressed_tokens": 24,
+          "reduction_pct": 60.66,
+          "cold_seconds": 2.5e-05,
+          "warm_seconds": 1.8e-05,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
           "compressed_tokens": 10,
           "reduction_pct": 83.61,
-          "cold_seconds": 2.1e-05,
-          "warm_seconds": 1.7e-05,
+          "cold_seconds": 2e-05,
+          "warm_seconds": 1.6e-05,
           "must_preserve_ok": false
         }
       ]
@@ -42,26 +42,26 @@
       "levels": [
         {
           "level": "verbose",
-          "compressed_tokens": 6245,
-          "reduction_pct": 22.69,
-          "cold_seconds": 0.001101,
-          "warm_seconds": 0.001028,
+          "compressed_tokens": 5525,
+          "reduction_pct": 31.6,
+          "cold_seconds": 0.001058,
+          "warm_seconds": 0.000995,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
-          "compressed_tokens": 244,
-          "reduction_pct": 96.98,
-          "cold_seconds": 0.000929,
-          "warm_seconds": 0.00084,
+          "compressed_tokens": 214,
+          "reduction_pct": 97.35,
+          "cold_seconds": 0.000827,
+          "warm_seconds": 0.000822,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
           "compressed_tokens": 43,
           "reduction_pct": 99.47,
-          "cold_seconds": 0.000835,
-          "warm_seconds": 0.000827,
+          "cold_seconds": 0.000811,
+          "warm_seconds": 0.000815,
           "must_preserve_ok": false
         }
       ]

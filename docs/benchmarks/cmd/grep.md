@@ -1,11 +1,11 @@
 # Compressor: grep
 
-_Generated 2026-04-26 19:55 UTC_
+_Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `grep_small` | 19 | -42.1% (cold 0.07 ms, warm 0.01 ms) | -42.1% (cold 0.01 ms, warm 0.01 ms) | -47.4% (cold 0.02 ms, warm 0.01 ms) |
-| `grep_massive` | 7,015 | +33.9% (cold 2.52 ms, warm 1.55 ms) | +76.9% (cold 1.37 ms, warm 1.32 ms) | +99.9% (cold 0.79 ms, warm 0.79 ms) |
+| `grep_small` | 19 | -26.3% (cold 0.07 ms, warm 0.01 ms) | -26.3% (cold 0.01 ms, warm 0.01 ms) | -31.6% (cold 0.02 ms, warm 0.01 ms) |
+| `grep_massive` | 7,015 | +40.3% (cold 2.47 ms, warm 1.49 ms) | +79.7% (cold 1.33 ms, warm 1.29 ms) | +99.9% (cold 0.82 ms, warm 0.80 ms) |
 
 ## Notes
 

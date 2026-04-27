@@ -1,10 +1,10 @@
 # Compressor: cargo_test
 
-_Generated 2026-04-26 19:55 UTC_
+_Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `cargo_test` | 84 | +60.7% (cold 0.07 ms, warm 0.02 ms) | +66.7% (cold 0.02 ms, warm 0.02 ms) | +78.6% (cold 0.02 ms, warm 0.02 ms) |
+| `cargo_test` | 84 | +61.9% (cold 0.07 ms, warm 0.02 ms) | +67.9% (cold 0.02 ms, warm 0.02 ms) | +78.6% (cold 0.02 ms, warm 0.02 ms) |
 
 ## Notes
 

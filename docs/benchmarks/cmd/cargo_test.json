@@ -1,6 +1,6 @@
 {
   "schema": "cargo_test",
-  "generated_at": "2026-04-26 19:55 UTC",
+  "generated_at": "2026-04-27 08:11 UTC",
   "benchmarks": [
     {
       "schema": "cargo_test",
@@ -10,25 +10,25 @@
       "levels": [
         {
           "level": "verbose",
-          "compressed_tokens": 33,
-          "reduction_pct": 60.71,
-          "cold_seconds": 7.5e-05,
-          "warm_seconds": 2.2e-05,
+          "compressed_tokens": 32,
+          "reduction_pct": 61.9,
+          "cold_seconds": 7e-05,
+          "warm_seconds": 2e-05,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
-          "compressed_tokens": 28,
-          "reduction_pct": 66.67,
-          "cold_seconds": 2e-05,
-          "warm_seconds": 1.7e-05,
+          "compressed_tokens": 27,
+          "reduction_pct": 67.86,
+          "cold_seconds": 1.8e-05,
+          "warm_seconds": 1.6e-05,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
           "compressed_tokens": 18,
           "reduction_pct": 78.57,
-          "cold_seconds": 1.7e-05,
+          "cold_seconds": 1.6e-05,
           "warm_seconds": 1.5e-05,
           "must_preserve_ok": true
         }

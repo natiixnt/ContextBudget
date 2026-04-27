@@ -1,0 +1,38 @@
+{
+  "schema": "profiler",
+  "generated_at": "2026-04-27 08:11 UTC",
+  "benchmarks": [
+    {
+      "schema": "profiler",
+      "fixture": "profiler_typical",
+      "raw_bytes": 9463,
+      "raw_tokens": 2366,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 605,
+          "reduction_pct": 74.43,
+          "cold_seconds": 0.00098,
+          "warm_seconds": 0.000481,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 255,
+          "reduction_pct": 89.22,
+          "cold_seconds": 0.000421,
+          "warm_seconds": 0.00042,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 23,
+          "reduction_pct": 99.03,
+          "cold_seconds": 0.000386,
+          "warm_seconds": 0.000383,
+          "must_preserve_ok": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,10 +1,10 @@
-# Compressor: git_status
+# Compressor: pkg_install
 
 _Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `git_status` | 16 | +0.0% (cold 0.08 ms, warm 0.01 ms) | +0.0% (cold 0.01 ms, warm 0.01 ms) | +0.0% (cold 0.02 ms, warm 0.01 ms) |
+| `pip_install_typical` | 171 | +84.2% (cold 0.12 ms, warm 0.03 ms) | +84.2% (cold 0.03 ms, warm 0.03 ms) | +97.1% (cold 0.02 ms, warm 0.02 ms) |
 
 ## Notes
 
@@ -17,4 +17,4 @@ _Generated 2026-04-27 08:11 UTC_
 
 ## Raw data
 
-See [`git_status.json`](./git_status.json) for the full structured payload.
+See [`pkg_install.json`](./pkg_install.json) for the full structured payload.

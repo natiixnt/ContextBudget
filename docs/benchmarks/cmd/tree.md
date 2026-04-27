@@ -1,10 +1,10 @@
 # Compressor: tree
 
-_Generated 2026-04-26 19:55 UTC_
+_Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `tree` | 10 | -30.0% (cold 0.03 ms, warm 0.01 ms) | -30.0% (cold 0.01 ms, warm 0.01 ms) | -160.0% (cold 0.02 ms, warm 0.02 ms) |
+| `tree` | 10 | -30.0% (cold 0.05 ms, warm 0.02 ms) | -30.0% (cold 0.02 ms, warm 0.01 ms) | -160.0% (cold 0.02 ms, warm 0.02 ms) |
 
 ## Notes
 

@@ -1,0 +1,38 @@
+{
+  "schema": "sql_explain",
+  "generated_at": "2026-04-27 08:11 UTC",
+  "benchmarks": [
+    {
+      "schema": "sql_explain",
+      "fixture": "sql_explain_postgres",
+      "raw_bytes": 1682,
+      "raw_tokens": 421,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 290,
+          "reduction_pct": 31.12,
+          "cold_seconds": 0.000284,
+          "warm_seconds": 0.000153,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 125,
+          "reduction_pct": 70.31,
+          "cold_seconds": 0.000137,
+          "warm_seconds": 0.000133,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 27,
+          "reduction_pct": 93.59,
+          "cold_seconds": 0.000127,
+          "warm_seconds": 0.000123,
+          "must_preserve_ok": true
+        }
+      ]
+    }
+  ]
+}

@@ -1,6 +1,6 @@
 # Compressor: go_test
 
-_Generated 2026-04-26 19:55 UTC_
+_Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|

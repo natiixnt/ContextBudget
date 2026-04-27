@@ -1,0 +1,38 @@
+{
+  "schema": "json_log",
+  "generated_at": "2026-04-27 08:11 UTC",
+  "benchmarks": [
+    {
+      "schema": "json_log",
+      "fixture": "json_log_typical",
+      "raw_bytes": 24053,
+      "raw_tokens": 6014,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 3298,
+          "reduction_pct": 45.16,
+          "cold_seconds": 0.001974,
+          "warm_seconds": 0.001683,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 532,
+          "reduction_pct": 91.15,
+          "cold_seconds": 0.001616,
+          "warm_seconds": 0.001601,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 24,
+          "reduction_pct": 99.6,
+          "cold_seconds": 0.00084,
+          "warm_seconds": 0.000833,
+          "must_preserve_ok": true
+        }
+      ]
+    }
+  ]
+}

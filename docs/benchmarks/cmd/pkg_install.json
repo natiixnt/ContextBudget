@@ -1,0 +1,38 @@
+{
+  "schema": "pkg_install",
+  "generated_at": "2026-04-27 08:11 UTC",
+  "benchmarks": [
+    {
+      "schema": "pkg_install",
+      "fixture": "pip_install_typical",
+      "raw_bytes": 682,
+      "raw_tokens": 171,
+      "levels": [
+        {
+          "level": "verbose",
+          "compressed_tokens": 27,
+          "reduction_pct": 84.21,
+          "cold_seconds": 0.000119,
+          "warm_seconds": 3.2e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "compact",
+          "compressed_tokens": 27,
+          "reduction_pct": 84.21,
+          "cold_seconds": 2.9e-05,
+          "warm_seconds": 2.7e-05,
+          "must_preserve_ok": true
+        },
+        {
+          "level": "ultra",
+          "compressed_tokens": 5,
+          "reduction_pct": 97.08,
+          "cold_seconds": 2.4e-05,
+          "warm_seconds": 2.3e-05,
+          "must_preserve_ok": false
+        }
+      ]
+    }
+  ]
+}

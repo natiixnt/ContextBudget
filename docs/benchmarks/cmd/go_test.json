@@ -1,6 +1,6 @@
 {
   "schema": "go_test",
-  "generated_at": "2026-04-26 19:55 UTC",
+  "generated_at": "2026-04-27 08:11 UTC",
   "benchmarks": [
     {
       "schema": "go_test",
@@ -12,7 +12,7 @@
           "level": "verbose",
           "compressed_tokens": 13,
           "reduction_pct": 69.05,
-          "cold_seconds": 4.3e-05,
+          "cold_seconds": 4.1e-05,
           "warm_seconds": 1.2e-05,
           "must_preserve_ok": true
         },
@@ -20,7 +20,7 @@
           "level": "compact",
           "compressed_tokens": 13,
           "reduction_pct": 69.05,
-          "cold_seconds": 1.1e-05,
+          "cold_seconds": 1e-05,
           "warm_seconds": 1e-05,
           "must_preserve_ok": true
         },
@@ -29,7 +29,7 @@
           "compressed_tokens": 13,
           "reduction_pct": 69.05,
           "cold_seconds": 1e-05,
-          "warm_seconds": 1.3e-05,
+          "warm_seconds": 9e-06,
           "must_preserve_ok": true
         }
       ]

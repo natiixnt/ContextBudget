@@ -1,10 +1,10 @@
-# Compressor: git_status
+# Compressor: profiler
 
 _Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `git_status` | 16 | +0.0% (cold 0.08 ms, warm 0.01 ms) | +0.0% (cold 0.01 ms, warm 0.01 ms) | +0.0% (cold 0.02 ms, warm 0.01 ms) |
+| `profiler_typical` | 2,366 | +74.4% (cold 0.98 ms, warm 0.48 ms) | +89.2% (cold 0.42 ms, warm 0.42 ms) | +99.0% (cold 0.39 ms, warm 0.38 ms) |
 
 ## Notes
 
@@ -17,4 +17,4 @@ _Generated 2026-04-27 08:11 UTC_
 
 ## Raw data
 
-See [`git_status.json`](./git_status.json) for the full structured payload.
+See [`profiler.json`](./profiler.json) for the full structured payload.

@@ -1,6 +1,6 @@
 {
   "schema": "git_status",
-  "generated_at": "2026-04-26 19:55 UTC",
+  "generated_at": "2026-04-27 08:11 UTC",
   "benchmarks": [
     {
       "schema": "git_status",
@@ -10,25 +10,25 @@
       "levels": [
         {
           "level": "verbose",
-          "compressed_tokens": 20,
-          "reduction_pct": -25.0,
-          "cold_seconds": 0.000106,
+          "compressed_tokens": 16,
+          "reduction_pct": 0.0,
+          "cold_seconds": 7.6e-05,
           "warm_seconds": 1.2e-05,
           "must_preserve_ok": true
         },
         {
           "level": "compact",
-          "compressed_tokens": 20,
-          "reduction_pct": -25.0,
+          "compressed_tokens": 16,
+          "reduction_pct": 0.0,
           "cold_seconds": 1e-05,
-          "warm_seconds": 2.2e-05,
+          "warm_seconds": 9e-06,
           "must_preserve_ok": true
         },
         {
           "level": "ultra",
-          "compressed_tokens": 28,
-          "reduction_pct": -75.0,
-          "cold_seconds": 2.5e-05,
+          "compressed_tokens": 16,
+          "reduction_pct": 0.0,
+          "cold_seconds": 1.8e-05,
           "warm_seconds": 1.2e-05,
           "must_preserve_ok": true
         }

@@ -1,10 +1,10 @@
-# Compressor: git_status
+# Compressor: json_log
 
 _Generated 2026-04-27 08:11 UTC_
 
 | Fixture | Raw tokens | Verbose | Compact | Ultra |
 |---------|-----------:|---------|---------|-------|
-| `git_status` | 16 | +0.0% (cold 0.08 ms, warm 0.01 ms) | +0.0% (cold 0.01 ms, warm 0.01 ms) | +0.0% (cold 0.02 ms, warm 0.01 ms) |
+| `json_log_typical` | 6,014 | +45.2% (cold 1.97 ms, warm 1.68 ms) | +91.2% (cold 1.62 ms, warm 1.60 ms) | +99.6% (cold 0.84 ms, warm 0.83 ms) |
 
 ## Notes
 
@@ -17,4 +17,4 @@ _Generated 2026-04-27 08:11 UTC_
 
 ## Raw data
 
-See [`git_status.json`](./git_status.json) for the full structured payload.
+See [`json_log.json`](./json_log.json) for the full structured payload.
