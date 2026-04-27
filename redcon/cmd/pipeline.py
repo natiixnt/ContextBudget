@@ -73,6 +73,7 @@ def compress_command(
     use_default_cache: bool = True,
     record_history: bool = False,
     aliaser=None,
+    snapshot_delta: bool = False,
 ) -> CompressionReport:
     """
     Run a command, parse its output via the matching compressor, and return
@@ -150,6 +151,13 @@ def compress_command(
         compressed = compressor.compress(stdout, stderr, ctx)
         compressed = _normalise_whitespace(compressed)
         compressed = _apply_subst_table(compressed)
+        if snapshot_delta:
+            compressed = _maybe_swap_to_delta(
+                compressed,
+                argv=argv,
+                cwd=cwd_path,
+                raw_text=stdout.decode("utf-8", errors="replace"),
+            )
         compressed = _stamp_invariant_cert(compressed, stdout, compressor)
         if aliaser is not None:
             compressed = _apply_aliaser(compressed, aliaser)
@@ -263,6 +271,55 @@ def _neutralise_terminal(blob: bytes) -> bytes:
         else:
             out_lines.append(line)
     return b"\n".join(out_lines)
+
+
+def _maybe_swap_to_delta(
+    output: CompressedOutput,
+    *,
+    argv: tuple[str, ...],
+    cwd: Path,
+    raw_text: str,
+) -> CompressedOutput:
+    """Swap compressed text for a delta against the prior baseline if shorter.
+
+    Stores the new baseline (post-substitution canonical text) regardless,
+    so the next call has something to diff against. Always picks
+    min(cost_delta, cost_abs) -> non-regressive by construction.
+    """
+    from redcon.cmd import delta as _delta
+    from redcon.cmd._tokens_lite import estimate_tokens
+
+    prior = _delta.get_baseline(argv, cwd)
+    # Always refresh the baseline so the next call has a current snapshot.
+    _delta.store_baseline(
+        argv,
+        cwd,
+        raw_text=raw_text,
+        formatted_text=output.text,
+        schema=output.schema,
+    )
+    if prior is None or prior.schema != output.schema:
+        return output
+    if not _delta.jaccard_above_floor(prior.formatted_text, output.text):
+        return output
+    delta_text = _delta.render_line_delta(
+        output.schema,
+        baseline_formatted=prior.formatted_text,
+        current_formatted=output.text,
+    )
+    delta_tokens = estimate_tokens(delta_text)
+    if delta_tokens >= output.compressed_tokens:
+        return output
+    return CompressedOutput(
+        text=delta_text,
+        level=output.level,
+        schema=output.schema + "_delta",
+        original_tokens=output.original_tokens,
+        compressed_tokens=delta_tokens,
+        must_preserve_ok=output.must_preserve_ok,
+        truncated=output.truncated,
+        notes=output.notes,
+    )
 
 
 def _apply_aliaser(output: CompressedOutput, aliaser) -> CompressedOutput:
