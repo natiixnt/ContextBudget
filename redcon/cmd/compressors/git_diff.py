@@ -322,3 +322,66 @@ def _status_marker(status: str) -> str:
         "deleted": "D",
         "renamed": "R",
     }.get(status, "?")
+
+
+def render_git_diff_delta(baseline_raw: str, current_raw: str) -> str:
+    """File-set diff plus per-file +/- counts.
+
+    Wins over generic line-delta on git_diff because hunk bodies dominate
+    the byte count yet rarely change semantically across consecutive
+    invocations. The canonical fact set is (file path, status, +N, -M)
+    per file - everything else is detail. Returns "" (sentinel) when
+    neither side parses to a real DiffResult; dispatcher falls back to
+    line-delta.
+    """
+    prior = parse_diff(baseline_raw)
+    curr = parse_diff(current_raw)
+    if not prior.files and not curr.files:
+        return ""
+    prior_files = {f.path: f for f in prior.files}
+    curr_files = {f.path: f for f in curr.files}
+    added_paths = sorted(curr_files.keys() - prior_files.keys())
+    removed_paths = sorted(prior_files.keys() - curr_files.keys())
+    common = sorted(curr_files.keys() & prior_files.keys())
+    changed_in_common: list[str] = []
+    for path in common:
+        a = prior_files[path]
+        b = curr_files[path]
+        if a.insertions != b.insertions or a.deletions != b.deletions or a.status != b.status:
+            changed_in_common.append(
+                f"{_status_marker(b.status)} {path}: "
+                f"+{b.insertions} -{b.deletions} (was +{a.insertions} -{a.deletions})"
+            )
+    parts = [
+        f"delta vs prior git_diff: {len(curr.files)} files "
+        f"({len(curr.files) - len(prior.files):+d}), "
+        f"+{curr.total_insertions} -{curr.total_deletions} "
+        f"(was +{prior.total_insertions} -{prior.total_deletions})"
+    ]
+    if added_paths:
+        parts.append(f"+{len(added_paths)} new:")
+        for path in added_paths[:20]:
+            f = curr_files[path]
+            parts.append(
+                f"+ {_status_marker(f.status)} {path}: +{f.insertions} -{f.deletions}"
+            )
+        if len(added_paths) > 20:
+            parts.append(f"+ ... ({len(added_paths) - 20} more)")
+    if removed_paths:
+        parts.append(f"-{len(removed_paths)} gone: " + ", ".join(removed_paths[:10]))
+        if len(removed_paths) > 10:
+            parts.append(f"- ... ({len(removed_paths) - 10} more)")
+    if changed_in_common:
+        parts.append(f"~{len(changed_in_common)} updated:")
+        parts.extend(changed_in_common[:20])
+        if len(changed_in_common) > 20:
+            parts.append(f"~ ... ({len(changed_in_common) - 20} more)")
+    return "\n".join(parts)
+
+
+try:
+    from redcon.cmd.delta import register_schema_renderer as _register
+
+    _register("git_diff", render_git_diff_delta)
+except ImportError:
+    pass

@@ -305,3 +305,56 @@ def _parse_warnings(lines: list[str]) -> list[str]:
             if stripped:
                 out.append(stripped)
     return out
+
+
+def render_pytest_delta(baseline_raw: str, current_raw: str) -> str:
+    """Set-diff on failure names plus pass/fail counts.
+
+    Wins over generic line-delta on pytest because failure bodies are
+    multi-line and a single character flip ripples into noisy +/- lines.
+    Treating failure NAMES as the canonical fact set produces a stable
+    delta that scales linearly with the number of test flips, not the
+    body byte count. Returns "" (sentinel) if neither side parses to a
+    useful TestRunResult; the dispatcher then falls back to line-delta.
+    """
+    prior = parse_pytest(baseline_raw)
+    curr = parse_pytest(current_raw)
+    if (
+        prior.total == 0
+        and curr.total == 0
+        and not prior.failures
+        and not curr.failures
+    ):
+        return ""
+    prior_fails = {f.name for f in prior.failures}
+    curr_fails = {f.name for f in curr.failures}
+    added = sorted(curr_fails - prior_fails)
+    removed = sorted(prior_fails - curr_fails)
+    parts = [
+        f"delta vs prior pytest: {curr.passed} passed "
+        f"({curr.passed - prior.passed:+d}), "
+        f"{curr.failed} failed ({curr.failed - prior.failed:+d})"
+    ]
+    if added:
+        parts.append(
+            f"+{len(added)} new failures: " + ", ".join(added[:20])
+        )
+        if len(added) > 20:
+            parts.append(f"+ ... ({len(added) - 20} more)")
+    if removed:
+        parts.append(
+            f"-{len(removed)} resolved: " + ", ".join(removed[:20])
+        )
+        if len(removed) > 20:
+            parts.append(f"- ... ({len(removed) - 20} more)")
+    return "\n".join(parts)
+
+
+# Register at import so the delta dispatcher can find us when the test
+# module is loaded lazily.
+try:
+    from redcon.cmd.delta import register_schema_renderer as _register
+
+    _register("pytest", render_pytest_delta)
+except ImportError:
+    pass

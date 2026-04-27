@@ -302,10 +302,11 @@ def _maybe_swap_to_delta(
         return output
     if not _delta.jaccard_above_floor(prior.formatted_text, output.text):
         return output
-    delta_text = _delta.render_line_delta(
+    delta_text = _delta.render_delta_for_schema(
         output.schema,
-        baseline_formatted=prior.formatted_text,
+        baseline=prior,
         current_formatted=output.text,
+        current_raw=raw_text,
     )
     delta_tokens = estimate_tokens(delta_text)
     if delta_tokens >= output.compressed_tokens:

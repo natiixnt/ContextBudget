@@ -192,3 +192,146 @@ def test_reset_baselines_clears_state():
     # Without a baseline, framework cannot delta - returns absolute.
     assert swapped.schema == "git_status"
     assert swapped.text == follow.text
+
+
+# ---------- structured deltas (V47 schema-aware renderers) ----------
+
+
+def test_structured_pytest_delta_set_diff_on_failure_names():
+    """Structured renderer emits set-diff over failure names plus count delta."""
+    from redcon.cmd.compressors.pytest_compressor import render_pytest_delta
+
+    base_raw = (
+        "============================= test session starts =============================\n"
+        "collected 102 items\n\n"
+        "=================================== FAILURES ===================================\n"
+        "________________________________ test_old_failing __________________________________\n"
+        "tests/test_a.py:42: in test_old_failing\n"
+        "    assert x == y\n"
+        "E   AssertionError\n"
+        "=========================== short test summary info ============================\n"
+        "FAILED tests/test_a.py::test_old_failing - AssertionError\n"
+        "============= 101 passed, 1 failed in 5.42s =============\n"
+    )
+    follow_raw = (
+        "============================= test session starts =============================\n"
+        "collected 102 items\n\n"
+        "=================================== FAILURES ===================================\n"
+        "________________________________ test_old_failing __________________________________\n"
+        "tests/test_a.py:42: in test_old_failing\n"
+        "    assert x == y\n"
+        "E   AssertionError\n"
+        "________________________________ test_new_failing __________________________________\n"
+        "tests/test_b.py:51: in test_new_failing\n"
+        "    assert foo() == bar\n"
+        "E   AssertionError\n"
+        "=========================== short test summary info ============================\n"
+        "FAILED tests/test_a.py::test_old_failing - AssertionError\n"
+        "FAILED tests/test_b.py::test_new_failing - AssertionError\n"
+        "============= 100 passed, 2 failed in 5.39s =============\n"
+    )
+    delta = render_pytest_delta(base_raw, follow_raw)
+    assert "delta vs prior pytest" in delta
+    assert "test_new_failing" in delta
+    assert "100 passed" in delta
+    assert "2 failed" in delta
+
+
+def test_structured_git_diff_delta_file_set_with_counts():
+    """Structured renderer emits file-set diff plus per-file counts."""
+    from redcon.cmd.compressors.git_diff import render_git_diff_delta
+
+    base_raw = (
+        "diff --git a/foo.py b/foo.py\n"
+        "@@ -1,3 +1,4 @@\n"
+        " line\n"
+        "+added\n"
+        " line\n"
+        " line\n"
+        "diff --git a/bar.py b/bar.py\n"
+        "@@ -10,2 +10,2 @@\n"
+        "-old\n"
+        "+new\n"
+    )
+    follow_raw = base_raw + (
+        "diff --git a/baz.py b/baz.py\n"
+        "new file mode 100644\n"
+        "@@ -0,0 +1,3 @@\n"
+        "+line1\n"
+        "+line2\n"
+        "+line3\n"
+    )
+    delta = render_git_diff_delta(base_raw, follow_raw)
+    assert "delta vs prior git_diff" in delta
+    assert "baz.py" in delta
+    # Three files now, was two.
+    assert "3 files" in delta
+    assert "(+1)" in delta
+
+
+def test_structured_renderer_returns_empty_on_unparseable_input():
+    """Sentinel: parser extracts nothing -> renderer returns "" so the
+    dispatcher knows to fall back to line-delta."""
+    from redcon.cmd.compressors.pytest_compressor import render_pytest_delta
+    from redcon.cmd.compressors.git_diff import render_git_diff_delta
+
+    junk = "not a real pytest or diff output"
+    assert render_pytest_delta(junk, junk) == ""
+    assert render_git_diff_delta(junk, junk) == ""
+
+
+def test_dispatcher_uses_structured_then_falls_back():
+    """Dispatcher path: structured wins on real raw; fallback returns
+    line-delta when structured returns sentinel."""
+    from redcon.cmd.delta import (
+        DeltaBaseline,
+        render_delta_for_schema,
+    )
+
+    real_raw_a = (
+        "=================================== FAILURES ===================================\n"
+        "________________________________ test_x __________________________________\n"
+        "tests/test_a.py:1: in test_x\n"
+        "E   AssertionError\n"
+        "=========================== short test summary info ============================\n"
+        "FAILED tests/test_a.py::test_x - AssertionError\n"
+        "============= 50 passed, 1 failed in 1.0s =============\n"
+    )
+    real_raw_b = (
+        "=================================== FAILURES ===================================\n"
+        "________________________________ test_x __________________________________\n"
+        "tests/test_a.py:1: in test_x\n"
+        "E   AssertionError\n"
+        "________________________________ test_y __________________________________\n"
+        "tests/test_b.py:1: in test_y\n"
+        "E   AssertionError\n"
+        "=========================== short test summary info ============================\n"
+        "FAILED tests/test_a.py::test_x - AssertionError\n"
+        "FAILED tests/test_b.py::test_y - AssertionError\n"
+        "============= 49 passed, 2 failed in 1.0s =============\n"
+    )
+    structured = render_delta_for_schema(
+        "pytest",
+        baseline=DeltaBaseline(
+            raw_text=real_raw_a,
+            formatted_text="pytest: 50 passed",
+            schema="pytest",
+        ),
+        current_formatted="pytest: 49 passed",
+        current_raw=real_raw_b,
+    )
+    assert "test_y" in structured  # structured form fired
+
+    # Now feed unparseable raw - dispatcher must fall back to line-delta.
+    fallback = render_delta_for_schema(
+        "pytest",
+        baseline=DeltaBaseline(
+            raw_text="bogus",
+            formatted_text="line a\nline b\nline c",
+            schema="pytest",
+        ),
+        current_formatted="line a\nline b\nline d",
+        current_raw="bogus",
+    )
+    assert "delta vs prior pytest" in fallback
+    assert "+ line d" in fallback  # line-delta marker

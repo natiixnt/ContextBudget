@@ -21,10 +21,17 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from pathlib import Path
+from typing import Callable
 
 # Empirical Jaccard floor; below this the lines diverged enough that the
 # delta header overhead beats any byte saving and we should ship absolute.
 _MIN_JACCARD_FOR_DELTA = 0.30
+
+# Schema-specific delta renderers. Each takes (baseline_raw, current_raw)
+# and returns the structured delta text. Falling back to line-delta when
+# the schema is not registered is intentional - the min-gate guards
+# regressions either way.
+_SCHEMA_RENDERERS: dict[str, Callable[[str, str], str]] = {}
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,3 +124,58 @@ def jaccard(a: str, b: str) -> float:
 
 def jaccard_above_floor(a: str, b: str) -> bool:
     return jaccard(a, b) >= _MIN_JACCARD_FOR_DELTA
+
+
+def register_schema_renderer(
+    schema: str, renderer: Callable[[str, str], str]
+) -> None:
+    """Wire a schema-specific delta renderer. Idempotent."""
+    _SCHEMA_RENDERERS[schema] = renderer
+
+
+def render_delta_for_schema(
+    schema: str,
+    *,
+    baseline: DeltaBaseline,
+    current_formatted: str,
+    current_raw: str,
+) -> str:
+    """Pick a structured renderer for the schema or fall back to line-delta.
+
+    Lazily ensures known structured renderers are registered before
+    consulting the registry; otherwise the fallback is the generic
+    line-level diff.
+    """
+    _ensure_default_renderers()
+    fn = _SCHEMA_RENDERERS.get(schema)
+    if fn is not None:
+        try:
+            structured = fn(baseline.raw_text, current_raw)
+        except Exception:  # pragma: no cover - defensive
+            structured = ""
+        # Convention: a structured renderer returns "" when its parser
+        # could not extract anything useful (e.g. caller passed formatted
+        # text instead of raw, or the schema is malformed). Fall through
+        # to line-delta on that signal.
+        if structured:
+            return structured
+    return render_line_delta(
+        schema,
+        baseline_formatted=baseline.formatted_text,
+        current_formatted=current_formatted,
+    )
+
+
+_RENDERERS_LOADED = False
+
+
+def _ensure_default_renderers() -> None:
+    global _RENDERERS_LOADED
+    if _RENDERERS_LOADED:
+        return
+    _RENDERERS_LOADED = True
+    # Lazy import: each compressor module registers its own renderer
+    # at module import time. We trigger imports here so the registry
+    # is populated even if the compressor was loaded lazily before.
+    from redcon.cmd.compressors import git_diff as _gd  # noqa: F401
+    from redcon.cmd.compressors import pytest_compressor as _pc  # noqa: F401
