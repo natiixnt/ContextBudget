@@ -74,6 +74,7 @@ def compress_command(
     record_history: bool = False,
     aliaser=None,
     ref_ledger=None,
+    symbol_aliaser=None,
     snapshot_delta: bool = False,
 ) -> CompressionReport:
     """
@@ -162,6 +163,8 @@ def compress_command(
         compressed = _stamp_invariant_cert(compressed, stdout, compressor)
         if ref_ledger is not None:
             compressed = _apply_ref_ledger(compressed, ref_ledger)
+        if symbol_aliaser is not None:
+            compressed = _apply_symbol_aliaser(compressed, symbol_aliaser)
         if aliaser is not None:
             compressed = _apply_aliaser(compressed, aliaser)
 
@@ -320,6 +323,30 @@ def _maybe_swap_to_delta(
         schema=output.schema + "_delta",
         original_tokens=output.original_tokens,
         compressed_tokens=delta_tokens,
+        must_preserve_ok=output.must_preserve_ok,
+        truncated=output.truncated,
+        notes=output.notes,
+    )
+
+
+def _apply_symbol_aliaser(output: CompressedOutput, aliaser) -> CompressedOutput:
+    """V49: substitute repeated CamelCase / snake_case identifiers
+    with session-stable aliases. Same min-gate as the path aliaser
+    so a single-call session never inflates."""
+    new_text = aliaser.apply(output.text)
+    if new_text == output.text:
+        return output
+    from redcon.cmd._tokens_lite import estimate_tokens
+
+    new_tokens = estimate_tokens(new_text)
+    if new_tokens >= output.compressed_tokens:
+        return output
+    return CompressedOutput(
+        text=new_text,
+        level=output.level,
+        schema=output.schema,
+        original_tokens=output.original_tokens,
+        compressed_tokens=new_tokens,
         must_preserve_ok=output.must_preserve_ok,
         truncated=output.truncated,
         notes=output.notes,

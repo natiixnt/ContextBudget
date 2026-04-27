@@ -178,6 +178,110 @@ class RefLedger:
         self.by_fingerprint.clear()
 
 
+# --- V49 symbol aliaser ---
+
+
+# Identifier shape: CamelCase types/classes OR snake_case with at least
+# one underscore. Min length filter applied separately so we never
+# alias short keywords (`error`, `class`, ...). The negative lookbehind
+# `(?<!\w)` is needed because Python re's \b treats trailing
+# underscores as word chars; without it `_x_y` would split mid-word.
+_SYMBOL_RE = re.compile(
+    r"(?<!\w)(?:[A-Z][A-Za-z0-9_]+|[a-z][a-z0-9_]*_[a-z0-9_]+)(?!\w)"
+)
+_SYMBOL_MIN_LEN = 8
+_SYMBOL_FMT = "c{:03d}"
+_SYMBOL_LEGEND_SUFFIX = " (={alias})"
+
+# Words we never want to alias even if they pass the regex. These are
+# noun/verb compounds that read naturally and aliasing them only hurts
+# readability without saving real cl100k tokens.
+_SYMBOL_BLOCKLIST: frozenset[str] = frozenset(
+    {
+        "must_preserve",
+        "compressed_tokens",
+        "original_tokens",
+        "raw_tokens",
+        "compress_command",
+        "AssertionError",
+        "ValueError",
+        "TypeError",
+        "KeyError",
+        "FileNotFoundError",
+    }
+)
+
+
+@dataclass
+class SymbolAliaser:
+    """Session-scoped symbol -> alias map (V49).
+
+    Same lazy-first-use protocol as PathAliaser: first occurrence keeps
+    the symbol verbatim with a '(=c001)' annotation, later occurrences
+    collapse to the bare alias. Cap on the alias map keeps memory
+    bounded across long sessions.
+    """
+
+    next_index: int = 1
+    by_symbol: dict[str, str] = field(default_factory=dict)
+    max_aliases: int = 256
+
+    def apply(self, text: str) -> str:
+        if not text:
+            return text
+        seen_in_call: list[str] = []
+        seen_set: set[str] = set()
+        for match in _SYMBOL_RE.finditer(text):
+            name = match.group(0)
+            if (
+                len(name) < _SYMBOL_MIN_LEN
+                or name in _SYMBOL_BLOCKLIST
+                or name in seen_set
+            ):
+                continue
+            seen_set.add(name)
+            seen_in_call.append(name)
+
+        new_aliases: list[tuple[str, str]] = []
+        for name in seen_in_call:
+            if name not in self.by_symbol and len(self.by_symbol) < self.max_aliases:
+                alias = _SYMBOL_FMT.format(self.next_index)
+                self.next_index += 1
+                self.by_symbol[name] = alias
+                new_aliases.append((name, alias))
+
+        if not seen_in_call:
+            return text
+
+        # Walk all matches; first-use names get the legend suffix.
+        out_parts: list[str] = []
+        cursor = 0
+        first_use_done: set[str] = set()
+        new_set = {name for name, _ in new_aliases}
+        for match in _SYMBOL_RE.finditer(text):
+            name = match.group(0)
+            if (
+                len(name) < _SYMBOL_MIN_LEN
+                or name in _SYMBOL_BLOCKLIST
+                or name not in self.by_symbol
+            ):
+                continue
+            alias = self.by_symbol[name]
+            out_parts.append(text[cursor:match.start()])
+            if name in new_set and name not in first_use_done:
+                out_parts.append(name + _SYMBOL_LEGEND_SUFFIX.format(alias=alias))
+                first_use_done.add(name)
+            else:
+                out_parts.append(alias)
+            cursor = match.end()
+        out_parts.append(text[cursor:])
+        return "".join(out_parts)
+
+    def reset(self) -> None:
+        self.next_index = 1
+        self.by_symbol.clear()
+
+
 def _split_blocks(text: str) -> list[str]:
     """Split text into paragraph-shaped blocks, keeping the empty
     separators so reassembly is exact."""
