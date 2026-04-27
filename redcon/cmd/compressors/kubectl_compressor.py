@@ -17,6 +17,8 @@ from redcon.cmd.compressors.base import CompressorContext, verify_must_preserve
 from redcon.cmd.types import (
     CompressedOutput,
     CompressionLevel,
+    KubeEventGroup,
+    KubeEventsResult,
     KubeListResult,
     KubeResource,
 )
@@ -25,6 +27,18 @@ from redcon.cmd._tokens_lite import estimate_tokens
 
 _HEADER_RE = re.compile(r"^[A-Z][A-Z0-9 \-/()]+$")
 _NOISY_COLUMNS = frozenset({"AGE", "RESTARTS", "RESOURCE-VERSION", "TIMESTAMP"})
+_EVENT_HEADER_HINTS = frozenset({"REASON", "OBJECT", "MESSAGE"})
+
+# Mask volatile substrings in event messages so semantically-equal
+# events collapse into one group: container ids, pod hashes, ip addrs,
+# durations, byte counts.
+_MSG_MASK_RULES: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\b[0-9a-f]{12,64}\b"), "<id>"),
+    (re.compile(r"\b\d{1,3}(?:\.\d{1,3}){3}\b"), "<ip>"),
+    (re.compile(r"\b\d+m?s\b"), "<dur>"),
+    (re.compile(r"\b\d+\.\d+(?:KB|MB|GB|MiB|KiB|GiB)\b"), "<size>"),
+    (re.compile(r"\b\d{4,}\b"), "<n>"),
+)
 
 
 class KubectlGetCompressor:
@@ -46,6 +60,8 @@ class KubectlGetCompressor:
         ctx: CompressorContext,
     ) -> CompressedOutput:
         text = raw_stdout.decode("utf-8", errors="replace")
+        if _is_events_argv(ctx.argv) or _looks_like_events_header(text):
+            return _compress_events(text, ctx)
         kind = _kind_from_argv(ctx.argv)
         result = parse_kubectl_get(text, kind=kind)
         raw_tokens = estimate_tokens(text)
@@ -183,3 +199,161 @@ def _count_by_status(result: KubeListResult) -> list[tuple[str, int]]:
         key = r.status or "unknown"
         counts[key] = counts.get(key, 0) + 1
     return sorted(counts.items(), key=lambda kv: -kv[1])
+
+
+# --- events branch ---
+
+
+def _is_events_argv(argv: tuple[str, ...]) -> bool:
+    return (
+        len(argv) >= 3
+        and argv[0] == "kubectl"
+        and argv[1] in ("get", "describe")
+        and argv[2] in ("events", "ev", "event")
+    )
+
+
+def _looks_like_events_header(text: str) -> bool:
+    first_line = next((ln for ln in text.splitlines() if ln.strip()), "")
+    if not _HEADER_RE.match(first_line):
+        return False
+    cols = set(_column_names(first_line))
+    return _EVENT_HEADER_HINTS.issubset(cols)
+
+
+def _compress_events(text: str, ctx: CompressorContext) -> CompressedOutput:
+    result = parse_kubectl_events(text)
+    raw_tokens = estimate_tokens(text)
+    level = select_level(raw_tokens, ctx.hint)
+    formatted = _format_events(result, level)
+    compressed = estimate_tokens(formatted)
+    # Must-preserve: every Warning reason+object must survive in COMPACT/VERBOSE.
+    warnings = tuple(
+        re.escape(f"{g.reason} {g.object_kind}/{g.object_name}")
+        for g in result.groups
+        if g.event_type == "Warning"
+    )
+    preserved = verify_must_preserve(formatted, warnings, text)
+    return CompressedOutput(
+        text=formatted,
+        level=level,
+        schema="kubectl_events",
+        original_tokens=raw_tokens,
+        compressed_tokens=compressed,
+        must_preserve_ok=preserved,
+        truncated=False,
+        notes=ctx.notes,
+    )
+
+
+def parse_kubectl_events(text: str) -> KubeEventsResult:
+    lines = [ln.rstrip() for ln in text.splitlines() if ln.strip()]
+    if not lines:
+        return KubeEventsResult(groups=(), total_events=0, warning_count=0)
+
+    header_line = lines[0]
+    if not _HEADER_RE.match(header_line):
+        return KubeEventsResult(groups=(), total_events=0, warning_count=0)
+    columns = _column_names(header_line)
+    offsets = _column_offsets(header_line)
+
+    bucket: dict[
+        tuple[str, str, str, str, str | None],
+        tuple[int, str, str | None],
+    ] = {}
+    total = 0
+    warnings = 0
+
+    for raw in lines[1:]:
+        cells = _split_by_offsets(raw, offsets)
+        if len(cells) != len(columns) or not cells:
+            continue
+        record = dict(zip(columns, cells))
+        ev_type = record.get("TYPE", "") or "Normal"
+        reason = record.get("REASON", "") or ""
+        object_field = record.get("OBJECT", "") or ""
+        message = record.get("MESSAGE", "") or ""
+        namespace = record.get("NAMESPACE")
+        last_seen = record.get("LAST SEEN") or record.get("LAST-SEEN") or record.get("AGE")
+
+        object_kind, _, object_name = object_field.partition("/")
+        if not object_name:
+            object_name = object_kind
+            object_kind = "object"
+        try:
+            count = int(record.get("COUNT", "1") or "1")
+        except ValueError:
+            count = 1
+        total += count
+        if ev_type == "Warning":
+            warnings += count
+
+        masked = _mask_message(message)
+        key = (ev_type, reason, object_kind, object_name, namespace if namespace else None)
+        existing = bucket.get(key)
+        if existing is None:
+            bucket[key] = (count, masked, last_seen if last_seen else None)
+        else:
+            prev_count, prev_msg, prev_last = existing
+            new_last = last_seen if last_seen else prev_last
+            bucket[key] = (prev_count + count, prev_msg, new_last)
+
+    groups = tuple(
+        KubeEventGroup(
+            event_type=k[0],
+            reason=k[1],
+            object_kind=k[2],
+            object_name=k[3],
+            namespace=k[4],
+            count=v[0],
+            sample_message=v[1],
+            last_seen=v[2],
+        )
+        for k, v in sorted(
+            bucket.items(),
+            key=lambda kv: (
+                0 if kv[0][0] == "Warning" else 1,
+                -kv[1][0],
+                kv[0][1],
+                kv[0][2],
+                kv[0][3],
+            ),
+        )
+    )
+    return KubeEventsResult(
+        groups=groups, total_events=total, warning_count=warnings
+    )
+
+
+def _mask_message(msg: str) -> str:
+    out = msg.strip()
+    for pattern, replacement in _MSG_MASK_RULES:
+        out = pattern.sub(replacement, out)
+    return out
+
+
+def _format_events(result: KubeEventsResult, level: CompressionLevel) -> str:
+    head = (
+        f"kubectl events: {result.total_events} events, "
+        f"{result.warning_count} warning, {len(result.groups)} groups"
+    )
+    if level == CompressionLevel.ULTRA:
+        warn_groups = [g for g in result.groups if g.event_type == "Warning"]
+        if not warn_groups:
+            return head
+        top = warn_groups[: min(5, len(warn_groups))]
+        return head + "; " + "; ".join(
+            f"{g.reason}@{g.object_kind}/{g.object_name}({g.count})" for g in top
+        )
+
+    lines = [head]
+    limit = len(result.groups) if level == CompressionLevel.VERBOSE else 30
+    for g in result.groups[:limit]:
+        ns = f"{g.namespace}/" if g.namespace else ""
+        last = f" last={g.last_seen}" if g.last_seen else ""
+        lines.append(
+            f"[{g.event_type[0]}] x{g.count} {g.reason} {ns}{g.object_kind}/{g.object_name}: {g.sample_message}{last}"
+        )
+    if len(result.groups) > limit:
+        lines.append(f"+{len(result.groups) - limit} more groups")
+    return "\n".join(lines)

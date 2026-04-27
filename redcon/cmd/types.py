@@ -285,3 +285,24 @@ class KubeResource:
 class KubeListResult:
     resources: tuple[KubeResource, ...]
     kind: str
+
+
+@dataclass(frozen=True, slots=True)
+class KubeEventGroup:
+    """Aggregated events sharing the same (type, reason, object_kind, object_name)."""
+
+    event_type: str  # "Warning" | "Normal" | other
+    reason: str
+    object_kind: str
+    object_name: str
+    namespace: str | None
+    count: int
+    sample_message: str
+    last_seen: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class KubeEventsResult:
+    groups: tuple[KubeEventGroup, ...]
+    total_events: int
+    warning_count: int
