@@ -73,6 +73,7 @@ def compress_command(
     use_default_cache: bool = True,
     record_history: bool = False,
     aliaser=None,
+    ref_ledger=None,
     snapshot_delta: bool = False,
 ) -> CompressionReport:
     """
@@ -159,6 +160,8 @@ def compress_command(
                 raw_text=stdout.decode("utf-8", errors="replace"),
             )
         compressed = _stamp_invariant_cert(compressed, stdout, compressor)
+        if ref_ledger is not None:
+            compressed = _apply_ref_ledger(compressed, ref_ledger)
         if aliaser is not None:
             compressed = _apply_aliaser(compressed, aliaser)
 
@@ -317,6 +320,33 @@ def _maybe_swap_to_delta(
         schema=output.schema + "_delta",
         original_tokens=output.original_tokens,
         compressed_tokens=delta_tokens,
+        must_preserve_ok=output.must_preserve_ok,
+        truncated=output.truncated,
+        notes=output.notes,
+    )
+
+
+def _apply_ref_ledger(output: CompressedOutput, ledger) -> CompressedOutput:
+    """V43: substitute repeated content blocks with numeric refs.
+
+    Min-gate: if rewriting would not reduce tokens, keep absolute. Same
+    non-regressive guarantee as V47.
+    """
+    new_text = ledger.apply(output.text)
+    if new_text == output.text:
+        return output
+
+    from redcon.cmd._tokens_lite import estimate_tokens
+
+    new_tokens = estimate_tokens(new_text)
+    if new_tokens >= output.compressed_tokens:
+        return output
+    return CompressedOutput(
+        text=new_text,
+        level=output.level,
+        schema=output.schema,
+        original_tokens=output.original_tokens,
+        compressed_tokens=new_tokens,
         must_preserve_ok=output.must_preserve_ok,
         truncated=output.truncated,
         notes=output.notes,

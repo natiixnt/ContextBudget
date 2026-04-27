@@ -97,3 +97,109 @@ class PathAliaser:
     def reset(self) -> None:
         self.next_index = 1
         self.by_path.clear()
+
+
+# --- V43 content reference ledger ---
+
+
+import hashlib
+
+# Block must exceed this many cl100k tokens to be eligible for ref'ing.
+# Below the floor the '(=ref:NNN)' annotation cost beats the saving.
+_REF_MIN_TOKENS = 6
+# Cap per-block content length we'll consider; very long blocks still
+# refable but we limit the dict footprint.
+_REF_MAX_CHARS = 4096
+_REF_MIN_CHARS = 24
+_REF_FMT = "ref:{:03d}"
+
+
+def _normalise_block(text: str) -> str:
+    """Strip trailing whitespace + collapse internal runs so cosmetically-
+    equal blocks share a fingerprint. Determinism-preserving."""
+    return "\n".join(line.rstrip() for line in text.splitlines() if line.strip())
+
+
+def _fingerprint(text: str) -> str:
+    return hashlib.sha1(_normalise_block(text).encode("utf-8")).hexdigest()
+
+
+@dataclass
+class RefLedger:
+    """Session-scoped content -> numeric-ref map (V43).
+
+    Caller passes one into compress_command per session; the pipeline
+    rewrites repeat content blocks to '{ref:NNN}' on later calls.
+    First-call output annotates blocks above the size floor with
+    '(=ref:NNN)' so the agent learns the binding.
+
+    Block scope: paragraph-shaped chunks separated by blank lines.
+    A block must have at least _REF_MIN_TOKENS cl100k tokens (estimated
+    via _tokens_lite) and no more than _REF_MAX_CHARS characters to be
+    eligible.
+    """
+
+    next_index: int = 1
+    by_fingerprint: dict[str, str] = field(default_factory=dict)
+
+    def apply(self, text: str) -> str:
+        from redcon.cmd._tokens_lite import estimate_tokens
+
+        # Split on blank lines: each "block" is a paragraph separated by
+        # one or more empty lines. Preserves the inter-block separator
+        # so reassembly is exact.
+        if not text:
+            return text
+        parts: list[str] = []
+        for block in _split_blocks(text):
+            if block.strip() == "":
+                parts.append(block)
+                continue
+            if (
+                len(block) < _REF_MIN_CHARS
+                or len(block) > _REF_MAX_CHARS
+                or estimate_tokens(block) < _REF_MIN_TOKENS
+            ):
+                parts.append(block)
+                continue
+            fp = _fingerprint(block)
+            existing = self.by_fingerprint.get(fp)
+            if existing is None:
+                ref = _REF_FMT.format(self.next_index)
+                self.next_index += 1
+                self.by_fingerprint[fp] = ref
+                parts.append(block + f"  (=ref:{self.next_index - 1:03d})")
+            else:
+                parts.append("{" + existing + "}")
+        return "".join(parts)
+
+    def reset(self) -> None:
+        self.next_index = 1
+        self.by_fingerprint.clear()
+
+
+def _split_blocks(text: str) -> list[str]:
+    """Split text into paragraph-shaped blocks, keeping the empty
+    separators so reassembly is exact."""
+    out: list[str] = []
+    buf: list[str] = []
+    in_blank = False
+    for line in text.splitlines(keepends=True):
+        is_blank = line.strip() == ""
+        if is_blank and not in_blank and buf:
+            out.append("".join(buf))
+            buf = [line]
+            in_blank = True
+        elif is_blank:
+            buf.append(line)
+            in_blank = True
+        else:
+            if in_blank and buf:
+                out.append("".join(buf))
+                buf = [line]
+            else:
+                buf.append(line)
+            in_blank = False
+    if buf:
+        out.append("".join(buf))
+    return out
