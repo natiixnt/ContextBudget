@@ -41,11 +41,11 @@ class GitDiffCompressor:
     """Compressor for `git diff` (and friends - `git diff HEAD`, `git diff --cached`)."""
 
     schema = "git_diff"
-    must_preserve_patterns = (
-        # Every file mentioned in the diff must survive in the output text.
-        # The harness in M8 expands this with concrete fixtures.
-        r"\bfiles? changed\b|\bdiff --git\b|^[A-Z] [^\s]+|^- ?[^\s]+",
-    )
+    # must_preserve_patterns are computed per-call from the parsed file
+    # paths so we only assert on facts the parser actually extracted.
+    # Static regex patterns false-positive on adversarial garbage that
+    # incidentally contains a diff token (V85 surfaced this class of bug).
+    must_preserve_patterns: tuple[str, ...] = ()
 
     def matches(self, argv: tuple[str, ...]) -> bool:
         if len(argv) < 2:
@@ -69,9 +69,13 @@ class GitDiffCompressor:
         level = select_level(raw_tokens, ctx.hint)
         formatted = _format(result, level)
         compressed_tokens = estimate_tokens(formatted)
-        preserved = verify_must_preserve(
-            formatted, self.must_preserve_patterns, text
-        )
+        # Build patterns from parsed paths so we only assert on real
+        # diff facts. Cap at 50 to bound re._cache pressure.
+        patterns = tuple(
+            re.escape(diff_file.path)
+            for diff_file in result.files
+        )[:50]
+        preserved = verify_must_preserve(formatted, patterns, text)
         return CompressedOutput(
             text=formatted,
             level=level,

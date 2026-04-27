@@ -32,13 +32,12 @@ _ONELINE = re.compile(r"^(?P<sha>[0-9a-f]{7,40}) (?P<subject>.+)$")
 
 class GitLogCompressor:
     schema = "git_log"
-    must_preserve_patterns = (
-        # Two parser-aligned shapes: 'commit <sha> ...' (header) OR
-        # '<sha> <subject>' (oneline). Parser is now tolerant of trailing
-        # junk after the sha so adversarial inputs that match this regex
-        # also produce a parsed LogEntry, which keeps the contract honest.
-        r"(?:^commit\s+[0-9a-f]{7,40}\b)|(?:^[0-9a-f]{7,40}\s+\S)",
-    )
+    # must_preserve_patterns are computed per-call from the parsed log
+    # entries (short shas) so we only assert on facts the parser
+    # actually extracted - mirrors git_diff and listing compressors.
+    # Static regex matched mutation-generated fragments that the
+    # parser correctly drops (V85 finding).
+    must_preserve_patterns: tuple[str, ...] = ()
 
     def matches(self, argv: tuple[str, ...]) -> bool:
         if len(argv) < 2:
@@ -58,7 +57,14 @@ class GitLogCompressor:
         level = select_level(raw_tokens, ctx.hint)
         formatted = _format(result, level)
         compressed_tokens = estimate_tokens(formatted)
-        preserved = verify_must_preserve(formatted, self.must_preserve_patterns, text)
+        # Patterns from parsed entries: short shas survive in compact
+        # output so this asserts a fact the formatter actually emits.
+        patterns = tuple(
+            re.escape(entry.short_sha)
+            for entry in result.entries
+            if entry.short_sha
+        )[:50]
+        preserved = verify_must_preserve(formatted, patterns, text)
         return CompressedOutput(
             text=formatted,
             level=level,

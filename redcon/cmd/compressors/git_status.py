@@ -40,7 +40,11 @@ _RENAMED_LINE = re.compile(r"^(?P<idx>.)(?P<wt>.) (?P<from>.+) -> (?P<to>.+)$")
 class GitStatusCompressor:
     schema = "git_status"
     must_preserve_patterns = (
-        r"branch:|^[ MADRCU?!]{2} ",
+        # Status entry shape: 2-char index/worktree code + space + path.
+        # Require at least one non-whitespace path character so we do not
+        # match a pure-whitespace line (V85 finding: 3+ spaces at line
+        # start was previously accepted as a legitimate entry pattern).
+        r"branch:|^[ MADRCU?!]{2} [^\s]",
     )
 
     def matches(self, argv: tuple[str, ...]) -> bool:
@@ -60,13 +64,13 @@ class GitStatusCompressor:
         level = select_level(raw_tokens, ctx.hint)
         formatted = _format(result, level)
         compressed_tokens = estimate_tokens(formatted)
-        # Header inflation guard: on tiny noisy inputs the 'branch: ?\\n...'
-        # header plus per-line passthrough can exceed raw. Fall through to
-        # raw passthrough so the contract stays non-regressive on the
-        # margin (V85 finding 3).
+        # Inflation guard: when the structured form is no smaller than raw
+        # the parser was almost certainly confused by non-status input
+        # (V85 surfaces this with adversarial pytest-shaped junk). Fall
+        # through to raw so the contract stays non-regressive at any tier
+        # short of ULTRA (which always emits a single-line summary).
         if (
             level != CompressionLevel.ULTRA
-            and raw_tokens < 80
             and compressed_tokens >= raw_tokens
             and text.strip()
         ):

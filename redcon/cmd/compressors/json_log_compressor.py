@@ -83,11 +83,16 @@ class JsonLogCompressor:
         # form is pure overhead. Fall through to raw so we never inflate
         # on non-JSON noise. ULTRA always emits a single line so it stays
         # cheaper than raw - skip the guard there.
+        # Two cases trigger raw passthrough:
+        # 1. Inflation: formatter no smaller than raw (header overhead).
+        # 2. Empty parse: no records mined, no canonical schema -> the
+        #    structured form has nothing to compress; pretending it does
+        #    drives below-floor V85 findings on adversarial noise.
+        no_structure = not result.records and not result.schema_keys
         if (
             level != CompressionLevel.ULTRA
-            and not result.records
-            and compressed_tokens >= raw_tokens
             and text.strip()
+            and (compressed_tokens >= raw_tokens or no_structure)
         ):
             formatted = text.rstrip()
             compressed_tokens = estimate_tokens(formatted)
