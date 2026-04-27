@@ -3,7 +3,9 @@ name: Release
 on:
   push:
     tags:
-      - "v*"
+      # Match only canonical semver tags like v1.2.3 - NOT extension tags
+      # such as 'vscode-v0.8.0' (handled by a separate publish flow).
+      - "v[0-9]*"
 
 jobs:
   publish:
