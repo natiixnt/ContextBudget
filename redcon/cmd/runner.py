@@ -69,6 +69,25 @@ DEFAULT_TIMEOUT_SECONDS = 120
 MAX_OUTPUT_BYTES = 16 * 1024 * 1024  # 16 MiB hard cap on captured output
 
 
+# Env vars suppressing colour / progress-bar output for tools we wrap. Caller
+# overrides win (request.env merged on top). ANSI escapes tokenise badly on
+# cl100k and add no agent value, so we silence them at source rather than
+# stripping them post-hoc when possible.
+DEFAULT_COLOR_OFF_ENV: dict[str, str] = {
+    "NO_COLOR": "1",
+    "TERM": "dumb",
+    "FORCE_COLOR": "0",
+    "CLICOLOR": "0",
+    "CLICOLOR_FORCE": "0",
+    "PY_COLORS": "0",
+    "PYTEST_ADDOPTS": "--color=no",
+    "MYPY_FORCE_COLOR": "0",
+    "RUFF_NO_COLOR": "1",
+    "DOCKER_CLI_HINTS": "false",
+    "NPM_CONFIG_COLOR": "false",
+}
+
+
 class CommandNotAllowed(RuntimeError):
     pass
 
@@ -136,11 +155,15 @@ def run_command(
     cap = max(1, request.max_output_bytes)
 
     started = time.monotonic()
+    spawn_env: dict[str, str] = dict(os.environ)
+    spawn_env.update(DEFAULT_COLOR_OFF_ENV)
+    if request.env is not None:
+        spawn_env.update(request.env)
     try:
         proc = subprocess.Popen(
             list(request.argv),
             cwd=str(cwd),
-            env=request.env,
+            env=spawn_env,
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
         )

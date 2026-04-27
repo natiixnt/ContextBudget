@@ -120,11 +120,14 @@ def compress_command(
 
     effective_hint = hint or effective_hint_for_rewrite
 
-    raw_bytes = len(run_result.stdout) + len(run_result.stderr)
+    stdout = _neutralise_terminal(run_result.stdout)
+    stderr = _neutralise_terminal(run_result.stderr)
+
+    raw_bytes = len(stdout) + len(stderr)
     if raw_bytes > LOG_POINTER_THRESHOLD_BYTES:
         compressed = _spill_to_log(
-            run_result.stdout,
-            run_result.stderr,
+            stdout,
+            stderr,
             argv=argv,
             cwd=cwd_path,
             cache_key=cache_key,
@@ -133,7 +136,7 @@ def compress_command(
         )
     elif compressor is None:
         compressed = _semantic_or_passthrough(
-            run_result.stdout, run_result.stderr, effective_hint
+            stdout, stderr, effective_hint
         )
     else:
         ctx = CompressorContext(
@@ -143,9 +146,7 @@ def compress_command(
             hint=effective_hint,
             notes=run_result.notes,
         )
-        compressed = compressor.compress(
-            run_result.stdout, run_result.stderr, ctx
-        )
+        compressed = compressor.compress(stdout, stderr, ctx)
         compressed = _normalise_whitespace(compressed)
         compressed = _apply_subst_table(compressed)
 
@@ -219,6 +220,45 @@ def _normalise_whitespace(output: CompressedOutput) -> CompressedOutput:
         truncated=output.truncated,
         notes=output.notes,
     )
+
+
+_CSI_RE: bytes | None = None
+_OSC_RE: bytes | None = None
+_SHORT_ESC_RE: bytes | None = None
+
+
+def _neutralise_terminal(blob: bytes) -> bytes:
+    """Strip ANSI/escape sequences and collapse CR-overwrite.
+
+    Removes CSI (\\x1b[...x), OSC (\\x1b]...BEL or ESC\\), short ESC
+    sequences, and BEL bytes. Then collapses CR-overwrite per line,
+    keeping only the segment after the last CR. Idempotent on plain
+    ASCII; deterministic.
+    """
+    if not blob:
+        return blob
+    global _CSI_RE, _OSC_RE, _SHORT_ESC_RE
+    import re
+
+    if _CSI_RE is None:
+        _CSI_RE = re.compile(rb"\x1b\[[0-9;?]*[ -/]*[@-~]")
+        _OSC_RE = re.compile(rb"\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)")
+        _SHORT_ESC_RE = re.compile(rb"\x1b[@-Z\\-_]")
+
+    cleaned = _OSC_RE.sub(b"", blob)
+    cleaned = _CSI_RE.sub(b"", cleaned)
+    cleaned = _SHORT_ESC_RE.sub(b"", cleaned)
+    cleaned = cleaned.replace(b"\x07", b"")
+
+    if b"\r" not in cleaned:
+        return cleaned
+    out_lines: list[bytes] = []
+    for line in cleaned.split(b"\n"):
+        if b"\r" in line:
+            out_lines.append(line.rsplit(b"\r", 1)[-1])
+        else:
+            out_lines.append(line)
+    return b"\n".join(out_lines)
 
 
 def _apply_subst_table(output: CompressedOutput) -> CompressedOutput:
