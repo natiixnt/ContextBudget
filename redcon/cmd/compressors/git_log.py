@@ -24,7 +24,7 @@ from redcon.cmd.types import (
 )
 from redcon.cmd._tokens_lite import estimate_tokens
 
-_COMMIT_LINE = re.compile(r"^commit (?P<sha>[0-9a-f]{7,40})(?: \(.*\))?$")
+_COMMIT_LINE = re.compile(r"^commit (?P<sha>[0-9a-f]{7,40})\b.*$")
 _AUTHOR_LINE = re.compile(r"^Author: (?P<author>.+)$")
 _DATE_LINE = re.compile(r"^Date:\s+(?P<date>.+)$")
 _ONELINE = re.compile(r"^(?P<sha>[0-9a-f]{7,40}) (?P<subject>.+)$")
@@ -33,7 +33,11 @@ _ONELINE = re.compile(r"^(?P<sha>[0-9a-f]{7,40}) (?P<subject>.+)$")
 class GitLogCompressor:
     schema = "git_log"
     must_preserve_patterns = (
-        r"\bcommit\b|^[0-9a-f]{7,40} ",
+        # Two parser-aligned shapes: 'commit <sha> ...' (header) OR
+        # '<sha> <subject>' (oneline). Parser is now tolerant of trailing
+        # junk after the sha so adversarial inputs that match this regex
+        # also produce a parsed LogEntry, which keeps the contract honest.
+        r"(?:^commit\s+[0-9a-f]{7,40}\b)|(?:^[0-9a-f]{7,40}\s+\S)",
     )
 
     def matches(self, argv: tuple[str, ...]) -> bool:
@@ -180,7 +184,15 @@ def _format_compact(result: LogResult) -> str:
         return "log: (no commits)"
     lines = [f"log: {len(result.entries)} commits"]
     for e in result.entries[:30]:
-        lines.append(f"{e.short_sha} {_clip(e.subject, 80)}")
+        subject = _clip(e.subject, 80)
+        if subject:
+            lines.append(f"{e.short_sha} {subject}")
+        else:
+            # Empty subject: preserve the canonical 'commit <sha>' form so
+            # downstream auditors can verify the entry survived. Otherwise
+            # the row collapses to '<sha> ' which fails the must-preserve
+            # contract (V85 finding).
+            lines.append(f"commit {e.short_sha}")
     if len(result.entries) > 30:
         lines.append(f"... +{len(result.entries) - 30} more commits")
     return "\n".join(lines)
@@ -194,7 +206,10 @@ def _format_verbose(result: LogResult) -> str:
     if _is_oneline_style(result):
         lines = [f"log: {len(result.entries)} commits"]
         for e in result.entries:
-            lines.append(f"{e.short_sha} {e.subject}")
+            if e.subject:
+                lines.append(f"{e.short_sha} {e.subject}")
+            else:
+                lines.append(f"commit {e.short_sha}")
         return "\n".join(lines)
 
     lines = [f"log: {len(result.entries)} commits"]
