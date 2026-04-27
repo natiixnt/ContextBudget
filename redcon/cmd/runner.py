@@ -75,6 +75,11 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
         "mysql",
         "mysqlsh",
         "mariadb",
+        "webpack",
+        "esbuild",
+        "vite",
+        "rollup",
+        "parcel",
     }
 )
 

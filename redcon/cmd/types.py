@@ -400,3 +400,27 @@ class ExplainResult:
     slowest: tuple[ExplainNode, ...]  # top 3 by self_ms desc
     flag_counts: tuple[tuple[str, int], ...]  # ("seq_scan", 2), sorted desc
     warnings: tuple[str, ...]
+
+
+# --- Bundle stats canonical types (webpack / esbuild / vite / rollup) ---
+
+
+@dataclass(frozen=True, slots=True)
+class BundleEntry:
+    """One entry-point or output bundle the build emitted."""
+
+    name: str
+    total_bytes: int
+    module_count: int
+    top_modules: tuple[tuple[str, int], ...]  # (path, bytes), sorted desc
+
+
+@dataclass(frozen=True, slots=True)
+class BundleStatsResult:
+    tool: str  # "webpack" | "esbuild" | "vite" | "rollup" | "parcel" | "unknown"
+    entries: tuple[BundleEntry, ...]  # sorted desc by total_bytes
+    total_modules: int
+    duplicate_count: int  # webpack only
+    errors: tuple[str, ...]
+    warnings: tuple[str, ...]
+    build_time_ms: float | None

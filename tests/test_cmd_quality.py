@@ -23,6 +23,7 @@ from redcon.cmd.compressors.listing_compressor import (
     TreeCompressor,
 )
 from redcon.cmd.compressors.npm_test_compressor import NpmTestCompressor
+from redcon.cmd.compressors.bundle_stats_compressor import BundleStatsCompressor
 from redcon.cmd.compressors.coverage_compressor import CoverageCompressor
 from redcon.cmd.compressors.json_log_compressor import JsonLogCompressor
 from redcon.cmd.compressors.profiler_compressor import ProfilerCompressor
@@ -412,6 +413,27 @@ def _json_log_fixture() -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+def _bundle_stats_fixture() -> bytes:
+    """Synthetic webpack --json output, 50 modules across 2 assets."""
+    import json
+
+    modules = [
+        {"name": f"./node_modules/lib_{n // 10}/file_{n}.js", "size": 50000 - n * 100}
+        for n in range(50)
+    ]
+    stats = {
+        "time": 4523,
+        "assets": [
+            {"name": "main.js", "size": sum(m["size"] for m in modules[:30])},
+            {"name": "vendor.js", "size": 800000},
+        ],
+        "modules": modules,
+        "errors": [],
+        "warnings": [{"message": "asset size limit exceeded"}],
+    }
+    return json.dumps(stats).encode("utf-8")
+
+
 _SQL_EXPLAIN_PG_FIXTURE = b"""\
                                                                        QUERY PLAN
 -----------------------------------------------------------------------------------------------------------------------------------------------
@@ -662,6 +684,13 @@ CASES = [
         _SQL_EXPLAIN_PG_FIXTURE,
         b"",
         ("psql", "-c", "EXPLAIN ANALYZE SELECT 1"),
+    ),
+    (
+        "bundle_stats_webpack",
+        BundleStatsCompressor(),
+        _bundle_stats_fixture(),
+        b"",
+        ("webpack", "--json"),
     ),
 ]
 

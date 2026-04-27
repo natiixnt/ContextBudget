@@ -219,6 +219,34 @@ def _is_profiler(argv: tuple[str, ...]) -> bool:
     return False
 
 
+def _is_bundle_stats(argv: tuple[str, ...]) -> bool:
+    if not argv:
+        return False
+    head = argv[0].rsplit("/", 1)[-1]
+    if head in {"webpack", "esbuild", "vite", "rollup", "parcel"}:
+        if len(argv) >= 2 and argv[1] in {"build", "compile", "bundle"}:
+            return True
+        return any(
+            a in {"--json", "--analyze", "--stats", "--metafile"}
+            for a in argv[1:]
+        )
+    if head == "npx" and len(argv) >= 2 and argv[1] in {
+        "webpack", "esbuild", "vite", "rollup", "parcel",
+    }:
+        return True
+    if head in {"cat", "tail", "less", "more"}:
+        for token in argv[1:]:
+            t = token.lower()
+            if (
+                t.endswith(".stats.json")
+                or t.endswith(".metafile.json")
+                or t.endswith("stats.json")
+                or t.endswith("metafile.json")
+            ):
+                return True
+    return False
+
+
 def _is_sql_explain(argv: tuple[str, ...]) -> bool:
     if not argv:
         return False
@@ -393,6 +421,12 @@ def _bootstrap_lazy() -> None:
         _is_sql_explain,
         "redcon.cmd.compressors.sql_explain_compressor",
         "SqlExplainCompressor",
+    )
+    register_lazy(
+        "bundle_stats",
+        _is_bundle_stats,
+        "redcon.cmd.compressors.bundle_stats_compressor",
+        "BundleStatsCompressor",
     )
 
 
