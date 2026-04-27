@@ -8,14 +8,36 @@ so each runner's compressor only has to handle parsing.
 
 from __future__ import annotations
 
+import re
+
 from redcon.cmd.types import CompressionLevel, TestFailure, TestRunResult
+
+
+_CLUSTER_MIN_FAILURES = 10
+_CLUSTER_MIN_SIZE = 3
+_CLUSTER_MASKS: tuple[tuple[re.Pattern[str], str], ...] = (
+    (re.compile(r"\b0x[0-9a-fA-F]+\b"), "<hex>"),
+    (re.compile(r"\b[0-9a-f]{12,}\b"), "<id>"),
+    (re.compile(r"\b\d+\.\d+\b"), "<f>"),
+    (re.compile(r"\b\d{2,}\b"), "<n>"),
+    (re.compile(r"'[^']*'"), "'<s>'"),
+    (re.compile(r'"[^"]*"'), '"<s>"'),
+)
 
 
 def format_test_result(result: TestRunResult, level: CompressionLevel) -> str:
     if level == CompressionLevel.ULTRA:
         return _format_ultra(result)
     if level == CompressionLevel.COMPACT:
-        return _format_compact(result)
+        baseline = _format_compact(result)
+        clustered = _maybe_format_compact_clustered(result)
+        if clustered is None:
+            return baseline
+        from redcon.cmd._tokens_lite import estimate_tokens
+
+        if estimate_tokens(clustered) < estimate_tokens(baseline):
+            return clustered
+        return baseline
     return _format_verbose(result)
 
 
@@ -139,3 +161,66 @@ def _clip(text: str, limit: int) -> str:
     if len(text) <= limit:
         return text
     return text[: limit - 1] + "..."
+
+
+# --- clustering (V64) ---
+
+
+def _failure_skeleton(failure: TestFailure) -> str:
+    """Mask values out of the first message line; equal masks share a cluster."""
+    msg = _first_meaningful_line(failure.message)
+    for pattern, replacement in _CLUSTER_MASKS:
+        msg = pattern.sub(replacement, msg)
+    return msg
+
+
+def cluster_failures_by_template(
+    failures: tuple[TestFailure, ...],
+) -> list[list[TestFailure]]:
+    """Group failures by masked-message skeleton, preserving first-seen order."""
+    bucket: dict[str, list[TestFailure]] = {}
+    order: list[str] = []
+    for f in failures:
+        key = _failure_skeleton(f)
+        if key not in bucket:
+            bucket[key] = []
+            order.append(key)
+        bucket[key].append(f)
+    return [bucket[k] for k in order]
+
+
+def _maybe_format_compact_clustered(r: TestRunResult) -> str | None:
+    """Return a clustered COMPACT body when worth doing, else None.
+
+    Activation: at least _CLUSTER_MIN_FAILURES failures total AND at least
+    one cluster of size >= _CLUSTER_MIN_SIZE. Otherwise the per-failure
+    overhead of cluster headers makes things worse.
+    """
+    if len(r.failures) < _CLUSTER_MIN_FAILURES:
+        return None
+    clusters = cluster_failures_by_template(r.failures)
+    if not any(len(c) >= _CLUSTER_MIN_SIZE for c in clusters):
+        return None
+
+    lines = [_summary_line(r)]
+    lines.append("")
+    for idx, cluster in enumerate(clusters, start=1):
+        sample = cluster[0]
+        location = _format_location(sample)
+        head = f"FAIL-CLUSTER {idx} x{len(cluster)}" + (
+            f" ({location})" if location else ""
+        )
+        lines.append(head)
+        short_msg = _first_meaningful_line(sample.message)
+        if short_msg:
+            lines.append(_clip(short_msg, 200))
+        # All failing names in this cluster, comma-joined and clipped.
+        joined = ", ".join(f.name for f in cluster)
+        lines.append("failed: " + _clip(joined, 600))
+
+    if r.warnings:
+        lines.append("")
+        lines.append(f"warnings: {len(r.warnings)}")
+        for warning in r.warnings[:5]:
+            lines.append(_clip(warning, 200))
+    return "\n".join(lines)
