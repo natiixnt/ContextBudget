@@ -62,6 +62,9 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
         "python",
         "python3",
         "npx",
+        "py-spy",
+        "perf",
+        "flamegraph.pl",
     }
 )
 

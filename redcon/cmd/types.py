@@ -306,3 +306,25 @@ class KubeEventsResult:
     groups: tuple[KubeEventGroup, ...]
     total_events: int
     warning_count: int
+
+
+# --- Profiler canonical types (py-spy / perf collapsed stacks) ---
+
+
+@dataclass(frozen=True, slots=True)
+class HotPath:
+    """One stack from a collapsed-stack profile sample."""
+
+    stack: tuple[str, ...]  # frames root -> leaf
+    samples: int
+
+    @property
+    def leaf(self) -> str:
+        return self.stack[-1] if self.stack else ""
+
+
+@dataclass(frozen=True, slots=True)
+class ProfileResult:
+    paths: tuple[HotPath, ...]  # sorted desc by samples
+    total_samples: int
+    distinct_stacks: int

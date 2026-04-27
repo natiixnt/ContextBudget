@@ -207,6 +207,18 @@ def _is_kubectl_get(argv: tuple[str, ...]) -> bool:
     return argv[0] == "kubectl" and argv[1] == "get"
 
 
+def _is_profiler(argv: tuple[str, ...]) -> bool:
+    if not argv:
+        return False
+    if argv[0] == "py-spy":
+        return len(argv) >= 2 and argv[1] in {"record", "dump", "top"}
+    if argv[0] == "perf":
+        return len(argv) >= 2 and argv[1] in {"record", "script", "report"}
+    if argv[0] == "flamegraph.pl":
+        return True
+    return False
+
+
 def _bootstrap_lazy() -> None:
     """Register every built-in compressor as a lazy entry."""
     register_lazy(
@@ -298,6 +310,12 @@ def _bootstrap_lazy() -> None:
         _is_kubectl_get,
         "redcon.cmd.compressors.kubectl_compressor",
         "KubectlGetCompressor",
+    )
+    register_lazy(
+        "profiler",
+        _is_profiler,
+        "redcon.cmd.compressors.profiler_compressor",
+        "ProfilerCompressor",
     )
 
 

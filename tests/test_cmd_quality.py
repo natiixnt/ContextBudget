@@ -23,6 +23,7 @@ from redcon.cmd.compressors.listing_compressor import (
     TreeCompressor,
 )
 from redcon.cmd.compressors.npm_test_compressor import NpmTestCompressor
+from redcon.cmd.compressors.profiler_compressor import ProfilerCompressor
 from redcon.cmd.compressors.pytest_compressor import PytestCompressor
 from redcon.cmd.quality import run_quality_check
 
@@ -370,6 +371,24 @@ Time:        2.345 s
 """
 
 
+def _profiler_fixture() -> bytes:
+    """Synthetic 200-line py-spy collapsed-stack output, deterministic seed."""
+    import random
+
+    rng = random.Random(0)
+    modules = ["main", "parse", "compile", "run", "cache", "render", "store"]
+    funcs = ["init", "load", "process", "serialize", "lookup", "fetch"]
+    lines: list[str] = []
+    for _ in range(200):
+        depth = rng.randint(2, 5)
+        stack = ";".join(
+            f"{rng.choice(modules)}.{rng.choice(funcs)}" for _ in range(depth)
+        )
+        samples = rng.randint(1, 50)
+        lines.append(f"{stack} {samples}")
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
 # --- parametrized fixtures ---
 
 
@@ -521,6 +540,13 @@ CASES = [
         _KUBECTL_PODS_FIXTURE,
         b"",
         ("kubectl", "get", "pods"),
+    ),
+    (
+        "profiler_typical",
+        ProfilerCompressor(),
+        _profiler_fixture(),
+        b"",
+        ("py-spy", "record"),
     ),
 ]
 
