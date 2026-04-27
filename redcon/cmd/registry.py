@@ -219,6 +219,38 @@ def _is_profiler(argv: tuple[str, ...]) -> bool:
     return False
 
 
+def _is_json_log(argv: tuple[str, ...]) -> bool:
+    if not argv:
+        return False
+    head = argv[0]
+    if head == "journalctl":
+        for i, a in enumerate(argv):
+            if a == "--output=json":
+                return True
+            if a in {"-o", "--output"} and i + 1 < len(argv) and argv[i + 1] == "json":
+                return True
+        return False
+    if head == "kubectl" and len(argv) >= 2 and argv[1] == "logs":
+        for i, a in enumerate(argv):
+            if a in {"-o=json", "--output=json"}:
+                return True
+            if a in {"-o", "--output"} and i + 1 < len(argv) and argv[i + 1] == "json":
+                return True
+        return False
+    if head in {"cat", "tail", "less", "more"}:
+        for token in argv[1:]:
+            t = token.lower()
+            if (
+                t.endswith(".log")
+                or t.endswith(".ndjson")
+                or t.endswith(".jsonl")
+                or "/log/" in t
+            ):
+                return True
+        return False
+    return False
+
+
 def _bootstrap_lazy() -> None:
     """Register every built-in compressor as a lazy entry."""
     register_lazy(
@@ -316,6 +348,12 @@ def _bootstrap_lazy() -> None:
         _is_profiler,
         "redcon.cmd.compressors.profiler_compressor",
         "ProfilerCompressor",
+    )
+    register_lazy(
+        "json_log",
+        _is_json_log,
+        "redcon.cmd.compressors.json_log_compressor",
+        "JsonLogCompressor",
     )
 
 

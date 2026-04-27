@@ -23,6 +23,7 @@ from redcon.cmd.compressors.listing_compressor import (
     TreeCompressor,
 )
 from redcon.cmd.compressors.npm_test_compressor import NpmTestCompressor
+from redcon.cmd.compressors.json_log_compressor import JsonLogCompressor
 from redcon.cmd.compressors.profiler_compressor import ProfilerCompressor
 from redcon.cmd.compressors.pytest_compressor import PytestCompressor
 from redcon.cmd.quality import run_quality_check
@@ -389,6 +390,26 @@ def _profiler_fixture() -> bytes:
     return ("\n".join(lines) + "\n").encode("utf-8")
 
 
+def _json_log_fixture() -> bytes:
+    """Synthetic 200-line NDJSON application log, deterministic seed."""
+    import json
+    import random
+
+    rng = random.Random(0)
+    levels = ["info"] * 80 + ["warn"] * 12 + ["error"] * 5 + ["debug"] * 3
+    lines: list[str] = []
+    for i in range(200):
+        obj = {
+            "ts": f"2026-04-27T10:{i % 60:02d}:{i % 60:02d}Z",
+            "level": rng.choice(levels),
+            "msg": f"request handled {i}",
+            "trace_id": f"tr-{rng.randint(1000, 9999)}",
+            "duration_ms": rng.randint(1, 500),
+        }
+        lines.append(json.dumps(obj))
+    return ("\n".join(lines) + "\n").encode("utf-8")
+
+
 # --- parametrized fixtures ---
 
 
@@ -547,6 +568,13 @@ CASES = [
         _profiler_fixture(),
         b"",
         ("py-spy", "record"),
+    ),
+    (
+        "json_log_typical",
+        JsonLogCompressor(),
+        _json_log_fixture(),
+        b"",
+        ("cat", "/var/log/app.log"),
     ),
 ]
 

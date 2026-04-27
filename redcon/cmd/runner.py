@@ -65,6 +65,11 @@ DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
         "py-spy",
         "perf",
         "flamegraph.pl",
+        "cat",
+        "tail",
+        "less",
+        "more",
+        "journalctl",
     }
 )
 

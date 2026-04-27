@@ -328,3 +328,25 @@ class ProfileResult:
     paths: tuple[HotPath, ...]  # sorted desc by samples
     total_samples: int
     distinct_stacks: int
+
+
+# --- JSON-line log canonical types ---
+
+
+@dataclass(frozen=True, slots=True)
+class JsonLogRecord:
+    """One parsed NDJSON line. `extras` carries keys outside the dominant schema."""
+
+    fields: tuple[tuple[str, str], ...]  # canonical-schema (key, value) in schema order
+    level: str | None
+    timestamp: str | None
+    raw_line: str  # kept for verbose emit and outlier fallback
+
+
+@dataclass(frozen=True, slots=True)
+class JsonLogResult:
+    schema_keys: tuple[str, ...]  # canonical key order; "" when no schema mined
+    records: tuple[JsonLogRecord, ...]
+    outliers: tuple[str, ...]  # raw lines that failed to parse or fit the schema
+    total_lines: int
+    level_histogram: tuple[tuple[str, int], ...]  # sorted desc by count
