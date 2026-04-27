@@ -52,6 +52,48 @@ def must_preserve_patterns_for_failures(failures: tuple[TestFailure, ...]) -> tu
     return tuple(re.escape(f.name) for f in failures)
 
 
+def stratified_failure_sample(
+    failures: tuple[TestFailure, ...], k: int
+) -> list[TestFailure]:
+    """Pick at most k failures balanced across files, deterministic.
+
+    Strategy:
+      1. Group failures by their `file` (or '' fallback for unparseable).
+      2. Round-robin across the groups so every distinct file contributes
+         at least one entry before any file gets a second.
+      3. Tie-break on parse order within a group.
+
+    Determinism is maintained because (a) the input is the parse-ordered
+    failure tuple, (b) round-robin order is dict-iteration which is
+    insertion-ordered in CPython 3.7+, (c) no RNG is used.
+    """
+    if k <= 0 or not failures:
+        return []
+    if len(failures) <= k:
+        return list(failures)
+
+    bucket: dict[str, list[TestFailure]] = {}
+    for f in failures:
+        bucket.setdefault(f.file or "", []).append(f)
+
+    selected: list[TestFailure] = []
+    pointers = {key: 0 for key in bucket}
+    while len(selected) < k:
+        progressed = False
+        for key, items in bucket.items():
+            idx = pointers[key]
+            if idx >= len(items):
+                continue
+            selected.append(items[idx])
+            pointers[key] = idx + 1
+            progressed = True
+            if len(selected) >= k:
+                break
+        if not progressed:
+            break
+    return selected
+
+
 # --- ultra ---
 
 
@@ -71,20 +113,33 @@ def _format_ultra(r: TestRunResult) -> str:
 # --- compact ---
 
 
+_COMPACT_FAILURE_BUDGET = 30
+
+
 def _format_compact(r: TestRunResult) -> str:
     # Body / message lines drop the leading two-space indent: the FAIL line
     # immediately above provides context and dropping the prefix saves one
     # cl100k token per body line on long failure listings.
     lines = [_summary_line(r)]
     if r.failures:
+        body_failures = stratified_failure_sample(
+            r.failures, _COMPACT_FAILURE_BUDGET
+        )
         lines.append("")
-        for failure in r.failures:
+        for failure in body_failures:
             location = _format_location(failure)
             head = f"FAIL {failure.name}" + (f" ({location})" if location else "")
             lines.append(head)
             short_msg = _first_meaningful_line(failure.message)
             if short_msg:
                 lines.append(_clip(short_msg, 200))
+        if len(body_failures) < len(r.failures):
+            tail = [
+                f.name for f in r.failures if f not in set(body_failures)
+            ]
+            lines.append(
+                f"... +{len(tail)} more failures: " + _clip(", ".join(tail), 600)
+            )
     if r.warnings:
         lines.append("")
         lines.append(f"warnings: {len(r.warnings)}")
