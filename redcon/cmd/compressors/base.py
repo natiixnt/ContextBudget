@@ -87,3 +87,32 @@ def select_level_for_output(
 
     raw_tokens = token_estimator(raw_text)
     return select_level(raw_tokens, hint), raw_tokens
+
+
+def compute_invariant_cert(
+    raw_text: str, patterns: tuple[str, ...]
+) -> str:
+    """Sha256-prefix over the sorted multiset of (pattern_index, match) on raw.
+
+    Stamped on COMPACT/VERBOSE outputs as `mp_sha=<16hex>` in notes so a
+    downstream auditor can recompute the cert against the compressed text
+    and assert set-equality (catches spurious additions and capture thinning,
+    not just existence). Empty pattern set returns "".
+    """
+    if not patterns:
+        return ""
+    import hashlib
+
+    rows: list[tuple[int, str]] = []
+    for idx, pat in enumerate(patterns):
+        regex = _compile_preserve(pat, re.MULTILINE)
+        for match in regex.finditer(raw_text):
+            rows.append((idx, match.group(0)))
+    rows.sort()
+    h = hashlib.sha256()
+    for idx, snippet in rows:
+        h.update(idx.to_bytes(4, "big"))
+        h.update(b"\x00")
+        h.update(snippet.encode("utf-8", errors="replace"))
+        h.update(b"\x01")
+    return h.hexdigest()[:16]

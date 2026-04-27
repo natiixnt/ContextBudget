@@ -149,6 +149,7 @@ def compress_command(
         compressed = compressor.compress(stdout, stderr, ctx)
         compressed = _normalise_whitespace(compressed)
         compressed = _apply_subst_table(compressed)
+        compressed = _stamp_invariant_cert(compressed, stdout, compressor)
 
     report = CompressionReport(
         output=compressed,
@@ -259,6 +260,41 @@ def _neutralise_terminal(blob: bytes) -> bytes:
         else:
             out_lines.append(line)
     return b"\n".join(out_lines)
+
+
+def _stamp_invariant_cert(
+    output: CompressedOutput,
+    raw_stdout: bytes,
+    compressor,
+) -> CompressedOutput:
+    """Attach mp_sha=<16hex> note for COMPACT/VERBOSE outputs.
+
+    ULTRA is exempt because the BASELINE explicitly allows ULTRA to drop
+    facts. Empty must_preserve_patterns produces no cert (no-op).
+    """
+    if output.level == CompressionLevel.ULTRA:
+        return output
+    patterns = getattr(compressor, "must_preserve_patterns", ())
+    if not patterns:
+        return output
+
+    from redcon.cmd.compressors.base import compute_invariant_cert
+
+    raw_text = raw_stdout.decode("utf-8", errors="replace")
+    cert = compute_invariant_cert(raw_text, patterns)
+    if not cert:
+        return output
+
+    return CompressedOutput(
+        text=output.text,
+        level=output.level,
+        schema=output.schema,
+        original_tokens=output.original_tokens,
+        compressed_tokens=output.compressed_tokens,
+        must_preserve_ok=output.must_preserve_ok,
+        truncated=output.truncated,
+        notes=output.notes + (f"mp_sha={cert}",),
+    )
 
 
 def _apply_subst_table(output: CompressedOutput) -> CompressedOutput:
