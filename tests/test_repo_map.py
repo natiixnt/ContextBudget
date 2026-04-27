@@ -86,15 +86,22 @@ def test_repo_map_falls_back_gracefully_without_symbols(monkeypatch, python_repo
 
 def test_repo_map_respects_budget(python_repo: Path):
     """A tight budget must keep total_tokens at or under budget."""
+    # With the symbol-less fallback every path costs ~2-3 cl100k-ish
+    # tokens, so budget=12 fits all three fixture files. Pick a budget
+    # that genuinely cannot fit every file (~5 tokens admits 1-2 of 3)
+    # so the truncation contract actually fires.
     tight = build_repo_map(
-        task="add authentication", repo=python_repo, budget=12, top_files=10
+        task="add authentication", repo=python_repo, budget=5, top_files=10
     )
-    # 12 tokens budget can't fit even one of the file blocks (smallest is
-    # ~6 tokens for path + ~4 per signature). Assert the contract: never
-    # exceed budget. With a 12-token budget the second file is the one
-    # that pushes us over, so truncated must be set.
     assert tight.total_tokens <= tight.budget
     assert tight.truncated is True
+
+    # Roomy budget: contract still holds, no truncation when everything fits.
+    roomy = build_repo_map(
+        task="add authentication", repo=python_repo, budget=4_000, top_files=10
+    )
+    assert roomy.total_tokens <= roomy.budget
+    assert roomy.truncated is False
 
 
 def test_repo_map_mcp_tool_returns_meta(python_repo: Path):
