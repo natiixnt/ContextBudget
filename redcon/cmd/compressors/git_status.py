@@ -60,6 +60,18 @@ class GitStatusCompressor:
         level = select_level(raw_tokens, ctx.hint)
         formatted = _format(result, level)
         compressed_tokens = estimate_tokens(formatted)
+        # Header inflation guard: on tiny noisy inputs the 'branch: ?\\n...'
+        # header plus per-line passthrough can exceed raw. Fall through to
+        # raw passthrough so the contract stays non-regressive on the
+        # margin (V85 finding 3).
+        if (
+            level != CompressionLevel.ULTRA
+            and raw_tokens < 80
+            and compressed_tokens >= raw_tokens
+            and text.strip()
+        ):
+            formatted = text.rstrip()
+            compressed_tokens = estimate_tokens(formatted)
         preserved = verify_must_preserve(formatted, self.must_preserve_patterns, text)
         return CompressedOutput(
             text=formatted,
