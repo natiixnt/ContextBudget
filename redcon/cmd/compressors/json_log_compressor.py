@@ -78,6 +78,19 @@ class JsonLogCompressor:
         level = select_level(raw_tokens, ctx.hint)
         formatted = _format(result, level)
         compressed_tokens = estimate_tokens(formatted)
+        # Header inflation guard: when no records mined a canonical schema
+        # AND the formatted output is no smaller than raw, the structured
+        # form is pure overhead. Fall through to raw so we never inflate
+        # on non-JSON noise. ULTRA always emits a single line so it stays
+        # cheaper than raw - skip the guard there.
+        if (
+            level != CompressionLevel.ULTRA
+            and not result.records
+            and compressed_tokens >= raw_tokens
+            and text.strip()
+        ):
+            formatted = text.rstrip()
+            compressed_tokens = estimate_tokens(formatted)
         # Severe records (error/fatal/warn) must keep their primary
         # identifier (timestamp + level) in COMPACT/VERBOSE.
         patterns = _must_preserve_for(result, level)
