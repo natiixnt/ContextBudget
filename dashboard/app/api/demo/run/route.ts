@@ -8,7 +8,7 @@ import { tmpdir } from "os";
 
 const execFileAsync = promisify(execFile);
 
-const PROJECT_ROOT = process.env.REDCON_ROOT ?? "/Users/naithai/Desktop/amogus/praca/ContextBudget";
+const PROJECT_ROOT = process.env.REDCON_ROOT ?? "/home/dev/ContextBudget";
 const PYTHON = process.env.REDCON_PYTHON ?? `${PROJECT_ROOT}/.venv/bin/python`;
 const DEMO_REPO = process.env.REDCON_DEMO_REPO ?? `${PROJECT_ROOT}/redcon`;
 const MAX_TOKENS = 8000;

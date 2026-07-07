@@ -326,28 +326,28 @@ on Windows (which lacks SIGALRM).
 
 ## File pointers
 
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/runner.py
+- /home/dev/ContextBudget/redcon/cmd/runner.py
   (L84-90: `RunRequest` dataclass, add `partial_on_timeout`;
    L156: `deadline = started + request.timeout_seconds`;
    L161-169: timeout branch where partial buffer is discarded today;
    L293-307: `_terminate` SIGTERM/SIGKILL is already correct for the
    subprocess side)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/pipeline.py
+- /home/dev/ContextBudget/redcon/cmd/pipeline.py
   (L114-119: `try/except CommandTimeout` - reroute to partial path;
    L124-148: branch on log-pointer / compressor.compress - inject
    `partial_compress` dispatch here;
    L182-211: `_normalise_whitespace` already re-counts tokens, so
    partial outputs report accurate `compressed_tokens`)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/compressors/base.py
+- /home/dev/ContextBudget/redcon/cmd/compressors/base.py
   (Compressor protocol: add optional `partial_compress`)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/compressors/listing_compressor.py
+- /home/dev/ContextBudget/redcon/cmd/compressors/listing_compressor.py
   (parse_find L195-207, parse_tree L139-168, parse_ls L64-105: each is
   a one-pass line loop already - drop a deadline gate at the loop head)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/compressors/grep_compressor.py
+- /home/dev/ContextBudget/redcon/cmd/compressors/grep_compressor.py
   (line-oriented parser, same pattern)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/compressors/lint_compressor.py
+- /home/dev/ContextBudget/redcon/cmd/compressors/lint_compressor.py
   (issue-oriented loop, same pattern)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/quality.py
+- /home/dev/ContextBudget/redcon/cmd/quality.py
   (extend the harness with a "deadline-clamped synthetic input" fixture
   that asserts `truncated=True` and that prefix patterns that *did*
   appear remain `must_preserve_ok=True`)

@@ -80,7 +80,7 @@ where the marker is the same length or longer.
 ### 3. Per-file derivation: budget.py
 
 Manually applied type-collapse to
-`/Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/budget.py`
+`/home/dev/ContextBudget/redcon/cmd/budget.py`
 (96 lines, 3,392 chars, 792 cl100k tokens), preserving all docstrings,
 method signatures, and parameter type annotations. The collapsed
 variant kept every `def`/`@dataclass`/`class` signature byte-identical;
@@ -337,7 +337,7 @@ the agent about call semantics. Explicitly out of scope.
 The exact measurement script lives at `/tmp/v14_collapse.py`
 (throwaway, not committed). To regenerate:
 
-    /Users/naithai/Desktop/amogus/praca/ContextBudget/.venv/bin/python /tmp/v14_collapse.py
+    /home/dev/ContextBudget/.venv/bin/python /tmp/v14_collapse.py
 
 Reports `original_tokens=792`, `collapsed_tokens=813`,
 `literal-token share of repo=1.05 %`, `estimated reduction across

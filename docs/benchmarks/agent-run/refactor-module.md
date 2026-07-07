@@ -11,27 +11,27 @@ Evaluates selection accuracy when the primary change targets the database connec
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 3 ms |
-| Generated | 2026-03-15T11:35:09.212394+00:00 |
+| Scan runtime | 245 ms |
+| Generated | 2026-07-07T18:51:43.905823+00:00 |
 
 ## Baseline
 
-Full repository context (no selection, no compression): **12,230 tokens**
+Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Strategy comparison
 
 | Strategy | Input tokens | Saved tokens | Quality risk | Runtime |
 |----------|-------------|--------------|--------------|---------|
-| naive_full_context | 12,230 | 0 (0.0%) | low | 0 ms |
-| top_k_selection | 12,230 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,484 | 9,746 (79.7%) | low | 17 ms |
-| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 17 ms |
+| naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
+| top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
+| compressed_pack | 2,285 | 9,943 (81.3%) | low | 218 ms |
+| cache_assisted_pack | 2,285 | 9,943 (81.3%) | low | 170 ms |
 
 ## Compressed pack details
 
-- **Baseline tokens:** 12,230
-- **Optimized tokens:** 2,484 (20.3% of baseline)
-- **Saved tokens:** 9,746 (79.7% reduction)
+- **Baseline tokens:** 12,228
+- **Optimized tokens:** 2,285 (18.7% of baseline)
+- **Saved tokens:** 9,943 (81.3% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -55,7 +55,7 @@ Full repository context (no selection, no compression): **12,230 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 17 ms
+Second run (warm cache): **2,285 tokens**, 30 cache hits, 170 ms
 
 ## Token estimator comparison
 
@@ -63,4 +63,4 @@ Second run (warm cache): **150 tokens**, 15 cache hits, 17 ms
 |--------|-----------|---------------|----------------|
 | task | 29 | 33 | 29 *(fallback)* |
 | top_ranked_file | 753 | 861 | 753 *(fallback)* |
-| packed_context | 2490 | 2846 | 2490 *(fallback)* |
+| packed_context | 2287 | 2613 | 2287 *(fallback)* |

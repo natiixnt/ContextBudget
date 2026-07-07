@@ -33,7 +33,7 @@ Equivalently, this is a degenerate one-symbol-per-class **MDL / grammar-inductio
 
 ## Concrete proposal for Redcon
 
-I empirically mined `/Users/naithai/Desktop/amogus/praca/ContextBudget/redcon` (130 `*.py`, 0 parse errors) using `ast`. Method: structural hash of node type + child arity, ignoring identifier names and constants, depth-bounded at 6.
+I empirically mined `/home/dev/ContextBudget/redcon` (130 `*.py`, 0 parse errors) using `ast`. Method: structural hash of node type + child arity, ignoring identifier names and constants, depth-bounded at 6.
 
 **Raw counts (no filter)** - distinct structural keys: 1369; total candidate top-level / class-method nodes: 2722. Top 20 templates aggregate to raw=33,916 tokens, savable=25,759 tokens (75.9% of just-those-tokens), but the top 4 of those are dominated by single-line imports and module docstrings - sources that are either irrelevant (imports already 2 tokens) or *already addressed by `_strip_docstrings_in_text` in `redcon/compressors/context_compressor.py:65`* in the COMPACT tier.
 

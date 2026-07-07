@@ -11,8 +11,8 @@ Evaluates how well Redcon selects the task service, route handlers, and reposito
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 38 ms |
-| Generated | 2026-03-18T11:06:32.980641+00:00 |
+| Scan runtime | 23 ms |
+| Generated | 2026-07-07T18:53:09.060886+00:00 |
 
 ## Baseline
 
@@ -24,8 +24,8 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,862 | 9,366 (76.6%) | low | 44 ms |
-| cache_assisted_pack | 2,862 | 9,366 (76.6%) | low | 41 ms |
+| compressed_pack | 2,862 | 9,366 (76.6%) | low | 59 ms |
+| cache_assisted_pack | 2,862 | 9,366 (76.6%) | low | 86 ms |
 
 ## Compressed pack details
 
@@ -54,7 +54,7 @@ Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **2,862 tokens**, 30 cache hits, 41 ms
+Second run (warm cache): **2,862 tokens**, 30 cache hits, 86 ms
 
 ## Token estimator comparison
 

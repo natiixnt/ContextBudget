@@ -57,7 +57,7 @@ recipe gives 126 tokens compact = **70.2% reduction**.
 ## Concrete proposal for Redcon
 
 New file:
-`/Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/compressors/sql_explain_compressor.py`,
+`/home/dev/ContextBudget/redcon/cmd/compressors/sql_explain_compressor.py`,
 following `pytest_compressor.py`.
 
 New types in `redcon/cmd/types.py`:

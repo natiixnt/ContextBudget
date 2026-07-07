@@ -11,27 +11,27 @@ Evaluates context selection for an auth-focused change spanning route handlers, 
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 3 ms |
-| Generated | 2026-03-15T11:35:09.173424+00:00 |
+| Scan runtime | 108 ms |
+| Generated | 2026-07-07T18:51:43.270736+00:00 |
 
 ## Baseline
 
-Full repository context (no selection, no compression): **12,230 tokens**
+Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Strategy comparison
 
 | Strategy | Input tokens | Saved tokens | Quality risk | Runtime |
 |----------|-------------|--------------|--------------|---------|
-| naive_full_context | 12,230 | 0 (0.0%) | low | 0 ms |
-| top_k_selection | 12,230 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,196 | 10,034 (82.0%) | low | 17 ms |
-| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 18 ms |
+| naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
+| top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
+| compressed_pack | 4,514 | 7,714 (63.1%) | low | 70 ms |
+| cache_assisted_pack | 4,514 | 7,714 (63.1%) | low | 280 ms |
 
 ## Compressed pack details
 
-- **Baseline tokens:** 12,230
-- **Optimized tokens:** 2,196 (18.0% of baseline)
-- **Saved tokens:** 10,034 (82.0% reduction)
+- **Baseline tokens:** 12,228
+- **Optimized tokens:** 4,514 (36.9% of baseline)
+- **Saved tokens:** 7,714 (63.1% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -55,12 +55,12 @@ Full repository context (no selection, no compression): **12,230 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 18 ms
+Second run (warm cache): **4,514 tokens**, 30 cache hits, 280 ms
 
 ## Token estimator comparison
 
 | Sample | heuristic | model_aligned | exact_tiktoken |
 |--------|-----------|---------------|----------------|
 | task | 24 | 28 | 24 *(fallback)* |
-| top_ranked_file | 1025 | 1172 | 1025 *(fallback)* |
-| packed_context | 2202 | 2517 | 2202 *(fallback)* |
+| top_ranked_file | 1615 | 1845 | 1615 *(fallback)* |
+| packed_context | 4541 | 5189 | 4541 *(fallback)* |

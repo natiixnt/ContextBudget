@@ -288,7 +288,7 @@ each entry, the union is what the CI gate checks.
     immediately rather than weeks later.
   - **Robustness risks**: one - if a fixture itself contains environment-
     specific paths (e.g. captured `git diff` output mentioning `/Users/
-    naithai/...`), the golden bakes in that path and fails on other
+    dev/...`), the golden bakes in that path and fails on other
     machines. Mitigation: capture against a temp-repo with stable paths
     (`/tmp/redcon_corpus_<n>/...`) and document the convention in
     `tests/golden/cmd/README.md`. The capture script (Phase A) does this

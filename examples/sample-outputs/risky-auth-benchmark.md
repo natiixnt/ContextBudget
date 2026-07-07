@@ -1,7 +1,7 @@
 # Redcon Benchmark Report
 
 Task: add rate limiting to auth API
-Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/risky-auth-change/repo
+Repository: /home/dev/ContextBudget/examples/risky-auth-change/repo
 Baseline full-context tokens: 73
 Token budget: 30000
 Top files: 25

@@ -1,7 +1,7 @@
 # Redcon Pack Report
 
 Task: refactor auth exports
-Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/language-aware/repo
+Repository: /home/dev/ContextBudget/examples/language-aware/repo
 Max tokens: 30000
 
 ## Budget

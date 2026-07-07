@@ -178,7 +178,7 @@ intentionally explicit so the agent never silently loses content.
 
 ## Estimated impact
 
-Quantified on the real `/Users/naithai/Desktop/amogus/praca/ContextBudget`
+Quantified on the real `/home/dev/ContextBudget`
 repo with three plausible 6-call sessions (raw output of common
 shell tools, line-level dedup is a ground-truth proxy for what the
 bloom would catch at fp~=0):

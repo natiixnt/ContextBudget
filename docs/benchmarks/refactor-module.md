@@ -11,8 +11,8 @@ Evaluates selection accuracy when the primary change targets the database connec
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 20 ms |
-| Generated | 2026-03-18T11:06:33.184805+00:00 |
+| Scan runtime | 22 ms |
+| Generated | 2026-07-07T18:53:09.351401+00:00 |
 
 ## Baseline
 
@@ -24,8 +24,8 @@ Full repository context (no selection, no compression): **12,228 tokens**
 |----------|-------------|--------------|--------------|---------|
 | naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
 | top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,285 | 9,943 (81.3%) | low | 36 ms |
-| cache_assisted_pack | 2,285 | 9,943 (81.3%) | low | 37 ms |
+| compressed_pack | 2,285 | 9,943 (81.3%) | low | 54 ms |
+| cache_assisted_pack | 2,285 | 9,943 (81.3%) | low | 68 ms |
 
 ## Compressed pack details
 
@@ -54,7 +54,7 @@ Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **2,285 tokens**, 30 cache hits, 37 ms
+Second run (warm cache): **2,285 tokens**, 30 cache hits, 68 ms
 
 ## Token estimator comparison
 

@@ -1,7 +1,7 @@
 # Redcon Summary Report
 
 Task: add caching to search API
-Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/small-feature/repo
+Repository: /home/dev/ContextBudget/examples/small-feature/repo
 Generated at: 2026-03-12T19:45:55.978523+00:00
 
 - Estimated input tokens: 69
