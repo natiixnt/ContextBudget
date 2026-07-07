@@ -22,4 +22,17 @@ redcon benchmark "Add Redis caching to task lookup endpoints" \
     --repo benchmarks/dataset --max-tokens 8000
 ```
 
-_Generated 2026-03-18_
+## Related reports
+
+Three measurement pipelines run against the same dataset and each owns
+its own artifacts. Per-task numbers differ slightly between pipelines
+because they measure different flows, not because any table is stale:
+
+- **Strategy benchmark** (this report + per-task files in this directory):
+  `python benchmarks/run_benchmarks.py` - compares packing strategies per task.
+- **Agent-run dataset** ([`agent-run/`](./agent-run/)):
+  `python benchmarks/build_agent_run_dataset.py` - simulates agent-shaped runs.
+- **Context dataset** ([`dataset-report.md`](./dataset-report.md)):
+  `python benchmarks/generate_dataset.py` - measures the context dataset builder.
+
+_Generated 2026-07-07_

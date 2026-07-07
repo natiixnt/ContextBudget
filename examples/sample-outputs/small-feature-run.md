@@ -1,7 +1,7 @@
 # Redcon Pack Report
 
 Task: add caching to search API
-Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/small-feature/repo
+Repository: /home/dev/ContextBudget/examples/small-feature/repo
 Max tokens: 1200
 
 ## Budget

@@ -95,7 +95,7 @@ def _should_rename(name: str, keywords: frozenset[str], public: frozenset[str]) 
 | `compress_command` net (rename + side-table 71 tok) | 654 | 675 | **+21** | **+3.2% LOSS** |
 
 Source: `/tmp/v12_alpha_rename.py` (throwaway), measured against
-`/Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/pipeline.py`
+`/home/dev/ContextBudget/redcon/cmd/pipeline.py`
 verbatim function bodies for `_spill_to_log` (lines 226-305) and
 `compress_command` (lines 66-171).
 

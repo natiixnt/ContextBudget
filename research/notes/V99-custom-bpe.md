@@ -223,7 +223,7 @@ benchmarking only.
 ## Appendix: empirical numbers
 
 All numbers from
-`/Users/naithai/Desktop/amogus/praca/ContextBudget/.venv/bin/python`
+`/home/dev/ContextBudget/.venv/bin/python`
 running the throwaway scripts under `/tmp/v99_*.py`. Corpus written to
 `/tmp/v99_corpus/`. Compact-only training is `corpus_compact_only.txt`
 (44 503 chars after augmentation), full training is `corpus_all.txt`

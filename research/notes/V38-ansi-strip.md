@@ -265,14 +265,14 @@ replaying terminal semantics over a flat buffer.
 
 ## File pointers
 
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/runner.py
+- /home/dev/ContextBudget/redcon/cmd/runner.py
   (line 88: `env: dict[str, str] | None = None`; line 143: passed to Popen)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/pipeline.py
+- /home/dev/ContextBudget/redcon/cmd/pipeline.py
   (line 108: RunRequest construction; line 115: run_command call -
   insertion point for `_neutralise_terminal`; line 134: log-pointer
   threshold check sees `len(stdout)+len(stderr)` and would benefit
   from already-stripped bytes since ANSI inflates that count, possibly
   triggering log-pointer prematurely)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cli.py
+- /home/dev/ContextBudget/redcon/cli.py
   (line 136-144: an existing NO_COLOR convention, scoped to CLI display
   only - confirms the project already treats NO_COLOR as canonical)

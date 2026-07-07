@@ -1,7 +1,7 @@
 # Redcon Pack Report
 
 Task: tighten auth middleware token validation
-Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/risky-auth-change/repo
+Repository: /home/dev/ContextBudget/examples/risky-auth-change/repo
 Max tokens: 30000
 
 ## Budget

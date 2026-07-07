@@ -1,7 +1,7 @@
 # Redcon Pack Report
 
 Task: large service layer refactor
-Repository: /Users/naithai/Desktop/amogus/praca/Redcon/examples/large-refactor/repo
+Repository: /home/dev/ContextBudget/examples/large-refactor/repo
 Max tokens: 1000
 
 ## Budget

@@ -84,7 +84,7 @@ linearly in N). For k = N (all traces distinct), rho -> 1 + epsilon
 ### 4. Empirical measurement (this study)
 
 I generated 5 real Python tracebacks by importing
-`/Users/naithai/Desktop/amogus/praca/ContextBudget/redcon` and triggering
+`/home/dev/ContextBudget/redcon` and triggering
 type errors on:
 
   - `parse_pytest(b'failing-bytes-not-str')` (T1)

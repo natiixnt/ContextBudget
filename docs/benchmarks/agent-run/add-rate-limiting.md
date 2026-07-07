@@ -11,27 +11,27 @@ Evaluates context selection for rate-limiting middleware spanning route handlers
 | Token budget | 8,000 |
 | Top files | 20 |
 | Token estimator | heuristic |
-| Scan runtime | 3 ms |
-| Generated | 2026-03-15T11:35:09.251093+00:00 |
+| Scan runtime | 91 ms |
+| Generated | 2026-07-07T18:51:44.332241+00:00 |
 
 ## Baseline
 
-Full repository context (no selection, no compression): **12,230 tokens**
+Full repository context (no selection, no compression): **12,228 tokens**
 
 ## Strategy comparison
 
 | Strategy | Input tokens | Saved tokens | Quality risk | Runtime |
 |----------|-------------|--------------|--------------|---------|
-| naive_full_context | 12,230 | 0 (0.0%) | low | 0 ms |
-| top_k_selection | 12,230 | 0 (0.0%) | low | 0 ms |
-| compressed_pack | 2,619 | 9,611 (78.6%) | low | 17 ms |
-| cache_assisted_pack | 150 | 12,080 (98.8%) | low | 17 ms |
+| naive_full_context | 12,228 | 0 (0.0%) | low | 0 ms |
+| top_k_selection | 12,228 | 0 (0.0%) | low | 0 ms |
+| compressed_pack | 802 | 11,426 (93.4%) | low | 197 ms |
+| cache_assisted_pack | 802 | 11,426 (93.4%) | low | 137 ms |
 
 ## Compressed pack details
 
-- **Baseline tokens:** 12,230
-- **Optimized tokens:** 2,619 (21.4% of baseline)
-- **Saved tokens:** 9,611 (78.6% reduction)
+- **Baseline tokens:** 12,228
+- **Optimized tokens:** 802 (6.6% of baseline)
+- **Saved tokens:** 11,426 (93.4% reduction)
 - **Quality risk:** low
 - **Files included:** 15
 
@@ -55,12 +55,12 @@ Full repository context (no selection, no compression): **12,230 tokens**
 
 ## Cache-assisted pack
 
-Second run (warm cache): **150 tokens**, 15 cache hits, 17 ms
+Second run (warm cache): **802 tokens**, 30 cache hits, 137 ms
 
 ## Token estimator comparison
 
 | Sample | heuristic | model_aligned | exact_tiktoken |
 |--------|-----------|---------------|----------------|
 | task | 21 | 24 | 21 *(fallback)* |
-| top_ranked_file | 469 | 536 | 469 *(fallback)* |
-| packed_context | 2625 | 3000 | 2625 *(fallback)* |
+| top_ranked_file | 392 | 448 | 392 *(fallback)* |
+| packed_context | 804 | 919 | 804 *(fallback)* |

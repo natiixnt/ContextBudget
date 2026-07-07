@@ -328,6 +328,6 @@ Throwaway scripts that produced the numbers in this note live in
 `/tmp/v31_subst.py`, `/tmp/v31_ngrams.py`, `/tmp/v31_final.py`,
 `/tmp/v31_breakdown.py`, `/tmp/v31_measured.py`, `/tmp/v31_vs_raw.py`.
 All numbers come from running tiktoken `cl100k_base` directly via
-`/Users/naithai/Desktop/amogus/praca/ContextBudget/.venv/bin/python`
+`/home/dev/ContextBudget/.venv/bin/python`
 against the COMPACT-tier output of every fixture in
 `tests/test_cmd_quality.py`. No estimates.

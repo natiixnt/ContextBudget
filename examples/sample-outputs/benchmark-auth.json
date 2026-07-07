@@ -3,7 +3,7 @@
   "command": "benchmark",
   "generated_at": "2026-03-12T20:08:28.601050+00:00",
   "max_tokens": 2500,
-  "repo": "/Users/naithai/Desktop/amogus/praca/Redcon/examples/benchmark/repo",
+  "repo": "/home/dev/ContextBudget/examples/benchmark/repo",
   "scan_runtime_ms": 2,
   "strategies": [
     {

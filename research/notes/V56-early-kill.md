@@ -412,27 +412,27 @@ of the current key - constraint #6 satisfied.
 
 ## File pointers
 
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/runner.py
+- /home/dev/ContextBudget/redcon/cmd/runner.py
   (lines 30-69: caps and timeouts; lines 152-227: the read loop where
   the observer hook lives; lines 265-289: existing drain logic that
   already handles post-kill bytes; lines 292-309: SIGTERM/SIGKILL
   ladder reused as-is)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/pipeline.py
+- /home/dev/ContextBudget/redcon/cmd/pipeline.py
   (lines 107-148: where the compressor is detected and run, the glue
   for stream_observer; lines 60-63: log-pointer threshold which V56
   pre-empts)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/budget.py
+- /home/dev/ContextBudget/redcon/cmd/budget.py
   (line 47: `_BUDGET_SHARE = 0.30`, the multiplier the kill threshold
   reuses)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/quality.py
+- /home/dev/ContextBudget/redcon/cmd/quality.py
   (lines 168-175: existing robustness corpus including
   `truncated mid-stream`, the property V56 amplifies)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/compressors/base.py
+- /home/dev/ContextBudget/redcon/cmd/compressors/base.py
   (lines 32-57: the Compressor Protocol, sibling location for the new
   StreamingCompressor Protocol)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/compressors/git_log.py
+- /home/dev/ContextBudget/redcon/cmd/compressors/git_log.py
   (lines 27-30: line-level regexes already prefix-gated, ready to be
   reused as the streaming feeder for git_log)
-- /Users/naithai/Desktop/amogus/praca/ContextBudget/redcon/cmd/rewriter.py
+- /home/dev/ContextBudget/redcon/cmd/rewriter.py
   (related: argv-level capping that supersedes V56 when applicable -
   V56 only earns its keep where rewriter cannot)

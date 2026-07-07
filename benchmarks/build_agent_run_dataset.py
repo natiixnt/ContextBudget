@@ -22,7 +22,7 @@ Options (env vars)
 ------------------
     BENCHMARK_MAX_TOKENS   Token budget for optimised run (default: 8000)
     BENCHMARK_TOP_FILES    Max files ranked per task (default: 20)
-    BENCHMARK_OUT_DIR      Output directory (default: docs/benchmarks)
+    BENCHMARK_OUT_DIR      Output directory (default: docs/benchmarks/agent-run)
     BENCHMARK_DATASET_DIR  Repo to benchmark against (default: benchmarks/dataset)
 """
 
@@ -53,7 +53,11 @@ from redcon.core.dataset import (  # noqa: E402
 
 MAX_TOKENS: int = int(os.getenv("BENCHMARK_MAX_TOKENS", "8000"))
 TOP_FILES: int = int(os.getenv("BENCHMARK_TOP_FILES", "20"))
-OUT_DIR: Path = Path(os.getenv("BENCHMARK_OUT_DIR", str(_repo_root / "docs" / "benchmarks")))
+# Separate directory from run_benchmarks.py output: both pipelines emit
+# per-task <slug>.json/.md files and would silently overwrite each other.
+OUT_DIR: Path = Path(
+    os.getenv("BENCHMARK_OUT_DIR", str(_repo_root / "docs" / "benchmarks" / "agent-run"))
+)
 DATASET_DIR: Path = Path(
     os.getenv("BENCHMARK_DATASET_DIR", str(_repo_root / "benchmarks" / "dataset"))
 )
