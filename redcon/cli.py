@@ -1,22 +1,21 @@
-from __future__ import annotations
-
 """CLI entrypoint for Redcon commands."""
+
+from __future__ import annotations
 
 import argparse
 import json as _json_mod
 import logging
-from pathlib import Path
 import sys
 import time
+from pathlib import Path
 
 from redcon import __version__ as _redcon_version
+from redcon.agents.middleware import RedconMiddleware
 from redcon.config import RedconConfig, load_config, validate_config
 from redcon.core.policy import (
     default_strict_policy,
     load_policy,
 )
-from redcon.agents.middleware import RedconMiddleware
-from redcon.engine import BudgetPolicyViolationError, RedconEngine
 from redcon.core.render import (
     render_advise_markdown,
     render_agent_plan_markdown,
@@ -41,8 +40,9 @@ from redcon.core.render import (
     render_visualize_markdown,
     write_json,
 )
-from redcon.schemas.models import normalize_repo
+from redcon.engine import BudgetPolicyViolationError, RedconEngine
 from redcon.scanners.incremental import ScanRefreshResult, ScanRefreshSummary
+from redcon.schemas.models import normalize_repo
 from redcon.stages.workflow import run_scan_refresh_stage
 
 
@@ -141,6 +141,7 @@ _NO_COLOR = False
 def _setup_no_color(args: argparse.Namespace) -> None:
     global _NO_COLOR
     import os
+
     _NO_COLOR = getattr(args, "no_color", False) or os.environ.get("NO_COLOR", "") != ""
 
 
@@ -148,19 +149,43 @@ def cmd_completion(args: argparse.Namespace) -> int:
     """Generate shell completion script."""
     shell = args.shell
     commands = [
-        "doctor", "plan", "plan-agent", "simulate-agent", "pack", "export",
-        "profile", "pipeline", "read-profiler", "report", "diff", "pr-audit",
-        "benchmark", "dataset", "context-dataset", "heatmap", "watch",
-        "advise", "observe", "visualize", "prepare-context", "enforce",
-        "policy", "drift", "cost-analysis", "gateway", "control-plane",
-        "init", "roi", "benchmark-report",
+        "doctor",
+        "plan",
+        "plan-agent",
+        "simulate-agent",
+        "pack",
+        "export",
+        "profile",
+        "pipeline",
+        "read-profiler",
+        "report",
+        "diff",
+        "pr-audit",
+        "benchmark",
+        "dataset",
+        "context-dataset",
+        "heatmap",
+        "watch",
+        "advise",
+        "observe",
+        "visualize",
+        "prepare-context",
+        "enforce",
+        "policy",
+        "drift",
+        "cost-analysis",
+        "gateway",
+        "control-plane",
+        "init",
+        "roi",
+        "benchmark-report",
     ]
     if shell == "bash":
         print(f"""# Redcon bash completion - add to ~/.bashrc or ~/.bash_completion
 _redcon_completions() {{
     local cur="${{COMP_WORDS[COMP_CWORD]}}"
     if [ "$COMP_CWORD" -eq 1 ]; then
-        COMPREPLY=($(compgen -W "{' '.join(commands)}" -- "$cur"))
+        COMPREPLY=($(compgen -W "{" ".join(commands)}" -- "$cur"))
     fi
 }}
 complete -F _redcon_completions redcon""")
@@ -187,11 +212,12 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 
     if action in ("install", "uninstall", "status"):
         from redcon.mcp.install import (
+            _load_config,
+            _target_paths,
             install_all,
             uninstall_for_target,
-            _target_paths,
-            _load_config,
         )
+
         target = args.target
         targets = ["claude", "cursor", "windsurf"] if target == "all" else [target]
 
@@ -241,6 +267,7 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     # action == "serve"
     try:
         import asyncio
+
         from redcon.mcp import serve
     except ImportError as e:
         print(
@@ -261,7 +288,7 @@ def cmd_mcp(args: argparse.Namespace) -> int:
 
 
 def cmd_doctor(args: argparse.Namespace) -> int:
-    from redcon.core.doctor import run_doctor, doctor_as_dict
+    from redcon.core.doctor import doctor_as_dict, run_doctor
 
     repo = Path(args.repo).resolve()
     report = run_doctor(repo)
@@ -369,9 +396,7 @@ def cmd_plan_agent(args: argparse.Namespace) -> int:
             context = step.get("context", [])
             if isinstance(context, list) and context:
                 preview = ", ".join(
-                    item.get("path", "")
-                    for item in context[:5]
-                    if isinstance(item, dict)
+                    item.get("path", "") for item in context[:5] if isinstance(item, dict)
                 )
                 if len(context) > 5:
                     preview = f"{preview}, +{len(context) - 5} more"
@@ -391,6 +416,7 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
     fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
     if getattr(args, "list_models", False):
         from redcon.core.agent_cost import list_known_models
+
         rows = list_known_models()
         if fmt == "json":
             print(_json_mod.dumps(rows, indent=2, default=str))
@@ -414,6 +440,7 @@ def cmd_simulate_agent(args: argparse.Namespace) -> int:
             print(f"Error: run artifact not found: {run_artifact_file}")
             return 2
         from redcon.core.render import read_json as _read_json
+
         _run_data = _read_json(run_artifact_file)
         if not task:
             task = str(_run_data.get("task", "") or "")
@@ -585,7 +612,9 @@ def cmd_pack(args: argparse.Namespace) -> int:
         if args.policy:
             policy = load_policy(Path(args.policy))
         else:
-            policy = default_strict_policy(max_estimated_input_tokens=int(data.get("max_tokens", 0) or 0))
+            policy = default_strict_policy(
+                max_estimated_input_tokens=int(data.get("max_tokens", 0) or 0)
+            )
         policy_result = engine.evaluate_policy(data, policy=policy)
         data["policy"] = policy_result
         write_json(json_path, data)
@@ -638,7 +667,10 @@ def cmd_pack(args: argparse.Namespace) -> int:
             f"max_tokens={model_profile.get('effective_max_tokens', data.get('max_tokens', 0))}",
         )
         if model_profile.get("budget_clamped", False):
-            _qprint(args, "Model profile note: max_tokens was clamped to fit the configured context window")
+            _qprint(
+                args,
+                "Model profile note: max_tokens was clamped to fit the configured context window",
+            )
     delta = data.get("delta", {})
     if isinstance(delta, dict) and delta:
         delta_budget = delta.get("budget", {})
@@ -724,7 +756,8 @@ def cmd_export(args: argparse.Namespace) -> int:
     elif getattr(args, "clipboard", False):
         try:
             import subprocess
-            proc = subprocess.run(
+
+            subprocess.run(
                 ["pbcopy"] if sys.platform == "darwin" else ["xclip", "-selection", "clipboard"],
                 input=output_text.encode("utf-8"),
                 check=True,
@@ -748,7 +781,6 @@ def cmd_profile(args: argparse.Namespace) -> int:
     markdown = render_profile_markdown(data)
 
     tokens_before = int(data.get("tokens_before") or 0)
-    tokens_saved = int(data.get("tokens_saved") or 0)
     savings_pct = float(data.get("savings_pct") or 0.0)
 
     _STAGE_LABELS = {
@@ -837,7 +869,7 @@ def cmd_pipeline(args: argparse.Namespace) -> int:
     print(
         f"{'Final context':<{col_w[0]}} {'':{col_w[1]}} "
         f"{'':{col_w[2]}} {final_tokens:>{col_w[3]},} "
-        f"{total_saved:>{col_w[4]},} {total_pct:>{col_w[5]-1}.1f}%"
+        f"{total_saved:>{col_w[4]},} {total_pct:>{col_w[5] - 1}.1f}%"
     )
     print()
     print(f"Wrote pipeline JSON:     {json_path}")
@@ -878,6 +910,7 @@ def cmd_observe(args: argparse.Namespace) -> int:
 
     if getattr(args, "export_history", False):
         from redcon.telemetry.store import export_observe_history_json
+
         hist = export_observe_history_json(base_dir=base_dir)
         hist_path = Path(f"{prefix}-history.json")
         write_json(hist_path, hist)
@@ -912,6 +945,7 @@ def cmd_read_profiler(args: argparse.Namespace) -> int:
         print(f"Wrote read-profile JSON:     {json_path}")
         print(f"Wrote read-profile Markdown: {md_path}")
     return 0
+
 
 def cmd_report(args: argparse.Namespace) -> int:
     engine = RedconEngine()
@@ -1299,7 +1333,9 @@ def cmd_enforce(args: argparse.Namespace) -> int:
         print(f"Policy check: PASS ({run_path})")
         checks = policy_result.get("checks", {})
         for name, detail in checks.items():
-            print(f"  {name}: actual={detail.get('actual')} limit={detail.get('limit')} pass={detail.get('passed')}")
+            print(
+                f"  {name}: actual={detail.get('actual')} limit={detail.get('limit')} pass={detail.get('passed')}"
+            )
         return 0
     else:
         print(f"Policy check: FAIL ({run_path})")
@@ -1455,7 +1491,7 @@ def cmd_dashboard(args: argparse.Namespace) -> int:
 
     if fmt == "json" or export:
         if export:
-            export_path = Path(args.out_prefix or "redcon-dashboard") .with_suffix(".json")
+            export_path = Path(args.out_prefix or "redcon-dashboard").with_suffix(".json")
             write_json(export_path, data)
             if fmt != "json":
                 print(f"Wrote dashboard JSON: {export_path}")
@@ -1511,7 +1547,6 @@ def cmd_gateway(args: argparse.Namespace) -> int:
 def cmd_init(args: argparse.Namespace) -> int:
     """Auto-detect repository language(s) and generate config files."""
     import collections
-    import re
 
     repo_path = Path(args.repo).resolve()
     if not repo_path.is_dir():
@@ -1527,8 +1562,30 @@ def cmd_init(args: argparse.Namespace) -> int:
 
     # ── Detect languages ──────────────────────────────────────────────────────
     ext_counts: dict[str, int] = collections.Counter()
-    code_extensions = {".py", ".ts", ".tsx", ".js", ".jsx", ".go", ".rs", ".java", ".rb", ".cpp", ".c", ".cs"}
-    ignore_dirs = {".git", "node_modules", "__pycache__", ".venv", "venv", "dist", "build", ".redcon"}
+    code_extensions = {
+        ".py",
+        ".ts",
+        ".tsx",
+        ".js",
+        ".jsx",
+        ".go",
+        ".rs",
+        ".java",
+        ".rb",
+        ".cpp",
+        ".c",
+        ".cs",
+    }
+    ignore_dirs = {
+        ".git",
+        "node_modules",
+        "__pycache__",
+        ".venv",
+        "venv",
+        "dist",
+        "build",
+        ".redcon",
+    }
 
     for item in repo_path.rglob("*"):
         if any(part in ignore_dirs for part in item.parts):
@@ -1541,10 +1598,18 @@ def cmd_init(args: argparse.Namespace) -> int:
     if ext_counts:
         dominant_ext = max(ext_counts, key=lambda e: ext_counts[e])
         lang_map = {
-            ".py": "python", ".ts": "typescript", ".tsx": "typescript",
-            ".js": "javascript", ".jsx": "javascript", ".go": "go",
-            ".rs": "rust", ".java": "java", ".rb": "ruby",
-            ".cpp": "cpp", ".c": "c", ".cs": "csharp",
+            ".py": "python",
+            ".ts": "typescript",
+            ".tsx": "typescript",
+            ".js": "javascript",
+            ".jsx": "javascript",
+            ".go": "go",
+            ".rs": "rust",
+            ".java": "java",
+            ".rb": "ruby",
+            ".cpp": "cpp",
+            ".c": "c",
+            ".cs": "csharp",
         }
         dominant_lang = lang_map.get(dominant_ext, "")
         lang_hints["dominant"] = dominant_lang
@@ -1669,21 +1734,26 @@ jobs:
 
     # ── Print summary ─────────────────────────────────────────────────────────
     print(f"Initialized Redcon for: {repo_path}")
-    print(f"  Created: redcon.toml")
-    print(f"  Created: policy.toml")
+    print("  Created: redcon.toml")
+    print("  Created: policy.toml")
     if ci_created:
-        print(f"  Created: .github/workflows/redcon-pr-audit.yml")
+        print("  Created: .github/workflows/redcon-pr-audit.yml")
     if dominant_lang:
-        lang_breakdown = ", ".join(f"{ext}={n}" for ext, n in list(lang_hints['file_counts'].items())[:3])
+        lang_breakdown = ", ".join(
+            f"{ext}={n}" for ext, n in list(lang_hints["file_counts"].items())[:3]
+        )
         print(f"  Detected: {dominant_lang} ({lang_breakdown})")
     print(f"  Code files found: {total_files}")
-    print(f"  Estimated savings: ~{estimated_savings_pct}%  (~{estimated_saved:,} tokens saved per run)")
+    print(
+        f"  Estimated savings: ~{estimated_savings_pct}%  (~{estimated_saved:,} tokens saved per run)"
+    )
     print()
     # ── Auto-install MCP config for AI IDEs ───────────────────────────────────
     mcp_installed_targets: list[str] = []
     if not getattr(args, "no_mcp", False):
         try:
             from redcon.mcp.install import install_all
+
             mcp_results = install_all(repo_path)
             for r in mcp_results:
                 if r["status"] in ("installed", "up_to_date"):
@@ -1769,7 +1839,7 @@ def cmd_prepare_context(args: argparse.Namespace) -> int:
 
 def cmd_roi(args: argparse.Namespace) -> int:
     """Compute ROI from local run history (SQLite) or a list of run artifact JSON files."""
-    from redcon.core.cost_analysis import compute_cost_analysis, list_known_models
+    from redcon.core.cost_analysis import compute_cost_analysis
 
     fmt = "json" if getattr(args, "json", False) else getattr(args, "format", "human")
 
@@ -1789,7 +1859,9 @@ def cmd_roi(args: argparse.Namespace) -> int:
         cwd = Path(".")
         run_files = sorted(cwd.glob("redcon-*.json"))
         if not run_files:
-            print("Error: no run artifacts found. Pass paths via positional arguments or run 'redcon pack' first.")
+            print(
+                "Error: no run artifacts found. Pass paths via positional arguments or run 'redcon pack' first."
+            )
             return 2
 
     if not run_files:
@@ -1865,7 +1937,8 @@ def cmd_roi(args: argparse.Namespace) -> int:
                 "dollars_saved": round(v["dollars"], 4),
                 "runs": v["runs"],
                 "savings_pct": round(v["saved"] / (v["optimized"] + v["saved"]) * 100, 1)
-                    if (v["optimized"] + v["saved"]) > 0 else 0.0,
+                if (v["optimized"] + v["saved"]) > 0
+                else 0.0,
             }
             for repo, v in sorted(repos.items(), key=lambda x: -x[1]["saved"])
         ],
@@ -1890,7 +1963,9 @@ def cmd_roi(args: argparse.Namespace) -> int:
             label = r["repo"]
             if len(label) > 35:
                 label = "..." + label[-32:]
-            print(f"  {label:<36} {r['tokens_saved']:>10,} {r['savings_pct']:>9.1f}% ${r['dollars_saved']:>9.4f}")
+            print(
+                f"  {label:<36} {r['tokens_saved']:>10,} {r['savings_pct']:>9.1f}% ${r['dollars_saved']:>9.4f}"
+            )
     return 0
 
 
@@ -1956,8 +2031,7 @@ def cmd_benchmark_report(args: argparse.Namespace) -> int:
             "savings_pct": round(savings_pct, 1),
             "dollars_saved": round(dollars_saved, 4),
             "top_files": [
-                {"path": f["path"], "saved_tokens": f["saved_tokens"]}
-                for f in top_files
+                {"path": f["path"], "saved_tokens": f["saved_tokens"]} for f in top_files
             ],
         }
         entries.append(entry)
@@ -1978,11 +2052,11 @@ def cmd_benchmark_report(args: argparse.Namespace) -> int:
         "model": model,
         "runs_analyzed": totals["runs"],
         "totals": {
-            "baseline_tokens":    totals["baseline"],
-            "optimized_tokens":   totals["optimized"],
-            "tokens_saved":       totals["saved"],
+            "baseline_tokens": totals["baseline"],
+            "optimized_tokens": totals["optimized"],
+            "tokens_saved": totals["saved"],
             "overall_savings_pct": overall_pct,
-            "dollars_saved":      round(totals["dollars"], 4),
+            "dollars_saved": round(totals["dollars"], 4),
         },
         "entries": entries,
     }
@@ -1997,8 +2071,8 @@ def cmd_benchmark_report(args: argparse.Namespace) -> int:
         "",
         "## Summary",
         "",
-        f"| Metric | Value |",
-        f"|--------|-------|",
+        "| Metric | Value |",
+        "|--------|-------|",
         f"| Runs analyzed | {totals['runs']} |",
         f"| Baseline tokens | {totals['baseline']:,} |",
         f"| Optimized tokens | {totals['optimized']:,} |",
@@ -2008,8 +2082,8 @@ def cmd_benchmark_report(args: argparse.Namespace) -> int:
         "",
         "## Per-run Breakdown",
         "",
-        f"| Artifact | Task | Baseline | Optimized | Saved | Reduction | $ Saved |",
-        f"|----------|------|----------|-----------|-------|-----------|---------|",
+        "| Artifact | Task | Baseline | Optimized | Saved | Reduction | $ Saved |",
+        "|----------|------|----------|-----------|-------|-----------|---------|",
     ]
     for e in entries:
         task_label = (e["task"][:40] + "…") if len(e["task"]) > 40 else e["task"]
@@ -2031,8 +2105,8 @@ def cmd_benchmark_report(args: argparse.Namespace) -> int:
 
     if all_files:
         lines += [
-            f"| File | Tokens Saved |",
-            f"|------|--------------|",
+            "| File | Tokens Saved |",
+            "|------|--------------|",
         ]
         for fpath, fsaved in sorted(all_files.items(), key=lambda x: -x[1])[:10]:
             lines.append(f"| `{fpath}` | {fsaved:,} |")
@@ -2072,10 +2146,7 @@ def cmd_cost_analysis(args: argparse.Namespace) -> int:
             print(f"{'Model':<36} {'Provider':<12} {'Input $/MTok':>14}")
             print("-" * 66)
             for row in rows:
-                print(
-                    f"{row['model']:<36} {row['provider']:<12} "
-                    f"{row['input_per_1m_usd']:>14.4f}"
-                )
+                print(f"{row['model']:<36} {row['provider']:<12} {row['input_per_1m_usd']:>14.4f}")
         return 0
 
     if not args.run_json:
@@ -2119,9 +2190,15 @@ def cmd_cost_analysis(args: argparse.Namespace) -> int:
     provider_str = f" ({provider})" if provider else ""
     print(f"Model: {model_label}{provider_str}  |  input ${result['input_per_1m_usd']:.4f}/MTok")
     print()
-    print(f"Baseline cost:  ${result['baseline_cost_usd']:.2f}  ({result['baseline_tokens']:,} tokens)")
-    print(f"Optimized cost: ${result['optimized_cost_usd']:.2f}  ({result['optimized_tokens']:,} tokens)")
-    print(f"Savings:        ${result['saved_cost_usd']:.2f}  ({result['saved_tokens']:,} tokens, {result['savings_pct']:.1f}%)")
+    print(
+        f"Baseline cost:  ${result['baseline_cost_usd']:.2f}  ({result['baseline_tokens']:,} tokens)"
+    )
+    print(
+        f"Optimized cost: ${result['optimized_cost_usd']:.2f}  ({result['optimized_tokens']:,} tokens)"
+    )
+    print(
+        f"Savings:        ${result['saved_cost_usd']:.2f}  ({result['saved_tokens']:,} tokens, {result['savings_pct']:.1f}%)"
+    )
 
     per_file = result.get("per_file", [])
     if per_file:
@@ -2349,13 +2426,15 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
-        "-v", "--verbose",
+        "-v",
+        "--verbose",
         action="store_true",
         default=False,
         help="Enable verbose (DEBUG) logging output.",
     )
     parser.add_argument(
-        "-q", "--quiet",
+        "-q",
+        "--quiet",
         action="store_true",
         default=False,
         help="Suppress all output except errors and JSON.",
@@ -2373,8 +2452,12 @@ def build_parser() -> argparse.ArgumentParser:
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
-    doctor = sub.add_parser("doctor", help="Check environment health, dependencies, and configuration")
-    doctor.add_argument("--repo", default=".", help="Repository path to check (default: current directory).")
+    doctor = sub.add_parser(
+        "doctor", help="Check environment health, dependencies, and configuration"
+    )
+    doctor.add_argument(
+        "--repo", default=".", help="Repository path to check (default: current directory)."
+    )
     doctor.add_argument(
         "--format",
         choices=["human", "json"],
@@ -2430,7 +2513,9 @@ def build_parser() -> argparse.ArgumentParser:
     plan = sub.add_parser("plan", help="Rank relevant files for a natural language task")
     plan.add_argument("task", help="Task description")
     plan.add_argument("--repo", default=".", help="Repository path")
-    plan.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
+    plan.add_argument(
+        "--workspace", help="Workspace TOML describing multiple local repositories/packages."
+    )
     plan.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown")
     plan.add_argument(
         "--top-files",
@@ -2444,10 +2529,14 @@ def build_parser() -> argparse.ArgumentParser:
     )
     plan.set_defaults(func=cmd_plan)
 
-    plan_agent = sub.add_parser("plan-agent", help="Plan context usage across a multi-step agent workflow")
+    plan_agent = sub.add_parser(
+        "plan-agent", help="Plan context usage across a multi-step agent workflow"
+    )
     plan_agent.add_argument("task", help="Task description")
     plan_agent.add_argument("--repo", default=".", help="Repository path")
-    plan_agent.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
+    plan_agent.add_argument(
+        "--workspace", help="Workspace TOML describing multiple local repositories/packages."
+    )
     plan_agent.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown")
     plan_agent.add_argument(
         "--top-files",
@@ -2472,7 +2561,9 @@ def build_parser() -> argparse.ArgumentParser:
         help="Task description (may be omitted when --run-artifact is provided).",
     )
     simulate_agent.add_argument("--repo", default=".", help="Repository path")
-    simulate_agent.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
+    simulate_agent.add_argument(
+        "--workspace", help="Workspace TOML describing multiple local repositories/packages."
+    )
     simulate_agent.add_argument("--out-prefix", help="Output file prefix for JSON/Markdown")
     simulate_agent.add_argument(
         "--top-files",
@@ -2562,7 +2653,9 @@ def build_parser() -> argparse.ArgumentParser:
     pack = sub.add_parser("pack", help="Build compressed context under token budget")
     pack.add_argument("task", help="Task description")
     pack.add_argument("--repo", default=".", help="Repository path")
-    pack.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
+    pack.add_argument(
+        "--workspace", help="Workspace TOML describing multiple local repositories/packages."
+    )
     pack.add_argument(
         "--max-tokens",
         type=int,
@@ -2686,10 +2779,16 @@ def build_parser() -> argparse.ArgumentParser:
 
     pr_audit = sub.add_parser("pr-audit", help="Analyze pull-request diffs for context growth")
     pr_audit.add_argument("--repo", default=".", help="Repository path")
-    pr_audit.add_argument("--base", help="Base git ref or commit SHA (defaults from CI env or HEAD~1).")
+    pr_audit.add_argument(
+        "--base", help="Base git ref or commit SHA (defaults from CI env or HEAD~1)."
+    )
     pr_audit.add_argument("--head", help="Head git ref or commit SHA (default: HEAD or CI SHA).")
-    pr_audit.add_argument("--config", help="Optional path to config TOML (default: <repo>/redcon.toml).")
-    pr_audit.add_argument("--out-prefix", help="Output prefix for PR audit JSON/Markdown/comment files")
+    pr_audit.add_argument(
+        "--config", help="Optional path to config TOML (default: <repo>/redcon.toml)."
+    )
+    pr_audit.add_argument(
+        "--out-prefix", help="Output prefix for PR audit JSON/Markdown/comment files"
+    )
     pr_audit.add_argument(
         "--max-token-increase",
         type=int,
@@ -2707,10 +2806,21 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark = sub.add_parser("benchmark", help="Compare context packing strategies")
     benchmark.add_argument("task", help="Task description")
     benchmark.add_argument("--repo", default=".", help="Repository path")
-    benchmark.add_argument("--workspace", help="Workspace TOML describing multiple local repositories/packages.")
-    benchmark.add_argument("--max-tokens", type=int, default=None, help="Token budget override for packed strategies.")
-    benchmark.add_argument("--top-files", type=int, default=None, help="Top files override for ranking-based strategies.")
-    benchmark.add_argument("--config", help="Optional path to config TOML (default: <repo>/redcon.toml).")
+    benchmark.add_argument(
+        "--workspace", help="Workspace TOML describing multiple local repositories/packages."
+    )
+    benchmark.add_argument(
+        "--max-tokens", type=int, default=None, help="Token budget override for packed strategies."
+    )
+    benchmark.add_argument(
+        "--top-files",
+        type=int,
+        default=None,
+        help="Top files override for ranking-based strategies.",
+    )
+    benchmark.add_argument(
+        "--config", help="Optional path to config TOML (default: <repo>/redcon.toml)."
+    )
     benchmark.add_argument("--out-prefix", help="Output file prefix for benchmark JSON/Markdown")
     benchmark.set_defaults(func=cmd_benchmark)
 
@@ -2728,10 +2838,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Path to TOML file containing [[tasks]] entries (omit when using --runs).",
     )
     dataset.add_argument("--repo", default=".", help="Repository path to benchmark against")
-    dataset.add_argument("--max-tokens", type=int, default=None, help="Token budget forwarded to each benchmark run")
-    dataset.add_argument("--top-files", type=int, default=None, help="Top-files limit forwarded to each benchmark run")
-    dataset.add_argument("--config", help="Optional path to config TOML (default: <repo>/redcon.toml)")
-    dataset.add_argument("--out-prefix", default="redcon-dataset", help="Output file prefix for dataset JSON/Markdown")
+    dataset.add_argument(
+        "--max-tokens", type=int, default=None, help="Token budget forwarded to each benchmark run"
+    )
+    dataset.add_argument(
+        "--top-files",
+        type=int,
+        default=None,
+        help="Top-files limit forwarded to each benchmark run",
+    )
+    dataset.add_argument(
+        "--config", help="Optional path to config TOML (default: <repo>/redcon.toml)"
+    )
+    dataset.add_argument(
+        "--out-prefix",
+        default="redcon-dataset",
+        help="Output file prefix for dataset JSON/Markdown",
+    )
     dataset.add_argument(
         "--runs",
         nargs="+",
@@ -2773,9 +2896,18 @@ def build_parser() -> argparse.ArgumentParser:
         default=False,
         help="Skip built-in tasks and use only those from --tasks-toml",
     )
-    build_dataset.add_argument("--max-tokens", type=int, default=None, help="Token budget forwarded to each benchmark run")
-    build_dataset.add_argument("--top-files", type=int, default=None, help="Top-files limit forwarded to each benchmark run")
-    build_dataset.add_argument("--config", help="Optional path to config TOML (default: <repo>/redcon.toml)")
+    build_dataset.add_argument(
+        "--max-tokens", type=int, default=None, help="Token budget forwarded to each benchmark run"
+    )
+    build_dataset.add_argument(
+        "--top-files",
+        type=int,
+        default=None,
+        help="Top-files limit forwarded to each benchmark run",
+    )
+    build_dataset.add_argument(
+        "--config", help="Optional path to config TOML (default: <repo>/redcon.toml)"
+    )
     build_dataset.add_argument(
         "--out-prefix",
         default="redcon-context-dataset",
@@ -2829,7 +2961,6 @@ def build_parser() -> argparse.ArgumentParser:
         help="Run a single incremental refresh and exit.",
     )
     watch.set_defaults(func=cmd_watch)
-
 
     advise = sub.add_parser(
         "advise",
@@ -3387,8 +3518,7 @@ def build_parser() -> argparse.ArgumentParser:
         "--remaining-tokens",
         type=int,
         default=30000,
-        help="Remaining budget hint that drives compression aggressiveness "
-        "(default: 30000).",
+        help="Remaining budget hint that drives compression aggressiveness (default: 30000).",
     )
     run_parser.add_argument(
         "--quality-floor",
@@ -3470,9 +3600,7 @@ def build_parser() -> argparse.ArgumentParser:
             "fitted under a token budget"
         ),
     )
-    repo_map_parser.add_argument(
-        "task", help="Task description used to rank file relevance"
-    )
+    repo_map_parser.add_argument("task", help="Task description used to rank file relevance")
     repo_map_parser.add_argument(
         "--repo", default=".", help="Repository path (default: current directory)"
     )

@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Diagnostics for verifying Redcon environment health."""
+
+from __future__ import annotations
 
 import platform
 import shutil
@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from redcon.config import RedconConfig, load_config, validate_config
+from redcon.config import validate_config
 
 
 @dataclass(slots=True)
@@ -59,11 +59,13 @@ def _check_python_version() -> CheckResult:
 def _check_toml_parser() -> CheckResult:
     try:
         import tomllib  # noqa: F401
+
         return CheckResult(name="toml_parser", status="ok", message="tomllib (stdlib)")
     except ModuleNotFoundError:
         pass
     try:
         import tomli  # noqa: F401
+
         return CheckResult(name="toml_parser", status="ok", message="tomli (backport)")
     except ModuleNotFoundError:
         return CheckResult(
@@ -107,6 +109,7 @@ def _check_config(repo: Path) -> CheckResult:
             import tomli as tomllib  # type: ignore[no-redef]
         data = tomllib.loads(config_path.read_text(encoding="utf-8"))
         from redcon.config import load_config_from_mapping
+
         cfg = load_config_from_mapping(data)
         errors = validate_config(cfg)
         if errors:
@@ -157,8 +160,8 @@ def _check_disk_space(repo: Path) -> CheckResult:
     """Check available disk space for the workspace (fix 2)."""
     try:
         usage = shutil.disk_usage(repo)
-        free_gb = usage.free / (1024 ** 3)
-        total_gb = usage.total / (1024 ** 3)
+        free_gb = usage.free / (1024**3)
+        total_gb = usage.total / (1024**3)
         pct_free = (usage.free / usage.total) * 100 if usage.total > 0 else 0
         if free_gb < 0.5:
             return CheckResult(

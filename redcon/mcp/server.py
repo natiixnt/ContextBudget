@@ -18,9 +18,10 @@ import logging
 from typing import Any
 
 try:
+    import mcp.types as types
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
-    import mcp.types as types
+
     _MCP_AVAILABLE = True
 except ImportError:
     _MCP_AVAILABLE = False
@@ -171,7 +172,10 @@ _TOOL_SCHEMAS = [
             "properties": {
                 "pattern": {"type": "string"},
                 "scope": {"type": "string", "default": "."},
-                "language": {"type": "string", "description": "Language hint (python, javascript, rust, ...)"},
+                "language": {
+                    "type": "string",
+                    "description": "Language hint (python, javascript, rust, ...)",
+                },
                 "max_results": {"type": "integer", "default": 200},
             },
             "required": ["pattern"],
