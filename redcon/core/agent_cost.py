@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Agent workflow cost estimation.
 
 Maps model names to published input/output token prices and computes USD cost
@@ -13,8 +11,9 @@ parameters of :func:`compute_step_cost` and :func:`compute_workflow_cost`.
 Adding a new model is a single-line change to ``BUILTIN_MODEL_PRICING``.
 """
 
-from dataclasses import dataclass
+from __future__ import annotations
 
+from dataclasses import dataclass
 
 # ---------------------------------------------------------------------------
 # Pricing table
@@ -22,9 +21,10 @@ from dataclasses import dataclass
 # Sources: public provider pricing pages, approximate as of early 2026.
 # ---------------------------------------------------------------------------
 
+
 @dataclass(frozen=True, slots=True)
 class ModelPricing:
-    input_per_1m: float   # USD per 1 000 000 input tokens
+    input_per_1m: float  # USD per 1 000 000 input tokens
     output_per_1m: float  # USD per 1 000 000 output tokens
     provider: str = ""
     notes: str = ""
@@ -32,72 +32,72 @@ class ModelPricing:
 
 BUILTIN_MODEL_PRICING: dict[str, ModelPricing] = {
     # --- Anthropic ---
-    "claude-opus-4-6":          ModelPricing(15.00,  75.00, provider="anthropic"),
-    "claude-opus-4-5":          ModelPricing(15.00,  75.00, provider="anthropic"),
-    "claude-opus-4":            ModelPricing(15.00,  75.00, provider="anthropic"),
-    "claude-sonnet-4-6":        ModelPricing( 3.00,  15.00, provider="anthropic"),
-    "claude-sonnet-4-5":        ModelPricing( 3.00,  15.00, provider="anthropic"),
-    "claude-sonnet-4":          ModelPricing( 3.00,  15.00, provider="anthropic"),
-    "claude-3-7-sonnet":        ModelPricing( 3.00,  15.00, provider="anthropic"),
-    "claude-3-5-sonnet":        ModelPricing( 3.00,  15.00, provider="anthropic"),
-    "claude-haiku-4-5":         ModelPricing( 0.80,   4.00, provider="anthropic"),
-    "claude-3-5-haiku":         ModelPricing( 0.80,   4.00, provider="anthropic"),
-    "claude-3-haiku":           ModelPricing( 0.25,   1.25, provider="anthropic"),
+    "claude-opus-4-6": ModelPricing(15.00, 75.00, provider="anthropic"),
+    "claude-opus-4-5": ModelPricing(15.00, 75.00, provider="anthropic"),
+    "claude-opus-4": ModelPricing(15.00, 75.00, provider="anthropic"),
+    "claude-sonnet-4-6": ModelPricing(3.00, 15.00, provider="anthropic"),
+    "claude-sonnet-4-5": ModelPricing(3.00, 15.00, provider="anthropic"),
+    "claude-sonnet-4": ModelPricing(3.00, 15.00, provider="anthropic"),
+    "claude-3-7-sonnet": ModelPricing(3.00, 15.00, provider="anthropic"),
+    "claude-3-5-sonnet": ModelPricing(3.00, 15.00, provider="anthropic"),
+    "claude-haiku-4-5": ModelPricing(0.80, 4.00, provider="anthropic"),
+    "claude-3-5-haiku": ModelPricing(0.80, 4.00, provider="anthropic"),
+    "claude-3-haiku": ModelPricing(0.25, 1.25, provider="anthropic"),
     # --- OpenAI ---
-    "gpt-4o":                   ModelPricing( 2.50,  10.00, provider="openai"),
-    "gpt-4o-mini":              ModelPricing( 0.15,   0.60, provider="openai"),
-    "gpt-4.1":                  ModelPricing( 2.00,   8.00, provider="openai"),
-    "gpt-4.1-mini":             ModelPricing( 0.40,   1.60, provider="openai"),
-    "gpt-4.1-nano":             ModelPricing( 0.10,   0.40, provider="openai"),
-    "o3":                       ModelPricing(10.00,  40.00, provider="openai"),
-    "o4-mini":                  ModelPricing( 1.10,   4.40, provider="openai"),
-    "o3-mini":                  ModelPricing( 1.10,   4.40, provider="openai"),
-    "gpt-4-turbo":              ModelPricing(10.00,  30.00, provider="openai"),
+    "gpt-4o": ModelPricing(2.50, 10.00, provider="openai"),
+    "gpt-4o-mini": ModelPricing(0.15, 0.60, provider="openai"),
+    "gpt-4.1": ModelPricing(2.00, 8.00, provider="openai"),
+    "gpt-4.1-mini": ModelPricing(0.40, 1.60, provider="openai"),
+    "gpt-4.1-nano": ModelPricing(0.10, 0.40, provider="openai"),
+    "o3": ModelPricing(10.00, 40.00, provider="openai"),
+    "o4-mini": ModelPricing(1.10, 4.40, provider="openai"),
+    "o3-mini": ModelPricing(1.10, 4.40, provider="openai"),
+    "gpt-4-turbo": ModelPricing(10.00, 30.00, provider="openai"),
     # --- Google ---
-    "gemini-2-0-flash":         ModelPricing( 0.10,   0.40, provider="google"),
-    "gemini-2-5-pro":           ModelPricing( 1.25,  10.00, provider="google"),
-    "gemini-1-5-pro":           ModelPricing( 1.25,   5.00, provider="google"),
-    "gemini-1-5-flash":         ModelPricing( 0.075,  0.30, provider="google"),
+    "gemini-2-0-flash": ModelPricing(0.10, 0.40, provider="google"),
+    "gemini-2-5-pro": ModelPricing(1.25, 10.00, provider="google"),
+    "gemini-1-5-pro": ModelPricing(1.25, 5.00, provider="google"),
+    "gemini-1-5-flash": ModelPricing(0.075, 0.30, provider="google"),
     # --- Mistral ---
-    "mistral-large":            ModelPricing( 2.00,   6.00, provider="mistral"),
-    "mistral-small":            ModelPricing( 0.20,   0.60, provider="mistral"),
-    "codestral":                ModelPricing( 0.20,   0.60, provider="mistral"),
+    "mistral-large": ModelPricing(2.00, 6.00, provider="mistral"),
+    "mistral-small": ModelPricing(0.20, 0.60, provider="mistral"),
+    "codestral": ModelPricing(0.20, 0.60, provider="mistral"),
     # --- Open Source (hosted API pricing, e.g. Groq / Together / DeepSeek) ---
-    # Meta Llama — Groq public pricing
-    "llama-3.3-70b":            ModelPricing( 0.59,   0.79, provider="meta", notes="Groq hosted"),
-    "llama-3.1-70b":            ModelPricing( 0.59,   0.79, provider="meta", notes="Groq hosted"),
-    "llama-3.1-8b":             ModelPricing( 0.05,   0.08, provider="meta", notes="Groq hosted"),
-    "llama-3-70b":              ModelPricing( 0.59,   0.79, provider="meta", notes="Groq hosted"),
-    "llama-3-8b":               ModelPricing( 0.05,   0.08, provider="meta", notes="Groq hosted"),
-    # DeepSeek — DeepSeek API pricing
-    "deepseek-v3":              ModelPricing( 0.27,   1.10, provider="deepseek"),
-    "deepseek-r1":              ModelPricing( 0.55,   2.19, provider="deepseek"),
-    "deepseek-r1-distill-70b":  ModelPricing( 0.55,   2.19, provider="deepseek"),
-    # Qwen — Together AI pricing
-    "qwen2.5-72b":              ModelPricing( 1.20,   1.20, provider="alibaba", notes="Together hosted"),
-    "qwen2.5-coder-32b":        ModelPricing( 0.80,   0.80, provider="alibaba", notes="Together hosted"),
+    # Meta Llama - Groq public pricing
+    "llama-3.3-70b": ModelPricing(0.59, 0.79, provider="meta", notes="Groq hosted"),
+    "llama-3.1-70b": ModelPricing(0.59, 0.79, provider="meta", notes="Groq hosted"),
+    "llama-3.1-8b": ModelPricing(0.05, 0.08, provider="meta", notes="Groq hosted"),
+    "llama-3-70b": ModelPricing(0.59, 0.79, provider="meta", notes="Groq hosted"),
+    "llama-3-8b": ModelPricing(0.05, 0.08, provider="meta", notes="Groq hosted"),
+    # DeepSeek - DeepSeek API pricing
+    "deepseek-v3": ModelPricing(0.27, 1.10, provider="deepseek"),
+    "deepseek-r1": ModelPricing(0.55, 2.19, provider="deepseek"),
+    "deepseek-r1-distill-70b": ModelPricing(0.55, 2.19, provider="deepseek"),
+    # Qwen - Together AI pricing
+    "qwen2.5-72b": ModelPricing(1.20, 1.20, provider="alibaba", notes="Together hosted"),
+    "qwen2.5-coder-32b": ModelPricing(0.80, 0.80, provider="alibaba", notes="Together hosted"),
     # Cohere Command R
-    "command-r-plus":           ModelPricing( 2.50,  10.00, provider="cohere"),
-    "command-r":                ModelPricing( 0.15,   0.60, provider="cohere"),
+    "command-r-plus": ModelPricing(2.50, 10.00, provider="cohere"),
+    "command-r": ModelPricing(0.15, 0.60, provider="cohere"),
 }
 
 # Aliases / common short names
 _ALIASES: dict[str, str] = {
-    "opus":        "claude-opus-4-6",
-    "sonnet":      "claude-sonnet-4-6",
-    "haiku":       "claude-haiku-4-5",
-    "claude":      "claude-sonnet-4-6",
-    "claude-3":    "claude-3-5-sonnet",
-    "claude-3-5":  "claude-3-5-sonnet",
-    "claude-3-7":  "claude-3-7-sonnet",
-    "gpt4o":       "gpt-4o",
+    "opus": "claude-opus-4-6",
+    "sonnet": "claude-sonnet-4-6",
+    "haiku": "claude-haiku-4-5",
+    "claude": "claude-sonnet-4-6",
+    "claude-3": "claude-3-5-sonnet",
+    "claude-3-5": "claude-3-5-sonnet",
+    "claude-3-7": "claude-3-7-sonnet",
+    "gpt4o": "gpt-4o",
     "gpt-4o-mini-latest": "gpt-4o-mini",
-    "o1":          "o3",          # treat deprecated o1 as o3-tier
-    "llama3":      "llama-3.3-70b",
-    "llama":       "llama-3.3-70b",
-    "deepseek":    "deepseek-v3",
-    "qwen":        "qwen2.5-72b",
-    "command-r+":  "command-r-plus",
+    "o1": "o3",  # treat deprecated o1 as o3-tier
+    "llama3": "llama-3.3-70b",
+    "llama": "llama-3.3-70b",
+    "deepseek": "deepseek-v3",
+    "qwen": "qwen2.5-72b",
+    "command-r+": "command-r-plus",
 }
 
 
@@ -149,10 +149,16 @@ def resolve_model_pricing(
     # Apply partial overrides
     if price_per_1m_input is not None or price_per_1m_output is not None:
         return ModelPricing(
-            input_per_1m=float(price_per_1m_input) if price_per_1m_input is not None else pricing.input_per_1m,
-            output_per_1m=float(price_per_1m_output) if price_per_1m_output is not None else pricing.output_per_1m,
+            input_per_1m=float(price_per_1m_input)
+            if price_per_1m_input is not None
+            else pricing.input_per_1m,
+            output_per_1m=float(price_per_1m_output)
+            if price_per_1m_output is not None
+            else pricing.output_per_1m,
             provider=pricing.provider,
-            notes=pricing.notes + " (partially overridden)" if pricing.notes else "(partially overridden)",
+            notes=pricing.notes + " (partially overridden)"
+            if pricing.notes
+            else "(partially overridden)",
         )
     return pricing
 
@@ -273,10 +279,12 @@ def list_known_models() -> list[dict]:
     """Return a sorted list of all models in the built-in pricing table."""
     rows = []
     for name, p in sorted(BUILTIN_MODEL_PRICING.items()):
-        rows.append({
-            "model": name,
-            "provider": p.provider,
-            "input_per_1m_usd": p.input_per_1m,
-            "output_per_1m_usd": p.output_per_1m,
-        })
+        rows.append(
+            {
+                "model": name,
+                "provider": p.provider,
+                "input_per_1m_usd": p.input_per_1m,
+                "output_per_1m_usd": p.output_per_1m,
+            }
+        )
     return rows

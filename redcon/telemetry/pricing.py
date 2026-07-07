@@ -2,8 +2,6 @@
 # Copyright (c) 2026 nai. All rights reserved.
 # See LICENSE-COMMERCIAL for terms.
 
-from __future__ import annotations
-
 """Model pricing tables and token cost computation.
 
 Pricing is expressed as USD per 1 million input tokens (the dominant cost
@@ -16,15 +14,17 @@ negotiated or volume-discount pricing can override the defaults by passing a
 custom ``model_pricing`` dict to :func:`compute_run_costs`.
 """
 
+from __future__ import annotations
+
 from typing import Any
 
 # ---------------------------------------------------------------------------
 # Pricing table
 # ---------------------------------------------------------------------------
 
-#: input_per_million  – USD per 1 M input tokens
-#: output_per_million – USD per 1 M output tokens (informational only)
-#: display_name       – human-readable model name shown in reports
+#: input_per_million  - USD per 1 M input tokens
+#: output_per_million - USD per 1 M output tokens (informational only)
+#: display_name       - human-readable model name shown in reports
 MODEL_PRICING: dict[str, dict[str, Any]] = {
     # ── Anthropic Claude ─────────────────────────────────────────────────────
     "claude-opus-4-6": {

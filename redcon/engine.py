@@ -1,18 +1,16 @@
-from __future__ import annotations
-
 """Public library API for Redcon workflows."""
+
+from __future__ import annotations
 
 import logging
 import time
+from collections.abc import Mapping, Sequence
 from pathlib import Path
-from typing import Any, Mapping, Sequence
-
-logger = logging.getLogger(__name__)
+from typing import Any
 
 from redcon.cache import update_run_history_artifacts
 from redcon.config import RedconConfig, WorkspaceDefinition, load_config, load_workspace
 from redcon.core.advisor import advise_as_dict, run_advise
-from redcon.core.drift import run_drift
 from redcon.core.benchmark import run_benchmark
 from redcon.core.context_dataset_builder import (
     BUILTIN_TASKS,
@@ -22,11 +20,13 @@ from redcon.core.context_dataset_builder import (
 )
 from redcon.core.dataset import DatasetTask, dataset_as_dict, load_tasks_toml, run_dataset
 from redcon.core.delta import effective_pack_metrics
+from redcon.core.drift import run_drift
 from redcon.core.graph_visualizer import (
     build_repo_graph,
     render_graph_html,
     visualize_as_dict,
 )
+from redcon.core.observe import build_observe_report, observe_as_dict
 from redcon.core.pipeline import (
     as_json_dict,
     run_diff_from_json,
@@ -38,21 +38,23 @@ from redcon.core.pipeline import (
     run_report_from_json,
     run_simulate_agent,
 )
+from redcon.core.pipeline_trace import build_pipeline_trace, pipeline_trace_as_dict
 from redcon.core.policy import (
     PolicySpec,
     default_strict_policy,
-    evaluate_policy as evaluate_policy_artifact,
     load_policy,
     policy_result_to_dict,
 )
-from redcon.core.observe import build_observe_report, observe_as_dict
+from redcon.core.policy import (
+    evaluate_policy as evaluate_policy_artifact,
+)
 from redcon.core.profiler import build_savings_profile, savings_profile_as_dict
 from redcon.core.read_profiler import build_read_profile, read_profile_as_dict
-from redcon.core.pipeline_trace import build_pipeline_trace, pipeline_trace_as_dict
 from redcon.core.render import read_json
 from redcon.schemas.models import normalize_repo
 from redcon.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
 
+logger = logging.getLogger(__name__)
 
 RunArtifactInput = dict[str, Any] | str | Path
 
@@ -182,10 +184,14 @@ class RedconEngine:
 
         repo_path = normalize_repo(repo)
         if not repo_path.is_dir():
-            raise FileNotFoundError(f"workspace_root does not exist or is not a directory: {repo_path}")
+            raise FileNotFoundError(
+                f"workspace_root does not exist or is not a directory: {repo_path}"
+            )
         if workspace is not None:
             workspace_definition = self._load_workspace(workspace, config_path=config_path)
-            effective_top_files = top_files if top_files is not None else workspace_definition.config.budget.top_files
+            effective_top_files = (
+                top_files if top_files is not None else workspace_definition.config.budget.top_files
+            )
             result = run_plan(
                 task,
                 repo=workspace_definition.root,
@@ -224,7 +230,9 @@ class RedconEngine:
         repo_path = normalize_repo(repo)
         if workspace is not None:
             workspace_definition = self._load_workspace(workspace, config_path=config_path)
-            effective_top_files = top_files if top_files is not None else workspace_definition.config.budget.top_files
+            effective_top_files = (
+                top_files if top_files is not None else workspace_definition.config.budget.top_files
+            )
             return run_plan_agent(
                 task,
                 repo=workspace_definition.root,
@@ -265,7 +273,9 @@ class RedconEngine:
         repo_path = normalize_repo(repo)
         if workspace is not None:
             workspace_definition = self._load_workspace(workspace, config_path=config_path)
-            effective_top_files = top_files if top_files is not None else workspace_definition.config.budget.top_files
+            effective_top_files = (
+                top_files if top_files is not None else workspace_definition.config.budget.top_files
+            )
             return run_simulate_agent(
                 task,
                 repo=workspace_definition.root,
@@ -364,7 +374,9 @@ class RedconEngine:
 
             # Handle no-files-matched: return empty result instead of propagating an error
             files_included = result.get("files_included")
-            if not files_included or (isinstance(files_included, list) and len(files_included) == 0):
+            if not files_included or (
+                isinstance(files_included, list) and len(files_included) == 0
+            ):
                 logger.info("pack: no files matched the scan for task=%r", task)
 
             # Defensive division-by-zero guard for token percentage calculations
@@ -476,7 +488,9 @@ class RedconEngine:
                 duplicate_reads_prevented=(
                     budget.get("duplicate_reads_prevented", 0) if isinstance(budget, dict) else None
                 ),
-                quality_risk_estimate=budget.get("quality_risk_estimate") if isinstance(budget, dict) else None,
+                quality_risk_estimate=budget.get("quality_risk_estimate")
+                if isinstance(budget, dict)
+                else None,
             )
             telemetry.emit("policy_failed", **_policy_emit_kwargs)
             telemetry.emit("policy_violation", **_policy_emit_kwargs)
@@ -578,22 +592,30 @@ class RedconEngine:
             for r in runs:
                 run_data = self._load_run_artifact(r)
                 budget = run_data.get("budget") or {}
-                entries.append(RunHistoryEntry(
-                    generated_at=str(run_data.get("generated_at", "") or ""),
-                    task=str(run_data.get("task", "") or ""),
-                    selected_files=list(run_data.get("files_included", []) or []),
-                    ignored_files=list(run_data.get("files_skipped", []) or []),
-                    candidate_files=list(run_data.get("candidate_files", []) or []),
-                    token_usage={
-                        "max_tokens": int(budget.get("max_tokens") or 0),
-                        "estimated_input_tokens": int(budget.get("estimated_input_tokens") or 0),
-                        "estimated_saved_tokens": int(budget.get("estimated_saved_tokens") or 0),
-                        "quality_risk_estimate": str(budget.get("quality_risk_estimate") or ""),
-                    },
-                    repo=str(run_data.get("repo", "") or ""),
-                    workspace=str(run_data.get("workspace", "") or ""),
-                ))
-        return run_drift(repo_path, task=task, window=window, threshold_pct=threshold_pct, entries=entries)
+                entries.append(
+                    RunHistoryEntry(
+                        generated_at=str(run_data.get("generated_at", "") or ""),
+                        task=str(run_data.get("task", "") or ""),
+                        selected_files=list(run_data.get("files_included", []) or []),
+                        ignored_files=list(run_data.get("files_skipped", []) or []),
+                        candidate_files=list(run_data.get("candidate_files", []) or []),
+                        token_usage={
+                            "max_tokens": int(budget.get("max_tokens") or 0),
+                            "estimated_input_tokens": int(
+                                budget.get("estimated_input_tokens") or 0
+                            ),
+                            "estimated_saved_tokens": int(
+                                budget.get("estimated_saved_tokens") or 0
+                            ),
+                            "quality_risk_estimate": str(budget.get("quality_risk_estimate") or ""),
+                        },
+                        repo=str(run_data.get("repo", "") or ""),
+                        workspace=str(run_data.get("workspace", "") or ""),
+                    )
+                )
+        return run_drift(
+            repo_path, task=task, window=window, threshold_pct=threshold_pct, entries=entries
+        )
 
     def benchmark(
         self,
@@ -664,7 +686,9 @@ class RedconEngine:
         repo_path = normalize_repo(repo)
         tasks = load_tasks_toml(Path(tasks_toml))
 
-        def _run(*, task: str, repo: Path, max_tokens: int | None, top_files: int | None) -> dict[str, Any]:
+        def _run(
+            *, task: str, repo: Path, max_tokens: int | None, top_files: int | None
+        ) -> dict[str, Any]:
             return self.benchmark(
                 task=task,
                 repo=repo,
@@ -698,8 +722,9 @@ class RedconEngine:
             Sequence of run artifact dicts or file paths produced by
             :meth:`pack` or :meth:`benchmark`.
         """
-        from redcon.core.dataset import DatasetEntry, DatasetReport, dataset_as_dict, _reduction_pct
         from datetime import datetime, timezone
+
+        from redcon.core.dataset import DatasetEntry, DatasetReport, _reduction_pct, dataset_as_dict
 
         entries: list[DatasetEntry] = []
         repo_label = "."
@@ -712,7 +737,10 @@ class RedconEngine:
             # Accept both pack artifacts (budget keys) and benchmark artifacts
             baseline = int(
                 run_data.get("baseline_full_context_tokens")
-                or (int(budget.get("estimated_input_tokens") or 0) + int(budget.get("estimated_saved_tokens") or 0))
+                or (
+                    int(budget.get("estimated_input_tokens") or 0)
+                    + int(budget.get("estimated_saved_tokens") or 0)
+                )
                 or 0
             )
             optimized = int(budget.get("estimated_input_tokens") or 0)
@@ -721,14 +749,16 @@ class RedconEngine:
                 if isinstance(strategy, dict) and strategy.get("strategy") == "compressed_pack":
                     optimized = int(strategy.get("estimated_input_tokens") or optimized)
                     break
-            entries.append(DatasetEntry(
-                task=task,
-                task_name=task_name,
-                baseline_tokens=baseline,
-                optimized_tokens=optimized,
-                reduction_pct=_reduction_pct(baseline, optimized),
-                benchmark={},
-            ))
+            entries.append(
+                DatasetEntry(
+                    task=task,
+                    task_name=task_name,
+                    baseline_tokens=baseline,
+                    optimized_tokens=optimized,
+                    reduction_pct=_reduction_pct(baseline, optimized),
+                    benchmark={},
+                )
+            )
 
         n = len(entries)
         total_baseline = sum(e.baseline_tokens for e in entries)
@@ -765,7 +795,7 @@ class RedconEngine:
     ) -> dict[str, Any]:
         """Build a token-reduction benchmark dataset using built-in and/or custom tasks.
 
-        Unlike :meth:`dataset`, no TOML file is required — the built-in task
+        Unlike :meth:`dataset`, no TOML file is required - the built-in task
         list is used by default, enabling reproducible benchmarks without any
         external configuration.
 
@@ -795,7 +825,9 @@ class RedconEngine:
 
         effective_tasks = builtin_tasks + extra_tasks
 
-        def _run(*, task: str, repo: Path, max_tokens: int | None, top_files: int | None) -> dict[str, Any]:
+        def _run(
+            *, task: str, repo: Path, max_tokens: int | None, top_files: int | None
+        ) -> dict[str, Any]:
             return self.benchmark(
                 task=task,
                 repo=repo,
@@ -863,7 +895,6 @@ class RedconEngine:
         report = build_repo_graph(repo_path, cfg, history=history)
         logger.info("visualize_html: done")
         return render_graph_html(report)
-
 
     def advise(
         self,
@@ -975,10 +1006,7 @@ class RedconEngine:
         from redcon.core.cost_analysis import compute_cost_analysis, load_run_data
 
         logger.info("cost_analysis: start - model=%r", model)
-        if isinstance(run, dict):
-            run_data = run
-        else:
-            run_data = load_run_data(run)
+        run_data = run if isinstance(run, dict) else load_run_data(run)
 
         return compute_cost_analysis(
             run_data,
@@ -1133,12 +1161,12 @@ class RedconEngine:
         Returns:
             JSON-serialisable dict with keys:
 
-            * ``summary`` — total baseline/optimised costs, savings, savings%
-            * ``by_repository`` — cost breakdown per repo path
-            * ``by_run`` — per-run cost entries (newest first)
-            * ``by_stage`` — savings split by cache vs compression stage
-            * ``pricing`` — model and rate used for the calculation
-            * ``available_models`` — list of all supported model pricing entries
+            * ``summary`` - total baseline/optimised costs, savings, savings%
+            * ``by_repository`` - cost breakdown per repo path
+            * ``by_run`` - per-run cost entries (newest first)
+            * ``by_stage`` - savings split by cache vs compression stage
+            * ``pricing`` - model and rate used for the calculation
+            * ``available_models`` - list of all supported model pricing entries
         """
         from redcon.core.cost_analytics import build_cost_report
 
@@ -1182,7 +1210,9 @@ class BudgetGuard:
         fallback_max_tokens: int | None = None,
         policy_path: str | Path | None = None,
     ) -> PolicySpec:
-        effective_policy_path = Path(policy_path).resolve() if policy_path is not None else self.policy_path
+        effective_policy_path = (
+            Path(policy_path).resolve() if policy_path is not None else self.policy_path
+        )
         if effective_policy_path is not None:
             spec = load_policy(effective_policy_path)
         else:
@@ -1439,7 +1469,9 @@ class BudgetGuard:
         estimated_input = int(budget.get("estimated_input_tokens", 0) or 0)
         estimated_saved = int(budget.get("estimated_saved_tokens", 0) or 0)
         original_tokens = estimated_input + estimated_saved
-        compression_ratio = round(estimated_saved / original_tokens, 4) if original_tokens > 0 else 0.0
+        compression_ratio = (
+            round(estimated_saved / original_tokens, 4) if original_tokens > 0 else 0.0
+        )
 
         files_included = run_data.get("files_included", [])
         files_skipped = run_data.get("files_skipped", [])

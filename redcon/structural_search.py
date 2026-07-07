@@ -287,8 +287,7 @@ def render_text(result: StructuralSearchResult) -> str:
         head += f" lang={result.language}"
     if result.backend == "unavailable":
         return (
-            head
-            + "\n(install ast-grep on PATH or `pip install redcon[ast_grep]`"
+            head + "\n(install ast-grep on PATH or the `redcon[ast_grep]` extra"
             " to enable structural search)"
         )
     if not result.matches:

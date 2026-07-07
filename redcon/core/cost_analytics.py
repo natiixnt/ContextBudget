@@ -1,10 +1,10 @@
-from __future__ import annotations
-
-"""Token cost analytics — compute financial savings from context optimisation.
+"""Token cost analytics - compute financial savings from context optimisation.
 
 Aggregates run data from pack artifacts and observe-history to produce
 cost reports broken down by repository, agent run, and optimisation stage.
 """
+
+from __future__ import annotations
 
 import json
 from pathlib import Path
@@ -13,11 +13,9 @@ from typing import Any
 from redcon.telemetry.pricing import (
     DEFAULT_MODEL,
     MODEL_PRICING,
-    compute_run_costs,
     get_pricing,
     tokens_to_usd,
 )
-
 
 # ---------------------------------------------------------------------------
 # Data collection helpers
@@ -109,6 +107,7 @@ def _load_history_entries(paths: list[Path]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Per-run record builder
 # ---------------------------------------------------------------------------
+
 
 def _extract_run_record(
     source: dict[str, Any],
@@ -202,9 +201,7 @@ def _extract_run_record(
             "cache_tokens_saved": 0,
             "duplicate_reads_prevented": 0,
             "source_type": "history",
-            "artifact_path": str(
-                (source.get("result_artifacts") or {}).get("json", "") or ""
-            ),
+            "artifact_path": str((source.get("result_artifacts") or {}).get("json", "") or ""),
         }
 
     return None
@@ -213,6 +210,7 @@ def _extract_run_record(
 # ---------------------------------------------------------------------------
 # Aggregation queries
 # ---------------------------------------------------------------------------
+
 
 def _cost_by_repository(
     records: list[dict[str, Any]],
@@ -266,21 +264,23 @@ def _cost_by_run(
         baseline_cost = tokens_to_usd(r["baseline_tokens"], rate)
         optimized_cost = tokens_to_usd(r["optimized_tokens"], rate)
         savings_usd = max(0.0, baseline_cost - optimized_cost)
-        result.append({
-            "generated_at": r["generated_at"],
-            "task": r["task"],
-            "repo": r["repo"] or "(unknown)",
-            "command": r["command"],
-            "baseline_tokens": r["baseline_tokens"],
-            "optimized_tokens": r["optimized_tokens"],
-            "tokens_saved": tokens_saved,
-            "baseline_cost_usd": round(baseline_cost, 8),
-            "optimized_cost_usd": round(optimized_cost, 8),
-            "savings_usd": round(savings_usd, 8),
-            "savings_pct": round(savings_usd / baseline_cost, 6) if baseline_cost > 0 else 0.0,
-            "source_type": r["source_type"],
-            "artifact_path": r["artifact_path"],
-        })
+        result.append(
+            {
+                "generated_at": r["generated_at"],
+                "task": r["task"],
+                "repo": r["repo"] or "(unknown)",
+                "command": r["command"],
+                "baseline_tokens": r["baseline_tokens"],
+                "optimized_tokens": r["optimized_tokens"],
+                "tokens_saved": tokens_saved,
+                "baseline_cost_usd": round(baseline_cost, 8),
+                "optimized_cost_usd": round(optimized_cost, 8),
+                "savings_usd": round(savings_usd, 8),
+                "savings_pct": round(savings_usd / baseline_cost, 6) if baseline_cost > 0 else 0.0,
+                "source_type": r["source_type"],
+                "artifact_path": r["artifact_path"],
+            }
+        )
     return result
 
 
@@ -296,7 +296,7 @@ def _cost_by_stage(
         Tokens (and USD) saved because file summaries were already cached
         and did not need to be re-transmitted.
     compression
-        All remaining savings beyond the cache layer — primarily from
+        All remaining savings beyond the cache layer - primarily from
         intelligent ranking, chunking, and symbol-level compression applied
         by the packer.
 
@@ -336,6 +336,7 @@ def _cost_by_stage(
 # Main entry point
 # ---------------------------------------------------------------------------
 
+
 def build_cost_report(
     paths: list[Path],
     *,
@@ -372,7 +373,7 @@ def build_cost_report(
     records: list[dict[str, Any]] = []
     seen_ts: set[str] = set()
 
-    # 1. Pack/simulate-agent artifacts (highest fidelity — include cache data)
+    # 1. Pack/simulate-agent artifacts (highest fidelity - include cache data)
     for artifact in _load_pack_artifacts(paths):
         rec = _extract_run_record(artifact, "artifact")
         if rec is None:
@@ -396,7 +397,7 @@ def build_cost_report(
             seen_ts.add(ts)
         records.append(rec)
 
-    # 3. history.json entries (lightweight fallback — no cache breakdown)
+    # 3. history.json entries (lightweight fallback - no cache breakdown)
     for hist in _load_history_entries(paths):
         rec = _extract_run_record(hist, "history")
         if rec is None:
@@ -417,7 +418,9 @@ def build_cost_report(
     total_baseline_cost = tokens_to_usd(total_baseline, rate)
     total_optimized_cost = tokens_to_usd(total_optimized, rate)
     total_savings_usd = max(0.0, total_baseline_cost - total_optimized_cost)
-    savings_pct = round(total_savings_usd / total_baseline_cost, 6) if total_baseline_cost > 0 else 0.0
+    savings_pct = (
+        round(total_savings_usd / total_baseline_cost, 6) if total_baseline_cost > 0 else 0.0
+    )
 
     summary = {
         "total_runs": len(records),

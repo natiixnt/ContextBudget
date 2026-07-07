@@ -14,5 +14,5 @@ END
 $$;
 
 -- Allow the replicator to connect from the replica container
--- (pg_hba.conf addition — handled at container level via POSTGRESQL_HBA_ENTRY
+-- (pg_hba.conf addition - handled at container level via POSTGRESQL_HBA_ENTRY
 --  in the bitnami image, or manually in pg_hba.conf for vanilla postgres)

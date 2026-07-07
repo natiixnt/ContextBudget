@@ -2,9 +2,9 @@
  * Redcon Runtime Gateway client.
  *
  * Wraps the three gateway endpoints:
- *   - POST /prepare-context    — stateless context optimization
- *   - POST /run-agent-step     — multi-turn agent sessions
- *   - POST /report-run         — run outcome telemetry
+ *   - POST /prepare-context    - stateless context optimization
+ *   - POST /run-agent-step     - multi-turn agent sessions
+ *   - POST /report-run         - run outcome telemetry
  *
  * @example
  * ```ts
@@ -77,7 +77,7 @@ export class GatewayClient {
    * Optimize the context for a single LLM call (stateless).
    *
    * Returns token estimates, compressed file contents, and policy status.
-   * No session state is created — use {@link runAgentStep} for multi-turn.
+   * No session state is created - use {@link runAgentStep} for multi-turn.
    */
   async prepareContext(req: PrepareContextRequest): Promise<PrepareContextResponse> {
     return this.post<PrepareContextResponse>("/prepare-context", req);

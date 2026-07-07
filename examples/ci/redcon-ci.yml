@@ -19,7 +19,7 @@ jobs:
           python-version: "3.11"
 
       - name: Install Redcon
-        run: pip install redcon
+        run: pip install git+https://github.com/natiixnt/ContextBudget
 
       # Pack the repository context for the current task.
       # Adjust --max-tokens and the task description to match your workflow.

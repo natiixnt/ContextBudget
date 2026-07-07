@@ -2,9 +2,9 @@
 # Copyright (c) 2026 nai. All rights reserved.
 # See LICENSE-COMMERCIAL for terms.
 
-from __future__ import annotations
-
 """Endpoint handlers for the Redcon Runtime Gateway."""
+
+from __future__ import annotations
 
 import json
 import logging
@@ -15,21 +15,11 @@ import uuid
 from datetime import datetime, timezone
 from typing import Any
 
-
-def _validate_url(url: str) -> bool:
-    """Reject non-HTTP(S) URLs to prevent SSRF via file://, ftp://, etc."""
-    parsed = urllib.parse.urlparse(url)
-    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
-
 from redcon.agents.middleware import RedconMiddleware
 from redcon.core.policy import PolicySpec
-from redcon.engine import RedconEngine
-from redcon.runtime import AgentRuntime
-from redcon.telemetry import NoOpTelemetrySink, TelemetryEvent, TelemetrySink
-
 from redcon.core.webhooks import dispatch_budget_overrun, dispatch_policy_violation
+from redcon.engine import RedconEngine
 from redcon.gateway.config import GatewayConfig
-from redcon.gateway.session_store import SessionStore
 from redcon.gateway.models import (
     OptimizedContext,
     PolicyStatus,
@@ -40,11 +30,22 @@ from redcon.gateway.models import (
     RunAgentStepRequest,
     RunAgentStepResponse,
 )
+from redcon.gateway.session_store import SessionStore
+from redcon.runtime import AgentRuntime
+from redcon.telemetry import NoOpTelemetrySink, TelemetryEvent, TelemetrySink
 
 logger = logging.getLogger(__name__)
 
 
-def _fetch_remote_policy(config: GatewayConfig, repository_id: str | None = None) -> PolicySpec | None:
+def _validate_url(url: str) -> bool:
+    """Reject non-HTTP(S) URLs to prevent SSRF via file://, ftp://, etc."""
+    parsed = urllib.parse.urlparse(url)
+    return parsed.scheme in ("http", "https") and bool(parsed.netloc)
+
+
+def _fetch_remote_policy(
+    config: GatewayConfig, repository_id: str | None = None
+) -> PolicySpec | None:
     """Fetch the active PolicySpec from the cloud control plane.
 
     Returns ``None`` if the cloud URL is not configured, the request fails,
@@ -102,7 +103,7 @@ def _fire_webhooks(
     *,
     run_id: str,
     endpoint: str,
-    policy_status: "PolicyStatus",
+    policy_status: PolicyStatus,
     tokens_used: int,
     max_tokens: int,
 ) -> None:
@@ -136,7 +137,11 @@ def _push_audit_entry(config: GatewayConfig, **fields: Any) -> None:
     failures are logged at WARNING level and swallowed so gateway requests
     are never blocked by audit delivery.
     """
-    if not config.cloud_policy_url or config.cloud_policy_org_id is None or not config.cloud_api_key:
+    if (
+        not config.cloud_policy_url
+        or config.cloud_policy_org_id is None
+        or not config.cloud_api_key
+    ):
         return
     url = f"{config.cloud_policy_url.rstrip('/')}/orgs/{config.cloud_policy_org_id}/audit-log"
     if not _validate_url(url):
@@ -254,7 +259,7 @@ class GatewayHandlers:
         self._config = config
         self._sink: TelemetrySink = telemetry_sink or NoOpTelemetrySink()
 
-        # Shared engine — all requests reuse the same on-disk cache
+        # Shared engine - all requests reuse the same on-disk cache
         self._engine = RedconEngine(
             config_path=config.config_path or None,
         )
@@ -289,21 +294,15 @@ class GatewayHandlers:
         return request_value if request_value is not None else self._config.max_files
 
     def _effective_max_context_size(self, request_value: int | None) -> int:
-        return (
-            request_value
-            if request_value is not None
-            else self._config.max_context_size
-        )
+        return request_value if request_value is not None else self._config.max_context_size
 
     # ── Endpoint handlers ──────────────────────────────────────────────────────
 
-    def handle_prepare_context(
-        self, req: PrepareContextRequest
-    ) -> PrepareContextResponse:
+    def handle_prepare_context(self, req: PrepareContextRequest) -> PrepareContextResponse:
         """Handle ``POST /prepare-context``.
 
         Runs the full optimization pipeline (scan → rank → compress → cache)
-        and evaluates the budget policy.  Stateless — no session is created.
+        and evaluates the budget policy.  Stateless - no session is created.
         """
         run_id = uuid.uuid4().hex
         max_tokens = self._effective_max_tokens(req.max_tokens)
@@ -356,9 +355,7 @@ class GatewayHandlers:
         estimated_tokens = int(meta.get("estimated_input_tokens") or 0)
         tokens_saved = int(meta.get("estimated_saved_tokens") or 0)
         cache_report = meta.get("cache") or {}
-        cache_hits = int(
-            cache_report.get("hits") if isinstance(cache_report, dict) else 0
-        )
+        cache_hits = int(cache_report.get("hits") if isinstance(cache_report, dict) else 0)
         quality_risk = str(budget.get("quality_risk_estimate") or "unknown")
 
         self._emit(
@@ -404,9 +401,7 @@ class GatewayHandlers:
             tokens_saved=tokens_saved,
         )
 
-    def handle_run_agent_step(
-        self, req: RunAgentStepRequest
-    ) -> RunAgentStepResponse:
+    def handle_run_agent_step(self, req: RunAgentStepRequest) -> RunAgentStepResponse:
         """Handle ``POST /run-agent-step``.
 
         Runs one agent turn against the optimization pipeline.  On subsequent

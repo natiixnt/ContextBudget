@@ -147,7 +147,7 @@ services:
     environment:
       # Writes go to primary
       DATABASE_URL: postgresql://redcon:${POSTGRES_PASSWORD}@pgbouncer-primary:5432/redcon
-      # Analytics reads go to replica (optional — falls back to DATABASE_URL when unset)
+      # Analytics reads go to replica (optional - falls back to DATABASE_URL when unset)
       READ_DATABASE_URL: postgresql://redcon:${POSTGRES_PASSWORD}@pgbouncer-replica:5432/redcon
     env_file:
       - .env

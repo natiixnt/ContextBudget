@@ -14,7 +14,7 @@
  * subsequent turns only resend files that changed.
  *
  * Prerequisites:
- *   pip install redcon     (Python side)
+ *   pip install git+https://github.com/natiixnt/ContextBudget     (Python side)
  *   npm install                   (from this directory)
  *   export ANTHROPIC_API_KEY=sk-ant-...
  *
@@ -42,7 +42,7 @@ async function callClaude(prompt: string): Promise<string> {
 }
 
 // -----------------------------------------------------------------------
-// Middleware helper — agent → Redcon → model
+// Middleware helper - agent → Redcon → model
 // -----------------------------------------------------------------------
 
 /**
@@ -74,7 +74,7 @@ async function runAgentLoop(): Promise<void> {
     const task = tasks[i];
     console.log(`\n[turn ${i + 1}] ${task}`);
 
-    // 1. Intercept the task — Redcon builds the optimised prompt
+    // 1. Intercept the task - Redcon builds the optimised prompt
     const result = sdk.prepareContext(task, REPO, {
       deltaFrom: previousRunJson, // only resend changed files on turn 2+
     });

@@ -3,12 +3,12 @@
  *
  * Demonstrates all three primary SDK entry points:
  *
- *   prepareContext  — pack repository context under a token budget
- *   simulateAgent   — estimate token use and API cost before packing
- *   profileRun      — pack and return compression profiling metrics
+ *   prepareContext  - pack repository context under a token budget
+ *   simulateAgent   - estimate token use and API cost before packing
+ *   profileRun      - pack and return compression profiling metrics
  *
  * Prerequisites:
- *   pip install redcon   (or: pip install -e . from repo root)
+ *   pip install git+https://github.com/natiixnt/ContextBudget   (or: pip install -e . from repo root)
  *   npm install                 (from this directory)
  *
  * Run:
@@ -23,7 +23,7 @@ const REPO = "examples/small-feature/repo";
 const sdk = new RedconSDK({ maxTokens: 30_000 });
 
 // -----------------------------------------------------------------------
-// 1. simulateAgent — check token and cost estimates before packing
+// 1. simulateAgent - check token and cost estimates before packing
 // -----------------------------------------------------------------------
 console.log("=== simulateAgent ===");
 
@@ -39,7 +39,7 @@ for (const step of plan.steps) {
 console.log();
 
 // -----------------------------------------------------------------------
-// 2. prepareContext — pack context and get the middleware result
+// 2. prepareContext - pack context and get the middleware result
 // -----------------------------------------------------------------------
 console.log("=== prepareContext ===");
 
@@ -62,7 +62,7 @@ console.log(`Prompt length:  ${prompt.length} chars`);
 console.log();
 
 // -----------------------------------------------------------------------
-// 3. profileRun — pack and return timing + compression metrics
+// 3. profileRun - pack and return timing + compression metrics
 // -----------------------------------------------------------------------
 console.log("=== profileRun ===");
 

@@ -1,16 +1,15 @@
-from __future__ import annotations
-
-"""Agent Observability Layer — analyze and record agent run metrics.
+"""Agent Observability Layer - analyze and record agent run metrics.
 
 Reads a pack run artifact (run.json) and produces a structured report
 covering tokens used, files read, duplicate reads, cache hits, context
 size, and run duration.
 """
 
+from __future__ import annotations
+
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from typing import Any
-
 
 # ---------------------------------------------------------------------------
 # Data structures
@@ -167,7 +166,7 @@ def build_observe_report(
     # Sort heaviest first
     files.sort(key=lambda f: f["original_tokens"], reverse=True)
 
-    # Duration — stored as run_duration_ms in some artifacts, else 0
+    # Duration - stored as run_duration_ms in some artifacts, else 0
     run_duration_ms = _int(run_data.get("run_duration_ms") or run_data.get("elapsed_ms"))
 
     return AgentRunMetrics(

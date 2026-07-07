@@ -50,7 +50,7 @@ DATASET_DIR: Path = Path(
     os.getenv("BENCHMARK_DATASET_DIR", str(_repo_root / "benchmarks" / "dataset"))
 )
 
-# The four core tasks the user requested — subset of BUILTIN_TASKS.
+# The four core tasks the user requested - subset of BUILTIN_TASKS.
 _TASK_NAMES = {"Add Caching", "Add Authentication", "Refactor Module", "Add Rate Limiting"}
 GENERATOR_TASKS: list[DatasetTask] = [t for t in BUILTIN_TASKS if t.name in _TASK_NAMES]
 

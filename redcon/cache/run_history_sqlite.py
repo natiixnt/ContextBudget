@@ -1,11 +1,13 @@
-from __future__ import annotations
-
 """SQLite-backed run-history persistence for deterministic score adjustments."""
 
+from __future__ import annotations
+
+import contextlib
 import json
 import sqlite3
+from collections.abc import Mapping
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from redcon.cache.run_history import (
     RunHistoryEntry,
@@ -14,7 +16,6 @@ from redcon.cache.run_history import (
     _normalize_token_usage,
 )
 from redcon.schemas.models import RUN_HISTORY_FILE
-
 
 SQLITE_HISTORY_FORMAT_VERSION = 2
 
@@ -117,11 +118,19 @@ def _migrate_from_json(db_path: Path, json_path: Path) -> None:
                         task,
                         str(item.get("repo", "") or ""),
                         str(item.get("workspace", "") or ""),
-                        json.dumps(_normalize_string_list(item.get("selected_files")), sort_keys=True),
-                        json.dumps(_normalize_string_list(item.get("ignored_files")), sort_keys=True),
-                        json.dumps(_normalize_string_list(item.get("candidate_files")), sort_keys=True),
+                        json.dumps(
+                            _normalize_string_list(item.get("selected_files")), sort_keys=True
+                        ),
+                        json.dumps(
+                            _normalize_string_list(item.get("ignored_files")), sort_keys=True
+                        ),
+                        json.dumps(
+                            _normalize_string_list(item.get("candidate_files")), sort_keys=True
+                        ),
                         json.dumps(_normalize_token_usage(item.get("token_usage")), sort_keys=True),
-                        json.dumps(_normalize_string_map(item.get("result_artifacts")), sort_keys=True),
+                        json.dumps(
+                            _normalize_string_map(item.get("result_artifacts")), sort_keys=True
+                        ),
                     ),
                 )
             conn.commit()
@@ -129,10 +138,8 @@ def _migrate_from_json(db_path: Path, json_path: Path) -> None:
         # Remove the partially-initialised DB so the next call can retry migration.
         # Without this, db_path.exists() would return True and migration would be skipped,
         # leaving an empty SQLite DB while the JSON data is unreachable.
-        try:
+        with contextlib.suppress(OSError):
             db_path.unlink(missing_ok=True)
-        except OSError:
-            pass
         return
 
     try:
@@ -167,7 +174,7 @@ def load_run_history_sqlite(
                 return []
             _migrate_from_json(db, json_path)
         else:
-            # No history at all yet — create empty db lazily on first write
+            # No history at all yet - create empty db lazily on first write
             return []
 
     try:
@@ -305,10 +312,8 @@ def update_run_history_artifacts_sqlite(
             if row is None:
                 return False
             existing: dict[str, Any] = {}
-            try:
+            with contextlib.suppress(Exception):
                 existing = json.loads(row["result_artifacts"] or "{}")
-            except Exception:
-                pass
             if not isinstance(existing, dict):
                 existing = {}
             merged = _normalize_string_map(existing)

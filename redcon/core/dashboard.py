@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Local dashboard server for Redcon analytics."""
+
+from __future__ import annotations
 
 import json
 import threading
@@ -17,8 +17,14 @@ from redcon.core.heatmap import build_heatmap_report, heatmap_as_dict
 # ---------------------------------------------------------------------------
 
 _KNOWN_COMMANDS = {
-    "pack", "benchmark", "simulate-agent", "plan", "plan-agent",
-    "heatmap", "profile", "report",
+    "pack",
+    "benchmark",
+    "simulate-agent",
+    "plan",
+    "plan-agent",
+    "heatmap",
+    "profile",
+    "report",
 }
 
 
@@ -79,6 +85,7 @@ def _load_history_entries(paths: list[Path]) -> list[dict[str, Any]]:
 # ---------------------------------------------------------------------------
 # Data aggregation
 # ---------------------------------------------------------------------------
+
 
 def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
     """Aggregate artifact data for all dashboard sections."""
@@ -149,17 +156,19 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
         if ts in artifact_timestamps:
             continue  # already represented by a scanned artifact
         tu = h.get("token_usage", {}) or {}
-        run_history.append({
-            "command": "pack",
-            "task": h.get("task", ""),
-            "generated_at": ts,
-            "artifact": (h.get("result_artifacts") or {}).get("json", ""),
-            "input_tokens": int(tu.get("estimated_input_tokens", 0) or 0),
-            "saved_tokens": int(tu.get("estimated_saved_tokens", 0) or 0),
-            "files": len(h.get("selected_files", [])),
-            "risk": str(tu.get("quality_risk_estimate", "") or ""),
-            "source": "history",
-        })
+        run_history.append(
+            {
+                "command": "pack",
+                "task": h.get("task", ""),
+                "generated_at": ts,
+                "artifact": (h.get("result_artifacts") or {}).get("json", ""),
+                "input_tokens": int(tu.get("estimated_input_tokens", 0) or 0),
+                "saved_tokens": int(tu.get("estimated_saved_tokens", 0) or 0),
+                "files": len(h.get("selected_files", [])),
+                "risk": str(tu.get("quality_risk_estimate", "") or ""),
+                "source": "history",
+            }
+        )
 
     # Sort merged history newest-first
     run_history.sort(key=lambda r: r.get("generated_at", ""), reverse=True)
@@ -172,21 +181,25 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
         if len(label) > 28:
             label = label[:27] + "…"
         date = (r.get("generated_at", "") or "")[:10]
-        token_chart.append({
-            "label": f"{label} ({date})" if date else label,
-            "input_tokens": r["input_tokens"],
-            "saved_tokens": r["saved_tokens"],
-        })
+        token_chart.append(
+            {
+                "label": f"{label} ({date})" if date else label,
+                "input_tokens": r["input_tokens"],
+                "saved_tokens": r["saved_tokens"],
+            }
+        )
 
     # ── run trend (all pack runs chronological for line chart) ────────────────
     run_trend: list[dict[str, Any]] = []
     for r in pack_history:
-        run_trend.append({
-            "date": (r.get("generated_at", "") or "")[:10],
-            "label": (r.get("task", "") or "")[:24],
-            "input_tokens": r["input_tokens"],
-            "saved_tokens": r["saved_tokens"],
-        })
+        run_trend.append(
+            {
+                "date": (r.get("generated_at", "") or "")[:10],
+                "label": (r.get("task", "") or "")[:24],
+                "input_tokens": r["input_tokens"],
+                "saved_tokens": r["saved_tokens"],
+            }
+        )
 
     # ── summary stats ────────────────────────────────────────────────────────
     total_input = sum(r["input_tokens"] for r in run_history)
@@ -203,14 +216,15 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
         breakdown_map[cmd]["used"] += r["input_tokens"]
         breakdown_map[cmd]["saved"] += r["saved_tokens"]
     savings_breakdown = [
-        {"label": cmd, "used": v["used"], "saved": v["saved"]}
-        for cmd, v in breakdown_map.items()
+        {"label": cmd, "used": v["used"], "saved": v["saved"]} for cmd, v in breakdown_map.items()
     ]
 
     # ── heatmap ───────────────────────────────────────────────────────────────
     heatmap: dict[str, Any] = {}
     if pack_artifacts:
-        artifact_paths = [Path(a["_artifact_path"]) for a in pack_artifacts if "_artifact_path" in a]
+        artifact_paths = [
+            Path(a["_artifact_path"]) for a in pack_artifacts if "_artifact_path" in a
+        ]
         try:
             report = build_heatmap_report(artifact_paths)
             heatmap = heatmap_as_dict(report)
@@ -222,15 +236,17 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
     for a in sim_artifacts[:20]:
         ce = a.get("cost_estimate", {}) or {}
         steps = a.get("steps", [])
-        simulations.append({
-            "task": a.get("task", ""),
-            "model": a.get("model", ""),
-            "total_tokens": a.get("total_tokens", 0),
-            "steps": len(steps),
-            "context_mode": a.get("context_mode", ""),
-            "cost_usd": ce.get("total_cost_usd", 0),
-            "generated_at": a.get("generated_at", ""),
-        })
+        simulations.append(
+            {
+                "task": a.get("task", ""),
+                "model": a.get("model", ""),
+                "total_tokens": a.get("total_tokens", 0),
+                "steps": len(steps),
+                "context_mode": a.get("context_mode", ""),
+                "cost_usd": ce.get("total_cost_usd", 0),
+                "generated_at": a.get("generated_at", ""),
+            }
+        )
 
     # ── benchmark comparison ─────────────────────────────────────────────────
     benchmarks: list[dict[str, Any]] = []
@@ -239,19 +255,23 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
         rows = []
         for s in a.get("strategies", []):
             saved = s.get("estimated_saved_tokens", 0)
-            rows.append({
-                "strategy": s.get("strategy", ""),
-                "input_tokens": s.get("estimated_input_tokens", baseline),
-                "saved_tokens": saved,
-                "risk": s.get("quality_risk_estimate", ""),
-                "runtime_ms": s.get("runtime_ms", 0),
-            })
-        benchmarks.append({
-            "task": a.get("task", ""),
-            "baseline_tokens": baseline,
-            "generated_at": a.get("generated_at", ""),
-            "strategies": rows,
-        })
+            rows.append(
+                {
+                    "strategy": s.get("strategy", ""),
+                    "input_tokens": s.get("estimated_input_tokens", baseline),
+                    "saved_tokens": saved,
+                    "risk": s.get("quality_risk_estimate", ""),
+                    "runtime_ms": s.get("runtime_ms", 0),
+                }
+            )
+        benchmarks.append(
+            {
+                "task": a.get("task", ""),
+                "baseline_tokens": baseline,
+                "generated_at": a.get("generated_at", ""),
+                "strategies": rows,
+            }
+        )
 
     return {
         "summary": {
@@ -277,6 +297,7 @@ def build_dashboard_data(paths: list[Path]) -> dict[str, Any]:
 # ---------------------------------------------------------------------------
 # Dashboard API endpoint builders
 # ---------------------------------------------------------------------------
+
 
 def build_overview_data(data: dict[str, Any]) -> dict[str, Any]:
     """Aggregate data for GET /dashboard/overview."""
@@ -508,7 +529,7 @@ tr:hover td { background: #f8f9fa; }
 
 <!-- TOKEN USAGE CHART -->
 <section id="sec-chart">
-  <h2>Token Usage — Pack Runs</h2>
+  <h2>Token Usage - Pack Runs</h2>
   <div class="chart-wrap">
     <canvas id="tokenChart"></canvas>
     <p class="empty" id="chart-empty" style="display:none">No pack run artifacts found.</p>
@@ -791,7 +812,7 @@ makeSortable("heatmap-table", heatFiles, r => {
 
 if (!heatFiles.length) {
   document.getElementById("sec-heatmap").querySelector("table").innerHTML =
-    `<tr><td class="empty">No pack artifacts found — run <code>redcon pack</code> first.</td></tr>`;
+    `<tr><td class="empty">No pack artifacts found - run <code>redcon pack</code> first.</td></tr>`;
 }
 
 // ── simulation table ───────────────────────────────────────────────────────
@@ -827,7 +848,7 @@ if (!DATA.benchmarks.length) {
     return `
       <div style="margin-bottom:20px">
         <div style="font-size:13px;font-weight:600;margin-bottom:6px">${esc(b.task)}
-          <span class="muted" style="font-weight:400"> — baseline: ${fmt(b.baseline_tokens)} tokens</span>
+          <span class="muted" style="font-weight:400"> - baseline: ${fmt(b.baseline_tokens)} tokens</span>
         </div>
         <table>
           <thead><tr>
@@ -865,6 +886,7 @@ def _build_html(data: dict[str, Any]) -> str:
 # ---------------------------------------------------------------------------
 # HTTP server
 # ---------------------------------------------------------------------------
+
 
 class _Handler(BaseHTTPRequestHandler):
     dashboard_html: str = ""
@@ -912,6 +934,7 @@ class _Handler(BaseHTTPRequestHandler):
             model = (params.get("model") or [None])[0]
             if model and model != self.cost_data.get("model"):
                 from redcon.core.cost_analytics import build_cost_report
+
                 try:
                     refreshed = build_cost_report(self._scan_paths or [Path(".")], model=model)
                     self._send_json(refreshed)

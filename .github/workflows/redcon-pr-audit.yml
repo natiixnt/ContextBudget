@@ -24,7 +24,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Redcon
-        run: pip install redcon
+        run: pip install git+https://github.com/natiixnt/ContextBudget
 
       - name: Run PR audit
         run: |

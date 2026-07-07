@@ -1,19 +1,21 @@
-from __future__ import annotations
-
 """Cache backend abstractions and built-in implementations."""
 
+from __future__ import annotations
+
+import contextlib
 import json
 import logging
 import zlib
 from abc import ABC, abstractmethod
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Mapping
-
-logger = logging.getLogger(__name__)
+from typing import Any
 
 from redcon.schemas.models import CACHE_FILE, CacheReport
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -202,10 +204,10 @@ class SummaryCacheBackend(ABC):
         Return ``True`` if at least one entry was removed.
         """
 
-    def _clear(self) -> None:
+    def _clear(self) -> None:  # noqa: B027 - optional hook, subclasses may override
         """Optional hook to remove all cached entries."""
 
-    def _save(self) -> None:
+    def _save(self) -> None:  # noqa: B027 - optional hook, subclasses may override
         """Optional persistence hook."""
 
 
@@ -231,7 +233,11 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
         except (OSError, json.JSONDecodeError):
             self._data = {"summaries": {}, "fragments": {}, "slices": {}}
             return
-        self._data = raw_data if isinstance(raw_data, dict) else {"summaries": {}, "fragments": {}, "slices": {}}
+        self._data = (
+            raw_data
+            if isinstance(raw_data, dict)
+            else {"summaries": {}, "fragments": {}, "slices": {}}
+        )
 
     def _store(self, name: str) -> dict[str, str]:
         raw = self._data.get(name)
@@ -320,7 +326,9 @@ class SQLiteSummaryCacheBackend(SummaryCacheBackend):
     backend_name = "sqlite"
     _DB_FILENAME = ".redcon_cache.db"
 
-    def __init__(self, repo_path: Path, cache_file: str = CACHE_FILE, *, enabled: bool = True) -> None:
+    def __init__(
+        self, repo_path: Path, cache_file: str = CACHE_FILE, *, enabled: bool = True
+    ) -> None:
         super().__init__(enabled=enabled)
         self.repo_path = repo_path
         self.db_path = repo_path / self._DB_FILENAME
@@ -379,7 +387,11 @@ class SQLiteSummaryCacheBackend(SummaryCacheBackend):
 
     def _db_get(self, table: str, key: str) -> str | None:
         try:
-            row = self._connect().execute(f"SELECT value FROM {table} WHERE key = ?", (key,)).fetchone()  # noqa: S608
+            row = (
+                self._connect()
+                .execute(f"SELECT value FROM {table} WHERE key = ?", (key,))
+                .fetchone()
+            )  # noqa: S608
         except Exception:  # noqa: BLE001
             return None
         return row[0] if row else None
@@ -439,10 +451,8 @@ class SQLiteSummaryCacheBackend(SummaryCacheBackend):
 
     def __del__(self) -> None:
         if self._conn is not None:
-            try:
+            with contextlib.suppress(Exception):
                 self._conn.close()
-            except Exception:  # noqa: BLE001
-                pass
 
 
 class SharedSummaryCacheBackendStub(SummaryCacheBackend):
@@ -569,7 +579,7 @@ class RedisSummaryCacheBackend(SummaryCacheBackend):
             except ModuleNotFoundError as exc:  # pragma: no cover
                 raise RuntimeError(
                     "The 'redis' package is required for the Redis cache backend. "
-                    "Install it with: pip install 'redcon[redis]'"
+                    "Install it with: pip install 'redcon[redis] @ git+https://github.com/natiixnt/ContextBudget'"
                 ) from exc
             try:
                 client = _redis.Redis.from_url(self.redis_url, decode_responses=False)
@@ -771,7 +781,9 @@ class InMemorySummaryCacheBackend(SummaryCacheBackend):
             return None
         return store[key]
 
-    def _mem_put(self, store: dict[str, str], ts_store: dict[str, float], key: str, value: str) -> bool:
+    def _mem_put(
+        self, store: dict[str, str], ts_store: dict[str, float], key: str, value: str
+    ) -> bool:
         import time
 
         is_new_key = key not in store
@@ -860,9 +872,13 @@ def create_summary_cache_backend(
 
     backend_name = normalize_cache_backend_name(backend)
     if backend_name == LocalFileSummaryCacheBackend.backend_name:
-        return LocalFileSummaryCacheBackend(repo_path=repo_path, cache_file=cache_file, enabled=enabled)
+        return LocalFileSummaryCacheBackend(
+            repo_path=repo_path, cache_file=cache_file, enabled=enabled
+        )
     if backend_name == SQLiteSummaryCacheBackend.backend_name:
-        return SQLiteSummaryCacheBackend(repo_path=repo_path, cache_file=cache_file, enabled=enabled)
+        return SQLiteSummaryCacheBackend(
+            repo_path=repo_path, cache_file=cache_file, enabled=enabled
+        )
     if backend_name == SharedSummaryCacheBackendStub.backend_name:
         return SharedSummaryCacheBackendStub(namespace=repo_path.name or "default", enabled=enabled)
     if backend_name == InMemorySummaryCacheBackend.backend_name:
@@ -880,11 +896,14 @@ def create_summary_cache_backend(
             return backend_instance
         except Exception:  # noqa: BLE001
             import logging
+
             logging.getLogger(__name__).warning(
                 "Redis unavailable at %s - falling back to local_file cache backend",
                 redis_url,
             )
-            return LocalFileSummaryCacheBackend(repo_path=repo_path, cache_file=cache_file, enabled=enabled)
+            return LocalFileSummaryCacheBackend(
+                repo_path=repo_path, cache_file=cache_file, enabled=enabled
+            )
     raise AssertionError(f"Unhandled cache backend: {backend_name}")
 
 

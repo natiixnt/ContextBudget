@@ -2,8 +2,6 @@
 # Copyright (c) 2026 nai. All rights reserved.
 # See LICENSE-COMMERCIAL for terms.
 
-from __future__ import annotations
-
 """Redis-backed session store for the Redcon Gateway.
 
 When ``RC_GATEWAY_REDIS_URL`` is set, the gateway stores :class:`RuntimeSession`
@@ -11,7 +9,7 @@ state in Redis so multiple gateway replicas can serve the same multi-turn
 agent session without sticky routing.
 
 When ``RC_GATEWAY_REDIS_URL`` is **not** set the store falls back to an
-in-process dict — identical to the original behaviour.
+in-process dict - identical to the original behaviour.
 
 Session key format: ``cb_session:<session_id>``
 TTL: 24 h by default; configurable via ``RC_GATEWAY_SESSION_TTL_SECONDS``.
@@ -23,6 +21,8 @@ this module exposes a *synchronous* API (``save``, ``load``, ``delete``).
 If you need async access from an ASGI context, wrap calls with
 ``asyncio.get_event_loop().run_in_executor``.
 """
+
+from __future__ import annotations
 
 import json
 import logging
@@ -91,10 +91,7 @@ class SessionStore:
         """Return session state for *session_id*, or ``None`` if not found."""
         key = _KEY_PREFIX + session_id
         try:
-            if self._redis is not None:
-                raw = self._redis.get(key)
-            else:
-                raw = self._memory.get(key)
+            raw = self._redis.get(key) if self._redis is not None else self._memory.get(key)
             if raw is None:
                 return None
             return json.loads(raw)

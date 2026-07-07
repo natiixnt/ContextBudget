@@ -18,9 +18,10 @@ import logging
 from typing import Any
 
 try:
+    import mcp.types as types
     from mcp.server import Server
     from mcp.server.stdio import stdio_server
-    import mcp.types as types
+
     _MCP_AVAILABLE = True
 except ImportError:
     _MCP_AVAILABLE = False
@@ -171,7 +172,10 @@ _TOOL_SCHEMAS = [
             "properties": {
                 "pattern": {"type": "string"},
                 "scope": {"type": "string", "default": "."},
-                "language": {"type": "string", "description": "Language hint (python, javascript, rust, ...)"},
+                "language": {
+                    "type": "string",
+                    "description": "Language hint (python, javascript, rust, ...)",
+                },
                 "max_results": {"type": "integer", "default": 200},
             },
             "required": ["pattern"],
@@ -379,7 +383,8 @@ def create_server() -> Any:
     """Build and return a configured MCP server instance."""
     if not _MCP_AVAILABLE:
         raise RuntimeError(
-            "mcp package is not installed. Run: pip install redcon[mcp]"
+            "mcp package is not installed. Run: "
+            "pip install 'redcon[mcp] @ git+https://github.com/natiixnt/ContextBudget'"
         )
 
     server = Server("redcon")
@@ -408,7 +413,8 @@ async def serve() -> None:
     """Run the MCP server over stdio transport."""
     if not _MCP_AVAILABLE:
         raise RuntimeError(
-            "mcp package is not installed. Run: pip install redcon[mcp]"
+            "mcp package is not installed. Run: "
+            "pip install 'redcon[mcp] @ git+https://github.com/natiixnt/ContextBudget'"
         )
 
     server = create_server()

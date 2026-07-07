@@ -142,7 +142,7 @@ def test_unauthenticated_ingest_passes_no_org_id(client):
 
 
 def test_ingest_with_invalid_token_still_accepts_event(client):
-    """Invalid token is silently ignored — event is stored without org binding."""
+    """Invalid token is silently ignored - event is stored without org binding."""
     with patch(
         "app.main.auth.verify_api_key",
         new_callable=AsyncMock,

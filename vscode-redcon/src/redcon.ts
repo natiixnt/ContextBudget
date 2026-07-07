@@ -80,7 +80,7 @@ async function exec(
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         reject(
           new Error(
-            `Redcon CLI not found. Install with: pip install redcon\n` +
+            `Redcon CLI not found. Install with: pip install git+https://github.com/natiixnt/ContextBudget\n` +
               `Or set "redcon.cliCommand" in VS Code settings.`,
           ),
         );

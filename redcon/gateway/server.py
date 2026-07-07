@@ -2,25 +2,23 @@
 # Copyright (c) 2026 nai. All rights reserved.
 # See LICENSE-COMMERCIAL for terms.
 
-from __future__ import annotations
-
-"""Redcon Runtime Gateway — FastAPI ASGI service (falls back to stdlib HTTP).
+"""Redcon Runtime Gateway - FastAPI ASGI service (falls back to stdlib HTTP).
 
 When the optional ``fastapi`` and ``uvicorn`` packages are available, this module
 provides a production-grade ASGI gateway.  Without them, it falls back to the
 existing stdlib implementation so no new hard dependency is introduced.
 
 Install gateway extras:
-    pip install 'redcon[gateway]'
+    pip install 'redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget'
 """
+
+from __future__ import annotations
 
 import asyncio
 import hmac
 import logging
-import os
 import threading
 import time
-from typing import Any
 
 from redcon.gateway.config import GatewayConfig
 from redcon.gateway.handlers import GatewayHandlers
@@ -39,6 +37,7 @@ def _try_import_fastapi():
     try:
         import fastapi
         import uvicorn
+
         return fastapi, uvicorn
     except ImportError:
         return None, None
@@ -50,9 +49,8 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
     if fastapi is None:
         return None, None
 
-    from fastapi import FastAPI, Request, HTTPException, Depends
+    from fastapi import Depends, FastAPI, HTTPException, Request
     from fastapi.responses import JSONResponse
-    import fastapi as _fa
 
     app = FastAPI(title="Redcon Gateway", version="1.0.0-alpha", docs_url=None, redoc_url=None)
 
@@ -68,7 +66,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         auth_header = request.headers.get("Authorization", "")
         if not auth_header.startswith("Bearer "):
             raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
-        token = auth_header[len("Bearer "):]
+        token = auth_header[len("Bearer ") :]
         if not hmac.compare_digest(token, config.api_key):
             raise HTTPException(status_code=401, detail="Invalid API key")
 
@@ -103,8 +101,10 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
                 asyncio.get_event_loop().run_in_executor(None, coro),
                 timeout=float(timeout),
             )
-        except asyncio.TimeoutError:
-            raise HTTPException(status_code=504, detail=f"Request timed out after {timeout}s")
+        except asyncio.TimeoutError as exc:
+            raise HTTPException(
+                status_code=504, detail=f"Request timed out after {timeout}s"
+            ) from exc
 
     # ── POST /prepare-context ─────────────────────────────────────────────────
 
@@ -123,7 +123,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         except HTTPException:
             raise
         except KeyError as exc:
-            raise HTTPException(status_code=422, detail=f"Missing required field: {exc}")
+            raise HTTPException(status_code=422, detail=f"Missing required field: {exc}") from exc
         finally:
             with _stats_lock:
                 _stats["requests_active"] -= 1
@@ -144,7 +144,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         except HTTPException:
             raise
         except KeyError as exc:
-            raise HTTPException(status_code=422, detail=f"Missing required field: {exc}")
+            raise HTTPException(status_code=422, detail=f"Missing required field: {exc}") from exc
         finally:
             with _stats_lock:
                 _stats["requests_active"] -= 1
@@ -164,7 +164,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
         except HTTPException:
             raise
         except KeyError as exc:
-            raise HTTPException(status_code=422, detail=f"Missing required field: {exc}")
+            raise HTTPException(status_code=422, detail=f"Missing required field: {exc}") from exc
         finally:
             with _stats_lock:
                 _stats["requests_active"] -= 1
@@ -175,7 +175,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
 class GatewayServer:
     """Redcon Runtime Gateway.
 
-    Uses FastAPI + Uvicorn when available (install with ``pip install 'redcon[gateway]'``),
+    Uses FastAPI + Uvicorn when available (install with the ``[gateway]`` extra),
     falls back to stdlib HTTP otherwise.
     """
 
@@ -195,8 +195,8 @@ class GatewayServer:
             self._start_fastapi(block=block)
         else:
             logger.warning(
-                "fastapi/uvicorn not installed — using stdlib HTTP gateway. "
-                "For production use: pip install 'redcon[gateway]'"
+                "fastapi/uvicorn not installed - using stdlib HTTP gateway. "
+                "For production use: pip install 'redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget'"
             )
             self._start_stdlib(block=block)
 
@@ -257,7 +257,9 @@ class GatewayServer:
                 # Auth check
                 if config.api_key:
                     auth = self.headers.get("Authorization", "")
-                    if not auth.startswith("Bearer ") or not hmac.compare_digest(auth[len("Bearer "):], config.api_key):
+                    if not auth.startswith("Bearer ") or not hmac.compare_digest(
+                        auth[len("Bearer ") :], config.api_key
+                    ):
                         self._send_json({"error": "Invalid API key"}, 401)
                         return
 
@@ -287,12 +289,15 @@ class GatewayServer:
                 if path == "/health":
                     self._send_json({"status": "ok", "version": "1.0.0-alpha"}, 200)
                 elif path == "/metrics":
-                    self._send_json({
-                        "gateway": {
-                            "requests_total": 0,
-                            "uptime_seconds": round(time.monotonic() - _START_TIME, 1),
-                        }
-                    }, 200)
+                    self._send_json(
+                        {
+                            "gateway": {
+                                "requests_total": 0,
+                                "uptime_seconds": round(time.monotonic() - _START_TIME, 1),
+                            }
+                        },
+                        200,
+                    )
                 else:
                     self._send_json({"error": "not found"}, 404)
 

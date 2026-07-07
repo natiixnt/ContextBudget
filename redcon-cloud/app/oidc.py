@@ -44,7 +44,7 @@ _ISSUER: str = os.getenv("RC_CLOUD_OIDC_ISSUER", "")
 _AUDIENCE: str = os.getenv("RC_CLOUD_OIDC_AUDIENCE", "")
 _JWKS_URI: str = os.getenv("RC_CLOUD_OIDC_JWKS_URI", "")
 
-# Simple in-process JWKS cache — refreshed once per process restart.
+# Simple in-process JWKS cache - refreshed once per process restart.
 _jwks_cache: dict[str, Any] | None = None
 
 

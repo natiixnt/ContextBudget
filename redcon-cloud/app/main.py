@@ -177,7 +177,7 @@ async def prometheus_metrics() -> PlainTextResponse:
 
 
 # ---------------------------------------------------------------------------
-# Event ingestion — with per-API-key rate limiting and quota enforcement
+# Event ingestion - with per-API-key rate limiting and quota enforcement
 # ---------------------------------------------------------------------------
 
 @app.post("/events", response_model=IngestResponse, status_code=201)
@@ -330,7 +330,7 @@ async def get_dashboard_heatmap(
 
 
 # ---------------------------------------------------------------------------
-# Organizations — POST /orgs now requires admin token
+# Organizations - POST /orgs now requires admin token
 # ---------------------------------------------------------------------------
 
 @app.post("/orgs", response_model=OrgResponse, status_code=201)

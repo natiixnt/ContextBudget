@@ -89,8 +89,8 @@ def _extract_params(event: IncomingEvent, org_id: int | None = None) -> tuple:
         _bool(policy.get("evaluated")),
         _bool(policy.get("passed")),
         _int(policy.get("violation_count")),
-        org_id,       # $23 — None for unauthenticated ingest
-        json.dumps(p),  # $24 — JSONB payload (always last)
+        org_id,       # $23 - None for unauthenticated ingest
+        json.dumps(p),  # $24 - JSONB payload (always last)
     )
 
 

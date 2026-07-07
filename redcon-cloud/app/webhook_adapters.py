@@ -82,7 +82,7 @@ class SlackAdapter:
                 "type": "section",
                 "fields": [
                     {"type": "mrkdwn", "text": f"*Run ID*\n`{run_id}`"},
-                    {"type": "mrkdwn", "text": f"*Repository*\n{repo or '—'}"},
+                    {"type": "mrkdwn", "text": f"*Repository*\n{repo or '-'}"},
                     {"type": "mrkdwn", "text": f"*Endpoint*\n`{payload.get('endpoint', '')}`"},
                     {"type": "mrkdwn", "text": f"*Tokens used*\n{payload.get('tokens_used', 0):,}"},
                 ],
@@ -107,7 +107,7 @@ class SlackAdapter:
                 "type": "section",
                 "fields": [
                     {"type": "mrkdwn", "text": f"*Run ID*\n`{run_id}`"},
-                    {"type": "mrkdwn", "text": f"*Repository*\n{payload.get('repository_id', '—')}"},
+                    {"type": "mrkdwn", "text": f"*Repository*\n{payload.get('repository_id', '-')}"},
                     {"type": "mrkdwn", "text": f"*Tokens used*\n{payload.get('tokens_used', 0):,}"},
                     {"type": "mrkdwn", "text": f"*Max allowed*\n{payload.get('max_tokens', 0):,}"},
                 ],

@@ -28,7 +28,7 @@ TASK = "refactor auth middleware token validation"
 REPO = "examples/risky-auth-change/repo"
 
 # -----------------------------------------------------------------------
-# Option A — module-level helpers (quickest path)
+# Option A - module-level helpers (quickest path)
 # -----------------------------------------------------------------------
 print("=== Option A: module-level helpers ===")
 
@@ -65,7 +65,7 @@ print(f"  prompt length:  {len(prompt)} chars")
 print()
 
 # -----------------------------------------------------------------------
-# Option B — reusable RedconMiddleware instance
+# Option B - reusable RedconMiddleware instance
 # -----------------------------------------------------------------------
 print("=== Option B: RedconMiddleware ===")
 
@@ -94,7 +94,7 @@ print(f"  tokens:         {result2.metadata['estimated_input_tokens']}")
 print()
 
 # -----------------------------------------------------------------------
-# Option C — SDK-owned middleware (shares engine state)
+# Option C - SDK-owned middleware (shares engine state)
 # -----------------------------------------------------------------------
 print("=== Option C: RedconSDK.middleware() ===")
 

@@ -1,13 +1,13 @@
-from __future__ import annotations
-
-"""Tests for redcon.integrations — all four wrappers.
+"""Tests for redcon.integrations - all four wrappers.
 
 Tests use monkeypatching to avoid real LLM / subprocess calls:
-- OpenAIAgentWrapper  — patches _call_openai
-- AnthropicAgentWrapper — patches _call_anthropic
-- GenericAgentRunner — passes a no-op llm_fn
-- NodeJSAgentRunner — patches _call_nodejs (and subprocess.run for error paths)
+- OpenAIAgentWrapper  - patches _call_openai
+- AnthropicAgentWrapper - patches _call_anthropic
+- GenericAgentRunner - passes a no-op llm_fn
+- NodeJSAgentRunner - patches _call_nodejs (and subprocess.run for error paths)
 """
+
+from __future__ import annotations
 
 import subprocess
 from pathlib import Path
@@ -23,7 +23,6 @@ from redcon.integrations import (
 )
 from redcon.runtime import RuntimeResult
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -36,8 +35,13 @@ def _write(path: Path, content: str) -> None:
 
 @pytest.fixture()
 def simple_repo(tmp_path: Path) -> Path:
-    _write(tmp_path / "src" / "cache.py", "def cache_get(key: str) -> str | None:\n    return None\n")
-    _write(tmp_path / "src" / "api.py", "def get_item(key: str) -> str:\n    return cache_get(key) or 'miss'\n")
+    _write(
+        tmp_path / "src" / "cache.py", "def cache_get(key: str) -> str | None:\n    return None\n"
+    )
+    _write(
+        tmp_path / "src" / "api.py",
+        "def get_item(key: str) -> str:\n    return cache_get(key) or 'miss'\n",
+    )
     return tmp_path
 
 
@@ -116,6 +120,7 @@ class TestOpenAIAgentWrapper:
         history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
+
         data = json.loads(history_path.read_text())
         assert data["entries"][-1]["adapter"] == "openai"
 
@@ -139,6 +144,7 @@ class TestOpenAIAgentWrapper:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import builtins
+
         real_import = builtins.__import__
 
         def mock_import(name: str, *args: Any, **kwargs: Any) -> Any:
@@ -202,6 +208,7 @@ class TestAnthropicAgentWrapper:
         history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
+
         data = json.loads(history_path.read_text())
         assert data["entries"][-1]["adapter"] == "anthropic"
 
@@ -209,6 +216,7 @@ class TestAnthropicAgentWrapper:
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import builtins
+
         real_import = builtins.__import__
 
         def mock_import(name: str, *args: Any, **kwargs: Any) -> Any:
@@ -222,9 +230,7 @@ class TestAnthropicAgentWrapper:
         with pytest.raises(ImportError, match="anthropic"):
             agent._get_client()
 
-    def test_reset_session(
-        self, simple_repo: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_reset_session(self, simple_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         agent = AnthropicAgentWrapper(repo=simple_repo)
         monkeypatch.setattr(agent._runtime, "_llm_fn", lambda prompt: "ok")
         agent.run_task("task", repo=simple_repo)
@@ -259,9 +265,7 @@ class TestGenericAgentRunner:
 
         assert result.prepared_context.repo == str(simple_repo)
 
-    def test_adapter_name_appears_in_telemetry(
-        self, simple_repo: Path
-    ) -> None:
+    def test_adapter_name_appears_in_telemetry(self, simple_repo: Path) -> None:
         runner = GenericAgentRunner(
             llm_fn=lambda p: "ok",
             repo=simple_repo,
@@ -273,6 +277,7 @@ class TestGenericAgentRunner:
         history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
+
         data = json.loads(history_path.read_text())
         assert data["entries"][-1]["adapter"] == "my-custom-llm"
 
@@ -383,14 +388,13 @@ class TestNodeJSAgentRunner:
         history_path = simple_repo / ".redcon" / "observe-history.json"
         assert history_path.exists()
         import json
+
         data = json.loads(history_path.read_text())
         entry = data["entries"][-1]
         assert entry["adapter"] == "nodejs-test"
         assert isinstance(entry["command"], list)
 
-    def test_reset_session(
-        self, simple_repo: Path, monkeypatch: pytest.MonkeyPatch
-    ) -> None:
+    def test_reset_session(self, simple_repo: Path, monkeypatch: pytest.MonkeyPatch) -> None:
         runner = NodeJSAgentRunner(script="agent.js", repo=simple_repo)
         monkeypatch.setattr(runner._runtime, "_llm_fn", lambda prompt: "ok")
         runner.run_task("task", repo=simple_repo)
@@ -458,6 +462,7 @@ class TestNodeJSAgentRunner:
 
     def test_env_vars_merged_with_os_env(self, simple_repo: Path) -> None:
         import os
+
         runner = NodeJSAgentRunner(
             script="agent.js",
             repo=simple_repo,
