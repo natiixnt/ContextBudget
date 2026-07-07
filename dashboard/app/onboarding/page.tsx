@@ -284,7 +284,7 @@ function DoneStep({ cloudUrl, orgId, rawKey }: { cloudUrl: string; orgId: number
     `export RC_GATEWAY_CLOUD_ORG_ID="${orgId}"`,
     ``,
     `# Install and initialise in each repo`,
-    `pip install redcon`,
+    `pip install git+https://github.com/natiixnt/ContextBudget`,
     `redcon init`,
   ].join("\n");
 

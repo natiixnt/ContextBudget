@@ -379,7 +379,8 @@ def create_server() -> Any:
     """Build and return a configured MCP server instance."""
     if not _MCP_AVAILABLE:
         raise RuntimeError(
-            "mcp package is not installed. Run: pip install redcon[mcp]"
+            "mcp package is not installed. Run: "
+            "pip install 'redcon[mcp] @ git+https://github.com/natiixnt/ContextBudget'"
         )
 
     server = Server("redcon")
@@ -408,7 +409,8 @@ async def serve() -> None:
     """Run the MCP server over stdio transport."""
     if not _MCP_AVAILABLE:
         raise RuntimeError(
-            "mcp package is not installed. Run: pip install redcon[mcp]"
+            "mcp package is not installed. Run: "
+            "pip install 'redcon[mcp] @ git+https://github.com/natiixnt/ContextBudget'"
         )
 
     server = create_server()

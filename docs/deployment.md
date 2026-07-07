@@ -34,7 +34,7 @@ The two tiers are **decoupled** - the agent tier runs without the control plane.
 The runtime gateway is part of the `redcon` Python package.
 
 ```bash
-pip install 'redcon[gateway]'
+pip install "redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget"
 export RC_GATEWAY_API_KEY=my-secret-key
 redcon gateway --host 0.0.0.0 --port 8787
 ```

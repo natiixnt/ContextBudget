@@ -130,7 +130,7 @@ This document describes what is production-ready, what is in beta, known limitat
 
 ```
 [Developer Machine / CI]
-  └─ redcon CLI (pip install redcon)
+  └─ redcon CLI (pip install git+https://github.com/natiixnt/ContextBudget)
        ├─ cb pack / cb roi / cb benchmark-report
        └─ GitHub Action (action.yml in repo)
 
@@ -142,7 +142,7 @@ This document describes what is production-ready, what is in beta, known limitat
 ```
 
 **Setup steps:**
-1. `pip install redcon` on developer machines or in CI.
+1. `pip install git+https://github.com/natiixnt/ContextBudget` on developer machines or in CI.
 2. Run `redcon init` in each repo to generate `redcon.toml`.
 3. Deploy `redcon-cloud` using `docker-compose.prod.yml`.
 4. Run migrations (automatically applied via Docker init scripts).

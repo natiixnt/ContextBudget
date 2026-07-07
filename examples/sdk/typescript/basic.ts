@@ -8,7 +8,7 @@
  *   profileRun      — pack and return compression profiling metrics
  *
  * Prerequisites:
- *   pip install redcon   (or: pip install -e . from repo root)
+ *   pip install git+https://github.com/natiixnt/ContextBudget   (or: pip install -e . from repo root)
  *   npm install                 (from this directory)
  *
  * Run:

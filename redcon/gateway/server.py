@@ -11,7 +11,7 @@ provides a production-grade ASGI gateway.  Without them, it falls back to the
 existing stdlib implementation so no new hard dependency is introduced.
 
 Install gateway extras:
-    pip install 'redcon[gateway]'
+    pip install 'redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget'
 """
 
 import asyncio
@@ -175,7 +175,7 @@ def _build_fastapi_app(config: GatewayConfig, handlers: GatewayHandlers):
 class GatewayServer:
     """Redcon Runtime Gateway.
 
-    Uses FastAPI + Uvicorn when available (install with ``pip install 'redcon[gateway]'``),
+    Uses FastAPI + Uvicorn when available (install with the ``[gateway]`` extra),
     falls back to stdlib HTTP otherwise.
     """
 
@@ -196,7 +196,7 @@ class GatewayServer:
         else:
             logger.warning(
                 "fastapi/uvicorn not installed — using stdlib HTTP gateway. "
-                "For production use: pip install 'redcon[gateway]'"
+                "For production use: pip install 'redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget'"
             )
             self._start_stdlib(block=block)
 

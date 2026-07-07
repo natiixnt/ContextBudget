@@ -81,7 +81,7 @@ Open Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and type `Redcon`:
 
 - **Redcon CLI** installed and available in PATH:
   ```bash
-  pip install redcon
+  pip install git+https://github.com/natiixnt/ContextBudget
   ```
 - Python 3.10+
 - A `redcon.toml` config file in your project root (or run `Redcon: Initialize Config`)
@@ -107,7 +107,7 @@ Open Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and type `Redcon`:
 ## Quick Start
 
 1. Install the extension
-2. Install the CLI: `pip install redcon`
+2. Install the CLI: `pip install git+https://github.com/natiixnt/ContextBudget`
 3. Open a project and run `Redcon: Initialize Config`
 4. Run `Redcon: Pack Context` with a task description
 5. Explore results in the sidebar, status bar, and dashboard

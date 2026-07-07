@@ -245,7 +245,7 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     except ImportError as e:
         print(
             f"Error: mcp package not available: {e}\n"
-            f"Install with: pip install redcon[mcp]",
+            f"Install with: pip install 'redcon[mcp] @ git+https://github.com/natiixnt/ContextBudget'",
             file=sys.stderr,
         )
         return 1
@@ -1639,7 +1639,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install Redcon
-        run: pip install redcon
+        run: pip install git+https://github.com/natiixnt/ContextBudget
 
       - name: Run PR audit
         run: |

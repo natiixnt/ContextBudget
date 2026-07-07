@@ -6,7 +6,7 @@ The Redcon Runtime Gateway exposes the full context optimization pipeline as an 
 
 ```bash
 # Install gateway extras (FastAPI + Uvicorn)
-pip install 'redcon[gateway]'
+pip install "redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget"
 
 # Start with API key auth
 export RC_GATEWAY_API_KEY=my-secret-key
@@ -166,7 +166,7 @@ server.stop()
 
 ```dockerfile
 FROM python:3.12-slim
-RUN pip install 'redcon[gateway]'
+RUN pip install "redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget"
 ENV RC_GATEWAY_HOST=0.0.0.0
 ENV RC_GATEWAY_PORT=8787
 CMD ["redcon-gateway"]

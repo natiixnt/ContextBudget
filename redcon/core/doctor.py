@@ -86,7 +86,7 @@ def _check_optional_dep(name: str, package: str, extra: str) -> CheckResult:
         return CheckResult(
             name=name,
             status="warn",
-            message=f"Not installed - install with: pip install 'redcon[{extra}]'",
+            message=f"Not installed - install with: pip install 'redcon[{extra}] @ git+https://github.com/natiixnt/ContextBudget'",
         )
 
 

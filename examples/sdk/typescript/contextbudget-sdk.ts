@@ -25,7 +25,7 @@
  *
  * Prerequisites
  * ─────────────
- *   pip install redcon   (or `pip install -e .` from repo root)
+ *   pip install git+https://github.com/natiixnt/ContextBudget   (or `pip install -e .` from repo root)
  */
 
 import { spawnSync } from "child_process";
