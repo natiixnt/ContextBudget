@@ -1,5 +1,5 @@
 /**
- * @redcon/sdk — TypeScript/Node.js SDK for Redcon
+ * @redcon/sdk - TypeScript/Node.js SDK for Redcon
  *
  * @example Cloud API
  * ```ts

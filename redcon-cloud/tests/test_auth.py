@@ -50,7 +50,7 @@ def test_key_prefix_for_display():
 
 
 # ---------------------------------------------------------------------------
-# verify_api_key — DB-mocked tests
+# verify_api_key - DB-mocked tests
 # ---------------------------------------------------------------------------
 
 import pytest

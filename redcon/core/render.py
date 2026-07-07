@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """JSON and Markdown render/output helpers."""
+
+from __future__ import annotations
 
 import json
 import re
@@ -12,7 +12,6 @@ from redcon.compressors.summarizers import normalize_summarizer_report
 from redcon.core.delta import normalize_delta_report
 from redcon.core.model_profiles import normalize_model_profile_report
 from redcon.core.tokens import normalize_token_estimator_report
-
 
 _MAX_OUTPUT_BYTES = 10 * 1024 * 1024  # 10 MB
 
@@ -29,7 +28,7 @@ def _guard_output_size(output: str) -> str:
     if len(output.encode("utf-8", errors="replace")) <= _MAX_OUTPUT_BYTES:
         return output
     # Truncate to roughly 10 MB worth of characters and append warning
-    truncated = output[: _MAX_OUTPUT_BYTES]
+    truncated = output[:_MAX_OUTPUT_BYTES]
     return truncated + "\n\n[WARNING] Output truncated - exceeded 10 MB render limit.\n"
 
 
@@ -270,25 +269,27 @@ def render_agent_simulation_markdown(data: dict) -> str:
     # Cost estimate section
     # ------------------------------------------------------------------
     if isinstance(cost, dict) and cost:
-        lines.extend([
-            "",
-            "## Estimated API Cost",
-            "",
-            f"| | Value |",
-            f"|---|---|",
-            f"| Model | {cost.get('model', '')} |",
-            f"| Provider | {cost.get('provider', '-')} |",
-            f"| Input price | ${cost.get('input_per_1m_usd', 0):.2f} / MTok |",
-            f"| Output price | ${cost.get('output_per_1m_usd', 0):.2f} / MTok |",
-            f"| Total input tokens | {cost.get('total_input_tokens', 0):,} |",
-            f"| Total output tokens | {cost.get('total_output_tokens', 0):,} |",
-            f"| **Total cost** | **{_fmt_usd(cost.get('total_cost_usd', 0.0))} USD** |",
-            f"| Input cost | {_fmt_usd(cost.get('total_input_cost_usd', 0.0))} USD |",
-            f"| Output cost | {_fmt_usd(cost.get('total_output_cost_usd', 0.0))} USD |",
-            f"| Min step cost | {_fmt_usd(cost.get('min_step_cost_usd', 0.0))} USD |",
-            f"| Max step cost | {_fmt_usd(cost.get('max_step_cost_usd', 0.0))} USD |",
-            f"| Avg step cost | {_fmt_usd(cost.get('avg_step_cost_usd', 0.0))} USD |",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Estimated API Cost",
+                "",
+                "| | Value |",
+                "|---|---|",
+                f"| Model | {cost.get('model', '')} |",
+                f"| Provider | {cost.get('provider', '-')} |",
+                f"| Input price | ${cost.get('input_per_1m_usd', 0):.2f} / MTok |",
+                f"| Output price | ${cost.get('output_per_1m_usd', 0):.2f} / MTok |",
+                f"| Total input tokens | {cost.get('total_input_tokens', 0):,} |",
+                f"| Total output tokens | {cost.get('total_output_tokens', 0):,} |",
+                f"| **Total cost** | **{_fmt_usd(cost.get('total_cost_usd', 0.0))} USD** |",
+                f"| Input cost | {_fmt_usd(cost.get('total_input_cost_usd', 0.0))} USD |",
+                f"| Output cost | {_fmt_usd(cost.get('total_output_cost_usd', 0.0))} USD |",
+                f"| Min step cost | {_fmt_usd(cost.get('min_step_cost_usd', 0.0))} USD |",
+                f"| Max step cost | {_fmt_usd(cost.get('max_step_cost_usd', 0.0))} USD |",
+                f"| Avg step cost | {_fmt_usd(cost.get('avg_step_cost_usd', 0.0))} USD |",
+            ]
+        )
         notes = cost.get("notes", [])
         if isinstance(notes, list) and notes:
             lines.append("")
@@ -298,22 +299,24 @@ def render_agent_simulation_markdown(data: dict) -> str:
     # ------------------------------------------------------------------
     # Token summary
     # ------------------------------------------------------------------
-    lines.extend([
-        "",
-        "## Token Summary",
-        f"- Total tokens (all steps): {data.get('total_tokens', 0)}",
-        f"- Unique context tokens: {data.get('unique_context_tokens', 0)}",
-        f"- Total context tokens (with reuse): {data.get('total_context_tokens', 0)}",
-        f"- Total prompt overhead tokens: {data.get('total_prompt_tokens', 0)}",
-        f"- Total output tokens: {data.get('total_output_tokens', 0)}",
-        "",
-        "## Token Variance",
-        f"- Variance: {data.get('token_variance', 0.0)}",
-        f"- Std deviation: {data.get('token_std_dev', 0.0)}",
-        f"- Min step tokens: {data.get('min_step_tokens', 0)}",
-        f"- Max step tokens: {data.get('max_step_tokens', 0)}",
-        f"- Avg step tokens: {data.get('avg_step_tokens', 0.0)}",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Token Summary",
+            f"- Total tokens (all steps): {data.get('total_tokens', 0)}",
+            f"- Unique context tokens: {data.get('unique_context_tokens', 0)}",
+            f"- Total context tokens (with reuse): {data.get('total_context_tokens', 0)}",
+            f"- Total prompt overhead tokens: {data.get('total_prompt_tokens', 0)}",
+            f"- Total output tokens: {data.get('total_output_tokens', 0)}",
+            "",
+            "## Token Variance",
+            f"- Variance: {data.get('token_variance', 0.0)}",
+            f"- Std deviation: {data.get('token_std_dev', 0.0)}",
+            f"- Min step tokens: {data.get('min_step_tokens', 0)}",
+            f"- Max step tokens: {data.get('max_step_tokens', 0)}",
+            f"- Avg step tokens: {data.get('avg_step_tokens', 0.0)}",
+        ]
+    )
 
     # ------------------------------------------------------------------
     # Step breakdown table (now includes cost column)
@@ -321,21 +324,25 @@ def render_agent_simulation_markdown(data: dict) -> str:
     steps_cost: list[dict] = cost.get("steps_cost", []) if isinstance(cost, dict) else []
     has_cost = bool(steps_cost)
     if has_cost:
-        lines.extend([
-            "",
-            "## Step Breakdown",
-            "",
-            "| # | Step | Context | Prompt | Output | Step Total | Cumul. Context | Est. Cost |",
-            "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Step Breakdown",
+                "",
+                "| # | Step | Context | Prompt | Output | Step Total | Cumul. Context | Est. Cost |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
     else:
-        lines.extend([
-            "",
-            "## Step Breakdown",
-            "",
-            "| # | Step | Context | Prompt | Output | Step Total | Cumulative Context |",
-            "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Step Breakdown",
+                "",
+                "| # | Step | Context | Prompt | Output | Step Total | Cumulative Context |",
+                "| --- | --- | ---: | ---: | ---: | ---: | ---: |",
+            ]
+        )
 
     if isinstance(steps, list) and steps:
         for idx, step in enumerate(steps, start=1):
@@ -512,7 +519,9 @@ def render_agent_plan_markdown(data: dict) -> str:
         for item in ranked_files:
             if not isinstance(item, dict):
                 continue
-            reasons = ", ".join(item.get("reasons", [])) if item.get("reasons") else "no specific reason"
+            reasons = (
+                ", ".join(item.get("reasons", [])) if item.get("reasons") else "no specific reason"
+            )
             lines.append(f"- `{item.get('path', '')}` (score: {item.get('score', 0)}) - {reasons}")
     else:
         lines.append("- No files matched current heuristic signals.")
@@ -541,22 +550,24 @@ def render_pack_markdown(data: dict) -> str:
         _append_model_profile_lines(lines, data)
     lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
-    lines.extend([
-        "",
-        "## Budget",
-        f"- Estimated input tokens: {budget.get('estimated_input_tokens', 0)}",
-        f"- Estimated saved tokens: {budget.get('estimated_saved_tokens', 0)}",
-        f"- Duplicate reads prevented: {budget.get('duplicate_reads_prevented', 0)}",
-        f"- Quality risk estimate: {budget.get('quality_risk_estimate', 'unknown')}",
-        f"- Cache backend: {cache.get('backend', 'unknown')}",
-        f"- Cache hits: {cache.get('hits', 0)}",
-        f"- Cache misses: {cache.get('misses', 0)}",
-        f"- Cache writes: {cache.get('writes', 0)}",
-        f"- Cache tokens saved: {cache.get('tokens_saved', 0)}",
-        f"- Fragment cache hits: {cache.get('fragment_hits', 0)}",
-        f"- Fragment cache misses: {cache.get('fragment_misses', 0)}",
-        f"- Fragment cache writes: {cache.get('fragment_writes', 0)}",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Budget",
+            f"- Estimated input tokens: {budget.get('estimated_input_tokens', 0)}",
+            f"- Estimated saved tokens: {budget.get('estimated_saved_tokens', 0)}",
+            f"- Duplicate reads prevented: {budget.get('duplicate_reads_prevented', 0)}",
+            f"- Quality risk estimate: {budget.get('quality_risk_estimate', 'unknown')}",
+            f"- Cache backend: {cache.get('backend', 'unknown')}",
+            f"- Cache hits: {cache.get('hits', 0)}",
+            f"- Cache misses: {cache.get('misses', 0)}",
+            f"- Cache writes: {cache.get('writes', 0)}",
+            f"- Cache tokens saved: {cache.get('tokens_saved', 0)}",
+            f"- Fragment cache hits: {cache.get('fragment_hits', 0)}",
+            f"- Fragment cache misses: {cache.get('fragment_misses', 0)}",
+            f"- Fragment cache writes: {cache.get('fragment_writes', 0)}",
+        ]
+    )
     _append_summarizer_lines(lines, data)
     _append_delta_lines(lines, data)
     lines.extend(["", "## Files Included"])
@@ -637,21 +648,23 @@ def render_report_markdown(data: dict) -> str:
         _append_model_profile_lines(lines, data)
     lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
-    lines.extend([
-        "",
-        f"- Estimated input tokens: {data.get('estimated_input_tokens', 0)}",
-        f"- Estimated saved tokens: {data.get('estimated_saved_tokens', 0)}",
-        f"- Duplicate reads prevented: {data.get('duplicate_reads_prevented', 0)}",
-        f"- Quality risk estimate: {data.get('quality_risk_estimate', 'unknown')}",
-        f"- Cache backend: {cache.get('backend', 'unknown')}",
-        f"- Cache hits: {cache.get('hits', 0)}",
-        f"- Cache misses: {cache.get('misses', 0)}",
-        f"- Cache writes: {cache.get('writes', 0)}",
-        f"- Cache tokens saved: {cache.get('tokens_saved', 0)}",
-        f"- Fragment cache hits: {cache.get('fragment_hits', 0)}",
-        f"- Fragment cache misses: {cache.get('fragment_misses', 0)}",
-        f"- Fragment cache writes: {cache.get('fragment_writes', 0)}",
-    ])
+    lines.extend(
+        [
+            "",
+            f"- Estimated input tokens: {data.get('estimated_input_tokens', 0)}",
+            f"- Estimated saved tokens: {data.get('estimated_saved_tokens', 0)}",
+            f"- Duplicate reads prevented: {data.get('duplicate_reads_prevented', 0)}",
+            f"- Quality risk estimate: {data.get('quality_risk_estimate', 'unknown')}",
+            f"- Cache backend: {cache.get('backend', 'unknown')}",
+            f"- Cache hits: {cache.get('hits', 0)}",
+            f"- Cache misses: {cache.get('misses', 0)}",
+            f"- Cache writes: {cache.get('writes', 0)}",
+            f"- Cache tokens saved: {cache.get('tokens_saved', 0)}",
+            f"- Fragment cache hits: {cache.get('fragment_hits', 0)}",
+            f"- Fragment cache misses: {cache.get('fragment_misses', 0)}",
+            f"- Fragment cache writes: {cache.get('fragment_writes', 0)}",
+        ]
+    )
     _append_summarizer_lines(lines, data)
     _append_delta_lines(lines, data)
     lines.extend(["", "## Files Included"])
@@ -720,9 +733,13 @@ def render_heatmap_markdown(data: dict) -> str:
     ]
     _append_heatmap_rows(lines, data.get("top_token_heavy_files", []), runs_analyzed=runs_analyzed)
     lines.extend(["", "## Top Token-Heavy Directories"])
-    _append_heatmap_rows(lines, data.get("top_token_heavy_directories", []), runs_analyzed=runs_analyzed)
+    _append_heatmap_rows(
+        lines, data.get("top_token_heavy_directories", []), runs_analyzed=runs_analyzed
+    )
     lines.extend(["", "## Most Frequently Included Files"])
-    _append_heatmap_rows(lines, data.get("most_frequently_included_files", []), runs_analyzed=runs_analyzed)
+    _append_heatmap_rows(
+        lines, data.get("most_frequently_included_files", []), runs_analyzed=runs_analyzed
+    )
     lines.extend(["", "## Largest Token Savings Opportunities"])
     _append_heatmap_rows(
         lines,
@@ -924,11 +941,15 @@ def render_pr_comment_markdown(data: dict) -> str:
         if isinstance(larger_files, list) and larger_files:
             lines.append(f"- Larger files: {', '.join(str(item) for item in larger_files[:5])}")
         if isinstance(new_dependencies, list) and new_dependencies:
-            preview = ", ".join(str(item.get("name", "")) for item in new_dependencies[:5] if isinstance(item, dict))
+            preview = ", ".join(
+                str(item.get("name", "")) for item in new_dependencies[:5] if isinstance(item, dict)
+            )
             if preview:
                 lines.append(f"- New dependencies: {preview}")
         if isinstance(increased_complexity, list) and increased_complexity:
-            lines.append(f"- Increased context complexity: {', '.join(str(item) for item in increased_complexity[:5])}")
+            lines.append(
+                f"- Increased context complexity: {', '.join(str(item) for item in increased_complexity[:5])}"
+            )
 
     suggestions = data.get("suggestions", [])
     lines.extend(["", "Suggestions:"])
@@ -1010,7 +1031,9 @@ def render_pr_audit_markdown(data: dict) -> str:
             )
             new_dependencies = item.get("new_dependencies", [])
             if isinstance(new_dependencies, list) and new_dependencies:
-                lines.append(f"  - new dependencies: {', '.join(str(dep) for dep in new_dependencies)}")
+                lines.append(
+                    f"  - new dependencies: {', '.join(str(dep) for dep in new_dependencies)}"
+                )
             reasons = item.get("growth_reasons", [])
             if isinstance(reasons, list) and reasons:
                 lines.append(f"  - growth reasons: {', '.join(str(reason) for reason in reasons)}")
@@ -1073,13 +1096,15 @@ def render_advise_markdown(data: dict) -> str:
                 continue
             signals = item.get("signals", [])
             signals_str = ", ".join(signals) if signals else "none"
-            lines.extend([
-                f"### {idx}. `{item.get('path', '')}` - {item.get('suggestion', '')}",
-                f"- **Estimated token impact:** {item.get('estimated_token_impact', 0)}",
-                f"- **Signals:** {signals_str}",
-                f"- {item.get('reason', '')}",
-                "",
-            ])
+            lines.extend(
+                [
+                    f"### {idx}. `{item.get('path', '')}` - {item.get('suggestion', '')}",
+                    f"- **Estimated token impact:** {item.get('estimated_token_impact', 0)}",
+                    f"- **Signals:** {signals_str}",
+                    f"- {item.get('reason', '')}",
+                    "",
+                ]
+            )
     else:
         lines.append("- No suggestions. Repository structure looks agent-friendly.")
         lines.append("")
@@ -1107,13 +1132,15 @@ def render_benchmark_markdown(data: dict) -> str:
         _append_model_profile_lines(lines, data)
     lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
-    lines.extend([
-        "",
-        "## Strategy Comparison",
-        "",
-        "| Strategy | Input Tokens | Saved Tokens | Files Included | Duplicate Reads Prevented | Quality Risk | Cache Hits | Runtime (ms) |",
-        "| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Strategy Comparison",
+            "",
+            "| Strategy | Input Tokens | Saved Tokens | Files Included | Duplicate Reads Prevented | Quality Risk | Cache Hits | Runtime (ms) |",
+            "| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
+        ]
+    )
 
     for strategy in strategies:
         lines.append(
@@ -1135,8 +1162,12 @@ def render_benchmark_markdown(data: dict) -> str:
             lines.append(f"- Notes: {strategy.get('notes')}")
         files_included = strategy.get("files_included", [])
         files_skipped = strategy.get("files_skipped", [])
-        lines.append(f"- Files included ({len(files_included)}): {', '.join(files_included) if files_included else 'none'}")
-        lines.append(f"- Files skipped ({len(files_skipped)}): {', '.join(files_skipped) if files_skipped else 'none'}")
+        lines.append(
+            f"- Files included ({len(files_included)}): {', '.join(files_included) if files_included else 'none'}"
+        )
+        lines.append(
+            f"- Files skipped ({len(files_skipped)}): {', '.join(files_skipped) if files_skipped else 'none'}"
+        )
 
     estimator_samples = data.get("estimator_samples", [])
     if isinstance(estimator_samples, list) and estimator_samples:
@@ -1213,7 +1244,9 @@ def render_profile_markdown(data: dict) -> str:
             file_count = int(stage_data.get("file_count") or 0)
             if stage_saved == 0 and file_count == 0:
                 continue
-            pct_of_total = round((stage_saved / tokens_saved) * 100.0, 1) if tokens_saved > 0 else 0.0
+            pct_of_total = (
+                round((stage_saved / tokens_saved) * 100.0, 1) if tokens_saved > 0 else 0.0
+            )
             label = stage_name.replace("_", " ").title()
             lines.append(f"| {label} | {file_count} | {stage_saved} | {pct_of_total:.1f}% |")
             any_stage_data = True
@@ -1483,11 +1516,13 @@ def render_prepare_context_markdown(record: dict) -> str:
 
     if isinstance(policy_block, dict) and policy_block:
         passed = bool(policy_block.get("passed", True))
-        lines.extend([
-            "",
-            "## Policy",
-            f"- Result: {'PASS' if passed else 'FAIL'}",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Policy",
+                f"- Result: {'PASS' if passed else 'FAIL'}",
+            ]
+        )
         for v in policy_block.get("violations", []):
             lines.append(f"- Violation: {v}")
 
@@ -1640,7 +1675,7 @@ def render_observe_markdown(data: dict) -> str:
     task = str(data.get("task") or "")
     repo = str(data.get("repo") or "")
     duration_ms = int(data.get("run_duration_ms") or 0)
-    duration_str = f"{duration_ms:,} ms" if duration_ms else "—"
+    duration_str = f"{duration_ms:,} ms" if duration_ms else "-"
 
     lines = ["# Agent Run Summary", ""]
     if task:
@@ -1650,48 +1685,52 @@ def render_observe_markdown(data: dict) -> str:
     if run_json:
         lines.append(f"Run artifact: {run_json}")
     lines.append(f"Generated at: {data.get('generated_at', '')}")
-    lines.extend([
-        "",
-        "## Token Metrics",
-        "",
-        "| Metric | Value |",
-        "|--------|-------|",
-        f"| Total tokens used          | {data.get('total_tokens', 0):,} |",
-        f"| Baseline (unoptimised)     | {data.get('baseline_tokens', 0):,} |",
-        f"| Tokens saved by optimisation | {data.get('tokens_saved', 0):,} |",
-        f"| Token budget (max)         | {data.get('max_tokens', 0) or '—'} |",
-        "",
-        "## File Read Metrics",
-        "",
-        "| Metric | Value |",
-        "|--------|-------|",
-        f"| Files read (total)                 | {data.get('files_read', 0)} |",
-        f"| Unique files read                  | {data.get('unique_files_read', 0)} |",
-        f"| Duplicate reads detected           | {data.get('duplicate_reads', 0)} |",
-        f"| Duplicate reads prevented (packer) | {data.get('duplicate_reads_prevented', 0)} |",
-        "",
-        "## Cache Metrics",
-        "",
-        "| Metric | Value |",
-        "|--------|-------|",
-        f"| Cache hits          | {data.get('cache_hits', 0)} |",
-        f"| Tokens saved (cache)| {data.get('cache_tokens_saved', 0):,} |",
-        "",
-        "## Run Info",
-        "",
-        "| Metric | Value |",
-        "|--------|-------|",
-        f"| Context size (files) | {data.get('context_size_files', 0)} |",
-        f"| Run duration         | {duration_str} |",
-    ])
+    lines.extend(
+        [
+            "",
+            "## Token Metrics",
+            "",
+            "| Metric | Value |",
+            "|--------|-------|",
+            f"| Total tokens used          | {data.get('total_tokens', 0):,} |",
+            f"| Baseline (unoptimised)     | {data.get('baseline_tokens', 0):,} |",
+            f"| Tokens saved by optimisation | {data.get('tokens_saved', 0):,} |",
+            f"| Token budget (max)         | {data.get('max_tokens', 0) or '-'} |",
+            "",
+            "## File Read Metrics",
+            "",
+            "| Metric | Value |",
+            "|--------|-------|",
+            f"| Files read (total)                 | {data.get('files_read', 0)} |",
+            f"| Unique files read                  | {data.get('unique_files_read', 0)} |",
+            f"| Duplicate reads detected           | {data.get('duplicate_reads', 0)} |",
+            f"| Duplicate reads prevented (packer) | {data.get('duplicate_reads_prevented', 0)} |",
+            "",
+            "## Cache Metrics",
+            "",
+            "| Metric | Value |",
+            "|--------|-------|",
+            f"| Cache hits          | {data.get('cache_hits', 0)} |",
+            f"| Tokens saved (cache)| {data.get('cache_tokens_saved', 0):,} |",
+            "",
+            "## Run Info",
+            "",
+            "| Metric | Value |",
+            "|--------|-------|",
+            f"| Context size (files) | {data.get('context_size_files', 0)} |",
+            f"| Run duration         | {duration_str} |",
+        ]
+    )
 
     files: list = data.get("files") or []
     if files:
         lines.extend(["", "## Top Files by Token Cost", ""])
-        lines.extend([
-            "| File | Original tokens | Compressed tokens | Read count |",
-            "|------|-----------------|-------------------|------------|",
-        ])
+        lines.extend(
+            [
+                "| File | Original tokens | Compressed tokens | Read count |",
+                "|------|-----------------|-------------------|------------|",
+            ]
+        )
         for f in files[:20]:
             if not isinstance(f, dict):
                 continue
@@ -1828,28 +1867,34 @@ def render_visualize_markdown(data: dict) -> str:
     if top_token:
         lines.extend(["", "## Top Token-Heavy Files", ""])
         for path in top_token:
-            node_data = next((n for n in nodes if n.get("id") == path or n.get("label") == path), {})
+            node_data = next(
+                (n for n in nodes if n.get("id") == path or n.get("label") == path), {}
+            )
             tokens = node_data.get("estimated_tokens", 0)
-            tok_str = f" — {tokens:,} tokens" if tokens else ""
+            tok_str = f" - {tokens:,} tokens" if tokens else ""
             lines.append(f"- `{path}`{tok_str}")
 
     most_imported = stats.get("most_imported_files", [])
     if most_imported:
         lines.extend(["", "## Most Imported Files", ""])
         for path in most_imported:
-            node_data = next((n for n in nodes if n.get("id") == path or n.get("label") == path), {})
+            node_data = next(
+                (n for n in nodes if n.get("id") == path or n.get("label") == path), {}
+            )
             in_deg = node_data.get("in_degree", 0)
-            deg_str = f" — imported by {in_deg} files" if in_deg else ""
+            deg_str = f" - imported by {in_deg} files" if in_deg else ""
             lines.append(f"- `{path}`{deg_str}")
 
     if nodes:
-        lines.extend([
-            "",
-            "## Node Details",
-            "",
-            "| File | Tokens | Included | Rate | In-Degree | Out-Degree |",
-            "|------|-------:|--------:|-----:|----------:|-----------:|",
-        ])
+        lines.extend(
+            [
+                "",
+                "## Node Details",
+                "",
+                "| File | Tokens | Included | Rate | In-Degree | Out-Degree |",
+                "|------|-------:|--------:|-----:|----------:|-----------:|",
+            ]
+        )
         sorted_nodes = sorted(nodes, key=lambda n: n.get("estimated_tokens", 0), reverse=True)
         for node in sorted_nodes[:30]:
             if not isinstance(node, dict):
@@ -1864,7 +1909,9 @@ def render_visualize_markdown(data: dict) -> str:
                 f"| {node.get('out_degree', 0)} |"
             )
         if len(nodes) > 30:
-            lines.append(f"\n_...and {len(nodes) - 30} more nodes. See the JSON artifact for full details._")
+            lines.append(
+                f"\n_...and {len(nodes) - 30} more nodes. See the JSON artifact for full details._"
+            )
 
     lines.extend(["", f"Total edges in graph: {len(edges)}", ""])
     return "\n".join(lines)

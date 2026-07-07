@@ -18,8 +18,8 @@ RC_CLOUD_BILLING_ENABLED        Set to "true" to enable billing (default: false)
 Database schema
 ---------------
 The ``006_billing.sql`` migration adds:
-  - ``orgs.stripe_customer_id``  — Stripe Customer ID for the org
-  - ``billing_events`` table     — audit log of reported meter events
+  - ``orgs.stripe_customer_id``  - Stripe Customer ID for the org
+  - ``billing_events`` table     - audit log of reported meter events
 
 Usage
 -----

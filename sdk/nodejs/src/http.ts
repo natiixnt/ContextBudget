@@ -1,5 +1,5 @@
 /**
- * Minimal HTTP client utilities (Node.js built-ins only — no dependencies).
+ * Minimal HTTP client utilities (Node.js built-ins only - no dependencies).
  */
 
 import * as https from "https";

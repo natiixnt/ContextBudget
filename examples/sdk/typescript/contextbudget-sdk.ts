@@ -66,7 +66,7 @@ function callBridge<T>(
   const proc = spawnSync(pythonBin, [BRIDGE_SCRIPT], {
     input,
     encoding: "utf-8",
-    maxBuffer: 32 * 1024 * 1024, // 32 MB — generous for large context artifacts
+    maxBuffer: 32 * 1024 * 1024, // 32 MB - generous for large context artifacts
   });
 
   if (proc.error) {
@@ -117,7 +117,7 @@ export class RedconSDK {
   /**
    * Pack repository context for a task under the configured token budget.
    *
-   * Runs the full Redcon pipeline — scan, rank, compress, cache —
+   * Runs the full Redcon pipeline - scan, rank, compress, cache -
    * and returns a structured result containing the compressed context and
    * additive middleware metadata.
    *

@@ -2,9 +2,9 @@
 # Copyright (c) 2026 nai. All rights reserved.
 # See LICENSE-COMMERCIAL for terms.
 
-from __future__ import annotations
-
 """Configuration for the Redcon Runtime Gateway."""
+
+from __future__ import annotations
 
 import os
 from dataclasses import dataclass, fields
@@ -49,14 +49,14 @@ class GatewayConfig:
     config_path: str | None = None
     telemetry_enabled: bool = False
     log_requests: bool = True
-    api_key: str | None = None          # Required Bearer token; None = auth disabled
-    request_timeout_seconds: int = 30   # Per-request processing timeout
+    api_key: str | None = None  # Required Bearer token; None = auth disabled
+    request_timeout_seconds: int = 30  # Per-request processing timeout
 
-    # Remote policy — optional cloud control plane integration
+    # Remote policy - optional cloud control plane integration
     # If set, the gateway fetches the active PolicySpec from the cloud service
     # before each request and enforces it server-side.
-    cloud_policy_url: str | None = None   # e.g. https://cloud.example.com
-    cloud_api_key: str | None = None      # Bearer key for the cloud service
+    cloud_policy_url: str | None = None  # e.g. https://cloud.example.com
+    cloud_api_key: str | None = None  # Bearer key for the cloud service
     cloud_policy_org_id: int | None = None  # org_id to scope the policy lookup
 
     # Webhook push notifications (optional)
@@ -65,7 +65,7 @@ class GatewayConfig:
     webhook_url: str | None = None
     webhook_secret: str | None = None
 
-    # Redis session store (optional — enables horizontal scaling of /run-agent-step)
+    # Redis session store (optional - enables horizontal scaling of /run-agent-step)
     # When set, session state is persisted to Redis so any replica can continue
     # a multi-turn session started on another node.
     redis_url: str | None = None  # e.g. redis://redis:6379/0
@@ -80,18 +80,12 @@ class GatewayConfig:
             max_tokens=int(os.environ.get("RC_GATEWAY_MAX_TOKENS", "128000")),
             max_files=int(os.environ.get("RC_GATEWAY_MAX_FILES", "100")),
             max_context_size=int(
-                os.environ.get(
-                    "RC_GATEWAY_MAX_CONTEXT_SIZE", str(10 * 1024 * 1024)
-                )
+                os.environ.get("RC_GATEWAY_MAX_CONTEXT_SIZE", str(10 * 1024 * 1024))
             ),
             default_repo=os.environ.get("RC_GATEWAY_DEFAULT_REPO", "."),
             config_path=os.environ.get("RC_GATEWAY_CONFIG_PATH") or None,
-            telemetry_enabled=(
-                os.environ.get("RC_GATEWAY_TELEMETRY", "false").lower() == "true"
-            ),
-            log_requests=(
-                os.environ.get("RC_GATEWAY_LOG_REQUESTS", "true").lower() == "true"
-            ),
+            telemetry_enabled=(os.environ.get("RC_GATEWAY_TELEMETRY", "false").lower() == "true"),
+            log_requests=(os.environ.get("RC_GATEWAY_LOG_REQUESTS", "true").lower() == "true"),
             api_key=os.environ.get("RC_GATEWAY_API_KEY") or None,
             request_timeout_seconds=int(os.environ.get("RC_GATEWAY_TIMEOUT_SECONDS", "30")),
             cloud_policy_url=os.environ.get("RC_GATEWAY_CLOUD_POLICY_URL") or None,

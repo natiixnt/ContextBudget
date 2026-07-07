@@ -1,16 +1,16 @@
-from __future__ import annotations
-
 """Tests for RedisSummaryCacheBackend using fakeredis."""
+
+from __future__ import annotations
 
 import pytest
 
 pytest.importorskip("fakeredis", reason="fakeredis is required for Redis backend tests")
 pytest.importorskip("redis", reason="redis package is required for Redis backend tests")
 
+from pathlib import Path
+
 import fakeredis  # noqa: E402
 import redis as _redis_module  # noqa: E402
-
-from pathlib import Path
 
 from redcon.cache.backends import (
     RedisSummaryCacheBackend,
@@ -21,10 +21,10 @@ from redcon.cache.backends import (
 from redcon.config import default_config
 from redcon.stages.workflow import run_pack_stage, run_scan_stage, run_score_stage
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def _make_backend(namespace: str = "test", ttl: int = 3600) -> RedisSummaryCacheBackend:
     """Return a RedisSummaryCacheBackend wired to an in-process fakeredis server."""
@@ -44,8 +44,9 @@ def _write(path: Path, content: str) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Unit tests – backend behaviour
+# Unit tests - backend behaviour
 # ---------------------------------------------------------------------------
+
 
 def test_backend_name() -> None:
     assert RedisSummaryCacheBackend.backend_name == "redis"
@@ -148,6 +149,7 @@ def test_snapshot_reflects_stats() -> None:
 # build_redis_cache_key
 # ---------------------------------------------------------------------------
 
+
 def test_build_redis_cache_key_basic() -> None:
     key = build_redis_cache_key(
         org="acme",
@@ -180,8 +182,9 @@ def test_build_redis_cache_key_differs_for_different_content_hash() -> None:
 
 
 # ---------------------------------------------------------------------------
-# Integration – cache reuse across pipeline runs
+# Integration - cache reuse across pipeline runs
 # ---------------------------------------------------------------------------
+
 
 def test_cache_reuse_across_runs(tmp_path: Path) -> None:
     """Second pipeline run must hit cache for entries written by the first run."""
@@ -253,6 +256,7 @@ def test_token_savings_recorded_on_fragment_reuse(tmp_path: Path) -> None:
 # Factory
 # ---------------------------------------------------------------------------
 
+
 def test_create_summary_cache_backend_redis(tmp_path: Path, monkeypatch) -> None:
     # Patch Redis.from_url to use fakeredis so the ping probe succeeds
     fake_server = fakeredis.FakeServer()
@@ -276,6 +280,7 @@ def test_create_summary_cache_backend_redis(tmp_path: Path, monkeypatch) -> None
 # ---------------------------------------------------------------------------
 # Edge cases
 # ---------------------------------------------------------------------------
+
 
 def test_connection_failure_degrades_gracefully() -> None:
     """get_summary and put_summary must not raise on Redis connection errors."""
@@ -346,6 +351,7 @@ def test_cross_instance_reuse_via_fake_server(tmp_path: Path) -> None:
 # Context slices
 # ---------------------------------------------------------------------------
 
+
 def test_slice_miss_on_empty_cache() -> None:
     backend = _make_backend()
     assert backend.get_slice("slice-key") is None
@@ -412,6 +418,7 @@ def test_disabled_backend_does_not_store_slices() -> None:
 # ---------------------------------------------------------------------------
 # Invalidation
 # ---------------------------------------------------------------------------
+
 
 def test_invalidate_removes_summary() -> None:
     backend = _make_backend()

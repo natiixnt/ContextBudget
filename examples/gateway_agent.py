@@ -12,16 +12,16 @@ Architecture
     Redcon Gateway  (POST /prepare-context, /run-agent-step, /report-run)
         │
         ▼  optimized prompt
-    LLM API  (not called in this example — swap in your own client)
+    LLM API  (not called in this example - swap in your own client)
 
 Usage
 -----
-    # Terminal 1 — start the gateway
+    # Terminal 1 - start the gateway
     python -m redcon.gateway
     # or with a custom port:
     RC_GATEWAY_PORT=9000 python -m redcon.gateway
 
-    # Terminal 2 — run this example against a local repo
+    # Terminal 2 - run this example against a local repo
     python examples/gateway_agent.py [/path/to/repo]
 """
 
@@ -78,7 +78,7 @@ def prepare_context(
     max_tokens: int | None = None,
     max_files: int | None = None,
 ) -> dict[str, Any]:
-    """Call ``POST /prepare-context`` — stateless, no session created."""
+    """Call ``POST /prepare-context`` - stateless, no session created."""
     body: dict[str, Any] = {"task": task, "repo": repo}
     if max_tokens is not None:
         body["max_tokens"] = max_tokens
@@ -95,7 +95,7 @@ def run_agent_step(
     max_tokens: int | None = None,
     max_files: int | None = None,
 ) -> dict[str, Any]:
-    """Call ``POST /run-agent-step`` — stateful, reuses delta context across turns."""
+    """Call ``POST /run-agent-step`` - stateful, reuses delta context across turns."""
     body: dict[str, Any] = {"task": task, "repo": repo}
     if session_id is not None:
         body["session_id"] = session_id
@@ -166,7 +166,7 @@ def _print_result(label: str, result: dict[str, Any]) -> None:
 def main() -> None:
     repo = sys.argv[1] if len(sys.argv) > 1 else "."
 
-    print("Redcon Gateway — Agent Integration Example")
+    print("Redcon Gateway - Agent Integration Example")
     print(f"  repo    : {repo}")
     print(f"  gateway : {GATEWAY_URL}")
 
@@ -180,11 +180,11 @@ def main() -> None:
     )
     _print_result("POST /prepare-context", result)
 
-    # Consume the optimized context — in a real agent you would forward
+    # Consume the optimized context - in a real agent you would forward
     # result["optimized_context"]["prompt_text"] to your LLM client here.
 
     # ── 2. Start a multi-turn agent session ───────────────────────────────────
-    print("\n[2/4] POST /run-agent-step — turn 1 (new session) …")
+    print("\n[2/4] POST /run-agent-step - turn 1 (new session) …")
     turn1 = run_agent_step(
         task="identify files that need caching support",
         repo=repo,
@@ -195,8 +195,8 @@ def main() -> None:
 
     session_id = turn1["session_id"]
 
-    # ── 3. Continue the session — delta context is applied automatically ──────
-    print("\n[3/4] POST /run-agent-step — turn 2 (delta context) …")
+    # ── 3. Continue the session - delta context is applied automatically ──────
+    print("\n[3/4] POST /run-agent-step - turn 2 (delta context) …")
     turn2 = run_agent_step(
         task="implement in-memory LRU cache for scan results",
         repo=repo,

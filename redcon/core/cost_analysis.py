@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """Cost analytics engine for Redcon run artifacts.
 
 Translates token savings reported in a run.json artifact into USD financial
@@ -14,7 +12,7 @@ baseline_tokens
     compressor and file-skipping logic reduced it.
 
 optimized_tokens
-    Tokens actually sent — ``estimated_input_tokens`` from the budget report.
+    Tokens actually sent - ``estimated_input_tokens`` from the budget report.
 
 saved_tokens
     ``baseline_tokens - optimized_tokens`` (== ``estimated_saved_tokens``).
@@ -23,20 +21,24 @@ All costs are denominated in USD and use the input-token price only (context
 is input; output tokens are the model's response, not tracked here).
 """
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 
 from redcon.core.agent_cost import (
     ModelPricing,
-    list_known_models,
     resolve_model_pricing,
 )
+from redcon.core.agent_cost import (
+    list_known_models as list_known_models,  # re-exported for redcon.cli
+)
 from redcon.telemetry.pricing import tokens_to_usd as _tokens_to_usd
-
 
 # ---------------------------------------------------------------------------
 # Public helpers
 # ---------------------------------------------------------------------------
+
 
 def load_run_data(run_json: str | Path) -> dict:
     """Load and return a run artifact from *run_json*."""
@@ -63,16 +65,18 @@ def _per_file_breakdown(run_data: dict, pricing: ModelPricing) -> list[dict]:
         original = int(entry.get("original_tokens", 0) or 0)
         compressed = int(entry.get("compressed_tokens", 0) or 0)
         saved = max(0, original - compressed)
-        rows.append({
-            "path": entry.get("path", ""),
-            "strategy": entry.get("strategy", ""),
-            "original_tokens": original,
-            "compressed_tokens": compressed,
-            "saved_tokens": saved,
-            "baseline_cost_usd": round(_tokens_to_usd(original, pricing.input_per_1m), 8),
-            "optimized_cost_usd": round(_tokens_to_usd(compressed, pricing.input_per_1m), 8),
-            "saved_cost_usd": round(_tokens_to_usd(saved, pricing.input_per_1m), 8),
-        })
+        rows.append(
+            {
+                "path": entry.get("path", ""),
+                "strategy": entry.get("strategy", ""),
+                "original_tokens": original,
+                "compressed_tokens": compressed,
+                "saved_tokens": saved,
+                "baseline_cost_usd": round(_tokens_to_usd(original, pricing.input_per_1m), 8),
+                "optimized_cost_usd": round(_tokens_to_usd(compressed, pricing.input_per_1m), 8),
+                "saved_cost_usd": round(_tokens_to_usd(saved, pricing.input_per_1m), 8),
+            }
+        )
     return rows
 
 
@@ -114,9 +118,7 @@ def compute_cost_analysis(
     saved_tokens = int(budget.get("estimated_saved_tokens", 0) or 0)
     baseline_tokens = optimized_tokens + saved_tokens
 
-    savings_pct = (
-        round(saved_tokens / baseline_tokens * 100, 2) if baseline_tokens > 0 else 0.0
-    )
+    savings_pct = round(saved_tokens / baseline_tokens * 100, 2) if baseline_tokens > 0 else 0.0
 
     baseline_cost = _tokens_to_usd(baseline_tokens, pricing.input_per_1m)
     optimized_cost = _tokens_to_usd(optimized_tokens, pricing.input_per_1m)
@@ -130,7 +132,9 @@ def compute_cost_analysis(
     if saved_tokens == 0 and optimized_tokens == 0:
         notes.append("No token data found in budget report; costs are zero.")
     if baseline_tokens == optimized_tokens:
-        notes.append("No savings recorded — context was not compressed or file skipping had no effect.")
+        notes.append(
+            "No savings recorded - context was not compressed or file skipping had no effect."
+        )
 
     return {
         "model": model,

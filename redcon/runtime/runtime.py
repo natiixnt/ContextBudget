@@ -2,9 +2,7 @@
 # Copyright (c) 2026 nai. All rights reserved.
 # See LICENSE-COMMERCIAL for terms.
 
-from __future__ import annotations
-
-"""AgentRuntime — the agent/LLM middleware layer.
+"""AgentRuntime - the agent/LLM middleware layer.
 
 Architecture
 ------------
@@ -18,7 +16,7 @@ agent turn it:
    (scan → rank → symbol extraction → context slicing → compression →
    cache reuse → delta prompts).
 3. Applies token budget and context policy constraints.
-4. Returns a :class:`PreparedContext` — the optimised prompt payload — and
+4. Returns a :class:`PreparedContext` - the optimised prompt payload - and
    optionally dispatches it to a registered LLM callable.
 5. Records the turn in a :class:`RuntimeSession` so cumulative token usage
    is visible across the full agent session.
@@ -29,7 +27,7 @@ Quick-start
 
     from redcon.runtime import AgentRuntime
 
-    # Minimal — no LLM dispatch, just prepare context
+    # Minimal - no LLM dispatch, just prepare context
     runtime = AgentRuntime(max_tokens=32_000)
     result = runtime.run("add Redis caching to the session store", repo=".")
     print(result.prepared_context.prompt_text[:500])
@@ -52,9 +50,12 @@ Quick-start
     print(result.llm_response)
 """
 
+from __future__ import annotations
+
 import logging
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from redcon.agents.middleware import (
     AgentMiddlewareResult,
@@ -64,10 +65,9 @@ from redcon.agents.middleware import (
 )
 from redcon.core.delta import effective_pack_metrics
 from redcon.core.policy import PolicySpec, load_policy
-from redcon.engine import BudgetPolicyViolationError, RedconEngine
+from redcon.engine import RedconEngine
 from redcon.runtime.context import PreparedContext, RuntimeResult
 from redcon.runtime.session import RuntimeSession
-
 
 _log = logging.getLogger(__name__)
 
@@ -107,15 +107,15 @@ class AgentRuntime:
     ``agent → Redcon → LLM`` architecture.  It wraps
     :class:`~redcon.agents.middleware.RedconMiddleware` with:
 
-    * **Session tracking** — cumulative token and turn history via
+    * **Session tracking** - cumulative token and turn history via
       :class:`~redcon.runtime.session.RuntimeSession`.
-    * **Delta context** — after the first turn the runtime automatically
+    * **Delta context** - after the first turn the runtime automatically
       passes the previous run artifact as ``delta_from`` so only changed
       files are re-sent.
-    * **LLM dispatch** — an optional ``llm_fn`` callable receives the
+    * **LLM dispatch** - an optional ``llm_fn`` callable receives the
       assembled prompt and its response is returned in
       :class:`~redcon.runtime.context.RuntimeResult`.
-    * **Policy enforcement** — token budget and quality-risk policies are
+    * **Policy enforcement** - token budget and quality-risk policies are
       evaluated on every turn; ``strict=True`` raises
       :class:`~redcon.engine.BudgetPolicyViolationError` on
       violations.
@@ -176,8 +176,12 @@ class AgentRuntime:
         self._config_path = Path(config_path).resolve() if config_path else None
         self.session = session if session is not None else RuntimeSession()
 
-        self._engine = engine if engine is not None else RedconEngine(
-            config_path=self._config_path,
+        self._engine = (
+            engine
+            if engine is not None
+            else RedconEngine(
+                config_path=self._config_path,
+            )
         )
         self._middleware = RedconMiddleware(engine=self._engine)
 
@@ -242,7 +246,11 @@ class AgentRuntime:
 
         # Auto-delta: use previous run artifact on second+ turns
         effective_delta_from = delta_from
-        if effective_delta_from is None and self._delta and self.session.last_run_artifact is not None:
+        if (
+            effective_delta_from is None
+            and self._delta
+            and self.session.last_run_artifact is not None
+        ):
             effective_delta_from = self.session.last_run_artifact
 
         request = AgentTaskRequest(
@@ -256,7 +264,7 @@ class AgentRuntime:
             metadata=dict(metadata or {}),
         )
 
-        # Pack — handle dict delta_from by injecting it before pack
+        # Pack - handle dict delta_from by injecting it before pack
         if isinstance(effective_delta_from, dict):
             run_artifact = self._engine.pack(
                 task=request.task,
@@ -406,9 +414,7 @@ class AgentRuntime:
             policy_passed=policy_passed,
             policy_violations=policy_violations,
             delta_enabled=bool(meta.get("delta_enabled", False)),
-            cache_hits=int(
-                cache_report.get("hits") if isinstance(cache_report, dict) else 0
-            ),
+            cache_hits=int(cache_report.get("hits") if isinstance(cache_report, dict) else 0),
             metadata=dict(meta),
             run_artifact=dict(run_artifact),
         )

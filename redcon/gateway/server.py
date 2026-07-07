@@ -2,7 +2,7 @@
 # Copyright (c) 2026 nai. All rights reserved.
 # See LICENSE-COMMERCIAL for terms.
 
-"""Redcon Runtime Gateway — FastAPI ASGI service (falls back to stdlib HTTP).
+"""Redcon Runtime Gateway - FastAPI ASGI service (falls back to stdlib HTTP).
 
 When the optional ``fastapi`` and ``uvicorn`` packages are available, this module
 provides a production-grade ASGI gateway.  Without them, it falls back to the
@@ -195,7 +195,7 @@ class GatewayServer:
             self._start_fastapi(block=block)
         else:
             logger.warning(
-                "fastapi/uvicorn not installed — using stdlib HTTP gateway. "
+                "fastapi/uvicorn not installed - using stdlib HTTP gateway. "
                 "For production use: pip install 'redcon[gateway] @ git+https://github.com/natiixnt/ContextBudget'"
             )
             self._start_stdlib(block=block)

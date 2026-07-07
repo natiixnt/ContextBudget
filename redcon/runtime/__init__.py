@@ -1,4 +1,4 @@
-"""Redcon Agent Runtime — agent/LLM middleware layer."""
+"""Redcon Agent Runtime - agent/LLM middleware layer."""
 
 from redcon.runtime.context import PreparedContext, RuntimeResult
 from redcon.runtime.runtime import AgentRuntime

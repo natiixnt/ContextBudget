@@ -2,10 +2,10 @@
 
 Supported event types
 ---------------------
-- ``policy_violation``  — a pack or agent-step request violated a policy rule
-- ``budget_overrun``    — estimated tokens exceeded the configured max_tokens budget
-- ``drift_alert``       — repository context drift exceeded the threshold
-- ``cache_miss_spike``  — cache hit rate dropped below expected levels
+- ``policy_violation``  - a pack or agent-step request violated a policy rule
+- ``budget_overrun``    - estimated tokens exceeded the configured max_tokens budget
+- ``drift_alert``       - repository context drift exceeded the threshold
+- ``cache_miss_spike``  - cache hit rate dropped below expected levels
 
 Usage
 -----
@@ -17,6 +17,7 @@ If ``secret`` is provided the payload is signed with HMAC-SHA256 and the
 signature is sent in the ``X-CB-Signature-256`` header as ``sha256=<hex>``.
 This lets receiving servers verify authenticity.
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -30,7 +31,7 @@ from typing import Any
 
 logger = logging.getLogger(__name__)
 
-# Webhook delivery timeout — keep short to avoid blocking gateway requests
+# Webhook delivery timeout - keep short to avoid blocking gateway requests
 _TIMEOUT_SECONDS = 3
 
 
@@ -50,7 +51,7 @@ def dispatch_webhook(
     """Deliver one webhook event to *url*.
 
     This function is synchronous and blocks for up to :data:`_TIMEOUT_SECONDS`.
-    Call from a thread or as fire-and-forget — never ``await`` it from async code
+    Call from a thread or as fire-and-forget - never ``await`` it from async code
     (use ``asyncio.get_event_loop().run_in_executor`` or a background thread).
     All errors are caught and logged; the caller is never raised to.
     """
@@ -91,10 +92,10 @@ def dispatch_policy_violation(
         url,
         "policy_violation",
         {
-            "run_id":        run_id,
-            "endpoint":      endpoint,
-            "violations":    violations or [],
-            "tokens_used":   tokens_used,
+            "run_id": run_id,
+            "endpoint": endpoint,
+            "violations": violations or [],
+            "tokens_used": tokens_used,
             "repository_id": repository_id,
         },
         secret=secret,
@@ -115,10 +116,10 @@ def dispatch_budget_overrun(
         url,
         "budget_overrun",
         {
-            "run_id":        run_id,
-            "endpoint":      endpoint,
-            "tokens_used":   tokens_used,
-            "max_tokens":    max_tokens,
+            "run_id": run_id,
+            "endpoint": endpoint,
+            "tokens_used": tokens_used,
+            "max_tokens": max_tokens,
             "repository_id": repository_id,
         },
         secret=secret,
@@ -137,9 +138,9 @@ def dispatch_drift_alert(
         url,
         "drift_alert",
         {
-            "repository_id":  repository_id,
+            "repository_id": repository_id,
             "token_drift_pct": token_drift_pct,
-            "verdict":         verdict,
+            "verdict": verdict,
         },
         secret=secret,
     )

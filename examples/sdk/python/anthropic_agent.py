@@ -27,7 +27,7 @@ import anthropic
 from redcon.runtime import AgentRuntime
 
 # -----------------------------------------------------------------------
-# LLM callable — receives the optimised prompt, returns Claude's response
+# LLM callable - receives the optimised prompt, returns Claude's response
 # -----------------------------------------------------------------------
 
 _client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY", ""))
@@ -58,7 +58,7 @@ runtime = AgentRuntime(
 REPO = "examples/small-feature/repo"
 
 # -----------------------------------------------------------------------
-# Turn 1 — first agent task
+# Turn 1 - first agent task
 # -----------------------------------------------------------------------
 result1 = runtime.run("add Redis caching to the session store", repo=REPO)
 ctx1 = result1.prepared_context
@@ -73,7 +73,7 @@ print(f"  session:     {result1.session_tokens} cumulative tokens")
 print()
 
 # -----------------------------------------------------------------------
-# Turn 2 — follow-up task in the same session
+# Turn 2 - follow-up task in the same session
 #          Delta mode sends only the files that changed since turn 1.
 # -----------------------------------------------------------------------
 result2 = runtime.run("add unit tests for the Redis cache layer", repo=REPO)

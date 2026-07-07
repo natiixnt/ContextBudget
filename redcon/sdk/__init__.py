@@ -1,6 +1,4 @@
-from __future__ import annotations
-
-"""Redcon Agent SDK — canonical integration surface for agent frameworks.
+"""Redcon Agent SDK - canonical integration surface for agent frameworks.
 
 Architecture
 ------------
@@ -8,12 +6,12 @@ Architecture
 
 The three primary entry points mirror the agent lifecycle:
 
-* :func:`prepare_context` — pack repository context under a token budget,
+* :func:`prepare_context` - pack repository context under a token budget,
   returning a structured middleware result with compressed prompt material
   and additive metadata.
-* :func:`simulate_agent` — estimate token use and API cost step by step
+* :func:`simulate_agent` - estimate token use and API cost step by step
   before committing to a full pack run.
-* :func:`profile_run` — pack context and return the run artifact augmented
+* :func:`profile_run` - pack context and return the run artifact augmented
   with wall-clock timing and compression metrics.
 
 Usage
@@ -36,16 +34,19 @@ Class-based SDK (shared config, multi-turn)::
     turn = runtime.run("add Redis caching", repo=".")
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from redcon.agents.middleware import (
     AgentMiddlewareResult,
     AgentTaskRequest,
     RedconMiddleware,
-    enforce_budget as _enforce_budget,
+)
+from redcon.agents.middleware import (
     prepare_context as _prepare_context,
-    record_run as _record_run,
 )
 from redcon.core.policy import PolicySpec
 from redcon.engine import BudgetGuard, BudgetPolicyViolationError, RedconEngine
@@ -128,7 +129,7 @@ class RedconSDK:
     ) -> AgentMiddlewareResult:
         """Pack repository context for a task under the configured token budget.
 
-        Runs the full Redcon pipeline — scan, rank, compress, cache —
+        Runs the full Redcon pipeline - scan, rank, compress, cache -
         and returns an :class:`~redcon.agents.middleware.AgentMiddlewareResult`
         containing the compressed context and additive middleware metadata.
 
@@ -553,7 +554,7 @@ def start_gateway(
         # Foreground (blocks until Ctrl-C)
         start_gateway(port=8787, max_tokens=32_000)
 
-        # Background — useful in tests or embedded scenarios
+        # Background - useful in tests or embedded scenarios
         server = start_gateway(port=8787, block=False)
         # ... do work ...
         server.stop()
@@ -575,6 +576,16 @@ __all__ = [
     "RedconSDK",
     "GatewayConfig",
     "GatewayServer",
+    "AgentRuntime",
+    "AgentMiddlewareResult",
+    "AgentTaskRequest",
+    "BudgetGuard",
+    "BudgetPolicyViolationError",
+    "PolicySpec",
+    "PreparedContext",
+    "RedconEngine",
+    "RedconMiddleware",
+    "RuntimeResult",
     "prepare_context",
     "simulate_agent",
     "profile_run",

@@ -125,7 +125,7 @@ class DashboardHeatmap(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Control plane — orgs / projects / repos
+# Control plane - orgs / projects / repos
 # ---------------------------------------------------------------------------
 
 class OrgCreate(BaseModel):
@@ -190,7 +190,7 @@ class ApiKeyIssued(BaseModel):
 
 
 class ApiKeyResponse(BaseModel):
-    """Safe list view — no raw key."""
+    """Safe list view - no raw key."""
     id: int
     org_id: int
     key_prefix: str
@@ -227,7 +227,7 @@ class AuditLogResponse(BaseModel):
 
 
 class AuditEntryCreate(BaseModel):
-    """Body for ``POST /orgs/{org_id}/audit-log`` — used by the gateway to push entries."""
+    """Body for ``POST /orgs/{org_id}/audit-log`` - used by the gateway to push entries."""
     endpoint: str
     repository_id: str | None = None
     run_id: str | None = None
@@ -321,7 +321,7 @@ class AgentRunResponse(BaseModel):
 
 
 # ---------------------------------------------------------------------------
-# Cost attribution — by run and by stage
+# Cost attribution - by run and by stage
 # ---------------------------------------------------------------------------
 
 class CostByRunRow(BaseModel):

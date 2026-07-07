@@ -26,14 +26,14 @@ const TASK = "refactor auth middleware token validation";
 const REPO = "examples/risky-auth-change/repo";
 
 // -----------------------------------------------------------------------
-// Shared model stub — replace with a real LLM call in production
+// Shared model stub - replace with a real LLM call in production
 // -----------------------------------------------------------------------
 function callModel(prompt: string): string {
-  return `[model response — prompt was ${prompt.length} chars]`;
+  return `[model response - prompt was ${prompt.length} chars]`;
 }
 
 // -----------------------------------------------------------------------
-// Style A — SDK class with inline policy guard
+// Style A - SDK class with inline policy guard
 //
 // agent task → prepareContext() → policy check → callModel()
 // -----------------------------------------------------------------------
@@ -41,11 +41,11 @@ console.log("=== Style A: RedconSDK ===");
 
 const sdk = new RedconSDK({ maxTokens: 28_000 });
 
-// Step 1 — simulate cost before committing
+// Step 1 - simulate cost before committing
 const plan = sdk.simulateAgent(TASK, REPO, { model: "claude-sonnet-4-6" });
 console.log(`  Pre-flight:   ${plan.total_tokens} tokens, $${plan.cost_estimate.total_cost_usd.toFixed(4)}`);
 
-// Step 2 — prepare context (scan → rank → compress → cache)
+// Step 2 - prepare context (scan → rank → compress → cache)
 const result: PrepareContextResult = sdk.prepareContext(TASK, REPO);
 const meta = result.agent_middleware.metadata;
 console.log(`  Tokens used:  ${meta.estimated_input_tokens}`);
@@ -53,7 +53,7 @@ console.log(`  Tokens saved: ${meta.estimated_saved_tokens}`);
 console.log(`  Files:        ${meta.files_included_count} included, ${meta.files_skipped_count} skipped`);
 console.log(`  Risk:         ${meta.quality_risk_estimate}`);
 
-// Step 3 — inline policy guard (TypeScript side)
+// Step 3 - inline policy guard (TypeScript side)
 const TOKEN_LIMIT = 28_000;
 if (meta.estimated_input_tokens > TOKEN_LIMIT) {
   throw new Error(
@@ -61,10 +61,10 @@ if (meta.estimated_input_tokens > TOKEN_LIMIT) {
   );
 }
 if (meta.quality_risk_estimate === "high") {
-  console.warn("  WARNING: high compression risk — context quality may be degraded");
+  console.warn("  WARNING: high compression risk - context quality may be degraded");
 }
 
-// Step 4 — build prompt and call model
+// Step 4 - build prompt and call model
 const promptA = result.compressed_context
   .map((f) => `# File: ${f.path}\n${f.text}`)
   .join("\n\n");
@@ -74,7 +74,7 @@ console.log(`  Response:     ${responseA}`);
 console.log();
 
 // -----------------------------------------------------------------------
-// Style B — module-level convenience functions
+// Style B - module-level convenience functions
 //
 // Minimises boilerplate; shares no state across calls.
 // -----------------------------------------------------------------------
@@ -84,7 +84,7 @@ console.log("=== Style B: module-level functions ===");
 const planB = simulateAgent(TASK, REPO, { model: "claude-sonnet-4-6" });
 console.log(`  Pre-flight:   $${planB.cost_estimate.total_cost_usd.toFixed(4)}`);
 
-// Profile run — includes timing and compression metrics in one call
+// Profile run - includes timing and compression metrics in one call
 const profB = profileRun(TASK, REPO, { maxTokens: 28_000 });
 const p = profB.profile;
 console.log(`  Elapsed:      ${p.elapsed_ms} ms`);

@@ -1,4 +1,4 @@
-"""Control plane CRUD — orgs, projects, repos, API keys, audit log, policy versions."""
+"""Control plane CRUD - orgs, projects, repos, API keys, audit log, policy versions."""
 from __future__ import annotations
 
 import json
@@ -407,7 +407,7 @@ async def set_org_context(conn: asyncpg.Connection, org_id: int | None) -> None:
 
 
 # ---------------------------------------------------------------------------
-# Delete operations (hard delete — cascades to children via FK)
+# Delete operations (hard delete - cascades to children via FK)
 # ---------------------------------------------------------------------------
 
 async def delete_org(pool: asyncpg.Pool, org_id: int) -> bool:

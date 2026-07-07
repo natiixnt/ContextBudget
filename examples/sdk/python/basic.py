@@ -2,9 +2,9 @@
 
 Demonstrates all three primary SDK entry points:
 
-    prepareContext  — pack repository context under a token budget
-    simulateAgent   — estimate token use and API cost before packing
-    profileRun      — pack and return compression profiling metrics
+    prepareContext  - pack repository context under a token budget
+    simulateAgent   - estimate token use and API cost before packing
+    profileRun      - pack and return compression profiling metrics
 
 Run from the repository root:
     python examples/sdk/python/basic.py
@@ -18,7 +18,7 @@ REPO = "examples/small-feature/repo"
 sdk = RedconSDK(max_tokens=30_000)
 
 # -----------------------------------------------------------------------
-# 1. simulate_agent — check token and cost estimates before packing
+# 1. simulate_agent - check token and cost estimates before packing
 # -----------------------------------------------------------------------
 plan = sdk.simulate_agent(TASK, repo=REPO, model="claude-sonnet-4-6")
 
@@ -33,7 +33,7 @@ for step in plan.get("steps", []):
 print()
 
 # -----------------------------------------------------------------------
-# 2. prepare_context — pack context and get the middleware result
+# 2. prepare_context - pack context and get the middleware result
 # -----------------------------------------------------------------------
 result = sdk.prepare_context(TASK, repo=REPO)
 
@@ -56,7 +56,7 @@ print(f"Prompt length:  {len(prompt)} chars")
 print()
 
 # -----------------------------------------------------------------------
-# 3. profile_run — pack and return timing + compression metrics
+# 3. profile_run - pack and return timing + compression metrics
 # -----------------------------------------------------------------------
 prof = sdk.profile_run(TASK, repo=REPO)
 

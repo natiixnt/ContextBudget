@@ -87,7 +87,7 @@ async def check_quota(
     """
     quota = await get_quota(pool, org_id)
     if quota is None:
-        return True, None  # no quota configured — unrestricted
+        return True, None  # no quota configured - unrestricted
 
     usage = await get_monthly_usage(pool, org_id)
 

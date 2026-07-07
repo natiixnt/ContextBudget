@@ -16,10 +16,10 @@ Quick-start
 
 Available wrappers
 ------------------
-- :class:`OpenAIAgentWrapper`  — OpenAI Chat Completions API
-- :class:`AnthropicAgentWrapper` — Anthropic Messages API
-- :class:`GenericAgentRunner` — any ``(prompt: str) -> str`` callable
-- :class:`NodeJSAgentRunner` — Node.js script via stdin/stdout
+- :class:`OpenAIAgentWrapper`  - OpenAI Chat Completions API
+- :class:`AnthropicAgentWrapper` - Anthropic Messages API
+- :class:`GenericAgentRunner` - any ``(prompt: str) -> str`` callable
+- :class:`NodeJSAgentRunner` - Node.js script via stdin/stdout
 """
 
 from redcon.integrations.anthropic_wrapper import AnthropicAgentWrapper

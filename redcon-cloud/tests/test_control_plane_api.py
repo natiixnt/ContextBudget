@@ -464,7 +464,7 @@ class TestDeleteEndpoints:
         assert r.status_code == 204
 
     def test_delete_project_not_found_or_wrong_org(self, client):
-        # cp_store.delete_project uses WHERE id=$1 AND org_id=$2 — returns False for either case
+        # cp_store.delete_project uses WHERE id=$1 AND org_id=$2 - returns False for either case
         with patch("app.main.cp_store.delete_project", new_callable=AsyncMock, return_value=False):
             r = client.delete("/orgs/1/projects/10", headers=_AUTH)
         assert r.status_code == 404

@@ -13,7 +13,7 @@ Request envelope:
 
 Response:
     The raw dict returned by the corresponding Python SDK function, serialised
-    as JSON.  Never contains newlines inside the JSON body — the TypeScript
+    as JSON.  Never contains newlines inside the JSON body - the TypeScript
     side reads until EOF.
 """
 
@@ -21,7 +21,7 @@ import json
 import sys
 
 # ---------------------------------------------------------------------------
-# Path bootstrap — ensures redcon is importable in both pip-installed
+# Path bootstrap - ensures redcon is importable in both pip-installed
 # and editable-install (development) environments.
 #
 # When redcon is installed via `pip install redcon` the package
@@ -33,7 +33,7 @@ import sys
 # and add it to sys.path.
 # ---------------------------------------------------------------------------
 try:
-    import redcon  # noqa: F401 — fast path: package already importable
+    import redcon  # noqa: F401 - fast path: package already importable
 except ModuleNotFoundError:
     from pathlib import Path as _Path
 
