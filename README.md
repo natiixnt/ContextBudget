@@ -94,6 +94,24 @@ task: "add rate limiting to auth"
 
 Every step is deterministic. Same input, same output. No embeddings, no random chunking.
 
+## Benchmark: context-eval
+
+Selection quality is measured, not claimed. [`context-eval/`](context-eval/)
+is an open benchmark for context-selection tools: tasks come from real git
+commits, ground truth is the files each commit actually modified, and every
+tool packs the same token budget. Current results (33 tasks, 24k budget):
+
+| Tool | Mean coverage | Tokens / coverage point |
+|------|--------------:|------------------------:|
+| `redcon` | **43.8%** | **306.8** |
+| `keyword-topk` (baseline) | 29.8% | 538.9 |
+| `aider-repomap` (real aider) | 15.3% | 533.3 |
+| `pagerank` (baseline) | 11.4% | 720.0 |
+
+Rerun it on any repo: `python context-eval/run.py --repo /path/to/repo`.
+Methodology, limitations, and how to add your own tool:
+[context-eval/README.md](context-eval/README.md).
+
 ## MCP Integration (Pull Model)
 
 Instead of pushing a 30k-token blob to your agent, Redcon exposes 6 MCP tools the agent calls on demand:

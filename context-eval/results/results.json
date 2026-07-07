@@ -1,0 +1,2008 @@
+{
+  "budget_tokens": 24000,
+  "repo": "ContextBudget",
+  "task_count": 33,
+  "aggregate": {
+    "aider-repomap": {
+      "tasks": 33,
+      "mean_coverage_pct": 15.3,
+      "median_coverage_pct": 0.0,
+      "mean_tokens_used": 23999,
+      "mean_tokens_per_coverage_point": 533.3,
+      "errors": 0
+    },
+    "full-dump": {
+      "tasks": 33,
+      "mean_coverage_pct": 0.0,
+      "median_coverage_pct": 0.0,
+      "mean_tokens_used": 23999,
+      "mean_tokens_per_coverage_point": null,
+      "errors": 0
+    },
+    "keyword-topk": {
+      "tasks": 33,
+      "mean_coverage_pct": 29.8,
+      "median_coverage_pct": 0.0,
+      "mean_tokens_used": 23941,
+      "mean_tokens_per_coverage_point": 538.9,
+      "errors": 0
+    },
+    "pagerank": {
+      "tasks": 33,
+      "mean_coverage_pct": 11.4,
+      "median_coverage_pct": 0.0,
+      "mean_tokens_used": 23998,
+      "mean_tokens_per_coverage_point": 720.0,
+      "errors": 0
+    },
+    "random": {
+      "tasks": 33,
+      "mean_coverage_pct": 5.8,
+      "median_coverage_pct": 0.0,
+      "mean_tokens_used": 23999,
+      "mean_tokens_per_coverage_point": 690.0,
+      "errors": 0
+    },
+    "redcon": {
+      "tasks": 33,
+      "mean_coverage_pct": 43.8,
+      "median_coverage_pct": 50.0,
+      "mean_tokens_used": 23978,
+      "mean_tokens_per_coverage_point": 306.8,
+      "errors": 0
+    }
+  },
+  "tasks": [
+    {
+      "commit": "f4da3fe052",
+      "description": "repair pre-existing test_repo_map_respects_budget flake",
+      "ground_truth": [
+        "tests/test_repo_map.py"
+      ],
+      "universe_size": 335,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23953,
+          "files_included": 13,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23993,
+          "files_included": 12,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 25,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "df19ba01a8",
+      "description": "re-measure sessions with V41+V43+V49 cross-call layers enabled",
+      "ground_truth": [
+        "benchmarks/measure_sessions.py"
+      ],
+      "universe_size": 335,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23928,
+          "files_included": 14,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 100.0,
+          "tokens_used": 23996,
+          "files_included": 8,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 23,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "b945ad38b0",
+      "description": "V49 session-scoped symbol aliaser",
+      "ground_truth": [
+        "redcon/cmd/aliasing.py",
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 335,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23995,
+          "files_included": 12,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23912,
+          "files_included": 9,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 24,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "c7d443b9d6",
+      "description": "V43 session-scoped content reference ledger",
+      "ground_truth": [
+        "redcon/cmd/aliasing.py",
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 335,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 50.0,
+          "tokens_used": 23982,
+          "files_included": 13,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23987,
+          "files_included": 7,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "39d3a755d7",
+      "description": "pre-compile remaining inline regex patterns (V78 follow-up)",
+      "ground_truth": [
+        "redcon/cmd/compressors/sql_explain_compressor.py",
+        "redcon/compressors/symbols.py",
+        "redcon/symbols/tree_sitter.py"
+      ],
+      "universe_size": 334,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23971,
+          "files_included": 15,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 33.333333333333336,
+          "tokens_used": 23991,
+          "files_included": 10,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "b9b3dc66e4",
+      "description": "extract skeleton-clustering helper to _skeletons module",
+      "ground_truth": [
+        "redcon/cmd/compressors/test_format.py"
+      ],
+      "universe_size": 333,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 9,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23990,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "29d9345754",
+      "description": "bundle stats compressor for webpack/esbuild (V63)",
+      "ground_truth": [
+        "redcon/cmd/registry.py",
+        "redcon/cmd/runner.py",
+        "redcon/cmd/types.py",
+        "tests/test_cmd_quality.py"
+      ],
+      "universe_size": 332,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23984,
+          "files_included": 14,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 22,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 25.0,
+          "tokens_used": 23898,
+          "files_included": 10,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 25.0,
+          "tokens_used": 24000,
+          "files_included": 15,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 21,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "d5a2c8e320",
+      "description": "lint rule-pivot COMPACT layout with min-gate (V62)",
+      "ground_truth": [
+        "redcon/cmd/compressors/lint_compressor.py"
+      ],
+      "universe_size": 332,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23941,
+          "files_included": 17,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 22,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 100.0,
+          "tokens_used": 23991,
+          "files_included": 11,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 15,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 24,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "a7ff13f241",
+      "description": "stratified file sampling for >30 test failures (V51)",
+      "ground_truth": [
+        "redcon/cmd/compressors/test_format.py"
+      ],
+      "universe_size": 332,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23998,
+          "files_included": 14,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23995,
+          "files_included": 10,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 15,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 18,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "1e55b093e9",
+      "description": "close V85 residuals on 4 schemas, enable full ENFORCE",
+      "ground_truth": [
+        "redcon/cmd/compressors/git_diff.py",
+        "redcon/cmd/compressors/git_log.py",
+        "redcon/cmd/compressors/git_status.py",
+        "redcon/cmd/compressors/json_log_compressor.py",
+        "tests/test_cmd_quality_adversarial.py"
+      ],
+      "universe_size": 332,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 10,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 20.0,
+          "tokens_used": 23970,
+          "files_included": 7,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 15,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 40.0,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 2,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "ceb890cbbc",
+      "description": "make V85 fuzzer per-test seed deterministic across runs",
+      "ground_truth": [
+        "tests/test_cmd_quality_adversarial.py"
+      ],
+      "universe_size": 332,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23935,
+          "files_included": 17,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 18,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 100.0,
+          "tokens_used": 23948,
+          "files_included": 9,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 15,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "32f485c255",
+      "description": "coverage delta renderer for V47 dispatcher (#114)",
+      "ground_truth": [
+        "redcon/cmd/compressors/coverage_compressor.py",
+        "redcon/cmd/delta.py",
+        "tests/test_cmd_snapshot_delta.py"
+      ],
+      "universe_size": 332,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23997,
+          "files_included": 11,
+          "hits": 3,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 33.333333333333336,
+          "tokens_used": 24000,
+          "files_included": 16,
+          "hits": 1,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 100.0,
+          "tokens_used": 23926,
+          "files_included": 9,
+          "hits": 3,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 15,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 24,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "d47ed38f41",
+      "description": "SQL EXPLAIN ANALYZE compressor (V61)",
+      "ground_truth": [
+        "redcon/cmd/registry.py",
+        "redcon/cmd/runner.py",
+        "redcon/cmd/types.py",
+        "tests/test_cmd_quality.py"
+      ],
+      "universe_size": 331,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23981,
+          "files_included": 12,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 50.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 2,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 25.0,
+          "tokens_used": 23990,
+          "files_included": 11,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 25.0,
+          "tokens_used": 23999,
+          "files_included": 23,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 25.0,
+          "tokens_used": 24000,
+          "files_included": 23,
+          "hits": 1,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "d874a9a5b1",
+      "description": "coverage report compressor (V69)",
+      "ground_truth": [
+        "redcon/cmd/registry.py",
+        "redcon/cmd/runner.py",
+        "redcon/cmd/types.py",
+        "tests/test_cmd_quality.py"
+      ],
+      "universe_size": 330,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23996,
+          "files_included": 12,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 50.0,
+          "tokens_used": 23999,
+          "files_included": 17,
+          "hits": 2,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23961,
+          "files_included": 10,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 25.0,
+          "tokens_used": 23997,
+          "files_included": 18,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 25.0,
+          "tokens_used": 23998,
+          "files_included": 27,
+          "hits": 1,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "2051330c6a",
+      "description": "NDJSON log compressor with schema-mining (V65)",
+      "ground_truth": [
+        "redcon/cmd/registry.py",
+        "redcon/cmd/runner.py",
+        "redcon/cmd/types.py",
+        "tests/test_cmd_quality.py"
+      ],
+      "universe_size": 329,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23941,
+          "files_included": 9,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 50.0,
+          "tokens_used": 24000,
+          "files_included": 18,
+          "hits": 2,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 25.0,
+          "tokens_used": 23980,
+          "files_included": 13,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 25.0,
+          "tokens_used": 24000,
+          "files_included": 19,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 24,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "4731960e96",
+      "description": "profiler collapsed-stack compressor (V70)",
+      "ground_truth": [
+        "redcon/cmd/registry.py",
+        "redcon/cmd/runner.py",
+        "redcon/cmd/types.py",
+        "tests/test_cmd_quality.py"
+      ],
+      "universe_size": 328,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23960,
+          "files_included": 10,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 24,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 50.0,
+          "tokens_used": 23973,
+          "files_included": 10,
+          "hits": 2,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 25.0,
+          "tokens_used": 24000,
+          "files_included": 22,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 23,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "f99acb163f",
+      "description": "schema-aware V47 deltas for pytest + git_diff",
+      "ground_truth": [
+        "redcon/cmd/compressors/git_diff.py",
+        "redcon/cmd/compressors/pytest_compressor.py",
+        "redcon/cmd/delta.py",
+        "redcon/cmd/pipeline.py",
+        "tests/test_cmd_snapshot_delta.py"
+      ],
+      "universe_size": 328,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 80.0,
+          "tokens_used": 23997,
+          "files_included": 14,
+          "hits": 4,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 20.0,
+          "tokens_used": 24000,
+          "files_included": 20,
+          "hits": 1,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 40.0,
+          "tokens_used": 23999,
+          "files_included": 11,
+          "hits": 2,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 18,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "6730c48c47",
+      "description": "git_status header inflation fallback (V85 finding 3)",
+      "ground_truth": [
+        "redcon/cmd/compressors/git_status.py"
+      ],
+      "universe_size": 328,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23981,
+          "files_included": 20,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 100.0,
+          "tokens_used": 23997,
+          "files_included": 24,
+          "hits": 1,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23928,
+          "files_included": 7,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 23,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "b0a41836e2",
+      "description": "align ls/tree/find must-preserve patterns with formatter (V85 finding 2)",
+      "ground_truth": [
+        "redcon/cmd/compressors/listing_compressor.py"
+      ],
+      "universe_size": 328,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23994,
+          "files_included": 13,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 18,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 100.0,
+          "tokens_used": 23966,
+          "files_included": 8,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 21,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "add62c11ae",
+      "description": "align git_log parser+regex+formatter (V85 finding 1)",
+      "ground_truth": [
+        "redcon/cmd/compressors/git_log.py"
+      ],
+      "universe_size": 328,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23991,
+          "files_included": 15,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 100.0,
+          "tokens_used": 23999,
+          "files_included": 23,
+          "hits": 1,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23839,
+          "files_included": 4,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "e2fd08bb4f",
+      "description": "snapshot-delta framework + git_status hookup (V47)",
+      "ground_truth": [
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 325,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 14,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23974,
+          "files_included": 6,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 100.0,
+          "tokens_used": 23994,
+          "files_included": 31,
+          "hits": 1,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "c3ea8fa0a7",
+      "description": "session-scoped path aliases at egress (V41)",
+      "ground_truth": [
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 324,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23983,
+          "files_included": 12,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 21,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 9,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 22,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "a88abf1c73",
+      "description": "cluster duplicate test failures with min-gate (V64)",
+      "ground_truth": [
+        "redcon/cmd/compressors/test_format.py"
+      ],
+      "universe_size": 324,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23956,
+          "files_included": 19,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 22,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23988,
+          "files_included": 10,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "e593cbc1b8",
+      "description": "specialise kubectl events compressor",
+      "ground_truth": [
+        "redcon/cmd/compressors/kubectl_compressor.py",
+        "redcon/cmd/types.py"
+      ],
+      "universe_size": 324,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 50.0,
+          "tokens_used": 23995,
+          "files_included": 10,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 50.0,
+          "tokens_used": 24000,
+          "files_included": 20,
+          "hits": 1,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 50.0,
+          "tokens_used": 23893,
+          "files_included": 11,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 50.0,
+          "tokens_used": 23996,
+          "files_included": 21,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 14,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "0b4319ead0",
+      "description": "stamp invariant-cert sha prefix on compact/verbose",
+      "ground_truth": [
+        "redcon/cmd/compressors/base.py",
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 324,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 50.0,
+          "tokens_used": 23989,
+          "files_included": 15,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 18,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23952,
+          "files_included": 11,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 50.0,
+          "tokens_used": 23997,
+          "files_included": 16,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "b0b25ce75c",
+      "description": "inject NO_COLOR + strip ANSI escapes pre-compress",
+      "ground_truth": [
+        "redcon/cmd/pipeline.py",
+        "redcon/cmd/runner.py"
+      ],
+      "universe_size": 324,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23963,
+          "files_included": 14,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 18,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 9,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 32,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "ffa8842e01",
+      "description": "tokenizer-aware substitution table for compact/ultra",
+      "ground_truth": [
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 323,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23979,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 18,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23896,
+          "files_included": 11,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 15,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "b234f3b040",
+      "description": "tighten ', ' and ': ' whitespace post-normalise",
+      "ground_truth": [
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 323,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23964,
+          "files_included": 19,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 21,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23889,
+          "files_included": 14,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 23997,
+          "files_included": 16,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 22,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "16d2ef776e",
+      "description": "memoise compiled regex in verify_must_preserve",
+      "ground_truth": [
+        "redcon/cmd/compressors/base.py"
+      ],
+      "universe_size": 323,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 100.0,
+          "tokens_used": 23998,
+          "files_included": 17,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 21,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 100.0,
+          "tokens_used": 23533,
+          "files_included": 11,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 100.0,
+          "tokens_used": 24000,
+          "files_included": 11,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 23,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "bf860c186c",
+      "description": "--baseline gating for cmd-bench + bundled cmd_baseline.json (T4.B)",
+      "ground_truth": [
+        "redcon/cli.py",
+        "redcon/cmd/benchmark.py"
+      ],
+      "universe_size": 322,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 50.0,
+          "tokens_used": 23961,
+          "files_included": 12,
+          "hits": 1,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 25,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 50.0,
+          "tokens_used": 23996,
+          "files_included": 9,
+          "hits": 1,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 11,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "dbe5c3bf5e",
+      "description": "blend PageRank with engine ranker (T4.A3)",
+      "ground_truth": [
+        "redcon/repo_map.py"
+      ],
+      "universe_size": 322,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23986,
+          "files_included": 8,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23991,
+          "files_included": 6,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 11,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 23998,
+          "files_included": 19,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "a601fd33fd",
+      "description": "extract_imports() across Python/TS/JS/Rust/Go/Java/Ruby/C/C++",
+      "ground_truth": [
+        "redcon/symbols/__init__.py",
+        "redcon/symbols/tree_sitter.py",
+        "tests/test_symbols_tree_sitter.py"
+      ],
+      "universe_size": 320,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 66.66666666666667,
+          "tokens_used": 24000,
+          "files_included": 12,
+          "hits": 2,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 66.66666666666667,
+          "tokens_used": 23879,
+          "files_included": 7,
+          "hits": 2,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 11,
+          "hits": 0,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 23,
+          "hits": 0,
+          "error": null
+        }
+      }
+    },
+    {
+      "commit": "2da94108b5",
+      "description": "LLMLingua-2 opt-in semantic fallback (T3.D)",
+      "ground_truth": [
+        "redcon/cmd/budget.py",
+        "redcon/cmd/pipeline.py"
+      ],
+      "universe_size": 318,
+      "tools": {
+        "redcon": {
+          "tool": "redcon",
+          "coverage_pct": 0.0,
+          "tokens_used": 23990,
+          "files_included": 20,
+          "hits": 0,
+          "error": null
+        },
+        "aider-repomap": {
+          "tool": "aider-repomap",
+          "coverage_pct": 50.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 1,
+          "error": null
+        },
+        "keyword-topk": {
+          "tool": "keyword-topk",
+          "coverage_pct": 0.0,
+          "tokens_used": 23864,
+          "files_included": 5,
+          "hits": 0,
+          "error": null
+        },
+        "pagerank": {
+          "tool": "pagerank",
+          "coverage_pct": 50.0,
+          "tokens_used": 23997,
+          "files_included": 16,
+          "hits": 1,
+          "error": null
+        },
+        "full-dump": {
+          "tool": "full-dump",
+          "coverage_pct": 0.0,
+          "tokens_used": 23999,
+          "files_included": 27,
+          "hits": 0,
+          "error": null
+        },
+        "random": {
+          "tool": "random",
+          "coverage_pct": 0.0,
+          "tokens_used": 24000,
+          "files_included": 17,
+          "hits": 0,
+          "error": null
+        }
+      }
+    }
+  ],
+  "generated": "2026-07-07"
+}
