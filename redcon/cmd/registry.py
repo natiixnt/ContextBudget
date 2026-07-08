@@ -14,8 +14,9 @@ matches in the same process are O(1) attribute lookup.
 from __future__ import annotations
 
 import importlib
+import os
+from collections.abc import Callable
 from dataclasses import dataclass, field
-from typing import Callable
 
 from redcon.cmd.compressors.base import Compressor
 
@@ -75,11 +76,27 @@ def register_lazy(
 
 
 def detect_compressor(argv: tuple[str, ...]) -> Compressor | None:
-    """Return the first registered compressor whose matcher accepts argv."""
+    """Return the first registered compressor whose matcher accepts argv.
+
+    argv[0] is normalised to its basename for matching only, so a binary
+    invoked by absolute path (``/venv/bin/pytest``, ``/usr/bin/grep``) is
+    still recognised. The caller keeps the original argv for execution, so
+    the real binary path is never altered.
+    """
+    probe = _basename_argv(argv)
     for entry in _REGISTRY:
-        if entry.matcher(argv):
+        if entry.matcher(probe):
             return entry.load()
     return None
+
+
+def _basename_argv(argv: tuple[str, ...]) -> tuple[str, ...]:
+    if not argv or not argv[0]:
+        return argv
+    base = os.path.basename(argv[0])
+    if base == argv[0]:
+        return argv
+    return (base, *argv[1:])
 
 
 def registered_schemas() -> tuple[str, ...]:
@@ -118,9 +135,7 @@ def _is_pytest(argv: tuple[str, ...]) -> bool:
         return False
     if argv[0] == "pytest":
         return True
-    if argv[0] in {"python", "python3"} and "-m" in argv and "pytest" in argv:
-        return True
-    return False
+    return bool(argv[0] in {"python", "python3"} and "-m" in argv and "pytest" in argv)
 
 
 def _is_cargo_test(argv: tuple[str, ...]) -> bool:
@@ -134,9 +149,7 @@ def _is_npm_test(argv: tuple[str, ...]) -> bool:
         return True
     if argv[0] in {"vitest", "jest"}:
         return True
-    if argv[0] == "npx" and len(argv) >= 2 and argv[1] in {"vitest", "jest"}:
-        return True
-    return False
+    return bool(argv[0] == "npx" and len(argv) >= 2 and argv[1] in {"vitest", "jest"})
 
 
 def _is_go_test(argv: tuple[str, ...]) -> bool:
@@ -164,11 +177,9 @@ def _is_lint(argv: tuple[str, ...]) -> bool:
         return False
     if argv[0] in {"mypy", "ruff"}:
         return True
-    if argv[0] in {"python", "python3"} and "-m" in argv and (
-        "mypy" in argv or "ruff" in argv
-    ):
-        return True
-    return False
+    return bool(
+        argv[0] in {"python", "python3"} and "-m" in argv and ("mypy" in argv or "ruff" in argv)
+    )
 
 
 def _is_docker(argv: tuple[str, ...]) -> bool:
@@ -184,21 +195,28 @@ def _is_pkg_install(argv: tuple[str, ...]) -> bool:
         return False
     if argv[0] == "pip" and len(argv) >= 2 and argv[1] in {"install", "uninstall"}:
         return True
-    if argv[0] in {"python", "python3"} and "-m" in argv and "pip" in argv:
-        if "install" in argv or "uninstall" in argv:
-            return True
-    if argv[0] in {"npm", "pnpm"} and len(argv) >= 2 and argv[1] in {
-        "install",
-        "i",
-        "ci",
-        "uninstall",
-        "remove",
-        "rm",
-    }:
+    if (
+        argv[0] in {"python", "python3"}
+        and "-m" in argv
+        and "pip" in argv
+        and ("install" in argv or "uninstall" in argv)
+    ):
         return True
-    if argv[0] == "yarn" and len(argv) >= 2 and argv[1] in {"add", "remove", "install"}:
+    if (
+        argv[0] in {"npm", "pnpm"}
+        and len(argv) >= 2
+        and argv[1]
+        in {
+            "install",
+            "i",
+            "ci",
+            "uninstall",
+            "remove",
+            "rm",
+        }
+    ):
         return True
-    return False
+    return bool(argv[0] == "yarn" and len(argv) >= 2 and argv[1] in {"add", "remove", "install"})
 
 
 def _is_kubectl_get(argv: tuple[str, ...]) -> bool:
@@ -214,9 +232,7 @@ def _is_profiler(argv: tuple[str, ...]) -> bool:
         return len(argv) >= 2 and argv[1] in {"record", "dump", "top"}
     if argv[0] == "perf":
         return len(argv) >= 2 and argv[1] in {"record", "script", "report"}
-    if argv[0] == "flamegraph.pl":
-        return True
-    return False
+    return argv[0] == "flamegraph.pl"
 
 
 def _is_bundle_stats(argv: tuple[str, ...]) -> bool:
@@ -226,13 +242,19 @@ def _is_bundle_stats(argv: tuple[str, ...]) -> bool:
     if head in {"webpack", "esbuild", "vite", "rollup", "parcel"}:
         if len(argv) >= 2 and argv[1] in {"build", "compile", "bundle"}:
             return True
-        return any(
-            a in {"--json", "--analyze", "--stats", "--metafile"}
-            for a in argv[1:]
-        )
-    if head == "npx" and len(argv) >= 2 and argv[1] in {
-        "webpack", "esbuild", "vite", "rollup", "parcel",
-    }:
+        return any(a in {"--json", "--analyze", "--stats", "--metafile"} for a in argv[1:])
+    if (
+        head == "npx"
+        and len(argv) >= 2
+        and argv[1]
+        in {
+            "webpack",
+            "esbuild",
+            "vite",
+            "rollup",
+            "parcel",
+        }
+    ):
         return True
     if head in {"cat", "tail", "less", "more"}:
         for token in argv[1:]:
@@ -253,10 +275,7 @@ def _is_sql_explain(argv: tuple[str, ...]) -> bool:
     head = argv[0].rsplit("/", 1)[-1]
     if head in {"psql", "mysql", "mysqlsh", "mariadb"}:
         return True
-    for token in argv[1:]:
-        if token.upper().startswith("EXPLAIN"):
-            return True
-    return False
+    return any(token.upper().startswith("EXPLAIN") for token in argv[1:])
 
 
 def _is_coverage_report(argv: tuple[str, ...]) -> bool:
@@ -264,14 +283,12 @@ def _is_coverage_report(argv: tuple[str, ...]) -> bool:
         return False
     if argv[0] == "coverage" and len(argv) >= 2 and argv[1] == "report":
         return True
-    if (
+    return bool(
         argv[0] in {"python", "python3"}
         and "-m" in argv
         and "coverage" in argv
         and "report" in argv
-    ):
-        return True
-    return False
+    )
 
 
 def _is_json_log(argv: tuple[str, ...]) -> bool:
@@ -295,12 +312,7 @@ def _is_json_log(argv: tuple[str, ...]) -> bool:
     if head in {"cat", "tail", "less", "more"}:
         for token in argv[1:]:
             t = token.lower()
-            if (
-                t.endswith(".log")
-                or t.endswith(".ndjson")
-                or t.endswith(".jsonl")
-                or "/log/" in t
-            ):
+            if t.endswith(".log") or t.endswith(".ndjson") or t.endswith(".jsonl") or "/log/" in t:
                 return True
         return False
     return False

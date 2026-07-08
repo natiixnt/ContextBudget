@@ -1,32 +1,32 @@
-from __future__ import annotations
-
 """Incremental repository scan index for reusing unchanged file metadata."""
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from __future__ import annotations
+
 import fnmatch
+import hashlib
 import json
 import logging
 import os
-from pathlib import Path, PurePosixPath
 import re
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path, PurePosixPath
 from typing import Any
-import hashlib
+
+from redcon.schemas.models import (
+    BINARY_EXTENSIONS,
+    CACHE_FILE,
+    DEFAULT_IGNORE_DIRS,
+    RUN_HISTORY_FILE,
+    SCAN_INDEX_FILE,
+    FileRecord,
+)
 
 logger = logging.getLogger(__name__)
 
 MAX_FILE_COUNT = 50_000
 
 _SYMBOL_DEF_RE = re.compile(r"^(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)", re.MULTILINE)
-
-from redcon.schemas.models import (
-    BINARY_EXTENSIONS,
-    CACHE_FILE,
-    DEFAULT_IGNORE_DIRS,
-    FileRecord,
-    RUN_HISTORY_FILE,
-    SCAN_INDEX_FILE,
-)
 
 SCAN_INDEX_DB_FILE = ".redcon/scan-index.db"
 
@@ -125,9 +125,54 @@ _LEGACY_CACHE_FILES = {
     ".contextbudget_cache.json",  # pre-rename cache artifact
 }
 
+# redcon's own default output artifacts. If they are left in the repo they get
+# re-scanned and packed into the next run's context, contaminating it (and, on
+# a real repo, risking that a secret an artifact captured is re-emitted). These
+# are always excluded from the scan universe regardless of config; custom
+# out-prefixes are the caller's responsibility.
+REDCON_ARTIFACT_GLOBS: tuple[str, ...] = (
+    "run.json",
+    "run.md",
+    "redcon-plan*.json",
+    "redcon-plan*.md",
+    "redcon-dataset*.json",
+    "redcon-dataset*.md",
+    "*.redcon_cache.json",
+    ".redcon_cache.json",
+)
+
 
 def _default_internal_paths() -> set[str]:
     return {CACHE_FILE, RUN_HISTORY_FILE, SCAN_INDEX_FILE} | _LEGACY_CACHE_FILES
+
+
+def _gitignore_globs(repo_path: Path) -> list[str]:
+    """Best-effort read of the repo's root .gitignore into scanner globs.
+
+    Deliberately conservative: comments, blanks, negations (!...) and the
+    ``**`` recursive form are skipped rather than mis-translated, so we never
+    wrongly exclude a file the user did not clearly ignore. A trailing-slash
+    directory entry contributes both the name and its subtree.
+    """
+    gitignore = repo_path / ".gitignore"
+    try:
+        raw = gitignore.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return []
+    globs: list[str] = []
+    for line in raw.splitlines():
+        entry = line.strip()
+        if not entry or entry.startswith("#") or entry.startswith("!") or "**" in entry:
+            continue
+        entry = entry.lstrip("/")  # anchored patterns match relative to root
+        if not entry:
+            continue
+        if entry.endswith("/"):
+            name = entry.rstrip("/")
+            globs.extend((name, f"{name}/*"))
+        else:
+            globs.append(entry)
+    return globs
 
 
 def _normalize_relative_path(path: Path, repo_path: Path) -> str | None:
@@ -295,8 +340,20 @@ def _load_scan_index_sqlite(db_path: Path, *, settings_fingerprint: str) -> Scan
         if not row or row[0] != settings_fingerprint:
             return ScanIndexState(settings_fingerprint=settings_fingerprint)
         entries: dict[str, ScanIndexEntry] = {}
-        for r in conn.execute("SELECT path, size_bytes, mtime_ns, content_hash, kind, reason, extension, is_text, record_json FROM entries").fetchall():
-            path_val, size_bytes, mtime_ns, content_hash, kind, reason, extension, is_text, record_json = r
+        for r in conn.execute(
+            "SELECT path, size_bytes, mtime_ns, content_hash, kind, reason, extension, is_text, record_json FROM entries"
+        ).fetchall():
+            (
+                path_val,
+                size_bytes,
+                mtime_ns,
+                content_hash,
+                kind,
+                reason,
+                extension,
+                is_text,
+                record_json,
+            ) = r
             record: FileRecord | None = None
             if record_json:
                 try:
@@ -387,7 +444,9 @@ def _save_scan_index_sqlite(
         conn.close()
 
 
-def _migrate_scan_index_json_to_sqlite(json_path: Path, db_path: Path, *, settings_fingerprint: str) -> None:
+def _migrate_scan_index_json_to_sqlite(
+    json_path: Path, db_path: Path, *, settings_fingerprint: str
+) -> None:
     """One-time migration of an existing JSON scan index into SQLite."""
     if not json_path.exists() or db_path.exists():
         return
@@ -558,7 +617,12 @@ def refresh_scan_index(
     """Refresh the on-disk scan index and reuse unchanged file metadata."""
 
     include_patterns = include_globs if include_globs is not None else ["*"]
-    ignore_patterns = ignore_globs if ignore_globs is not None else []
+    ignore_patterns = list(ignore_globs if ignore_globs is not None else [])
+    # Always exclude redcon's own artifacts and honour the repo's .gitignore so
+    # the pack never re-ingests its own output or files the user has ignored.
+    for extra in (*REDCON_ARTIFACT_GLOBS, *_gitignore_globs(repo_path)):
+        if extra not in ignore_patterns:
+            ignore_patterns.append(extra)
     ignored_directories = ignore_dirs if ignore_dirs is not None else set(DEFAULT_IGNORE_DIRS)
     binaries = binary_extensions if binary_extensions is not None else set(BINARY_EXTENSIONS)
     normalized_internal_paths = _normalize_internal_paths(
@@ -578,9 +642,15 @@ def refresh_scan_index(
     index_path = _resolve_index_path(repo_path, scan_index_file)
     db_path = repo_path / SCAN_INDEX_DB_FILE if use_sqlite else None
     if db_path is not None:
-        _migrate_scan_index_json_to_sqlite(index_path, db_path, settings_fingerprint=settings_fingerprint)
+        _migrate_scan_index_json_to_sqlite(
+            index_path, db_path, settings_fingerprint=settings_fingerprint
+        )
         sqlite_state = _load_scan_index_sqlite(db_path, settings_fingerprint=settings_fingerprint)
-        previous = sqlite_state if sqlite_state is not None else _load_scan_index(index_path, settings_fingerprint=settings_fingerprint)
+        previous = (
+            sqlite_state
+            if sqlite_state is not None
+            else _load_scan_index(index_path, settings_fingerprint=settings_fingerprint)
+        )
     else:
         previous = _load_scan_index(index_path, settings_fingerprint=settings_fingerprint)
     current_entries: dict[str, ScanIndexEntry] = {}
@@ -595,8 +665,7 @@ def refresh_scan_index(
 
     for root, dirnames, filenames in os.walk(repo_path):
         dirnames[:] = sorted(
-            name for name in dirnames
-            if name not in ignored_directories and not _is_venv_dir(name)
+            name for name in dirnames if name not in ignored_directories and not _is_venv_dir(name)
         )
         for name in sorted(filenames):
             path = Path(root) / name
