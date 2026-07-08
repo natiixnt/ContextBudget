@@ -1,36 +1,43 @@
-from __future__ import annotations
-
 """Pack/compression stage for budgeted context generation."""
+
+from __future__ import annotations
 
 import logging
 import re
 import time
+from collections.abc import Callable
 from dataclasses import dataclass, field
 from hashlib import sha256
 from pathlib import Path
-from typing import TYPE_CHECKING, Callable
-
-logger = logging.getLogger(__name__)
-
-if TYPE_CHECKING:
-    from redcon.compressors.representations import FileTiers
+from typing import TYPE_CHECKING
 
 from redcon.cache.summary_cache import SummaryCacheBackend
-from redcon.config import CompressionSettings, SummarizationSettings
 from redcon.compressors.language_chunks import (
     SliceRelationshipContext,
     select_language_aware_chunks,
 )
+from redcon.compressors.summarizers import SummarizationService
 from redcon.compressors.symbols import (
-    select_symbol_aware_chunks,
-    _truncate_data_blocks,
     _STUB_SCORE_THRESHOLD,
+    _truncate_data_blocks,
+    select_symbol_aware_chunks,
 )
-from redcon.compressors.summarizers import SummaryRequest, SummarizationService
+from redcon.config import CompressionSettings, SummarizationSettings
 from redcon.core.text import task_keywords
 from redcon.core.tokens import estimate_tokens
-from redcon.schemas.models import CacheReport, CompressedFile, RankedFile, SummarizerReport
+from redcon.schemas.models import (
+    CacheReport,
+    CompressedFile,
+    FileRecord,
+    RankedFile,
+    SummarizerReport,
+)
 from redcon.scorers.import_graph import ImportGraph, build_import_graph
+
+if TYPE_CHECKING:
+    from redcon.compressors.representations import FileTiers, Tier
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -59,7 +66,7 @@ class _SnippetSelection:
     selected_ranges: list[dict[str, int | str]]
 
 
-from redcon.compressors.file_patterns import _is_test_file, _is_utility_file  # noqa: E402
+from redcon.compressors.file_patterns import _is_test_file  # noqa: E402
 
 
 def _strip_docstrings_in_text(text: str) -> str:
@@ -75,8 +82,7 @@ def _strip_docstrings_in_text(text: str) -> str:
         line = lines[i]
         stripped = line.strip()
         if stripped.endswith(":") and any(
-            stripped.startswith(kw)
-            for kw in ("def ", "async def ", "class ", "):", "        ):")
+            stripped.startswith(kw) for kw in ("def ", "async def ", "class ", "):", "        ):")
         ):
             out.append(line)
             i += 1
@@ -90,7 +96,7 @@ def _strip_docstrings_in_text(text: str) -> str:
             found = False
             for delim in ('"""', "'''"):
                 if first_body.startswith(delim):
-                    rest = first_body[len(delim):]
+                    rest = first_body[len(delim) :]
                     if rest.endswith(delim) and len(rest) >= len(delim):
                         i += 1
                         found = True
@@ -138,9 +144,7 @@ def _strip_decorative_dividers(text: str) -> str:
     Strips lines whose entire content (after ``#``) is 15+ repeated
     non-alphanumeric characters, e.g. ``# --------`` or ``# ========``.
     """
-    return "\n".join(
-        line for line in text.splitlines() if not _DIVIDER_RE.match(line)
-    )
+    return "\n".join(line for line in text.splitlines() if not _DIVIDER_RE.match(line))
 
 
 def _dedup_imports(text: str, seen_imports: set[str]) -> str:
@@ -255,7 +259,9 @@ def _range_keyword_reason(lines: list[str], start: int, end: int, keywords: list
     return f"keyword proximity: {', '.join(hits[:3])}"
 
 
-def _snippet_from_text(path: str, text: str, keywords: list[str], settings: CompressionSettings) -> _SnippetSelection:
+def _snippet_from_text(
+    path: str, text: str, keywords: list[str], settings: CompressionSettings
+) -> _SnippetSelection:
     raw_lines = text.splitlines()
     if not raw_lines:
         return _SnippetSelection(text=f"# {path}\n", selected_ranges=[])
@@ -359,8 +365,8 @@ def _build_risk_estimate(
 
 
 def _finalize_entry(
-    file_record: "RankedFile.file",  # type: ignore[name-defined]
-    tier: "Tier",  # type: ignore[name-defined]
+    file_record: FileRecord,
+    tier: Tier,
     raw_tokens: int,
     seen_imports: set[str],
     cache: SummaryCacheBackend,
@@ -424,8 +430,14 @@ def compress_ranked_files(
         logger.debug("compress_ranked_files called with empty file list - returning empty result")
         empty_cache = cache.snapshot()
         empty_summarizer = SummarizationService(
-            backend=(summarization_settings.backend if summarization_settings is not None else "deterministic"),
-            adapter_name=(summarization_settings.adapter if summarization_settings is not None else ""),
+            backend=(
+                summarization_settings.backend
+                if summarization_settings is not None
+                else "deterministic"
+            ),
+            adapter_name=(
+                summarization_settings.adapter if summarization_settings is not None else ""
+            ),
         )
         return CompressionResult(
             compressed_files=[],
@@ -445,9 +457,15 @@ def compress_ranked_files(
 
     duplicate_reads_prevented = 0
     seen_hashes: set[str] = set()
-    slice_relationships = _build_slice_relationship_contexts(ranked_files, import_graph=import_graph)
+    slice_relationships = _build_slice_relationship_contexts(
+        ranked_files, import_graph=import_graph
+    )
     summarizer = SummarizationService(
-        backend=(summarization_settings.backend if summarization_settings is not None else "deterministic"),
+        backend=(
+            summarization_settings.backend
+            if summarization_settings is not None
+            else "deterministic"
+        ),
         adapter_name=(summarization_settings.adapter if summarization_settings is not None else ""),
     )
 
@@ -479,7 +497,9 @@ def compress_ranked_files(
         t0 = time.monotonic() if raw_tokens > 10000 else None
 
         try:
-            relationship_context = slice_relationships.get(file_record.path, SliceRelationshipContext())
+            relationship_context = slice_relationships.get(
+                file_record.path, SliceRelationshipContext()
+            )
 
             relevance_score = ranked.heuristic_score if ranked.heuristic_score > 0 else ranked.score
             is_test = _is_test_file(file_record.path)
@@ -539,8 +559,11 @@ def compress_ranked_files(
 
             # Fallback: if the selected strategy produced no tiers, try "full"
             if not tiers:
-                logger.debug("No tiers produced for %s - falling back to full strategy", file_record.path)
+                logger.debug(
+                    "No tiers produced for %s - falling back to full strategy", file_record.path
+                )
                 from redcon.compressors.representations import Tier
+
                 full_tier = Tier(
                     strategy="full",
                     text=full_text,
@@ -559,16 +582,23 @@ def compress_ranked_files(
 
         if t0 is not None:
             elapsed = time.monotonic() - t0
-            logger.debug("Compressed large file %s (%d tokens) in %.3fs", file_record.path, raw_tokens, elapsed)
+            logger.debug(
+                "Compressed large file %s (%d tokens) in %.3fs",
+                file_record.path,
+                raw_tokens,
+                elapsed,
+            )
 
-        prepared.append(FileTiers(
-            path=file_record.path,
-            ranked=ranked,
-            raw_tokens=raw_tokens,
-            full_text=full_text,
-            line_count=len(full_text.splitlines()),
-            tiers=tiers,
-        ))
+        prepared.append(
+            FileTiers(
+                path=file_record.path,
+                ranked=ranked,
+                raw_tokens=raw_tokens,
+                full_text=full_text,
+                line_count=len(full_text.splitlines()),
+                tiers=tiers,
+            )
+        )
 
     if cfg.progressive_packer_enabled:
         result = _compress_progressive(
@@ -627,7 +657,12 @@ def _compress_greedy(
         # Pick the first (most detailed) tier - matches old behavior.
         tier = ft.tiers[0]
         entry = _finalize_entry(
-            ft.ranked.file, tier, ft.raw_tokens, seen_imports, cache, token_estimator,
+            ft.ranked.file,
+            tier,
+            ft.raw_tokens,
+            seen_imports,
+            cache,
+            token_estimator,
         )
         if total_compressed + entry.compressed_tokens > max_tokens:
             files_skipped.append(ft.path)
@@ -715,16 +750,23 @@ def _compress_progressive(
             ),
         )
 
+        # A degradation snapshots (deg_idx, tier_idx) at round start. Once an
+        # index is actually degraded, its snapshot tier is stale, so it must not
+        # be reused this round - otherwise the same one-step degradation credits
+        # `freed` again and again while the assignment update is idempotent,
+        # inflating budget_remaining and blowing the token budget wide open.
+        used_deg_indices: set[int] = set()
+
         still_skipped: list[FileTiers] = []
         for skipped_ft in skipped:
             fitted = False
-            # Find cheapest tier that could fit this skipped file.
-            cheapest_tier = skipped_ft.tiers[-1]
 
             # Try freeing budget by degrading included files.
             for deg_idx, deg_ft, deg_tier_idx in degradable:
                 if fitted:
                     break
+                if deg_idx in used_deg_indices:
+                    continue
                 current_tier = deg_ft.tiers[deg_tier_idx]
                 next_tier = deg_ft.tiers[deg_tier_idx + 1]
                 freed = current_tier.tokens - next_tier.tokens
@@ -737,6 +779,7 @@ def _compress_progressive(
                     if s_tier.tokens <= new_budget:
                         # Degrade the included file.
                         assignments[deg_idx] = (deg_ft, deg_tier_idx + 1)
+                        used_deg_indices.add(deg_idx)
                         budget_remaining += freed
                         degraded_files.append(deg_ft.path)
                         degradation_savings += freed
@@ -759,8 +802,7 @@ def _compress_progressive(
     # Rebuild assignments in the order files were prepared so that import
     # deduplication remains deterministic.
     assignment_map: dict[str, int] = {ft.path: tier_idx for ft, tier_idx in assignments}
-    compressed_files: list[CompressedFile] = []
-    files_included: list[str] = []
+    finalized: list[tuple[FileTiers, CompressedFile]] = []
     total_compressed = 0
 
     for ft in prepared:
@@ -769,11 +811,37 @@ def _compress_progressive(
         tier_idx = assignment_map[ft.path]
         tier = ft.tiers[tier_idx]
         entry = _finalize_entry(
-            ft.ranked.file, tier, ft.raw_tokens, seen_imports, cache, token_estimator,
+            ft.ranked.file,
+            tier,
+            ft.raw_tokens,
+            seen_imports,
+            cache,
+            token_estimator,
         )
         total_compressed += entry.compressed_tokens
-        compressed_files.append(entry)
-        files_included.append(ft.path)
+        finalized.append((ft, entry))
+
+    # -- Invariant clamp: the budget is a guarantee, not an aspiration. --
+    # Regardless of any packer accounting error, the finalized token total
+    # (which re-estimates after import dedup and can drift from tier budgeting)
+    # must never exceed max_tokens. Drop lowest-scoring files until it holds.
+    if total_compressed > max_tokens and finalized:
+
+        def _score(ft: FileTiers) -> float:
+            return ft.ranked.heuristic_score if ft.ranked.heuristic_score > 0 else ft.ranked.score
+
+        for ft, entry in sorted(finalized, key=lambda pair: _score(pair[0])):
+            if total_compressed <= max_tokens:
+                break
+            total_compressed -= entry.compressed_tokens
+            finalized.remove((ft, entry))
+            files_skipped.append(ft.path)
+
+    # Re-emit in prepared order so import deduplication stays deterministic.
+    prepared_order = {ft.path: i for i, ft in enumerate(prepared)}
+    finalized.sort(key=lambda pair: prepared_order[pair[0].path])
+    compressed_files: list[CompressedFile] = [entry for _ft, entry in finalized]
+    files_included: list[str] = [ft.path for ft, _entry in finalized]
 
     risk = _build_risk_estimate(cfg, files_skipped, ranked_files, total_compressed, total_raw)
     cache_snapshot = cache.snapshot()
