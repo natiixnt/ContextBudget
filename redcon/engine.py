@@ -379,10 +379,13 @@ class RedconEngine:
             ):
                 logger.info("pack: no files matched the scan for task=%r", task)
 
-            # Defensive division-by-zero guard for token percentage calculations
+            # Defensive division-by-zero guard for token percentage calculations.
+            # The budget dict carries max_tokens since the report builder was
+            # fixed; fall back to the report-level value for artifacts built
+            # before that, where this recompute always produced 0.0.
             budget = result.get("budget")
             if isinstance(budget, dict):
-                max_tok = budget.get("max_tokens") or 0
+                max_tok = budget.get("max_tokens") or result.get("max_tokens") or 0
                 estimated = budget.get("estimated_input_tokens") or 0
                 if max_tok > 0:
                     budget["utilization_pct"] = round(estimated / max_tok * 100, 2)

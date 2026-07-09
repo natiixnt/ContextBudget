@@ -794,3 +794,64 @@ snippet_total_line_limit = 20
             f"{entry['path']}: compressed_tokens ({entry['compressed_tokens']}) "
             f"exceeds original_tokens ({entry['original_tokens']})"
         )
+
+
+def test_run_pack_reports_truthful_budget_utilization(tmp_path: Path) -> None:
+    # The budget block must be self-describing: it carries the max_tokens the
+    # pack ran against and a utilization_pct derived from it. Before the fix
+    # the budget dict had no max_tokens key, so downstream consumers reading
+    # only the budget block computed utilization as 0.0 on every run.
+    _write(tmp_path / "src" / "auth.py", "def auth():\n    return 'ok'\n" * 20)
+
+    data = as_json_dict(run_pack("refactor auth", repo=tmp_path, max_tokens=1000))
+    budget = data["budget"]
+
+    assert budget["max_tokens"] == data["max_tokens"]
+    assert budget["estimated_input_tokens"] > 0
+    expected = round(budget["estimated_input_tokens"] / budget["max_tokens"] * 100, 2)
+    assert budget["utilization_pct"] == expected
+    assert budget["utilization_pct"] > 0
+
+
+def test_engine_pack_reports_nonzero_utilization(tmp_path: Path) -> None:
+    # Audit repro: engine.pack() always reported utilization_pct == 0.0
+    # because it looked for max_tokens inside the budget dict, which never
+    # contained it.
+    from redcon import RedconEngine
+
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n" * 10)
+
+    result = RedconEngine().pack(task="tighten auth checks", repo=tmp_path, max_tokens=300)
+    budget = result["budget"]
+
+    assert budget["estimated_input_tokens"] > 0
+    assert budget["utilization_pct"] > 0
+
+
+def test_engine_pack_backfills_utilization_for_legacy_budget_shape(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    # Reports built before the budget block carried max_tokens must still get
+    # a truthful utilization_pct from the engine via the report-level value.
+    from redcon import RedconEngine
+    from redcon import engine as engine_module
+
+    _write(tmp_path / "src" / "auth.py", "def login() -> bool:\n    return True\n" * 10)
+
+    real_run_pack = engine_module.run_pack
+
+    def legacy_run_pack(*args: object, **kwargs: object):
+        report = real_run_pack(*args, **kwargs)
+        report.budget.pop("max_tokens", None)
+        report.budget.pop("utilization_pct", None)
+        return report
+
+    monkeypatch.setattr(engine_module, "run_pack", legacy_run_pack)
+
+    result = RedconEngine().pack(task="tighten auth checks", repo=tmp_path, max_tokens=300)
+    budget = result["budget"]
+
+    assert "max_tokens" not in budget
+    assert budget["estimated_input_tokens"] > 0
+    assert budget["utilization_pct"] > 0

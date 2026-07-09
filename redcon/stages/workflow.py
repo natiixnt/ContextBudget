@@ -1,11 +1,11 @@
-from __future__ import annotations
-
 """Explicit pipeline stages for scan, score, pack, cache, and render boundaries."""
 
+from __future__ import annotations
+
+import subprocess
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
-import subprocess
 
 from redcon.cache.run_history import load_run_history
 from redcon.cache.summary_cache import SummaryCacheBackend, create_summary_cache_backend
@@ -18,9 +18,9 @@ from redcon.plugins import ResolvedPlugins, resolve_plugins
 from redcon.scanners.incremental import ScanRefreshResult, refresh_scan_index
 from redcon.scanners.workspace import ScannedWorkspaceRepo, scan_workspace
 from redcon.schemas.models import (
+    DEFAULT_TOP_FILES,
     AgentPlanReport,
     CompressedFile,
-    DEFAULT_TOP_FILES,
     FileRecord,
     ModelProfileReport,
     RankedFile,
@@ -146,7 +146,11 @@ def _get_git_dirty_paths(repo: Path) -> set[str]:
     try:
         result = subprocess.run(
             ["git", "diff", "--name-only", "HEAD"],
-            cwd=repo, capture_output=True, text=True, timeout=5, check=False,
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
         )
         if result.returncode == 0:
             return {line.strip() for line in result.stdout.splitlines() if line.strip()}
@@ -251,12 +255,20 @@ def run_render_stage(
         repo=str(repo),
         max_tokens=max_tokens,
         ranked_files=[_serialize_ranked_file(item) for item in ranked[:effective_top_files]],
-        compressed_context=[_serialize_compressed_file(item) for item in compressed.compressed_files],
+        compressed_context=[
+            _serialize_compressed_file(item) for item in compressed.compressed_files
+        ],
         files_included=compressed.files_included,
         files_skipped=compressed.files_skipped,
         budget={
+            "max_tokens": max_tokens,
             "estimated_input_tokens": compressed.estimated_input_tokens,
             "estimated_saved_tokens": compressed.estimated_saved_tokens,
+            "utilization_pct": (
+                round(compressed.estimated_input_tokens / max_tokens * 100, 2)
+                if max_tokens > 0
+                else 0.0
+            ),
             "duplicate_reads_prevented": compressed.duplicate_reads_prevented,
             "quality_risk_estimate": compressed.quality_risk_estimate,
         },
