@@ -1,13 +1,13 @@
-from __future__ import annotations
-
 """Deterministic symbol-level extraction for supported source files."""
+
+from __future__ import annotations
 
 import ast
 import logging
+import re
+from collections.abc import Callable
 from dataclasses import dataclass
 from pathlib import Path
-import re
-from typing import Callable
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,8 @@ def _normalise_signature_spacing(joined: str) -> str:
     joined = _SIG_OPEN_PAREN_WS.sub("(", joined)
     joined = _SIG_CLOSE_PAREN_WS.sub(")", joined)
     return _SIG_COMMA_WS.sub(", ", joined)
+
+
 GO_VAR_CONST_RE = re.compile(r"^(var|const)\s+([A-Za-z_][A-Za-z0-9_]*)\b")
 
 
@@ -90,7 +92,9 @@ def _brace_delta(line: str) -> int:
     return line.count("{") - line.count("}")
 
 
-def _include_leading_comments(lines: list[str], start: int, *, comment_prefixes: tuple[str, ...]) -> int:
+def _include_leading_comments(
+    lines: list[str], start: int, *, comment_prefixes: tuple[str, ...]
+) -> int:
     idx = start - 1
     while idx >= 0:
         stripped = lines[idx].strip()
@@ -222,7 +226,9 @@ def _extract_python_export_names(tree: ast.Module) -> set[str]:
     return exports
 
 
-def _python_symbol_candidates(file_path: str, text: str, keywords: list[str]) -> list[_SymbolCandidate]:
+def _python_symbol_candidates(
+    file_path: str, text: str, keywords: list[str]
+) -> list[_SymbolCandidate]:
     lines = text.splitlines()
     if not lines:
         return []
@@ -233,7 +239,9 @@ def _python_symbol_candidates(file_path: str, text: str, keywords: list[str]) ->
         logger.warning("AST parse failed for %s: %s - skipping symbol extraction", file_path, exc)
         return []
     except Exception as exc:
-        logger.warning("Unexpected error parsing %s: %s - skipping symbol extraction", file_path, exc)
+        logger.warning(
+            "Unexpected error parsing %s: %s - skipping symbol extraction", file_path, exc
+        )
         return []
 
     exported_names = _extract_python_export_names(tree)
@@ -286,7 +294,9 @@ def _python_symbol_candidates(file_path: str, text: str, keywords: list[str]) ->
     return candidates
 
 
-def _ts_js_symbol_candidates(file_path: str, text: str, keywords: list[str]) -> list[_SymbolCandidate]:
+def _ts_js_symbol_candidates(
+    file_path: str, text: str, keywords: list[str]
+) -> list[_SymbolCandidate]:
     del file_path
     lines = text.splitlines()
     candidates: list[_SymbolCandidate] = []
@@ -505,8 +515,8 @@ def _trim_candidate(candidate: _SymbolCandidate, budget: int) -> _SymbolCandidat
 
 
 _STUB_SCORE_THRESHOLD = 3.5  # symbols below this get signature-only stubs (no body)
-_MAX_CLASS_BODY_LINES = 40   # class bodies beyond this are condensed to method stubs
-_MAX_FUNC_BODY_LINES = 60    # standalone functions beyond this get a tail truncation
+_MAX_CLASS_BODY_LINES = 40  # class bodies beyond this are condensed to method stubs
+_MAX_FUNC_BODY_LINES = 60  # standalone functions beyond this get a tail truncation
 
 _PY_METHOD_RE = re.compile(r"^(\s+)(async\s+)?def\s+([A-Za-z_][A-Za-z0-9_]*)\s*\(")
 # Matches TS/JS method declarations indented at least 2 spaces inside a class body.
@@ -647,15 +657,15 @@ def _strip_python_docstring(body_lines: list[str]) -> list[str]:
     first = body_lines[i].strip()
     for delim in ('"""', "'''"):
         if first.startswith(delim):
-            rest = first[len(delim):]
+            rest = first[len(delim) :]
             if rest.endswith(delim) and len(rest) >= len(delim):
                 # Single-line docstring.
-                return body_lines[:i] + body_lines[i + 1:]
+                return body_lines[:i] + body_lines[i + 1 :]
             # Multi-line: scan for closing delimiter.
             j = i + 1
             while j < len(body_lines):
                 if delim in body_lines[j]:
-                    return body_lines[:i] + body_lines[j + 1:]
+                    return body_lines[:i] + body_lines[j + 1 :]
                 j += 1
             break
     return body_lines
@@ -765,9 +775,7 @@ def _strip_leading_comments(body_lines: list[str], language: str) -> list[str]:
 #   assignments:    ``x = {``, ``items = [``, ``task = Task(``
 #   method calls:   ``conn.executescript(``, ``cursor.execute(``
 #   bare brackets:  ``(`` or ``[`` or ``{`` alone on an indented line.
-_DATA_OPEN_RE = re.compile(
-    r"^\s*(?:[\w.]+(?:\s*=\s*(?:[A-Za-z_][\w.]*\s*)?)?\s*)?([{[(])\s*$"
-)
+_DATA_OPEN_RE = re.compile(r"^\s*(?:[\w.]+(?:\s*=\s*(?:[A-Za-z_][\w.]*\s*)?)?\s*)?([{[(])\s*$")
 _DATA_OPEN_MAX_ENTRIES = 7
 _DATA_OPEN_KEEP = 3
 
@@ -784,7 +792,11 @@ def _collapse_multiline_py_signatures(body_lines: list[str]) -> list[str]:
     while i < len(body_lines):
         line = body_lines[i]
         stripped = line.strip()
-        if stripped.startswith(("def ", "async def ")) and "(" in stripped and not stripped.endswith("..."):
+        if (
+            stripped.startswith(("def ", "async def "))
+            and "(" in stripped
+            and not stripped.endswith("...")
+        ):
             depth = stripped.count("(") - stripped.count(")")
             if depth > 0:
                 # Collect all lines of this multi-line signature.
@@ -850,7 +862,9 @@ def _truncate_data_blocks(body_lines: list[str]) -> list[str]:
     return result
 
 
-def _select_symbol_candidates(candidates: list[_SymbolCandidate], line_budget: int, max_symbols: int = 4) -> list[_SymbolCandidate]:
+def _select_symbol_candidates(
+    candidates: list[_SymbolCandidate], line_budget: int, max_symbols: int = 4
+) -> list[_SymbolCandidate]:
     if not candidates:
         return []
 
@@ -908,9 +922,14 @@ def _render_selected_symbols(
             if is_py:
                 body_lines = _condense_decorators(body_lines)
                 body_lines = _strip_python_docstring(body_lines)
+                # Data-block truncation emits a Python `#` comment and counts
+                # brackets without tracking string state, so it only runs on
+                # Python. On JS/TS/Go it broke syntax (`#` is not a comment)
+                # and could truncate inside a template literal, silently
+                # deleting real code (e.g. a SQL LIMIT/OFFSET clause).
+                body_lines = _truncate_data_blocks(body_lines)
             elif language in {"typescript", "javascript", "go"}:
                 body_lines = _strip_leading_comments(body_lines, language)
-            body_lines = _truncate_data_blocks(body_lines)
             if symbol.symbol_type == "class" and len(body_lines) > _MAX_CLASS_BODY_LINES:
                 body = _condense_class_body(body_lines, _MAX_CLASS_BODY_LINES, method_re)
             elif symbol.symbol_type == "function" and len(body_lines) > _MAX_FUNC_BODY_LINES:
@@ -965,7 +984,9 @@ def select_symbol_aware_chunks(
     if not language or not candidates:
         return None
 
-    selected = _select_symbol_candidates(candidates, line_budget=line_budget, max_symbols=max_symbols)
+    selected = _select_symbol_candidates(
+        candidates, line_budget=line_budget, max_symbols=max_symbols
+    )
     if not selected:
         return None
 

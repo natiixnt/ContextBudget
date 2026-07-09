@@ -109,6 +109,72 @@ func helper() bool {
     assert "type AuthChecker interface" in chunk.text
 
 
+def test_javascript_symbol_extraction_preserves_template_literals() -> None:
+    # A JS function whose body holds a multi-line SQL template literal.
+    # The data-block truncator is Python-oriented: it emits a `#` comment
+    # (invalid JS) and counts brackets without tracking string state, so on
+    # JS it used to fire inside the template literal and silently drop real
+    # SQL (the trailing LIMIT/OFFSET clauses). It must not touch JS at all.
+    text = """
+// Order listing query builder.
+export async function listOrdersForUser(userId, page) {
+  rows = db.query(
+    `SELECT o.id, o.total, o.status
+      FROM orders o
+      WHERE o.user_id = ${userId}
+        AND o.status IN ('paid', 'shipped')
+        AND o.total > (SELECT avg(total) FROM orders)
+      GROUP BY o.id
+      ORDER BY o.created_at DESC
+      LIMIT 20
+      OFFSET ${page * 20}`,
+  );
+  return rows;
+}
+""".strip()
+
+    chunk = select_symbol_aware_chunks(
+        file_path="src/orders.js",
+        text=text,
+        keywords=["orders", "listOrdersForUser", "query"],
+        line_budget=60,
+    )
+
+    assert chunk is not None
+    assert chunk.chunk_strategy == "symbol-extract-javascript"
+    # No Python `#` comment marker is injected into JS.
+    assert "# ..." not in chunk.text
+    # Real SQL clauses inside the template literal survive intact.
+    assert "LIMIT 20" in chunk.text
+    assert "OFFSET" in chunk.text
+    assert "GROUP BY o.id" in chunk.text
+
+
+def test_python_data_block_truncation_still_applies() -> None:
+    # Guard the other direction: gating the truncator to Python must not
+    # disable it for Python. A large inline data structure is still collapsed
+    # to its first few entries with a `# ... (N more entries)` marker.
+    entries = "\n".join(f"        {index!r}: {index} * 2," for index in range(20))
+    text = (
+        "# Order status lookup table.\n"
+        "def build_status_map():\n"
+        "    STATUS_MAP = {\n" + entries + "\n    }\n"
+        "    return STATUS_MAP\n"
+    ).strip()
+
+    chunk = select_symbol_aware_chunks(
+        file_path="src/status.py",
+        text=text,
+        keywords=["status", "build_status_map"],
+        line_budget=60,
+    )
+
+    assert chunk is not None
+    assert chunk.chunk_strategy == "symbol-extract-python"
+    assert "# ..." in chunk.text
+    assert "more entries" in chunk.text
+
+
 def test_pack_records_symbol_metadata_when_extraction_succeeds(tmp_path: Path) -> None:
     _write(
         tmp_path / "src" / "auth_service.py",
@@ -137,12 +203,16 @@ def helper() -> None:
     )
 
     data = as_json_dict(run_pack("refactor auth login", repo=tmp_path, max_tokens=1000, config=cfg))
-    entry = next(item for item in data["compressed_context"] if item["path"] == "src/auth_service.py")
+    entry = next(
+        item for item in data["compressed_context"] if item["path"] == "src/auth_service.py"
+    )
 
     assert entry["strategy"] == "symbol"
     assert entry["chunk_strategy"] == "symbol-extract-python"
     assert entry["symbols"]
-    assert {"name", "symbol_type", "path", "start_line", "end_line", "exported"} <= set(entry["symbols"][0])
+    assert {"name", "symbol_type", "path", "start_line", "end_line", "exported"} <= set(
+        entry["symbols"][0]
+    )
     assert any(item["name"] == "AuthService" for item in entry["symbols"])
     assert any(r["kind"] in {"class", "function"} for r in entry["selected_ranges"])
 
@@ -183,7 +253,9 @@ def helper() -> None:
     )
 
     data = as_json_dict(run_pack("refactor auth login", repo=tmp_path, max_tokens=1000, config=cfg))
-    entry = next(item for item in data["compressed_context"] if item["path"] == "src/auth_service.py")
+    entry = next(
+        item for item in data["compressed_context"] if item["path"] == "src/auth_service.py"
+    )
 
     assert entry["strategy"] == "snippet"
     assert entry["chunk_strategy"] == "language-aware-python"
@@ -193,8 +265,7 @@ def helper() -> None:
 
 def test_symbol_level_packing_reduces_tokens_against_full_file_pack(tmp_path: Path) -> None:
     repeated_helpers = "\n\n".join(
-        f"def helper_{index}() -> str:\n    return 'helper-{index}'"
-        for index in range(25)
+        f"def helper_{index}() -> str:\n    return 'helper-{index}'" for index in range(25)
     )
     _write(
         tmp_path / "src" / "auth_service.py",
@@ -227,13 +298,24 @@ class AuthService:
         )
     )
 
-    full_data = as_json_dict(run_pack("refactor auth login", repo=tmp_path, max_tokens=5000, config=full_cfg))
-    symbol_data = as_json_dict(run_pack("refactor auth login", repo=tmp_path, max_tokens=5000, config=symbol_cfg))
+    full_data = as_json_dict(
+        run_pack("refactor auth login", repo=tmp_path, max_tokens=5000, config=full_cfg)
+    )
+    symbol_data = as_json_dict(
+        run_pack("refactor auth login", repo=tmp_path, max_tokens=5000, config=symbol_cfg)
+    )
 
-    full_entry = next(item for item in full_data["compressed_context"] if item["path"] == "src/auth_service.py")
-    symbol_entry = next(item for item in symbol_data["compressed_context"] if item["path"] == "src/auth_service.py")
+    full_entry = next(
+        item for item in full_data["compressed_context"] if item["path"] == "src/auth_service.py"
+    )
+    symbol_entry = next(
+        item for item in symbol_data["compressed_context"] if item["path"] == "src/auth_service.py"
+    )
 
     assert full_entry["strategy"] == "full"
     assert symbol_entry["strategy"] == "symbol"
     assert symbol_entry["compressed_tokens"] < full_entry["compressed_tokens"]
-    assert symbol_data["budget"]["estimated_input_tokens"] < full_data["budget"]["estimated_input_tokens"]
+    assert (
+        symbol_data["budget"]["estimated_input_tokens"]
+        < full_data["budget"]["estimated_input_tokens"]
+    )
