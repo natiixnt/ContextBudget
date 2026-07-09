@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import re
-
 import pytest
 
 from redcon.cmd.budget import BudgetHint
@@ -138,9 +136,7 @@ def test_parse_diff_binary():
 def test_diff_compressor_levels(level: CompressionLevel, must_substr: str):
     comp = GitDiffCompressor()
     hint = _hint_for_level(level)
-    ctx = CompressorContext(
-        argv=("git", "diff"), cwd=".", returncode=0, hint=hint
-    )
+    ctx = CompressorContext(argv=("git", "diff"), cwd=".", returncode=0, hint=hint)
     out = comp.compress(DIFF_SIMPLE, b"", ctx)
     assert out.level == level
     assert must_substr in out.text
@@ -331,3 +327,73 @@ def _hint_for_level(level: CompressionLevel) -> BudgetHint:
         return BudgetHint(remaining_tokens=200, max_output_tokens=4_000)
     # ULTRA: hard cap below compact size for any non-trivial output.
     return BudgetHint(remaining_tokens=10, max_output_tokens=2)
+
+
+# --- grep: single-file and fail-closed regression tests ---
+
+from redcon.cmd.compressors.grep_compressor import (  # noqa: E402
+    GrepCompressor,
+    _single_file_operand,
+    parse_grep,
+)
+
+# `grep -n PATTERN file` on a single file prints bare `line:text` with no path
+# header. The parser used to drop every one of these matches and the compressor
+# reported "grep: no matches" with must_preserve_ok=True over real hits.
+GREP_SINGLE_FILE = (
+    b"82:def parse_grep(text, single_file_hint=None):\n"
+    b"95:        first = line[0]\n"
+    b'233:    logger.warning("AST parse failed for %s", path)\n'
+)
+
+
+def test_grep_single_file_matches_are_not_dropped():
+    result = parse_grep(GREP_SINGLE_FILE.decode(), single_file_hint="redcon/compressors/symbols.py")
+    assert result.match_count == 3
+
+
+def test_grep_single_file_operand_detection():
+    assert _single_file_operand(("grep", "-n", "parse", "redcon/x.py")) == "redcon/x.py"
+    assert _single_file_operand(("grep", "-n", "p", "a.py", "b.py")) is None
+    assert _single_file_operand(("grep", "-e", "p", "only.py")) == "only.py"
+    assert _single_file_operand(("grep", "-rn", "pat")) is None
+
+
+def test_grep_never_reports_no_matches_over_real_hits():
+    comp = GrepCompressor()
+    ctx = CompressorContext(
+        argv=("grep", "-n", "parse", "redcon/compressors/symbols.py"),
+        cwd=".",
+        returncode=0,
+        hint=BudgetHint(remaining_tokens=4000, max_output_tokens=4000),
+    )
+    out = comp.compress(GREP_SINGLE_FILE, b"", ctx)
+    assert "no matches" not in out.text
+    assert "AST parse failed" in out.text
+
+
+def test_grep_fail_closed_passthrough_on_unparseable_output():
+    """Unrecognized output with rc=0 must pass through raw, never 'no matches'."""
+    comp = GrepCompressor()
+    weird = b"some unexpected grep variant the parser cannot read\nsecond line\n"
+    ctx = CompressorContext(
+        argv=("grep", "-Z", "x", "f"),
+        cwd=".",
+        returncode=0,
+        hint=BudgetHint(remaining_tokens=4000, max_output_tokens=4000),
+    )
+    out = comp.compress(weird, b"", ctx)
+    assert "no matches" not in out.text
+    assert out.text == weird.decode()
+
+
+def test_grep_genuine_empty_still_reports_no_matches():
+    comp = GrepCompressor()
+    ctx = CompressorContext(
+        argv=("grep", "-n", "zzz", "f"),
+        cwd=".",
+        returncode=1,
+        hint=BudgetHint(remaining_tokens=4000, max_output_tokens=4000),
+    )
+    out = comp.compress(b"", b"", ctx)
+    assert "no matches" in out.text

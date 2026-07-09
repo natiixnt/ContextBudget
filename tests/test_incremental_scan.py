@@ -73,3 +73,32 @@ def test_incremental_scan_removes_deleted_files_from_index(tmp_path: Path) -> No
 
     index = load_scan_index(tmp_path / SCAN_INDEX_FILE)
     assert [entry["path"] for entry in index["entries"]] == ["src/current.py"]
+
+
+def test_scan_excludes_redcon_artifacts_and_gitignored_files(tmp_path: Path) -> None:
+    """Regression: the scanner re-ingested its own output and ignored .gitignore.
+
+    run.json/run.md/redcon-plan-* were packed back into the next run (a
+    self-contamination loop and a secret-exposure risk), and .gitignore was
+    never consulted at all.
+    """
+    _write(tmp_path / "src" / "app.py", "def app():\n    return 1\n")
+    _write(tmp_path / "run.json", '{"budget": 1}')
+    _write(tmp_path / "run.md", "# run\n")
+    _write(tmp_path / "redcon-plan-abc.json", '{"x": 1}')
+    _write(tmp_path / "secrets.log", "API_KEY=sk-ant-xxx\n")
+    _write(tmp_path / ".gitignore", "*.log\nbuildout/\n")
+    _write(tmp_path / "buildout" / "o.py", "x = 1\n")
+
+    result = refresh_scan_index(tmp_path, use_sqlite=False)
+    scanned = {record.path for record in result.records}
+
+    assert "src/app.py" in scanned
+    for excluded in (
+        "run.json",
+        "run.md",
+        "redcon-plan-abc.json",
+        "secrets.log",
+        "buildout/o.py",
+    ):
+        assert excluded not in scanned, f"leaked into scan: {excluded}"

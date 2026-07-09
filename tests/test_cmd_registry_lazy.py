@@ -117,9 +117,7 @@ def test_compressor_module_loads_on_first_match():
         "after = 'redcon.cmd.compressors.git_diff' in sys.modules; "
         "print(f'{before},{after}')"
     )
-    result = subprocess.run(
-        [sys.executable, "-c", code], capture_output=True, text=True
-    )
+    result = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True)
     assert result.returncode == 0, result.stderr
     before, after = result.stdout.strip().split(",")
     assert before == "False"
@@ -151,3 +149,23 @@ def test_predicates_agree_with_compressor_matches_methods():
         assert compressor is not None
         assert compressor.schema == expected
         assert compressor.matches(argv) is True
+
+
+def test_detect_compressor_normalises_absolute_path_binaries() -> None:
+    """Regression: a binary invoked by absolute path must still be detected.
+
+    Agents commonly run `/venv/bin/pytest` or `/usr/bin/grep`; matching on the
+    full path missed the compressor and fell back to raw passthrough.
+    """
+    from redcon.cmd.registry import detect_compressor
+
+    cases = [
+        (("/tmp/venv/bin/pytest",), "pytest"),
+        (("/usr/bin/grep", "-n", "x", "f.py"), "grep"),
+        (("/opt/python3.11/bin/python3", "-m", "pytest"), "pytest"),
+        (("pytest",), "pytest"),  # plain name still works
+    ]
+    for argv, expected in cases:
+        compressor = detect_compressor(argv)
+        assert compressor is not None, argv
+        assert compressor.schema == expected, (argv, compressor.schema)

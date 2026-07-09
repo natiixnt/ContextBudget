@@ -43,6 +43,43 @@ def test_run_pack_records_history_entry(tmp_path: Path) -> None:
     assert entry.result_artifacts == {"run_json": "", "run_markdown": ""}
 
 
+def test_pack_never_exceeds_budget_under_degradation(tmp_path: Path) -> None:
+    """Regression: the progressive packer double-credited reclaimed tokens.
+
+    With many files and a tight budget, Pass 2 degradation runs repeatedly.
+    A stale `degradable` snapshot let the same one-step degradation credit its
+    freed tokens again and again, inflating the budget and packing 2.9-5.1x
+    over --max-tokens (observed: 20k budget -> 57k then 102k on rerun). The
+    budget is a hard guarantee; assert it holds and that it is deterministic.
+    """
+    for i in range(40):
+        _write(
+            tmp_path / "src" / f"mod_{i:02d}.py",
+            f"def feature_{i}(payload):\n"
+            + "    # rate limiting and auth logic for the gateway\n" * 30
+            + f"    return process_{i}(payload)\n",
+        )
+
+    budget = 8000
+    sizes = []
+    for _ in range(3):
+        report = run_pack(
+            "add rate limiting to the gateway endpoints", repo=tmp_path, max_tokens=budget
+        )
+        data = as_json_dict(report)
+        assert data["budget"]["estimated_input_tokens"] <= budget, (
+            f"budget blown: {data['budget']['estimated_input_tokens']} > {budget}"
+        )
+        # No file should be degraded more than once per round-set: the
+        # double-credit symptom was hundreds of entries collapsing to a handful
+        # of unique paths.
+        degraded = data["budget"].get("degraded_files", [])
+        assert len(degraded) == len(set(degraded)), f"file degraded multiple times: {degraded}"
+        sizes.append(data["budget"]["estimated_input_tokens"])
+    # The original bug grew the pack on rerun (57k -> 102k). It must not grow.
+    assert sizes[-1] <= sizes[0], f"pack grew across identical reruns: {sizes}"
+
+
 def test_duplicate_reads_prevented_on_same_content(tmp_path: Path) -> None:
     content = "def same():\n    return 1\n" * 20
     _write(tmp_path / "src" / "a.py", content)
@@ -97,14 +134,21 @@ full_file_threshold_tokens = 1000
 snippet_score_threshold = 999
 """.strip(),
     )
-    _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
+    _write(
+        tmp_path / "src" / "auth.py",
+        "def login(token: str) -> bool:\n    return token.startswith('prod_')\n",
+    )
 
     first = as_json_dict(run_pack("update auth flow", repo=tmp_path, max_tokens=1000))
     second = as_json_dict(run_pack("update auth flow", repo=tmp_path, max_tokens=1000))
 
     cache_file = json.loads((tmp_path / ".redcon_cache.json").read_text(encoding="utf-8"))
-    first_entry = next(item for item in first["compressed_context"] if item["path"] == "src/auth.py")
-    second_entry = next(item for item in second["compressed_context"] if item["path"] == "src/auth.py")
+    first_entry = next(
+        item for item in first["compressed_context"] if item["path"] == "src/auth.py"
+    )
+    second_entry = next(
+        item for item in second["compressed_context"] if item["path"] == "src/auth.py"
+    )
 
     assert cache_file["fragments"]
     assert first_entry["cache_status"] == "stored"
@@ -126,13 +170,20 @@ full_file_threshold_tokens = 1000
 snippet_score_threshold = 999
 """.strip(),
     )
-    _write(tmp_path / "src" / "auth.py", "def login(token: str) -> bool:\n    return token.startswith('prod_')\n")
+    _write(
+        tmp_path / "src" / "auth.py",
+        "def login(token: str) -> bool:\n    return token.startswith('prod_')\n",
+    )
 
     first = as_json_dict(run_pack("update auth flow", repo=tmp_path, max_tokens=1000))
     second = as_json_dict(run_pack("refactor auth flow", repo=tmp_path, max_tokens=1000))
 
-    first_entry = next(item for item in first["compressed_context"] if item["path"] == "src/auth.py")
-    second_entry = next(item for item in second["compressed_context"] if item["path"] == "src/auth.py")
+    first_entry = next(
+        item for item in first["compressed_context"] if item["path"] == "src/auth.py"
+    )
+    second_entry = next(
+        item for item in second["compressed_context"] if item["path"] == "src/auth.py"
+    )
 
     assert first_entry["cache_reference"]
     assert second_entry["cache_status"] == "reused"
@@ -156,8 +207,12 @@ snippet_score_threshold = 999
     first = as_json_dict(run_pack("update auth flow", repo=tmp_path, max_tokens=1000))
     second = as_json_dict(run_pack("update auth flow", repo=tmp_path, max_tokens=1000))
 
-    first_entry = next(item for item in first["compressed_context"] if item["path"] == "src/auth.py")
-    second_entry = next(item for item in second["compressed_context"] if item["path"] == "src/auth.py")
+    first_entry = next(
+        item for item in first["compressed_context"] if item["path"] == "src/auth.py"
+    )
+    second_entry = next(
+        item for item in second["compressed_context"] if item["path"] == "src/auth.py"
+    )
 
     # With self-contained cache, real text is always kept - no fake token
     # savings from marker replacement.  Token counts match across runs.
@@ -273,7 +328,9 @@ def helper() -> None:
     )
 
     data = as_json_dict(run_pack("refactor auth login", repo=tmp_path, max_tokens=1000))
-    entry = next(item for item in data["compressed_context"] if item["path"] == "src/auth_service.py")
+    entry = next(
+        item for item in data["compressed_context"] if item["path"] == "src/auth_service.py"
+    )
 
     assert entry["strategy"] == "slice"
     assert entry["chunk_strategy"] == "language-aware-python"
@@ -319,7 +376,9 @@ export function validate(token: string): boolean {
     assert entry["strategy"] == "slice"
     assert entry["chunk_strategy"] == "language-aware-typescript"
     assert entry["selected_ranges"]
-    assert any(r["kind"] in {"import", "export", "function", "class"} for r in entry["selected_ranges"])
+    assert any(
+        r["kind"] in {"import", "export", "function", "class"} for r in entry["selected_ranges"]
+    )
     assert all("reason" in item for item in entry["selected_ranges"])
 
 
@@ -340,13 +399,17 @@ snippet_total_line_limit = 20
     )
 
     data = as_json_dict(run_pack("auth middleware", repo=tmp_path, max_tokens=1000))
-    entry = next(item for item in data["compressed_context"] if item["path"] == "src/auth_notes.txt")
+    entry = next(
+        item for item in data["compressed_context"] if item["path"] == "src/auth_notes.txt"
+    )
 
     assert entry["strategy"] == "snippet"
     assert entry["chunk_strategy"] == "keyword-window"
     assert entry["selected_ranges"]
     assert all(item["kind"] == "keyword-window" for item in entry["selected_ranges"])
-    assert all(str(item["reason"]).startswith("keyword proximity:") for item in entry["selected_ranges"])
+    assert all(
+        str(item["reason"]).startswith("keyword proximity:") for item in entry["selected_ranges"]
+    )
 
 
 def test_smart_slicing_uses_import_relationships_and_skips_unrelated_code(tmp_path: Path) -> None:
@@ -464,7 +527,9 @@ def allow_auth(token: str) -> bool:
         + "\n",
     )
 
-    second = as_json_dict(run_pack("update auth middleware", repo=tmp_path, max_tokens=1000, delta_from=first))
+    second = as_json_dict(
+        run_pack("update auth middleware", repo=tmp_path, max_tokens=1000, delta_from=first)
+    )
     delta = second["delta"]
 
     assert second["files_included"] == ["src/auth.py", "src/permissions.py"]
@@ -500,7 +565,9 @@ def test_model_profile_expands_budget_and_records_assumptions(tmp_path: Path) ->
     assert data["token_estimator"]["selected_backend"] == "exact_tiktoken"
 
 
-def test_local_model_profile_uses_aggressive_compression_and_custom_overrides(tmp_path: Path) -> None:
+def test_local_model_profile_uses_aggressive_compression_and_custom_overrides(
+    tmp_path: Path,
+) -> None:
     _write(
         tmp_path / "redcon.toml",
         """
@@ -607,7 +674,8 @@ symbol_extraction_enabled = true
             f"    validated = token.strip()\n"
             f"    return validated == 'valid_{i}'"
             for i in range(80)
-        ) + "\n",
+        )
+        + "\n",
     )
     _write(
         tmp_path / "src" / "middleware.py",
@@ -617,7 +685,8 @@ symbol_extraction_enabled = true
             f"    result = process(req, step={i})\n"
             f"    return result"
             for i in range(80)
-        ) + "\n",
+        )
+        + "\n",
     )
     _write(
         tmp_path / "src" / "router.py",
@@ -626,22 +695,25 @@ symbol_extraction_enabled = true
             f"    # Route auth request variant {i}.\n"
             f"    return f'auth/{{path}}/{i}'"
             for i in range(80)
-        ) + "\n",
+        )
+        + "\n",
     )
 
     # First measure how much budget the symbol tier uses per file.
-    big = as_json_dict(run_pack("refactor auth middleware routing", repo=tmp_path, max_tokens=50000))
+    big = as_json_dict(
+        run_pack("refactor auth middleware routing", repo=tmp_path, max_tokens=50000)
+    )
     assert len(big["files_included"]) >= 3
-    tokens_by_file = {
-        e["path"]: e["compressed_tokens"] for e in big["compressed_context"]
-    }
+    tokens_by_file = {e["path"]: e["compressed_tokens"] for e in big["compressed_context"]}
     # Sort files by token count descending to find a budget that fits 2 but not 3.
     sorted_tokens = sorted(tokens_by_file.values(), reverse=True)
     # Budget: fits the 2 largest files at their current tier, but not the 3rd.
     # This forces pass 1 to skip the 3rd file, triggering degradation.
     tight = sorted_tokens[0] + sorted_tokens[1] + 10
 
-    data = as_json_dict(run_pack("refactor auth middleware routing", repo=tmp_path, max_tokens=tight))
+    data = as_json_dict(
+        run_pack("refactor auth middleware routing", repo=tmp_path, max_tokens=tight)
+    )
 
     degraded = data.get("degraded_files", [])
     savings = data.get("degradation_savings", 0)

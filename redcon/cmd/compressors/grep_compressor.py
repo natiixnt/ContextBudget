@@ -20,6 +20,7 @@ from __future__ import annotations
 import json
 import re
 
+from redcon.cmd._tokens_lite import estimate_tokens
 from redcon.cmd.budget import select_level
 from redcon.cmd.compressors.base import CompressorContext, verify_must_preserve
 from redcon.cmd.types import (
@@ -28,7 +29,6 @@ from redcon.cmd.types import (
     GrepMatch,
     GrepResult,
 )
-from redcon.cmd._tokens_lite import estimate_tokens
 
 _INLINE = re.compile(
     r"^(?P<path>[^\s:][^:]*):(?P<line>\d+):"
@@ -59,9 +59,26 @@ class GrepCompressor:
         ctx: CompressorContext,
     ) -> CompressedOutput:
         text = raw_stdout.decode("utf-8", errors="replace")
-        result = parse_grep(text)
+        result = parse_grep(text, single_file_hint=_single_file_operand(ctx.argv))
         raw_tokens = estimate_tokens(text)
         level = select_level(raw_tokens, ctx.hint)
+
+        # Fail closed: if the command succeeded and produced output but we
+        # parsed nothing, the parser did not understand this format. Never tell
+        # the agent "no matches" over real hits - pass the raw output through
+        # unchanged instead. Truth beats compression.
+        if ctx.returncode == 0 and text.strip() and result.match_count == 0:
+            return CompressedOutput(
+                text=text,
+                level=CompressionLevel.VERBOSE,
+                schema=self.schema,
+                original_tokens=raw_tokens,
+                compressed_tokens=raw_tokens,
+                must_preserve_ok=True,
+                truncated=False,
+                notes=ctx.notes + ("grep: unrecognized format, raw passthrough",),
+            )
+
         formatted = _format(result, level)
         compressed_tokens = estimate_tokens(formatted)
         # Each path that had matches must survive in the formatted output.
@@ -79,7 +96,7 @@ class GrepCompressor:
         )
 
 
-def parse_grep(text: str) -> GrepResult:
+def parse_grep(text: str, single_file_hint: str | None = None) -> GrepResult:
     if _looks_like_json_lines(text):
         return parse_grep_json(text)
 
@@ -95,10 +112,14 @@ def parse_grep(text: str) -> GrepResult:
         first = line[0]
         if first.isdigit():
             indented = _INDENTED.match(line)
-            if indented and current_file is not None:
+            if indented:
+                # Single-file `grep -n PATTERN file` emits bare `line:text` with
+                # no path header. Attribute those matches to the file named on
+                # the command line, or a placeholder, so they are never dropped.
+                path = current_file if current_file is not None else (single_file_hint or "(input)")
                 matches.append(
                     GrepMatch(
-                        path=current_file,
+                        path=path,
                         line=int(indented.group("line")),
                         column=_safe_int(indented.group("col")),
                         text=indented.group("text").rstrip(),
@@ -119,9 +140,8 @@ def parse_grep(text: str) -> GrepResult:
             continue
         # Path header line in grouped form. Cheap structural check before regex.
         stripped = line.strip()
-        if stripped and "." in stripped and ":" not in stripped:
-            if _PATH_LIKE.match(stripped):
-                current_file = stripped
+        if stripped and "." in stripped and ":" not in stripped and _PATH_LIKE.match(stripped):
+            current_file = stripped
 
     paths = _unique_paths_from_matches(matches)
     return GrepResult(
@@ -214,6 +234,58 @@ def _extract_text(blob) -> str | None:
     return None
 
 
+# grep flags that consume the following argument, so it is not a file operand.
+_GREP_VALUE_FLAGS = {
+    "-e",
+    "-f",
+    "-m",
+    "-A",
+    "-B",
+    "-C",
+    "--regexp",
+    "--file",
+    "--max-count",
+    "--after-context",
+    "--before-context",
+    "--context",
+}
+
+
+def _single_file_operand(argv: tuple[str, ...]) -> str | None:
+    """Best-effort: the single file `grep` was pointed at, for single-file runs.
+
+    Single-file `grep -n PATTERN file` prints bare ``line:text`` with no path
+    header, so we recover the filename here to label those matches. Returns
+    None when there is not exactly one unambiguous file operand (0 or many),
+    in which case the parser falls back to a neutral placeholder.
+    """
+    if not argv:
+        return None
+    operands: list[str] = []
+    seen_pattern = False
+    i = 1
+    while i < len(argv):
+        arg = argv[i]
+        if arg == "--":
+            operands.extend(a for a in argv[i + 1 :])
+            break
+        if arg.startswith("-") and arg != "-":
+            if arg in _GREP_VALUE_FLAGS:
+                # -e/-f supply the pattern, so a later bare token is a file.
+                if arg in {"-e", "--regexp", "-f", "--file"}:
+                    seen_pattern = True
+                i += 2  # flag consumes its value
+                continue
+            i += 1
+            continue
+        if not seen_pattern:
+            seen_pattern = True  # first bare token is the pattern
+        else:
+            operands.append(arg)
+        i += 1
+    return operands[0] if len(operands) == 1 else None
+
+
 def _safe_int(value: str | None) -> int | None:
     if value is None:
         return None
@@ -255,9 +327,7 @@ def _format_compact(result: GrepResult) -> str:
     if not result.matches:
         return "grep: no matches"
     by_file = _group(result.matches)
-    lines: list[str] = [
-        f"grep: {result.match_count} matches in {result.file_count} files"
-    ]
+    lines: list[str] = [f"grep: {result.match_count} matches in {result.file_count} files"]
     for path, items in by_file.items():
         lines.append(f"{path} ({len(items)})")
         for match in items[:3]:
@@ -276,9 +346,7 @@ def _format_verbose(result: GrepResult) -> str:
     if not result.matches:
         return "grep: no matches"
     by_file = _group(result.matches)
-    lines: list[str] = [
-        f"grep: {result.match_count} matches in {result.file_count} files"
-    ]
+    lines: list[str] = [f"grep: {result.match_count} matches in {result.file_count} files"]
     for path, items in by_file.items():
         lines.append(f"{path}")
         for match in items:
