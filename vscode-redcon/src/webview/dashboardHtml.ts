@@ -95,6 +95,10 @@ export function renderDashboardHtml(data: DashboardData | null, nonce: string): 
       --status-good: #0ca30c;
       --status-warn: #fab219;
       --status-crit: #d03b3b;
+      /* Brand red - chrome and identity only, never a data mark. */
+      --brand: #d32f2f;
+      --brand-strong: #c62828;
+      --brand-hover: #b71c1c;
     }
     /* Same hues re-stepped for the dark surface (validated separately). */
     body.vscode-dark, body.vscode-high-contrast {
@@ -106,6 +110,9 @@ export function renderDashboardHtml(data: DashboardData | null, nonce: string): 
       --cat-6: #e66767;
       --delta-good: #0ca30c;
       --track: rgba(255, 255, 255, 0.10);
+      --brand: #ef5350;
+      --brand-strong: #d32f2f;
+      --brand-hover: #e53935;
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -131,7 +138,7 @@ export function renderDashboardHtml(data: DashboardData | null, nonce: string): 
     }
     .header-left { flex: 1; min-width: 0; }
     .header h1 { font-size: 1.35em; font-weight: 700; display: flex; align-items: center; gap: 10px; }
-    .header h1 svg { color: var(--cat-1); flex-shrink: 0; }
+    .header h1 svg { color: var(--brand); flex-shrink: 0; }
     .header .task {
       color: var(--muted); font-size: 0.85em; margin-top: 2px;
       white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
@@ -147,11 +154,11 @@ export function renderDashboardHtml(data: DashboardData | null, nonce: string): 
     }
     .btn:hover { background: var(--vscode-button-secondaryHoverBackground, var(--input-bg)); }
     .btn-primary {
-      background: var(--vscode-button-background);
-      color: var(--vscode-button-foreground);
+      background: var(--brand-strong);
+      color: #ffffff;
       border-color: transparent;
     }
-    .btn-primary:hover { background: var(--vscode-button-hoverBackground); }
+    .btn-primary:hover { background: var(--brand-hover); }
 
     .row { display: grid; gap: 16px; margin-bottom: 20px; }
     .row-2 { grid-template-columns: 1fr 1fr; }
@@ -174,7 +181,11 @@ export function renderDashboardHtml(data: DashboardData | null, nonce: string): 
     .section { margin-bottom: 24px; }
     .section-header {
       font-size: 0.95em; font-weight: 600; margin-bottom: 10px;
-      display: flex; align-items: baseline; gap: 10px;
+      display: flex; align-items: center; gap: 8px;
+    }
+    .section-header::before {
+      content: ''; width: 3px; height: 14px; border-radius: 2px;
+      background: var(--brand); flex-shrink: 0;
     }
     .section-header .hint { font-size: 0.8em; font-weight: 400; color: var(--muted); }
 
