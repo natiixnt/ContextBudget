@@ -43,7 +43,7 @@ pip install "redcon[mcp]"
 redcon init                      # creates redcon.toml + registers MCP
 ```
 
-The `init` command auto-configures MCP so your AI agent can call `redcon_rank`, `redcon_search`, `redcon_compress`, and `redcon_budget` as native tools.
+The `init` command auto-configures MCP for Claude Code, Cursor and Windsurf, plus VS Code, Codex CLI and Gemini CLI when they are detected, so your AI agent can call `redcon_rank`, `redcon_search`, `redcon_compress`, and `redcon_budget` as native tools. It also writes a short `AGENTS.md` section that tells agents to prefer these tools for context selection.
 
 ### Option 3: CLI only
 
