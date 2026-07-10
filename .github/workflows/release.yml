@@ -6,6 +6,14 @@ on:
       # Match only canonical semver tags like v1.2.3 - NOT extension tags
       # such as 'vscode-v0.8.0' (handled by a separate publish flow).
       - "v[0-9]*"
+  # Manual fallback when pushing a tag is not possible. The release step
+  # creates the tag via the GitHub API at the chosen ref.
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Release tag to create and publish (e.g. v1.7.0)"
+        required: true
+        type: string
 
 jobs:
   publish:
@@ -28,6 +36,15 @@ jobs:
       - name: Install build tools
         run: pip install build twine
 
+      - name: Verify tag matches package version (manual runs)
+        if: github.event_name == 'workflow_dispatch'
+        run: |
+          version=$(python -c "import tomllib; print(tomllib.load(open('pyproject.toml','rb'))['project']['version'])")
+          if [[ "${{ inputs.tag }}" != "v${version}" ]]; then
+            echo "Tag '${{ inputs.tag }}' does not match pyproject version '${version}'"
+            exit 1
+          fi
+
       - name: Build package
         run: python -m build
 
@@ -42,5 +59,8 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
         with:
+          # On tag pushes this defaults to the pushed tag; on manual runs
+          # the tag is created via the API at the workflow's commit.
+          tag_name: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           generate_release_notes: true
           files: dist/*
