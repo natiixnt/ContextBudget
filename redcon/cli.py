@@ -179,6 +179,7 @@ def cmd_completion(args: argparse.Namespace) -> int:
         "init",
         "roi",
         "benchmark-report",
+        "hooks",
     ]
     if shell == "bash":
         print(f"""# Redcon bash completion - add to ~/.bashrc or ~/.bash_completion
@@ -294,6 +295,44 @@ def cmd_mcp(args: argparse.Namespace) -> int:
     except Exception as e:
         print(f"Error: MCP server failed: {e}", file=sys.stderr)
         return 1
+    return 0
+
+
+def cmd_hooks(args: argparse.Namespace) -> int:
+    """Manage deterministic agent hooks (Claude Code)."""
+    from redcon.hooks import hook_status, install_hook, run_user_prompt_submit, uninstall_hook
+
+    action = args.action
+    if action == "run":
+        if args.event != "user-prompt-submit":
+            print(f"Unknown hook event: {args.event}", file=sys.stderr)
+            return 0
+        return run_user_prompt_submit(sys.stdin.read())
+
+    project_root = Path(args.repo).resolve()
+    if action == "install":
+        r = install_hook(project_root)
+        icon = {"installed": "[OK]", "up_to_date": "[=]", "error": "[X]"}.get(r["status"], "[-]")
+        print(f"{icon} claude-code: {r['message']} ({r['path']})")
+        if r["status"] == "installed":
+            print()
+            print("Every Claude Code prompt in this project now starts with a")
+            print("ranked file map from redcon. Set REDCON_HOOK_DISABLE=1 to")
+            print("pause injection without uninstalling.")
+        return 1 if r["status"] == "error" else 0
+
+    if action == "uninstall":
+        r = uninstall_hook(project_root)
+        icon = {"removed": "[OK]", "not_installed": "[-]", "error": "[X]"}.get(r["status"], "[-]")
+        print(f"{icon} claude-code: {r['message']} ({r['path']})")
+        return 1 if r["status"] == "error" else 0
+
+    # status
+    path = hook_status(project_root)
+    if path is not None:
+        print(f"[OK] claude-code: hook registered at {path}")
+    else:
+        print("[-]  claude-code: hook not registered")
     return 0
 
 
@@ -1789,6 +1828,9 @@ jobs:
     print("  redcon doctor                              # verify setup")
     print("  redcon pack 'describe your task' --repo .  # compress context")
     print("  redcon plan 'describe your task' --repo .  # rank files")
+    print(
+        "  redcon hooks install                        # guaranteed context injection (Claude Code)"
+    )
     if mcp_installed_targets:
         print()
         print("MCP: restart your IDE to pick up the new redcon tools.")
@@ -2534,6 +2576,34 @@ def build_parser() -> argparse.ArgumentParser:
         help="Project root for project-scoped configs (default: current directory).",
     )
     mcp_parser.set_defaults(func=cmd_mcp)
+
+    hooks_parser = sub.add_parser(
+        "hooks",
+        help="Deterministic context injection via agent hooks (Claude Code)",
+    )
+    hooks_parser.add_argument(
+        "action",
+        choices=["install", "uninstall", "status", "run"],
+        help=(
+            "'install' registers a UserPromptSubmit hook in .claude/settings.json "
+            "so every Claude Code prompt starts with a ranked file map "
+            "(guaranteed by the hook system, not left to the model's choice). "
+            "'run' is the entry point Claude Code invokes; it reads the hook "
+            "payload from stdin and always exits 0."
+        ),
+    )
+    hooks_parser.add_argument(
+        "event",
+        nargs="?",
+        default="user-prompt-submit",
+        help="Hook event name for 'run' (default: user-prompt-submit).",
+    )
+    hooks_parser.add_argument(
+        "--repo",
+        default=".",
+        help="Project root (default: current directory).",
+    )
+    hooks_parser.set_defaults(func=cmd_hooks)
 
     plan = sub.add_parser("plan", help="Rank relevant files for a natural language task")
     plan.add_argument("task", help="Task description")
