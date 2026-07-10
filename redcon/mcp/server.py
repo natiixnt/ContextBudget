@@ -38,9 +38,12 @@ _TOOL_SCHEMAS = [
     {
         "name": "redcon_rank",
         "description": (
-            "Rank repository files by relevance to the current task. Returns "
-            "top-K files with scores and reasons. Call this FIRST when starting "
-            "a new task to understand where to focus."
+            "Rank repository files by relevance to a task using keyword and "
+            "import-graph signals. Call this FIRST on any new task, before "
+            "searching or reading files: it replaces guessing paths, broad "
+            "grep sweeps, and directory listings. Returns the top-K paths "
+            "with scores and reasons; follow up with redcon_compress on the "
+            "top hits instead of reading them whole."
         ),
         "inputSchema": {
             "type": "object",
@@ -66,8 +69,11 @@ _TOOL_SCHEMAS = [
     {
         "name": "redcon_overview",
         "description": (
-            "Get a lightweight repository map grouped by directory, showing "
-            "relevant modules for the task. Much cheaper than ls -R."
+            "Lightweight repository map grouped by directory, filtered to "
+            "modules relevant to the task. Use when orienting in an "
+            "unfamiliar repo instead of ls -R, find, or reading READMEs; "
+            "costs a few hundred tokens. For actual code structure "
+            "(signatures), use redcon_repo_map instead."
         ),
         "inputSchema": {
             "type": "object",
@@ -81,8 +87,11 @@ _TOOL_SCHEMAS = [
     {
         "name": "redcon_compress",
         "description": (
-            "Return compressed version of a file scoped to the task. "
-            "Use this to inspect many files cheaply without reading full contents."
+            "Task-scoped compressed view of one file: signatures, imports "
+            "and the sections relevant to the task, typically 3-10x fewer "
+            "tokens than the raw file. Default to this INSTEAD of reading a "
+            "whole file; fetch the full file only if the compressed view "
+            "turns out to be insufficient."
         ),
         "inputSchema": {
             "type": "object",
@@ -105,9 +114,11 @@ _TOOL_SCHEMAS = [
     {
         "name": "redcon_search",
         "description": (
-            "Regex search within ranked files (scope='ranked') or the full "
-            "repository (scope='all'). Scoped search is much faster and more "
-            "focused than ripgrep."
+            "Regex search over the repository. scope='ranked' (default) "
+            "searches only the files relevant to the task, so matches come "
+            "pre-filtered by relevance instead of drowning you in hits; "
+            "scope='all' covers the whole repo. Prefer this over raw grep "
+            "on large repositories."
         ),
         "inputSchema": {
             "type": "object",
@@ -135,9 +146,11 @@ _TOOL_SCHEMAS = [
     {
         "name": "redcon_budget",
         "description": (
-            "Plan how to fit requested files within a token budget, selecting "
-            "compression strategies per file. Returns a plan with token counts "
-            "and any files that had to be dropped."
+            "Plan how to fit a set of files into a token budget, choosing a "
+            "compression strategy per file. Use BEFORE reading several files "
+            "at once, whenever their combined size could blow the context: "
+            "returns per-file token costs, chosen strategies, and which "
+            "files must be dropped to stay under the budget."
         ),
         "inputSchema": {
             "type": "object",
@@ -184,12 +197,13 @@ _TOOL_SCHEMAS = [
     {
         "name": "redcon_repo_map",
         "description": (
-            "Aider-style repo map: top ranked files plus their tree-sitter "
-            "class/function signatures fitted under a token budget. "
-            "Differentiates from redcon_overview by emitting actual code "
-            "structure (signatures with line numbers), not just paths. "
-            "When the redcon[symbols] extra is missing the map degrades "
-            "to a path-only listing rather than failing."
+            "Repo map: top ranked files plus their class/function "
+            "signatures with line numbers, fitted under a token budget. "
+            "Use when you need code structure across many files at once - "
+            "one call replaces opening files one by one to learn their "
+            "shape. Unlike redcon_overview it emits actual signatures, not "
+            "just paths. Degrades to a path-only listing when the "
+            "redcon[symbols] extra is missing rather than failing."
         ),
         "inputSchema": {
             "type": "object",
@@ -233,9 +247,13 @@ _TOOL_SCHEMAS = [
     {
         "name": "redcon_run",
         "description": (
-            "Run a shell command (git diff/status/log and others) and return its "
-            "output compressed for the LLM. Use this instead of the raw shell when "
-            "the command would otherwise produce hundreds of lines of output."
+            "Run a shell command and return its output compressed for LLM "
+            "consumption via schema-aware compressors (pytest, git "
+            "diff/status/log, builds, coverage, kubectl and more). Use "
+            "INSTEAD of a raw shell whenever output may exceed a screenful "
+            "- test runs, diffs, logs. The token caps are hard guarantees, "
+            "and failures keep their essential detail (failing test names, "
+            "error lines)."
         ),
         "inputSchema": {
             "type": "object",
