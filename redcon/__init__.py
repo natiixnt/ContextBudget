@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-__version__ = "1.1.0"
+__version__ = "1.7.0"
 
 # Mapping from public symbol name to the submodule it lives in. The first
 # attribute access triggers an import of that module and caches the symbol
