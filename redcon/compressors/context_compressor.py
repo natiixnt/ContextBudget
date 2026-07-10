@@ -341,22 +341,49 @@ def _build_slice_relationship_contexts(
     return contexts
 
 
+# Token loss below this fraction is redcon doing its job (routine 2x
+# compression), not a quality alarm. Only loss beyond the grace zone
+# counts toward risk, scaling to 1.0 when all content is gone.
+_LOSS_GRACE = 0.5
+
+
 def _build_risk_estimate(
     cfg: CompressionSettings,
     files_skipped: list[str],
     ranked_files: list[RankedFile],
     total_compressed: int,
     total_raw: int,
+    *,
+    max_tokens: int | None = None,
+    files_included_count: int | None = None,
+    degraded_files: list[str] | None = None,
 ) -> str:
+    # A pack that exceeds its own budget can never be low risk: the
+    # invariant itself is broken, whatever the ratios below say.
+    if max_tokens is not None and max_tokens > 0 and total_compressed > max_tokens:
+        return "high"
+
     skipped_ratio = len(files_skipped) / max(1, len(ranked_files))
-    compression_ratio = total_compressed / max(1, total_raw)
-    bounded_ratio = min(1.0, max(0.0, compression_ratio))
+
+    # Risk grows with content the agent will NOT see. The old formula
+    # scored kept content as risk, so a full uncompressed pack rated
+    # worse than one that silently dropped 95% of the code.
+    loss_ratio = 1.0 - min(1.0, total_compressed / max(1, total_raw))
+    deep_loss = max(0.0, loss_ratio - _LOSS_GRACE) / (1.0 - _LOSS_GRACE)
+
+    # Files degraded to a lower tier kept their slot but lost fidelity;
+    # treat their share as content loss and take the stronger signal.
+    degraded_ratio = 0.0
+    if degraded_files and files_included_count:
+        degraded_ratio = min(1.0, len(degraded_files) / files_included_count)
+    content_risk = max(deep_loss, degraded_ratio)
+
     total_weight = cfg.risk_skip_weight + cfg.risk_compression_weight
     if total_weight <= 0:
         total_weight = 1.0
     skip_weight = cfg.risk_skip_weight / total_weight
     compression_weight = cfg.risk_compression_weight / total_weight
-    risk_score = skip_weight * skipped_ratio + compression_weight * bounded_ratio
+    risk_score = skip_weight * skipped_ratio + compression_weight * content_risk
     if risk_score < 0.25:
         return "low"
     if risk_score < 0.5:
@@ -671,7 +698,15 @@ def _compress_greedy(
         compressed_files.append(entry)
         files_included.append(ft.path)
 
-    risk = _build_risk_estimate(cfg, files_skipped, ranked_files, total_compressed, total_raw)
+    risk = _build_risk_estimate(
+        cfg,
+        files_skipped,
+        ranked_files,
+        total_compressed,
+        total_raw,
+        max_tokens=max_tokens,
+        files_included_count=len(files_included),
+    )
     cache_snapshot = cache.snapshot()
     return CompressionResult(
         compressed_files=compressed_files,
@@ -843,7 +878,16 @@ def _compress_progressive(
     compressed_files: list[CompressedFile] = [entry for _ft, entry in finalized]
     files_included: list[str] = [ft.path for ft, _entry in finalized]
 
-    risk = _build_risk_estimate(cfg, files_skipped, ranked_files, total_compressed, total_raw)
+    risk = _build_risk_estimate(
+        cfg,
+        files_skipped,
+        ranked_files,
+        total_compressed,
+        total_raw,
+        max_tokens=max_tokens,
+        files_included_count=len(files_included),
+        degraded_files=degraded_files,
+    )
     cache_snapshot = cache.snapshot()
     return CompressionResult(
         compressed_files=compressed_files,
