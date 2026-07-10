@@ -48,7 +48,10 @@ redcon-gateway = "redcon.gateway.server:run_gateway"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-include = ["redcon*"]
+# "redcon*" would also match the sibling redcon-cloud/ and
+# redcon-benchmarks/ directories and ship them in the wheel.
+include = ["redcon", "redcon.*"]
+namespaces = false
 
 [tool.ruff]
 target-version = "py310"
