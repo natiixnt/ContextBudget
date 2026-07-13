@@ -1,14 +1,13 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Agent-facing middleware helpers built on top of the core engine."""
 
+from __future__ import annotations
+
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
 
 from redcon.cache import normalize_cache_report
 from redcon.core.delta import effective_pack_metrics
@@ -126,9 +125,15 @@ def _build_middleware_metadata(
         if isinstance(run_artifact.get("scanned_repos", []), list)
         else [],
         "delta_enabled": bool(effective.get("delta_enabled", False)),
-        "estimated_input_tokens": int(effective.get("estimated_input_tokens", budget.get("estimated_input_tokens", 0)) or 0),
-        "estimated_saved_tokens": int(effective.get("estimated_saved_tokens", budget.get("estimated_saved_tokens", 0)) or 0),
-        "original_input_tokens": int(effective.get("original_input_tokens", budget.get("estimated_input_tokens", 0)) or 0),
+        "estimated_input_tokens": int(
+            effective.get("estimated_input_tokens", budget.get("estimated_input_tokens", 0)) or 0
+        ),
+        "estimated_saved_tokens": int(
+            effective.get("estimated_saved_tokens", budget.get("estimated_saved_tokens", 0)) or 0
+        ),
+        "original_input_tokens": int(
+            effective.get("original_input_tokens", budget.get("estimated_input_tokens", 0)) or 0
+        ),
         "duplicate_reads_prevented": int(budget.get("duplicate_reads_prevented", 0) or 0),
         "quality_risk_estimate": str(budget.get("quality_risk_estimate", "unknown")),
         "cache": normalize_cache_report(run_artifact),
@@ -217,7 +222,9 @@ class RedconMiddleware:
         result.policy_result = policy_result
         result.run_artifact["policy"] = policy_result
         if strict and not bool(policy_result.get("passed", False)):
-            raise BudgetPolicyViolationError(policy_result=policy_result, run_artifact=result.as_record())
+            raise BudgetPolicyViolationError(
+                policy_result=policy_result, run_artifact=result.as_record()
+            )
         return result
 
     def record_run(
@@ -275,7 +282,9 @@ def prepare_context(
 ) -> AgentMiddlewareResult:
     """Convenience wrapper for preparing packed context."""
 
-    active_middleware = middleware if middleware is not None else RedconMiddleware(config_path=config_path)
+    active_middleware = (
+        middleware if middleware is not None else RedconMiddleware(config_path=config_path)
+    )
     return active_middleware.prepare_context(
         task,
         repo,
@@ -299,7 +308,9 @@ def enforce_budget(
 ) -> AgentMiddlewareResult:
     """Convenience wrapper for policy enforcement on middleware results."""
 
-    active_middleware = middleware if middleware is not None else RedconMiddleware(config_path=config_path)
+    active_middleware = (
+        middleware if middleware is not None else RedconMiddleware(config_path=config_path)
+    )
     return active_middleware.enforce_budget(
         result,
         policy=policy,

@@ -4,7 +4,7 @@
   "description": "Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under token limits.",
   "version": "0.9.0",
   "publisher": "redcon",
-  "license": "MIT",
+  "license": "FSL-1.1-MIT",
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",

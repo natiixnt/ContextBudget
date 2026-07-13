@@ -1,15 +1,12 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """SQLite-backed persistence for control plane entities."""
+
+from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Sequence
 
 from redcon.control_plane.models import AgentRun, Organization, Project, Repository
 
@@ -87,15 +84,11 @@ class ControlPlaneStore:
         return self.get_org(cur.lastrowid)  # type: ignore[arg-type]
 
     def get_org(self, org_id: int) -> Organization | None:
-        row = self._conn.execute(
-            "SELECT * FROM organizations WHERE id = ?", (org_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM organizations WHERE id = ?", (org_id,)).fetchone()
         return _row_to_org(row) if row else None
 
     def list_orgs(self) -> list[Organization]:
-        rows = self._conn.execute(
-            "SELECT * FROM organizations ORDER BY id"
-        ).fetchall()
+        rows = self._conn.execute("SELECT * FROM organizations ORDER BY id").fetchall()
         return [_row_to_org(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -111,9 +104,7 @@ class ControlPlaneStore:
         return self.get_project(cur.lastrowid)  # type: ignore[arg-type]
 
     def get_project(self, project_id: int) -> Project | None:
-        row = self._conn.execute(
-            "SELECT * FROM projects WHERE id = ?", (project_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone()
         return _row_to_project(row) if row else None
 
     def list_projects(self, org_id: int | None = None) -> list[Project]:
@@ -122,9 +113,7 @@ class ControlPlaneStore:
                 "SELECT * FROM projects WHERE org_id = ? ORDER BY id", (org_id,)
             ).fetchall()
         else:
-            rows = self._conn.execute(
-                "SELECT * FROM projects ORDER BY id"
-            ).fetchall()
+            rows = self._conn.execute("SELECT * FROM projects ORDER BY id").fetchall()
         return [_row_to_project(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -140,9 +129,7 @@ class ControlPlaneStore:
         return self.get_repo(cur.lastrowid)  # type: ignore[arg-type]
 
     def get_repo(self, repo_id: int) -> Repository | None:
-        row = self._conn.execute(
-            "SELECT * FROM repositories WHERE id = ?", (repo_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM repositories WHERE id = ?", (repo_id,)).fetchone()
         return _row_to_repo(row) if row else None
 
     def list_repos(self, project_id: int | None = None) -> list[Repository]:
@@ -152,9 +139,7 @@ class ControlPlaneStore:
                 (project_id,),
             ).fetchall()
         else:
-            rows = self._conn.execute(
-                "SELECT * FROM repositories ORDER BY id"
-            ).fetchall()
+            rows = self._conn.execute("SELECT * FROM repositories ORDER BY id").fetchall()
         return [_row_to_repo(r) for r in rows]
 
     # ------------------------------------------------------------------
@@ -181,9 +166,7 @@ class ControlPlaneStore:
         return self.get_run(cur.lastrowid)  # type: ignore[arg-type]
 
     def get_run(self, run_id: int) -> AgentRun | None:
-        row = self._conn.execute(
-            "SELECT * FROM agent_runs WHERE id = ?", (run_id,)
-        ).fetchone()
+        row = self._conn.execute("SELECT * FROM agent_runs WHERE id = ?", (run_id,)).fetchone()
         return _row_to_run(row) if row else None
 
     def list_runs(self, repo_id: int | None = None) -> list[AgentRun]:
@@ -192,9 +175,7 @@ class ControlPlaneStore:
                 "SELECT * FROM agent_runs WHERE repo_id = ? ORDER BY id", (repo_id,)
             ).fetchall()
         else:
-            rows = self._conn.execute(
-                "SELECT * FROM agent_runs ORDER BY id"
-            ).fetchall()
+            rows = self._conn.execute("SELECT * FROM agent_runs ORDER BY id").fetchall()
         return [_row_to_run(r) for r in rows]
 
     def get_repo_stats(self, repo_id: int) -> dict | None:

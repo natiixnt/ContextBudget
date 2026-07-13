@@ -1,14 +1,12 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Runtime context dataclasses.
 
 PreparedContext   - the optimised context package delivered to an LLM.
 RuntimeResult     - the full result of one AgentRuntime.run() cycle.
 """
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 from typing import Any

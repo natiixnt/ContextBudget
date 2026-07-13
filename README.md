@@ -10,7 +10,7 @@ Stop sending agents 200k tokens of irrelevant code. Redcon scores, compresses, a
 [![Tests](https://github.com/natiixnt/redcon/actions/workflows/test.yml/badge.svg)](https://github.com/natiixnt/redcon/actions/workflows/test.yml)
 [![Python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue.svg)](https://www.python.org/downloads/)
 [![VS Code Extension](https://img.shields.io/visual-studio-marketplace/v/redcon.redcon?label=VS%20Code)](https://marketplace.visualstudio.com/items?itemName=redcon.redcon)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![License: FSL-1.1-MIT](https://img.shields.io/badge/license-FSL--1.1--MIT-blue.svg)](LICENSE)
 
 [Install](#install) - [Quick Start](#quick-start) - [How It Works](#how-it-works) - [Docs](docs/)
 
@@ -272,11 +272,13 @@ Full reference: [docs/python-api.md](docs/python-api.md).
 
 ## License
 
-Dual-licensed. Open-source core + proprietary cloud/enterprise layer.
+Everything in this repository is licensed under the
+[Functional Source License, FSL-1.1-MIT](LICENSE): use it freely for any
+purpose except building a competing commercial product or service. Each
+release automatically becomes MIT-licensed two years after it ships.
 
-| Component | License |
-|-----------|---------|
-| Core engine, CLI, plugins, cache | [MIT](LICENSE) |
-| Gateway, control plane, agent middleware, LLM integrations, runtime | [Proprietary](LICENSE-COMMERCIAL) |
+The hosted Redcon Cloud control plane (orgs, quotas, usage metering,
+billing, team dashboards) is separate commercial software maintained in
+a private repository.
 
 Commercial licensing: natjiks@gmail.com

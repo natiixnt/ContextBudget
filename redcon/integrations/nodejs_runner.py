@@ -1,8 +1,4 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Node.js agent loop runner for Redcon.
 
@@ -51,12 +47,15 @@ Minimal example ``agent.js``::
     process.stdout.write(response.choices[0].message.content);
 """
 
+from __future__ import annotations
+
 import os
 import subprocess
 import sys
+from collections.abc import Mapping, Sequence
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Mapping, Sequence
+from typing import Any
 
 from redcon.core.policy import PolicySpec
 from redcon.engine import RedconEngine
@@ -264,7 +263,11 @@ class NodeJSAgentRunner:
         except subprocess.TimeoutExpired as exc:
             stderr_hint = ""
             if exc.stderr:
-                raw = exc.stderr.decode("utf-8", errors="replace") if isinstance(exc.stderr, bytes) else str(exc.stderr)
+                raw = (
+                    exc.stderr.decode("utf-8", errors="replace")
+                    if isinstance(exc.stderr, bytes)
+                    else str(exc.stderr)
+                )
                 if raw.strip():
                     stderr_hint = f"\nstderr: {raw.strip()}"
             raise RuntimeError(

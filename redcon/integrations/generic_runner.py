@@ -1,8 +1,4 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Generic agent runner wrapper for Redcon.
 
@@ -25,9 +21,12 @@ Quick-start
     print(result.llm_response)
 """
 
+from __future__ import annotations
+
+from collections.abc import Callable, Mapping
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Mapping
+from typing import Any
 
 from redcon.core.policy import PolicySpec
 from redcon.engine import RedconEngine
