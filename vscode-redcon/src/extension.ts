@@ -173,6 +173,36 @@ export async function activate(
     state.loadHistory(workspaceRoot);
   }
 
+  // --- Watch run artifacts: any pack run written to the workspace ---
+  // (CLI runs in a terminal, agent-driven runs, exports) shows up in the
+  // sidebar and dashboard automatically, without pressing anything.
+
+  if (workspaceRoot) {
+    let artifactTimer: ReturnType<typeof setTimeout> | undefined;
+    const onArtifactChange = () => {
+      if (artifactTimer) clearTimeout(artifactTimer);
+      artifactTimer = setTimeout(async () => {
+        artifactTimer = undefined;
+        await state.loadHistory(workspaceRoot);
+        // Promote the newest artifact when nothing is loaded yet, so a
+        // fresh window mirrors the latest activity by itself.
+        const newest = state.state.runHistory[0];
+        if (!state.state.lastRun && newest) {
+          vscode.commands.executeCommand('redcon.loadRun', newest.path);
+        }
+      }, 800);
+    };
+    for (const pattern of ['*.json', '.redcon/*.json']) {
+      const watcher = vscode.workspace.createFileSystemWatcher(
+        new vscode.RelativePattern(workspaceRoot, pattern),
+      );
+      watcher.onDidCreate(onArtifactChange);
+      watcher.onDidChange(onArtifactChange);
+      watcher.onDidDelete(onArtifactChange);
+      context.subscriptions.push(watcher);
+    }
+  }
+
   // --- Cleanup ---
 
   context.subscriptions.push({
