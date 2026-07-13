@@ -115,13 +115,8 @@ export class ControlViewProvider implements vscode.WebviewViewProvider {
     }
   }
 
-  private handleMessage(msg: { command: string; text?: string; action?: string; path?: string }): void {
+  private handleMessage(msg: { command: string; action?: string; path?: string }): void {
     switch (msg.command) {
-      case 'analyze':
-        if (msg.text?.trim()) {
-          vscode.commands.executeCommand('redcon.pack', msg.text.trim());
-        }
-        break;
       case 'openRun':
         if (msg.path) {
           void vscode.commands

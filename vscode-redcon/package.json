@@ -173,9 +173,14 @@
     "menus": {
       "view/title": [
         {
-          "command": "redcon.copyContext",
+          "command": "redcon.pack",
           "when": "view == redcon.control",
           "group": "navigation@1"
+        },
+        {
+          "command": "redcon.copyContext",
+          "when": "view == redcon.control",
+          "group": "navigation@2"
         },
         {
           "command": "redcon.syncContext",

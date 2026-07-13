@@ -2,12 +2,14 @@
  * Pure HTML renderer for the sidebar control panel.
  *
  * Replaces the old chat-styled sidebar: no message bubbles, no
- * pretend conversation. Three things, top to bottom: a hero card with
+ * pretend conversation. Two things, top to bottom: a hero card with
  * cumulative savings plus the last run (the single click-through to
- * the dashboard), the analyze input, and recent runs. The setup
- * checklist only appears while setup is incomplete. Utility actions
- * (copy context, sync, doctor, config) live in the view title bar,
- * not in the body. Sections are toggleable via redcon.views.*.
+ * the dashboard) and the run feed. Runs arrive on their own through
+ * the artifact watcher whenever an agent uses redcon; a manual pack
+ * lives in the view title bar together with the other utility
+ * actions (copy context, sync, doctor, config). The setup checklist
+ * only appears while setup is incomplete. Sections are toggleable
+ * via redcon.views.*.
  */
 
 import type { RunReport, RunHistoryEntry } from '../types';
@@ -153,15 +155,6 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
     }
     .section-title svg { color: var(--red); }
 
-    textarea {
-      width: 100%; resize: vertical; min-height: 54px;
-      background: var(--vscode-input-background, var(--panel));
-      color: var(--vscode-input-foreground, var(--text));
-      border: 1px solid var(--border); border-radius: 5px;
-      padding: 7px 9px; font-family: inherit; font-size: 12px;
-    }
-    textarea:focus { outline: 1px solid var(--red); border-color: var(--red); }
-
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 6px;
       height: 26px; padding: 0 12px; border-radius: 5px; font-size: 12px;
@@ -170,21 +163,15 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
     }
     .btn:hover { background: var(--rowHover); }
     .btn:disabled { opacity: 0.55; cursor: default; }
-    .btn-primary {
-      background: var(--red); border-color: transparent;
-      color: #fff; font-weight: 700; width: 100%;
-    }
-    .btn-primary:hover { background: var(--redHov); }
-    .analyze-actions { margin-top: 7px; }
 
     .notice {
-      margin-top: 8px; padding: 6px 9px; border-radius: 5px; font-size: 11.5px;
+      padding: 6px 9px; border-radius: 5px; font-size: 11.5px;
       border: 1px solid var(--border); color: var(--text2); background: var(--chip);
     }
     .notice.success { border-color: var(--good); color: var(--good); background: var(--goodBg); }
     .notice.error { border-color: var(--bad); color: var(--bad); background: var(--badBg); }
 
-    .busy { display: flex; align-items: center; gap: 8px; margin-top: 8px; color: var(--text2); font-size: 11.5px; }
+    .busy { display: flex; align-items: center; gap: 8px; color: var(--text2); font-size: 11.5px; }
     .spinner {
       width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0;
       border: 2px solid var(--track); border-top-color: var(--red);
@@ -198,13 +185,25 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
       border-radius: 6px; padding: 10px 12px;
     }
     .run-row {
-      display: flex; align-items: center; gap: 8px;
-      padding: 5px 6px; border-radius: 4px; cursor: pointer;
+      display: flex; align-items: flex-start; gap: 9px;
+      padding: 7px 8px; border-radius: 4px; cursor: pointer;
       transition: background 0.12s;
     }
     .run-row:hover { background: var(--rowHover); }
+    .run-row + .run-row { border-top: 1px solid var(--border); }
+    .run-idx {
+      font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+      color: var(--red); padding-top: 2.5px; flex-shrink: 0;
+    }
+    .run-main { flex: 1; min-width: 0; }
+    .run-top { display: flex; align-items: baseline; gap: 8px; }
     .run-task { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
     .run-saved { font-family: var(--mono); font-size: 11px; color: var(--red); font-weight: 600; flex-shrink: 0; }
+    .run-sub { display: flex; align-items: center; gap: 7px; margin-top: 4px; }
+    .run-track { flex: 1; height: 3px; border-radius: 2px; background: var(--track); overflow: hidden; }
+    .run-fill { display: block; height: 100%; border-radius: 2px; background: var(--red); }
+    .run-when { font-family: var(--mono); font-size: 9.5px; color: var(--text3); flex-shrink: 0; }
+    .run-dot { width: 6px; height: 6px; border-radius: 99px; flex-shrink: 0; }
     .empty-hint { font-size: 11px; color: var(--text3); padding: 2px 6px; }
 
     .setup-step { display: flex; align-items: flex-start; gap: 8px; padding: 5px 0; }
@@ -223,34 +222,16 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
 </head>
 <body>
   ${data.sections.miniDashboard ? renderMiniDash(data) : ''}
-  ${renderAnalyze(data)}
+  ${renderStatus(data)}
   ${data.sections.recentRuns ? renderRecentRuns(data.history) : ''}
   ${data.sections.setup ? renderSetup(data.setup) : ''}
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
-
-    // Preserve the draft task across full re-renders.
-    const input = document.getElementById('task-input');
-    if (input) {
-      const prev = vscode.getState();
-      if (prev && prev.draft && !input.value) input.value = prev.draft;
-      input.addEventListener('input', () => vscode.setState({ draft: input.value }));
-      input.addEventListener('keydown', (e) => {
-        if ((e.metaKey || e.ctrlKey) && e.key === 'Enter') submit();
-      });
-    }
-
-    function submit() {
-      if (!input || !input.value.trim()) return;
-      vscode.postMessage({ command: 'analyze', text: input.value.trim() });
-    }
-
     document.addEventListener('click', (e) => {
       const el = e.target.closest('[data-action]');
       if (!el) return;
       const action = el.dataset.action;
-      if (action === 'analyze') submit();
-      else if (action === 'open-run') vscode.postMessage({ command: 'openRun', path: el.dataset.path });
+      if (action === 'open-run') vscode.postMessage({ command: 'openRun', path: el.dataset.path });
       else vscode.postMessage({ command: 'exec', action });
     });
   </script>
@@ -276,7 +257,7 @@ function renderMiniDash(data: ControlViewData): string {
 
   const caption = runCount > 0
     ? `<div class="mini-caption num"><b>${fmtUsd(usd)}</b> saved &middot; across ${runCount} run${runCount === 1 ? '' : 's'}</div>`
-    : '<div class="mini-caption">no runs yet. analyze a task below.</div>';
+    : '<div class="mini-caption">no runs yet. they land here automatically.</div>';
 
   return `
     <div class="mini-dash" data-action="dashboard" title="Open the full dashboard">
@@ -317,35 +298,61 @@ function renderLastRunLine(run: RunReport | null): string {
       </div>`;
 }
 
-function renderAnalyze(data: ControlViewData): string {
-  const busy = data.busyLabel
-    ? `<div class="busy"><span class="spinner"></span>${esc(data.busyLabel)}</div>`
-    : '';
-  const notice = !data.busyLabel && data.notice
-    ? `<div class="notice ${data.notice.kind}">${esc(data.notice.text)}</div>`
-    : '';
-  return `
-    <div>
-      <div class="section-title">${CHEVRON_SVG}<span>analyze</span></div>
-      <textarea id="task-input" rows="3" placeholder="Describe the task, e.g. add rate limiting to auth endpoints"></textarea>
-      <div class="analyze-actions">
-        <button class="btn btn-primary" data-action="analyze" ${data.busyLabel ? 'disabled' : ''}>Analyze</button>
-      </div>
-      ${busy}${notice}
-    </div>
-  `;
+/* Slim progress / result strip. Only rendered while a command runs or
+ * right after one finishes; the rest of the time it takes no space. */
+function renderStatus(data: ControlViewData): string {
+  if (data.busyLabel) {
+    return `<div class="busy"><span class="spinner"></span>${esc(data.busyLabel)}</div>`;
+  }
+  if (data.notice) {
+    return `<div class="notice ${data.notice.kind}">${esc(data.notice.text)}</div>`;
+  }
+  return '';
+}
+
+function fmtAgo(iso: string): string {
+  const t = Date.parse(iso);
+  if (!Number.isFinite(t)) return '';
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return 'now';
+  if (s < 3600) return `${Math.round(s / 60)}m`;
+  if (s < 86400) return `${Math.round(s / 3600)}h`;
+  return `${Math.round(s / 86400)}d`;
 }
 
 function renderRecentRuns(history: RunHistoryEntry[]): string {
-  const rows = history.slice(0, 8).map((e) => `
-    <div class="run-row" data-action="open-run" data-path="${esc(e.path)}" title="${esc(e.task)}">
-      <span class="run-task">${esc(e.task)}</span>
-      <span class="run-saved">${fmtK(e.tokensSaved ?? 0)}</span>
-    </div>`);
+  const entries = history.slice(0, 8);
+  const maxSaved = Math.max(...entries.map((e) => e.tokensSaved ?? 0), 1);
+  const dotByRisk: Record<string, string> = {
+    low: 'var(--good)',
+    medium: 'var(--warn)',
+    high: 'var(--bad)',
+  };
+  const rows = entries.map((e, i) => {
+    const saved = e.tokensSaved ?? 0;
+    const width = Math.max(3, Math.round((saved / maxSaved) * 100));
+    const pct = e.maxTokens > 0 ? Math.round((e.tokens / e.maxTokens) * 100) : 0;
+    const tip = `${e.task} - ${pct}% budget - ${e.filesIncluded} files - ${e.risk} risk`;
+    return `
+    <div class="run-row" data-action="open-run" data-path="${esc(e.path)}" title="${esc(tip)}">
+      <span class="run-idx num">${String(i + 1).padStart(2, '0')}</span>
+      <div class="run-main">
+        <div class="run-top">
+          <span class="run-task">${esc(e.task)}</span>
+          <span class="run-saved num">${fmtK(saved)}</span>
+        </div>
+        <div class="run-sub">
+          <span class="run-track"><span class="run-fill" style="width:${width}%"></span></span>
+          <span class="run-when num">${fmtAgo(e.generatedAt)}</span>
+          <span class="run-dot" style="background:${dotByRisk[e.risk] ?? 'var(--text3)'}"></span>
+        </div>
+      </div>
+    </div>`;
+  });
   return `
     <div>
       <div class="section-title">${CHEVRON_SVG}<span>recent runs</span></div>
-      <div class="card list-card">${rows.length ? rows.join('') : '<div class="empty-hint">Run history appears here.</div>'}</div>
+      <div class="card list-card">${rows.length ? rows.join('') : '<div class="empty-hint">Runs land here automatically when your agent uses redcon.</div>'}</div>
     </div>
   `;
 }

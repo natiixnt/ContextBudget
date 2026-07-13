@@ -23,13 +23,14 @@
 - The chat-styled sidebar is gone. The panel now leads with a savings
   card in the brand gradient (cumulative savings, dollar estimate,
   per-run trend and the last run summary) that is the single
-  click-through to the full dashboard, followed by the analyze input
-  and recent runs. The setup checklist only appears while setup is
-  incomplete, and utility actions (copy context, sync, doctor, config,
-  help) moved to the view title bar. Sections are toggleable via
-  `redcon.views.*`. Run artifacts written by the CLI, MCP server or
-  hooks are picked up automatically by a workspace watcher, so agent
-  runs land in the panel without any clicking.
+  click-through to the full dashboard, followed by the run feed:
+  ranked rows with a savings bar, time-ago and a risk dot, each
+  opening that run in the dashboard. There is no analyze form in the
+  body; runs arrive automatically through the artifact watcher when
+  an agent uses redcon, and a manual pack sits in the view title bar
+  together with copy context, sync, doctor, config and help. The
+  setup checklist only appears while setup is incomplete. Sections
+  are toggleable via `redcon.views.*`.
 
 ### Notes
 
