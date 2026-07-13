@@ -20,6 +20,16 @@
     and status colors stay fixed.
   - `redcon.costPerMillionTokens` converts saved tokens into dollars.
 - Status bar shows tokens saved next to budget usage after a run.
+- The chat-styled sidebar is gone. The panel now leads with a savings
+  card in the brand gradient (cumulative savings, dollar estimate,
+  per-run trend and the last run summary) that is the single
+  click-through to the full dashboard, followed by the analyze input
+  and recent runs. The setup checklist only appears while setup is
+  incomplete, and utility actions (copy context, sync, doctor, config,
+  help) moved to the view title bar. Sections are toggleable via
+  `redcon.views.*`. Run artifacts written by the CLI, MCP server or
+  hooks are picked up automatically by a workspace watcher, so agent
+  runs land in the panel without any clicking.
 
 ### Notes
 

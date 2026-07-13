@@ -2,21 +2,20 @@
  * Pure HTML renderer for the sidebar control panel.
  *
  * Replaces the old chat-styled sidebar: no message bubbles, no
- * pretend conversation. The panel is a compact control surface in the
- * dashboard's design language: analyze input, last run summary,
- * recent runs (click-through to the dashboard), setup checklist and
- * quick actions. Sections are individually toggleable via the
- * redcon.views.* settings.
+ * pretend conversation. Three things, top to bottom: a hero card with
+ * cumulative savings plus the last run (the single click-through to
+ * the dashboard), the analyze input, and recent runs. The setup
+ * checklist only appears while setup is incomplete. Utility actions
+ * (copy context, sync, doctor, config) live in the view title bar,
+ * not in the body. Sections are toggleable via redcon.views.*.
  */
 
 import type { RunReport, RunHistoryEntry } from '../types';
 
 export interface ControlSections {
   miniDashboard: boolean;
-  lastRun: boolean;
   recentRuns: boolean;
   setup: boolean;
-  quickActions: boolean;
 }
 
 export interface ControlNotice {
@@ -133,6 +132,18 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
       display: flex; justify-content: space-between;
       font-family: var(--mono); font-size: 9px; color: rgba(255,255,255,0.55);
     }
+    .mini-divider { border-top: 1px solid rgba(255,255,255,0.25); padding-top: 8px; }
+    .mini-run-line {
+      display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+      font-size: 11px; color: rgba(255,255,255,0.82);
+    }
+    .mini-run-line b { font-weight: 700; color: #fff; }
+    .mini-risk { display: inline-flex; align-items: center; gap: 4px; }
+    .mini-risk .dot { width: 6px; height: 6px; border-radius: 99px; }
+    .mini-task {
+      margin-top: 3px; font-size: 10.5px; color: rgba(255,255,255,0.55);
+      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    }
 
     .section-title {
       display: inline-flex; align-items: center; gap: 2px;
@@ -186,23 +197,6 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
       background: var(--panel); border: 1px solid var(--border);
       border-radius: 6px; padding: 10px 12px;
     }
-    .lastrun-value { font-family: var(--display); font-weight: 800; font-size: 22px; color: var(--text); line-height: 1.2; }
-    .lastrun-label { font-size: 10.5px; font-weight: 700; color: var(--text2); text-transform: lowercase; }
-    .lastrun-sub { display: flex; align-items: center; gap: 8px; margin-top: 5px; font-size: 11px; color: var(--text2); flex-wrap: wrap; }
-    .lastrun-task {
-      margin-top: 5px; font-size: 11px; color: var(--text3);
-      overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
-    }
-    .pill {
-      display: inline-flex; align-items: center; gap: 5px;
-      padding: 1px 8px; border-radius: 99px; font-size: 10.5px; font-weight: 650;
-    }
-    .pill .dot { width: 6px; height: 6px; border-radius: 99px; background: currentColor; }
-    .pill-low { background: var(--goodBg); color: var(--good); }
-    .pill-medium { background: var(--warnBg); color: var(--warn); }
-    .pill-high { background: var(--bad); color: #fff; }
-    .card .btn { margin-top: 9px; width: 100%; }
-
     .run-row {
       display: flex; align-items: center; gap: 8px;
       padding: 5px 6px; border-radius: 4px; cursor: pointer;
@@ -225,18 +219,13 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
     .setup-name { font-size: 11.5px; font-weight: 600; }
     .setup-step.done .setup-name { color: var(--text3); text-decoration: line-through; }
     .setup-body .btn { height: 22px; font-size: 11px; margin-top: 4px; padding: 0 9px; }
-    .setup-done-line { font-size: 11px; color: var(--good); }
-
-    .qa-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   </style>
 </head>
 <body>
   ${data.sections.miniDashboard ? renderMiniDash(data) : ''}
-  ${data.sections.lastRun ? renderLastRun(data.run) : ''}
   ${renderAnalyze(data)}
   ${data.sections.recentRuns ? renderRecentRuns(data.history) : ''}
   ${data.sections.setup ? renderSetup(data.setup) : ''}
-  ${data.sections.quickActions ? renderQuickActions() : ''}
   <script nonce="${nonce}">
     const vscode = acquireVsCodeApi();
 
@@ -285,6 +274,10 @@ function renderMiniDash(data: ControlViewData): string {
     ? `<div><div class="mini-trend">${bars}</div><div class="mini-axis"><span>run 1</span><span>run ${entries.length}</span></div></div>`
     : '';
 
+  const caption = runCount > 0
+    ? `<div class="mini-caption num"><b>${fmtUsd(usd)}</b> saved &middot; across ${runCount} run${runCount === 1 ? '' : 's'}</div>`
+    : '<div class="mini-caption">no runs yet. analyze a task below.</div>';
+
   return `
     <div class="mini-dash" data-action="dashboard" title="Open the full dashboard">
       <div class="mini-head">${LOGO_SVG}<span class="mini-open">open dashboard &raquo;</span></div>
@@ -294,11 +287,34 @@ function renderMiniDash(data: ControlViewData): string {
           <span class="mini-value num">${fmtK(totalSaved)}</span>
           <span class="mini-unit">tokens saved.</span>
         </div>
-        <div class="mini-caption num"><b>${fmtUsd(usd)}</b> saved &middot; across ${runCount} run${runCount === 1 ? '' : 's'}</div>
+        ${caption}
       </div>
       ${trend}
+      ${renderLastRunLine(data.run)}
     </div>
   `;
+}
+
+/* Compact last-run summary inside the hero card. Dot colors are picked
+ * for contrast on the brand gradient, not the standard status ramp. */
+function renderLastRunLine(run: RunReport | null): string {
+  if (!run) return '';
+  const pct = run.max_tokens > 0
+    ? Math.round((run.budget.estimated_input_tokens / run.max_tokens) * 100)
+    : 0;
+  const risk = run.budget.quality_risk_estimate;
+  const dot = risk === 'high' ? '#FFFFFF' : risk === 'medium' ? '#F2C14E' : '#4ADE9C';
+  return `
+      <div class="mini-divider">
+        <div class="mini-label">last run</div>
+        <div class="mini-run-line num">
+          <b>${fmtK(run.budget.estimated_saved_tokens)} saved</b>
+          <span>${pct}% budget</span>
+          <span>${run.files_included.length} files</span>
+          <span class="mini-risk"><span class="dot" style="background:${dot}"></span>${esc(risk)} risk</span>
+        </div>
+        <div class="mini-task" title="${esc(run.task)}">${esc(run.task)}</div>
+      </div>`;
 }
 
 function renderAnalyze(data: ControlViewData): string {
@@ -320,42 +336,6 @@ function renderAnalyze(data: ControlViewData): string {
   `;
 }
 
-function riskPill(risk: string): string {
-  if (risk === 'high') return '<span class="pill pill-high">high risk</span>';
-  if (risk === 'medium') return '<span class="pill pill-medium">medium risk</span>';
-  return '<span class="pill pill-low"><span class="dot"></span>low risk</span>';
-}
-
-function renderLastRun(run: RunReport | null): string {
-  if (!run) {
-    return `
-      <div>
-        <div class="section-title">${CHEVRON_SVG}<span>last run</span></div>
-        <div class="empty-hint">No analysis yet. Describe a task above.</div>
-      </div>`;
-  }
-  const saved = run.budget.estimated_saved_tokens;
-  const pct = run.max_tokens > 0
-    ? Math.round((run.budget.estimated_input_tokens / run.max_tokens) * 100)
-    : 0;
-  return `
-    <div>
-      <div class="section-title">${CHEVRON_SVG}<span>last run</span></div>
-      <div class="card">
-        <div class="lastrun-label">tokens saved</div>
-        <div class="lastrun-value num">${fmtK(saved)}</div>
-        <div class="lastrun-sub num">
-          <span>${pct}% budget</span>
-          <span>${run.files_included.length} files</span>
-          ${riskPill(run.budget.quality_risk_estimate)}
-        </div>
-        <div class="lastrun-task" title="${esc(run.task)}">${esc(run.task)}</div>
-        <button class="btn" data-action="dashboard">Open Dashboard</button>
-      </div>
-    </div>
-  `;
-}
-
 function renderRecentRuns(history: RunHistoryEntry[]): string {
   const rows = history.slice(0, 8).map((e) => `
     <div class="run-row" data-action="open-run" data-path="${esc(e.path)}" title="${esc(e.task)}">
@@ -371,14 +351,9 @@ function renderRecentRuns(history: RunHistoryEntry[]): string {
 }
 
 function renderSetup(setup: { cliInstalled: boolean; mcpConfigured: boolean } | null): string {
-  if (!setup) return '';
-  if (setup.cliInstalled && setup.mcpConfigured) {
-    return `
-      <div>
-        <div class="section-title">${CHEVRON_SVG}<span>setup</span></div>
-        <div class="card"><div class="setup-done-line">&#10003; CLI installed &middot; MCP configured</div></div>
-      </div>`;
-  }
+  // Only surface setup while something is missing. A completed
+  // checklist is dead weight in a panel this small.
+  if (!setup || (setup.cliInstalled && setup.mcpConfigured)) return '';
   return `
     <div>
       <div class="section-title">${CHEVRON_SVG}<span>setup</span></div>
@@ -397,20 +372,6 @@ function renderSetup(setup: { cliInstalled: boolean; mcpConfigured: boolean } | 
           ${setup.mcpConfigured ? '' : '<button class="btn" data-action="setupMcp">Register</button>'}
         </div>
       </div>
-      </div>
-    </div>
-  `;
-}
-
-function renderQuickActions(): string {
-  return `
-    <div>
-      <div class="section-title">${CHEVRON_SVG}<span>quick actions</span></div>
-      <div class="qa-grid">
-        <button class="btn" data-action="doctor">Doctor</button>
-        <button class="btn" data-action="copy">Copy Context</button>
-        <button class="btn" data-action="sync">Sync Context</button>
-        <button class="btn" data-action="config">Config</button>
       </div>
     </div>
   `;

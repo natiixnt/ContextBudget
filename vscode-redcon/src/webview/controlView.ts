@@ -83,10 +83,8 @@ export class ControlViewProvider implements vscode.WebviewViewProvider {
     const cfg = vscode.workspace.getConfiguration('redcon.views');
     return {
       miniDashboard: cfg.get<boolean>('showMiniDashboard', true),
-      lastRun: cfg.get<boolean>('showLastRun', true),
       recentRuns: cfg.get<boolean>('showRecentRuns', true),
       setup: cfg.get<boolean>('showSetup', true),
-      quickActions: cfg.get<boolean>('showQuickActions', true),
     };
   }
 
@@ -139,10 +137,6 @@ export class ControlViewProvider implements vscode.WebviewViewProvider {
 
   private handleAction(action: string): void {
     const commandByAction: Record<string, string> = {
-      doctor: 'redcon.doctor',
-      copy: 'redcon.copyContext',
-      sync: 'redcon.syncContext',
-      config: 'redcon.openConfig',
       dashboard: 'redcon.openDashboard',
       setupInstall: 'redcon.setupInstall',
       setupMcp: 'redcon.setupMcp',

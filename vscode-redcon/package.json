@@ -173,19 +173,29 @@
     "menus": {
       "view/title": [
         {
+          "command": "redcon.copyContext",
+          "when": "view == redcon.control",
+          "group": "navigation@1"
+        },
+        {
+          "command": "redcon.syncContext",
+          "when": "view == redcon.control",
+          "group": "redcon@1"
+        },
+        {
+          "command": "redcon.doctor",
+          "when": "view == redcon.control",
+          "group": "redcon@2"
+        },
+        {
+          "command": "redcon.openConfig",
+          "when": "view == redcon.control",
+          "group": "redcon@3"
+        },
+        {
           "command": "redcon.help",
-          "when": "view == redcon.chat",
-          "group": "navigation"
-        },
-        {
-          "command": "redcon.openDashboard",
-          "when": "view == redcon.chat",
-          "group": "navigation"
-        },
-        {
-          "command": "redcon.refresh",
-          "when": "view == redcon.chat",
-          "group": "navigation"
+          "when": "view == redcon.control",
+          "group": "redcon@4"
         }
       ]
     },
@@ -306,11 +316,6 @@
           "default": "red",
           "description": "Accent used for data marks on the dashboard (charts, bars, pills). Chrome red and status colors are unaffected."
         },
-        "redcon.views.showLastRun": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show the last run summary in the sidebar."
-        },
         "redcon.views.showRecentRuns": {
           "type": "boolean",
           "default": true,
@@ -319,12 +324,7 @@
         "redcon.views.showSetup": {
           "type": "boolean",
           "default": true,
-          "description": "Show the setup checklist in the sidebar."
-        },
-        "redcon.views.showQuickActions": {
-          "type": "boolean",
-          "default": true,
-          "description": "Show quick action buttons in the sidebar."
+          "description": "Show the setup checklist in the sidebar while setup is incomplete."
         },
         "redcon.dashboard.showKpis": {
           "type": "boolean",
@@ -349,7 +349,7 @@
         "redcon.views.showMiniDashboard": {
           "type": "boolean",
           "default": true,
-          "description": "Show the mini savings dashboard at the top of the sidebar."
+          "description": "Show the savings card (cumulative savings, trend, last run) at the top of the sidebar."
         }
       }
     },
