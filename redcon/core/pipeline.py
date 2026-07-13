@@ -1,26 +1,30 @@
-from __future__ import annotations
-
 """Top-level pipeline API wrappers preserving CLI compatibility."""
 
+from __future__ import annotations
+
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any
 
 from redcon.cache import RunHistoryEntry, append_run_history_entry, normalize_cache_report
 from redcon.compressors.summarizers import normalize_summarizer_report
 from redcon.config import RedconConfig, WorkspaceDefinition, load_config
-from redcon.core.delta import build_delta_report, effective_pack_metrics, resolve_previous_run_label
 from redcon.core.agent_planning import build_agent_workflow_plan
 from redcon.core.agent_simulation import simulate_agent_workflow
-from redcon.core.model_profiles import normalize_model_profile_report, prepare_config_for_model_profile
+from redcon.core.delta import build_delta_report, effective_pack_metrics, resolve_previous_run_label
 from redcon.core.diffing import diff_run_artifacts
 from redcon.core.heatmap import build_heatmap_report, heatmap_as_dict
+from redcon.core.model_profiles import (
+    normalize_model_profile_report,
+    prepare_config_for_model_profile,
+)
 from redcon.core.pr_audit import analyze_pull_request, pr_audit_as_dict
 from redcon.core.render import read_json, render_pr_comment_markdown
+from redcon.core.run_feed import write_run_feed_artifact
 from redcon.core.tokens import normalize_token_estimator_report
 from redcon.plugins import ResolvedPlugins, resolve_plugins
-from redcon.scorers.import_graph import build_import_graph
 from redcon.schemas.models import DEFAULT_TOP_FILES, RunReport
-from redcon.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
+from redcon.scorers.import_graph import build_import_graph
 from redcon.stages.workflow import (
     as_json_dict,
     build_agent_plan_result,
@@ -32,6 +36,7 @@ from redcon.stages.workflow import (
     run_scan_workspace_stage,
     run_score_stage,
 )
+from redcon.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
 
 
 def _resolve_config(
@@ -93,7 +98,9 @@ def run_plan(
     cfg = _resolve_config(config, repo, workspace, config_path)
     prepared_cfg, model_profile = prepare_config_for_model_profile(cfg)
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
-    effective_top_n = top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
+    effective_top_n = (
+        top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
+    )
     target_repo = workspace.root if workspace is not None else repo
     telemetry = _build_telemetry_session(
         repo=target_repo,
@@ -114,7 +121,12 @@ def run_plan(
         scanned_repos = []
     telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
     ranked = run_score_stage(task, files, prepared_cfg, repo=target_repo, plugins=resolved_plugins)
-    telemetry.emit("scoring_completed", scanned_files=len(files), ranked_files=len(ranked), top_files=effective_top_n)
+    telemetry.emit(
+        "scoring_completed",
+        scanned_files=len(files),
+        ranked_files=len(ranked),
+        top_files=effective_top_n,
+    )
     plan = build_plan_result(
         task,
         target_repo,
@@ -161,7 +173,9 @@ def run_plan_agent(
     cfg = _resolve_config(config, repo, workspace, config_path)
     prepared_cfg, model_profile = prepare_config_for_model_profile(cfg)
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
-    effective_top_n = top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
+    effective_top_n = (
+        top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
+    )
     target_repo = workspace.root if workspace is not None else repo
     telemetry = _build_telemetry_session(
         repo=target_repo,
@@ -182,7 +196,12 @@ def run_plan_agent(
         scanned_repos = []
     telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
     ranked = run_score_stage(task, files, prepared_cfg, repo=target_repo, plugins=resolved_plugins)
-    telemetry.emit("scoring_completed", scanned_files=len(files), ranked_files=len(ranked), top_files=effective_top_n)
+    telemetry.emit(
+        "scoring_completed",
+        scanned_files=len(files),
+        ranked_files=len(ranked),
+        top_files=effective_top_n,
+    )
     workflow_plan = build_agent_workflow_plan(
         task=task,
         files=files,
@@ -251,7 +270,9 @@ def run_simulate_agent(
     cfg = _resolve_config(config, repo, workspace, config_path)
     prepared_cfg, model_profile = prepare_config_for_model_profile(cfg)
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
-    effective_top_n = top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
+    effective_top_n = (
+        top_n if top_n is not None else (prepared_cfg.budget.top_files or DEFAULT_TOP_FILES)
+    )
     target_repo = workspace.root if workspace is not None else repo
     telemetry = _build_telemetry_session(
         repo=target_repo,
@@ -272,7 +293,12 @@ def run_simulate_agent(
         scanned_repos = []
     telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
     ranked = run_score_stage(task, files, prepared_cfg, repo=target_repo, plugins=resolved_plugins)
-    telemetry.emit("scoring_completed", scanned_files=len(files), ranked_files=len(ranked), top_files=effective_top_n)
+    telemetry.emit(
+        "scoring_completed",
+        scanned_files=len(files),
+        ranked_files=len(ranked),
+        top_files=effective_top_n,
+    )
 
     simulation = simulate_agent_workflow(
         task=task,
@@ -350,7 +376,9 @@ def run_pack(
     """Run pack command pipeline and return typed run report."""
 
     cfg = _resolve_config(config, repo, workspace, config_path)
-    prepared_cfg, model_profile = prepare_config_for_model_profile(cfg, requested_max_tokens=max_tokens)
+    prepared_cfg, model_profile = prepare_config_for_model_profile(
+        cfg, requested_max_tokens=max_tokens
+    )
     resolved_plugins = plugins if plugins is not None else resolve_plugins(prepared_cfg)
     effective_max_tokens = prepared_cfg.budget.max_tokens
     effective_top_files = top_files if top_files is not None else prepared_cfg.budget.top_files
@@ -361,7 +389,9 @@ def run_pack(
         command="pack",
         telemetry_sink=telemetry_sink,
     )
-    telemetry_top_files = effective_top_files if effective_top_files is not None else DEFAULT_TOP_FILES
+    telemetry_top_files = (
+        effective_top_files if effective_top_files is not None else DEFAULT_TOP_FILES
+    )
     telemetry.emit(
         "run_started",
         max_tokens=effective_max_tokens,
@@ -378,12 +408,19 @@ def run_pack(
     telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
     ranked = run_score_stage(task, files, prepared_cfg, repo=target_repo, plugins=resolved_plugins)
     ranked_count = len(ranked)
-    telemetry.emit("scoring_completed", scanned_files=len(files), ranked_files=ranked_count, top_files=telemetry_top_files)
+    telemetry.emit(
+        "scoring_completed",
+        scanned_files=len(files),
+        ranked_files=ranked_count,
+        top_files=telemetry_top_files,
+    )
     if effective_top_files is not None:
         ranked = ranked[:effective_top_files]
     # Build import graph once and share with compression stage to avoid
     # rebuilding it from disk reads.
-    import_graph = build_import_graph(files) if prepared_cfg.score.enable_import_graph_signals else None
+    import_graph = (
+        build_import_graph(files) if prepared_cfg.score.enable_import_graph_signals else None
+    )
     cache = run_cache_stage(target_repo, prepared_cfg)
     pack_plugins = resolved_plugins
     if import_graph is not None:
@@ -392,7 +429,10 @@ def run_pack(
             scorer=resolved_plugins.scorer,
             scorer_options=resolved_plugins.scorer_options,
             compressor=resolved_plugins.compressor,
-            compressor_options={**resolved_plugins.compressor_options, "import_graph": import_graph},
+            compressor_options={
+                **resolved_plugins.compressor_options,
+                "import_graph": import_graph,
+            },
             token_estimator=resolved_plugins.token_estimator,
             token_estimator_options=resolved_plugins.token_estimator_options,
             token_estimator_report=resolved_plugins.token_estimator_report,
@@ -432,6 +472,14 @@ def run_pack(
         model_profile=model_profile,
     )
     if record_history:
+        # Mirror the full report into .redcon/runs/ so editor
+        # integrations see this run no matter which entry point made it
+        # (CLI, SDK, MCP tools, middleware).
+        feed_path = (
+            write_run_feed_artifact(target_repo, as_json_dict(report))
+            if prepared_cfg.cache.run_history_enabled
+            else None
+        )
         selected_set = set(report.files_included)
         considered_files = [item.file.path for item in ranked]
         append_run_history_entry(
@@ -444,12 +492,18 @@ def run_pack(
                 candidate_files=considered_files,
                 token_usage={
                     "max_tokens": effective_max_tokens,
-                    "estimated_input_tokens": int(report.budget.get("estimated_input_tokens", 0) or 0),
-                    "estimated_saved_tokens": int(report.budget.get("estimated_saved_tokens", 0) or 0),
-                    "quality_risk_estimate": str(report.budget.get("quality_risk_estimate", "unknown")),
+                    "estimated_input_tokens": int(
+                        report.budget.get("estimated_input_tokens", 0) or 0
+                    ),
+                    "estimated_saved_tokens": int(
+                        report.budget.get("estimated_saved_tokens", 0) or 0
+                    ),
+                    "quality_risk_estimate": str(
+                        report.budget.get("quality_risk_estimate", "unknown")
+                    ),
                 },
                 result_artifacts={
-                    "run_json": "",
+                    "run_json": str(feed_path) if feed_path else "",
                     "run_markdown": "",
                 },
                 repo=str(target_repo),
@@ -506,6 +560,7 @@ def run_pack(
     )
     return report
 
+
 def run_report_from_json(data: dict) -> dict:
     """Extract report summary fields from a run JSON payload."""
 
@@ -541,7 +596,9 @@ def run_report_from_json(data: dict) -> dict:
     return report
 
 
-def run_diff_from_json(old_data: dict, new_data: dict, old_label: str = "old", new_label: str = "new") -> dict:
+def run_diff_from_json(
+    old_data: dict, new_data: dict, old_label: str = "old", new_label: str = "new"
+) -> dict:
     """Build a run-to-run delta report from two run JSON payloads."""
 
     return diff_run_artifacts(old_data, new_data, old_label=old_label, new_label=new_label)
@@ -577,5 +634,3 @@ def run_heatmap(history: Sequence[str | Path] | None = None, *, limit: int = 10)
 
     report = build_heatmap_report(history, limit=limit)
     return heatmap_as_dict(report)
-
-

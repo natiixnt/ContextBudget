@@ -40,7 +40,13 @@ def test_run_pack_records_history_entry(tmp_path: Path) -> None:
     assert entry.task == "tighten auth checks"
     assert entry.selected_files == data["files_included"]
     assert entry.token_usage["estimated_input_tokens"] == data["budget"]["estimated_input_tokens"]
-    assert entry.result_artifacts == {"run_json": "", "run_markdown": ""}
+    # The run feed mirrors the report into .redcon/runs/ and the history
+    # entry points at that artifact.
+    run_json = entry.result_artifacts["run_json"]
+    assert run_json
+    assert Path(run_json).is_file()
+    assert json.loads(Path(run_json).read_text(encoding="utf-8"))["task"] == "tighten auth checks"
+    assert entry.result_artifacts["run_markdown"] == ""
 
 
 def test_pack_never_exceeds_budget_under_degradation(tmp_path: Path) -> None:
