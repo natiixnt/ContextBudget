@@ -35,7 +35,11 @@ function execAsync(cmd: string, cwd: string, timeoutMs = 120_000): Promise<{ std
 }
 
 async function detectPython(): Promise<string | null> {
-  const candidates = ['python3', 'python'];
+  const configured = vscode.workspace
+    .getConfiguration('redcon')
+    .get<string>('pythonPath', '')
+    .trim();
+  const candidates = [...new Set([configured, 'python3', 'python'].filter(Boolean))];
   for (const cmd of candidates) {
     try {
       const { stdout } = await execAsync(`${cmd} --version`, process.cwd(), 5000);

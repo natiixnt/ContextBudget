@@ -46,7 +46,7 @@ async function exec(
 
   return new Promise((resolve, reject) => {
     const pathDirs = ['/usr/local/bin', '/opt/homebrew/bin', process.env.HOME + '/.local/bin'].join(':');
-    const env = { ...process.env, PYTHONUNBUFFERED: '1' };
+    const env: NodeJS.ProcessEnv = { ...process.env, PYTHONUNBUFFERED: '1' };
     env.PATH = pathDirs + ':' + (process.env.PATH ?? '');
 
     const proc = spawn(cmd, args, {
@@ -80,7 +80,7 @@ async function exec(
       if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
         reject(
           new Error(
-            `Redcon CLI not found. Install with: pip install git+https://github.com/natiixnt/ContextBudget\n` +
+            `Redcon CLI not found. Install with: pip install redcon\n` +
               `Or set "redcon.cliCommand" in VS Code settings.`,
           ),
         );

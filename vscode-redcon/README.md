@@ -1,132 +1,120 @@
 # Redcon - Context Budget for VS Code
 
-Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under explicit token limits - directly from your editor.
+Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under explicit token limits - and watch how many tokens (and dollars) redcon saves you, directly in your editor.
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
+
+![Redcon Analytics dashboard](media/dashboard-dark.png)
 
 ---
 
 ## Features
 
-### Sidebar with Live Budget Analysis
+### Savings panel
 
-Four dedicated panels in the activity bar:
+The activity bar view leads with what matters: cumulative tokens and
+dollars saved, a per-run trend, and your last run - one click opens the
+full dashboard. Below it, a live run feed: every run shows the tokens
+that actually went to the agent against the gray would-be total, the
+cut percentage, age and a risk dot. Click any run to inspect it.
 
-- **Budget** - token usage gauge, savings, quality risk, cache stats
-- **File Ranking** - files sorted by relevance score with color-coded tiers
-- **Packed Context** - compressed files with strategy pills (full/snippet/symbol/summary)
-- **Run History** - past runs with trend arrows
+<img src="media/panel-dark.png" width="330" alt="Redcon sidebar panel" />
 
-### Status Bar
+### Plug and play: agent runs appear by themselves
 
-Real-time budget indicator in the bottom bar:
+Runs arrive automatically. Whenever an agent (Claude Code, Cursor,
+Windsurf, Codex, Gemini) or the CLI packs context, redcon mirrors the
+run report into `.redcon/runs/` and the extension picks it up live -
+panel, status bar and dashboard update with zero clicking. Manual packs
+live in the view title bar and the command palette.
 
-- Token usage: `12.4k / 30k`
-- Quality risk badge: `low` / `medium` / `high`
-- Click to open dashboard or re-pack
+### Analytics dashboard
 
-### File Decorations
+Brand-new in 0.9.0, implementing the Redcon Analytics design:
 
-Score badges appear on files in the Explorer:
+- cumulative savings hero with per-run trend and dollar estimate
+- KPI cards with budget threshold ticks and quality risk states
+- budget utilization and strategy share donuts
+- shared-scale token impact chart (packed vs saved per file)
+- packed context and file rankings tables
+- light and dark theme aware; six data accent presets
 
-- Star for high-scoring files
-- Checkmark for included files
-- Dash for skipped files
-- Color-coded by relevance tier
+### Status bar, decorations, CodeLens
 
-### CodeLens
+- live token usage and tokens saved in the status bar
+- relevance score badges on files in the Explorer
+- compression strategy and savings above each packed file:
+  `Redcon: snippet | 400/1200 tok (-67%)`
 
-Above every file that's in context:
+## Getting started
 
-```
-Redcon: snippet | 400/1200 tok (-67%)
-```
+1. Install this extension.
+2. Install the CLI: `pip install redcon`
+3. In your project: `redcon init` - one command registers the MCP
+   server for your agents, installs hooks and writes `redcon.toml`.
+   (The extension's setup checklist can do this for you too.)
+4. Work normally. Runs land in the panel by themselves.
 
-Shows compression strategy, token counts, and savings percentage.
+## Commands
 
-### Dashboard
-
-Full webview with:
-
-- KPI cards (tokens, savings, files, risk)
-- Animated budget gauge bar
-- Token distribution bar chart
-- Packed files table with strategy pills
-- File ranking table with score bars
-- Metadata (estimator, summarizer, cache)
-
-### Commands
-
-Open Command Palette (`Cmd+Shift+P` / `Ctrl+Shift+P`) and type `Redcon`:
-
-| Command | Description |
-|---------|-------------|
-| `Redcon: Pack Context` | Build compressed context under token budget |
-| `Redcon: Plan - Rank Files` | Score files by relevance to a task |
-| `Redcon: Plan Agent Workflow` | Plan multi-step agent context |
-| `Redcon: Doctor` | Check environment health |
-| `Redcon: Initialize Config` | Generate `redcon.toml` for your project |
-| `Redcon: Export Context` | Export packed context to clipboard or file |
-| `Redcon: Benchmark Strategies` | Compare packing strategies side by side |
-| `Redcon: Simulate Agent Cost` | Estimate token costs and USD spend |
-| `Redcon: Check Token Drift` | Detect token usage growth trends |
-| `Redcon: Open Dashboard` | Rich visualization of the latest run |
-| `Redcon: Open Configuration` | Open `redcon.toml` in editor |
-| `Redcon: Copy Context to Clipboard` | Copy all packed context text |
-
----
-
-## Requirements
-
-- **Redcon CLI** installed and available in PATH:
-  ```bash
-  pip install redcon
-  ```
-- Python 3.10+
-- A `redcon.toml` config file in your project root (or run `Redcon: Initialize Config`)
-
----
+| Command | What it does |
+| --- | --- |
+| `Redcon: Pack Context` | pack context for a task under the token budget |
+| `Redcon: Plan - Rank Files` | rank files by task relevance |
+| `Redcon: Plan Agent Workflow` | plan context across a multi-step workflow |
+| `Redcon: Open Dashboard` | open the analytics dashboard |
+| `Redcon: Doctor - Check Environment` | diagnose CLI, extras and MCP registration |
+| `Redcon: Initialize Config` | run `redcon init` |
+| `Redcon: Copy Context to Clipboard` | copy the packed context |
+| `Redcon: Sync Context to Agents` | write context files for agents |
+| `Redcon: Export Context` | export the packed context to a file |
+| `Redcon: Benchmark Strategies` | compare packing strategies |
+| `Redcon: Simulate Agent Cost` | estimate workflow token cost |
+| `Redcon: Check Token Drift` | compare token estimates across runs |
+| `Redcon: Install Redcon & Set Up MCP` | guided CLI install |
+| `Redcon: Register MCP Server` | register MCP for detected agents |
+| `Redcon: Open Configuration` | open `redcon.toml` |
+| `Redcon: Quick Start Guide` | open the docs |
 
 ## Settings
 
 | Setting | Default | Description |
-|---------|---------|-------------|
+| --- | --- | --- |
 | `redcon.cliCommand` | `redcon` | CLI command or path to executable |
-| `redcon.pythonPath` | `python` | Python interpreter path |
-| `redcon.defaultMaxTokens` | `30000` | Default token budget |
-| `redcon.defaultTopFiles` | `25` | Max ranked files |
-| `redcon.autoRefreshOnSave` | `false` | Re-run on file save |
-| `redcon.showStatusBar` | `true` | Show budget in status bar |
-| `redcon.showFileDecorations` | `true` | Score badges in Explorer |
-| `redcon.showCodeLens` | `true` | Compression info above files |
-| `redcon.configPath` | `""` | Custom path to `redcon.toml` |
+| `redcon.pythonPath` | `python` | Python used by the guided installer |
+| `redcon.defaultMaxTokens` | `30000` | token budget for pack commands |
+| `redcon.defaultTopFiles` | `25` | maximum number of ranked files |
+| `redcon.configPath` | auto | path to `redcon.toml` |
+| `redcon.autoRefreshOnSave` | `false` | re-run plan on save |
+| `redcon.showStatusBar` | `true` | budget gauge in the status bar |
+| `redcon.showFileDecorations` | `true` | score badges in the Explorer |
+| `redcon.showCodeLens` | `true` | strategy CodeLens above files |
+| `redcon.costPerMillionTokens` | `3.0` | USD per million input tokens for dollar estimates |
+| `redcon.display.primaryMetric` | `tokens` | leading number: `tokens` or `dollars` |
+| `redcon.display.dataAccent` | `red` | data mark accent: red, blue, violet, crimson, wine, gradient |
+| `redcon.budget.policy` | `auto-raise` | budget policy shown on the dashboard: auto-raise, strict-cap, ask-first |
+| `redcon.views.showMiniDashboard` | `true` | savings card on top of the sidebar |
+| `redcon.views.showRecentRuns` | `true` | run feed in the sidebar |
+| `redcon.views.showSetup` | `true` | setup checklist while setup is incomplete |
+| `redcon.dashboard.showKpis` | `true` | KPI cards row |
+| `redcon.dashboard.showDonuts` | `true` | budget and strategy donuts |
+| `redcon.dashboard.showImpact` | `true` | token impact chart |
+| `redcon.dashboard.showTables` | `true` | packed context and rankings tables |
+| `redcon.contextSync.enabled` | `true` | generate agent context files after runs |
+| `redcon.contextSync.autoSyncOnPack` | `true` | sync automatically after each pack |
+| `redcon.contextSync.targets` | claude, cursor, copilot | which agents get context files |
+| `redcon.contextSync.maxFiles` | `30` | max files in the context map |
 
----
+## Requirements
 
-## Quick Start
+- VS Code 1.85+
+- Python 3.10+ with `pip install redcon` (the setup checklist can
+  install it for you)
+- A trusted workspace (the extension runs the CLI against your files)
 
-1. Install the extension
-2. Install the CLI: `pip install redcon`
-3. Open a project and run `Redcon: Initialize Config`
-4. Run `Redcon: Pack Context` with a task description
-5. Explore results in the sidebar, status bar, and dashboard
+## Links
 
----
-
-## How It Works
-
-Redcon uses deterministic heuristics (no ML models) to:
-
-1. **Scan** your repository for relevant files
-2. **Score** each file against your natural-language task
-3. **Compress** files using the best strategy (full inclusion, snippet extraction, symbol extraction, or summarization)
-4. **Pack** everything under your token budget with quality risk estimation
-
-The extension wraps the Redcon CLI, displaying results inline in VS Code with zero additional dependencies.
-
----
-
-## License
-
-MIT
+- [Repository](https://github.com/natiixnt/redcon)
+- [CLI documentation](https://github.com/natiixnt/redcon/tree/main/docs)
+- [Issues](https://github.com/natiixnt/redcon/issues)

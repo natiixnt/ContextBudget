@@ -32,6 +32,17 @@
   setup checklist only appears while setup is incomplete. Sections
   are toggleable via `redcon.views.*`.
 
+### Fixed
+
+- Marketplace metadata points at the real repository (was a dead org),
+  the CLI-not-found hint says `pip install redcon`, `redcon.pythonPath`
+  is honored by the guided installer instead of being dead weight, the
+  long-standing `tsc` error in `redcon.ts` is gone (`tsc --noEmit` is
+  clean for the whole extension), nested sourcemaps are excluded from
+  the VSIX, and untrusted-workspace behavior is declared explicitly.
+- README rewritten for the 0.9.0 UI with screenshots, the full settings
+  table and command list.
+
 ### Notes
 
 - Telegraf display font is referenced with a system-stack fallback but

@@ -8,11 +8,11 @@
   "icon": "resources/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/redcon-dev/redcon"
+    "url": "https://github.com/natiixnt/redcon"
   },
-  "homepage": "https://github.com/redcon-dev/redcon/tree/main/vscode-redcon",
+  "homepage": "https://github.com/natiixnt/redcon/tree/main/vscode-redcon",
   "bugs": {
-    "url": "https://github.com/redcon-dev/redcon/issues"
+    "url": "https://github.com/natiixnt/redcon/issues"
   },
   "galleryBanner": {
     "color": "#1e1e2e",
@@ -39,6 +39,12 @@
   "activationEvents": [
     "workspaceContains:redcon.toml"
   ],
+  "capabilities": {
+    "untrustedWorkspaces": {
+      "supported": false,
+      "description": "Redcon runs the redcon CLI against workspace files, so it only activates in trusted workspaces."
+    }
+  },
   "main": "./dist/extension.js",
   "contributes": {
     "commands": [
