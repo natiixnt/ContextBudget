@@ -43,7 +43,7 @@ This document describes what is production-ready, what is in beta, known limitat
 | Audit push to cloud | ✅ Production | Fire-and-forget; non-blocking |
 | Webhook dispatch | ✅ Production | Policy violations + budget overruns |
 
-### Cloud Control Plane (`redcon-cloud`)
+### Cloud Control Plane (private `redcon-cloud` repository)
 | Feature | Status | Notes |
 |---------|--------|-------|
 | Event ingestion (`POST /events`) | ✅ Production | Batch-compatible |
@@ -135,7 +135,7 @@ This document describes what is production-ready, what is in beta, known limitat
        └─ GitHub Action (action.yml in repo)
 
 [Single VPS or ECS task, 2 vCPU / 1 GB RAM]
-  └─ redcon-cloud (docker-compose.prod.yml)
+  └─ redcon-cloud (private repository, docker-compose.prod.yml)
        ├─ FastAPI (uvicorn, 2 workers)
        ├─ PostgreSQL 16
        └─ nginx (TLS termination)
@@ -144,7 +144,7 @@ This document describes what is production-ready, what is in beta, known limitat
 **Setup steps:**
 1. `pip install redcon` on developer machines or in CI.
 2. Run `redcon init` in each repo to generate `redcon.toml`.
-3. Deploy `redcon-cloud` using `docker-compose.prod.yml`.
+3. Deploy Redcon Cloud from the private `redcon-cloud` repository using `docker-compose.prod.yml`.
 4. Run migrations (automatically applied via Docker init scripts).
 5. Create an org: `POST /orgs` → note the `id`.
 6. Issue an API key: `POST /orgs/{id}/api-keys` → save the `raw_key`.
