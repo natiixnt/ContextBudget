@@ -1,5 +1,32 @@
 # CLI Reference
 
+## Setup and Diagnostics
+
+### `redcon init`
+One-command project setup: writes a commented `redcon.toml`, registers the
+MCP server for detected agents (Claude Code, Cursor, Windsurf, VS Code,
+Codex, Gemini), installs the Claude Code hook and updates `AGENTS.md`.
+Idempotent; safe to re-run.
+
+### `redcon doctor`
+Environment diagnostics: Python version, optional extras (`tokenizers`,
+`redis`, `gateway`, `mcp`, `symbols`, `ast_grep`), MCP registration state,
+config validity, cache directory, git and disk space. Exit code reflects
+failures, so it works as a CI gate too.
+
+### `redcon mcp install | status | uninstall | serve`
+Manage the MCP server registration for coding agents. `serve` runs the
+stdio server itself (agents invoke it; you rarely run it by hand).
+See [MCP and hooks](mcp-and-hooks.md).
+
+### `redcon hooks install | status | uninstall | run`
+Manage the Claude Code `UserPromptSubmit` hook that injects a compact
+`<redcon-context>` block into every qualifying prompt. `run` is the hook
+entry point Claude Code executes. See [MCP and hooks](mcp-and-hooks.md).
+
+### `redcon completion <shell>`
+Print shell completion for bash, zsh or fish.
+
 ## Commands
 
 ### `redcon plan <task> --repo <path>`
@@ -647,3 +674,37 @@ ignore_globs = ["**/generated/**"]
 
 `plan`, `pack`, and `benchmark` automatically maintain `.redcon/scan-index.json`.
 Unchanged files reuse prior scan metadata; changed and deleted files are refreshed incrementally.
+
+## Command Output Compression
+
+### `redcon run <command>`
+Run a shell command and print its output compressed with the schema-aware
+compressor registry (pytest, git diff/status/log, grep, ls/find/tree, npm,
+go test, cargo, docker, kubectl, lint, coverage, profiler, json logs, sql
+explain, bundle stats). Flags: `--max-output-tokens`, `--remaining-tokens`,
+`--quality-floor {verbose,compact,ultra}`, `--timeout-seconds`, `--json`,
+`--no-history`, `--prefer-compact-output`.
+
+```bash
+redcon run "pytest -x"
+redcon run "git diff" --max-output-tokens 2000
+```
+
+### `redcon cmd-quality`
+Run the compression quality gate over the built-in case corpus (every
+registered compressor, small and stress fixtures). Fails non-zero on any
+quality regression; usable as a CI gate.
+
+### `redcon cmd-bench [--baseline <file>] [--tolerance N] [--json]`
+Benchmark compressor reduction rates against the same corpus and compare
+with an optional saved baseline.
+
+## Repo Map and ROI
+
+### `redcon repo-map <task> [--repo <path>] [--budget N] [--top-files N] [--json]`
+Symbol-level repository map ranked by task relevance (tree-sitter based;
+install `redcon[symbols]`). Cheap orientation for a new task or agent.
+
+### `redcon roi [runs ...] [--model M | --price-input P] [--json]`
+Aggregate estimated dollar savings across pack run artifacts. Defaults to
+`redcon-*.json` in the current directory; accepts files or directories.

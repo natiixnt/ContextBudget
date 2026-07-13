@@ -6,6 +6,7 @@ Redcon is local-first infrastructure for deterministic context selection, compre
 
 - [Getting Started](getting-started.md)
 - [CLI Reference](cli.md)
+- [MCP and Hooks](mcp-and-hooks.md)
 - [Configuration](configuration.md)
 - [Workspace](workspace.md)
 - [Python API](python-api.md)

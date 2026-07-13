@@ -74,7 +74,7 @@ fallback_backend = "model_aligned"
 Install the optional exact tokenizer backend with:
 
 ```bash
-python3 -m pip install -e .[tokenizers]
+pip install "redcon[tokenizers]"
 ```
 
 ## Artifact Reporting

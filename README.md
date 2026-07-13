@@ -261,6 +261,7 @@ Full reference: [docs/python-api.md](docs/python-api.md).
 
 - [Getting Started](docs/getting-started.md) - first pack in 60 seconds
 - [CLI Reference](docs/cli.md) - all commands and flags
+- [MCP and Hooks](docs/mcp-and-hooks.md) - agent integration, tool list, deterministic context injection
 - [Configuration](docs/configuration.md) - redcon.toml fields
 - [Workspaces](docs/workspace.md) - multi-repo setup
 - [Python API](docs/python-api.md) - programmatic usage
