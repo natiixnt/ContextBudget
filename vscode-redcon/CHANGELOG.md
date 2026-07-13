@@ -45,9 +45,12 @@
 
 ### Notes
 
-- Telegraf display font is referenced with a system-stack fallback but
-  NOT bundled: the Pangram Pangram license must be verified before
-  shipping the OTF files inside the extension.
+- Telegraf display font is referenced with a system-stack fallback and
+  is NOT bundled, permanently: Pangram Pangram confirmed that OTF files
+  may not be redistributed inside an app or a public repository. Their
+  licenses cover embedding in closed, non-extractable products only, so
+  a font license only becomes relevant for a future closed commercial
+  tier.
 - Run history now records tokens saved per run (drives the hero and
   trend). Dashboard HTML rendering lives in a pure module
   (`webview/dashboardHtml.ts`) with no vscode dependency, verified by
