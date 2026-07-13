@@ -200,8 +200,17 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
     .run-task { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11.5px; }
     .run-saved { font-family: var(--mono); font-size: 11px; color: var(--red); font-weight: 600; flex-shrink: 0; }
     .run-sub { display: flex; align-items: center; gap: 7px; margin-top: 4px; }
-    .run-track { flex: 1; height: 3px; border-radius: 2px; background: var(--track); overflow: hidden; }
-    .run-fill { display: block; height: 100%; border-radius: 2px; background: var(--red); }
+    .run-lane { flex: 1; height: 4px; }
+    .run-bar {
+      display: flex; height: 100%; border-radius: 2px; overflow: hidden;
+      min-width: 6px;
+    }
+    .run-fill { background: var(--red); }
+    .run-used { flex: 1; background: var(--red); opacity: 0.22; }
+    .run-cut {
+      font-family: var(--mono); font-size: 9.5px; font-weight: 600;
+      color: var(--red); flex-shrink: 0;
+    }
     .run-when { font-family: var(--mono); font-size: 9.5px; color: var(--text3); flex-shrink: 0; }
     .run-dot { width: 6px; height: 6px; border-radius: 99px; flex-shrink: 0; }
     .empty-hint { font-size: 11px; color: var(--text3); padding: 2px 6px; }
@@ -322,7 +331,11 @@ function fmtAgo(iso: string): string {
 
 function renderRecentRuns(history: RunHistoryEntry[]): string {
   const entries = history.slice(0, 8);
-  const maxSaved = Math.max(...entries.map((e) => e.tokensSaved ?? 0), 1);
+  // Shared scale across the list: a run's lane length is its would-be
+  // total (packed + saved), mirroring the dashboard's token impact
+  // chart. The bright segment is what redcon cut, the faint tail is
+  // what was actually sent.
+  const maxTotal = Math.max(...entries.map((e) => (e.tokens ?? 0) + (e.tokensSaved ?? 0)), 1);
   const dotByRisk: Record<string, string> = {
     low: 'var(--good)',
     medium: 'var(--warn)',
@@ -330,9 +343,11 @@ function renderRecentRuns(history: RunHistoryEntry[]): string {
   };
   const rows = entries.map((e, i) => {
     const saved = e.tokensSaved ?? 0;
-    const width = Math.max(3, Math.round((saved / maxSaved) * 100));
-    const pct = e.maxTokens > 0 ? Math.round((e.tokens / e.maxTokens) * 100) : 0;
-    const tip = `${e.task} - ${pct}% budget - ${e.filesIncluded} files - ${e.risk} risk`;
+    const total = (e.tokens ?? 0) + saved;
+    const lanePct = Math.max(4, Math.round((total / maxTotal) * 100));
+    const cutPct = total > 0 ? Math.round((saved / total) * 100) : 0;
+    const budgetPct = e.maxTokens > 0 ? Math.round((e.tokens / e.maxTokens) * 100) : 0;
+    const tip = `${e.task} - cut ${cutPct}% of ${fmtK(total)} tokens - ${budgetPct}% budget - ${e.filesIncluded} files - ${e.risk} risk`;
     return `
     <div class="run-row" data-action="open-run" data-path="${esc(e.path)}" title="${esc(tip)}">
       <span class="run-idx num">${String(i + 1).padStart(2, '0')}</span>
@@ -342,7 +357,8 @@ function renderRecentRuns(history: RunHistoryEntry[]): string {
           <span class="run-saved num">${fmtK(saved)}</span>
         </div>
         <div class="run-sub">
-          <span class="run-track"><span class="run-fill" style="width:${width}%"></span></span>
+          <span class="run-lane"><span class="run-bar" style="width:${lanePct}%"><span class="run-fill" style="width:${cutPct}%"></span><span class="run-used"></span></span></span>
+          <span class="run-cut num">-${cutPct}%</span>
           <span class="run-when num">${fmtAgo(e.generatedAt)}</span>
           <span class="run-dot" style="background:${dotByRisk[e.risk] ?? 'var(--text3)'}"></span>
         </div>
