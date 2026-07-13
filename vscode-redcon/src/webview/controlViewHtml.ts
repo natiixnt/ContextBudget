@@ -206,7 +206,7 @@ export function renderControlViewHtml(data: ControlViewData, nonce: string): str
       min-width: 6px;
     }
     .run-fill { background: var(--red); }
-    .run-used { flex: 1; background: var(--red); opacity: 0.22; }
+    .run-ghost { flex: 1; background: var(--track); }
     .run-cut {
       font-family: var(--mono); font-size: 9.5px; font-weight: 600;
       color: var(--red); flex-shrink: 0;
@@ -332,9 +332,9 @@ function fmtAgo(iso: string): string {
 function renderRecentRuns(history: RunHistoryEntry[]): string {
   const entries = history.slice(0, 8);
   // Shared scale across the list: a run's lane length is its would-be
-  // total (packed + saved), mirroring the dashboard's token impact
-  // chart. The bright segment is what redcon cut, the faint tail is
-  // what was actually sent.
+  // total (packed + saved). The small red segment is what actually
+  // went to the agent, the gray remainder is what would have been
+  // sent without redcon.
   const maxTotal = Math.max(...entries.map((e) => (e.tokens ?? 0) + (e.tokensSaved ?? 0)), 1);
   const dotByRisk: Record<string, string> = {
     low: 'var(--good)',
@@ -346,6 +346,7 @@ function renderRecentRuns(history: RunHistoryEntry[]): string {
     const total = (e.tokens ?? 0) + saved;
     const lanePct = Math.max(4, Math.round((total / maxTotal) * 100));
     const cutPct = total > 0 ? Math.round((saved / total) * 100) : 0;
+    const usedPct = Math.max(2, 100 - cutPct);
     const budgetPct = e.maxTokens > 0 ? Math.round((e.tokens / e.maxTokens) * 100) : 0;
     const tip = `${e.task} - cut ${cutPct}% of ${fmtK(total)} tokens - ${budgetPct}% budget - ${e.filesIncluded} files - ${e.risk} risk`;
     return `
@@ -357,7 +358,7 @@ function renderRecentRuns(history: RunHistoryEntry[]): string {
           <span class="run-saved num">${fmtK(saved)}</span>
         </div>
         <div class="run-sub">
-          <span class="run-lane"><span class="run-bar" style="width:${lanePct}%"><span class="run-fill" style="width:${cutPct}%"></span><span class="run-used"></span></span></span>
+          <span class="run-lane"><span class="run-bar" style="width:${lanePct}%"><span class="run-fill" style="width:${usedPct}%"></span><span class="run-ghost"></span></span></span>
           <span class="run-cut num">-${cutPct}%</span>
           <span class="run-when num">${fmtAgo(e.generatedAt)}</span>
           <span class="run-dot" style="background:${dotByRisk[e.risk] ?? 'var(--text3)'}"></span>
