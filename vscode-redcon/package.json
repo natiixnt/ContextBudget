@@ -2,7 +2,7 @@
   "name": "redcon",
   "displayName": "Redcon - Context Budget",
   "description": "Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under token limits.",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "publisher": "redcon",
   "license": "MIT",
   "icon": "resources/icon.png",
@@ -163,7 +163,7 @@
     "views": {
       "redcon": [
         {
-          "id": "redcon.chat",
+          "id": "redcon.control",
           "name": "Redcon",
           "type": "webview"
         }
@@ -173,19 +173,34 @@
     "menus": {
       "view/title": [
         {
+          "command": "redcon.pack",
+          "when": "view == redcon.control",
+          "group": "navigation@1"
+        },
+        {
+          "command": "redcon.copyContext",
+          "when": "view == redcon.control",
+          "group": "navigation@2"
+        },
+        {
+          "command": "redcon.syncContext",
+          "when": "view == redcon.control",
+          "group": "redcon@1"
+        },
+        {
+          "command": "redcon.doctor",
+          "when": "view == redcon.control",
+          "group": "redcon@2"
+        },
+        {
+          "command": "redcon.openConfig",
+          "when": "view == redcon.control",
+          "group": "redcon@3"
+        },
+        {
           "command": "redcon.help",
-          "when": "view == redcon.chat",
-          "group": "navigation"
-        },
-        {
-          "command": "redcon.openDashboard",
-          "when": "view == redcon.chat",
-          "group": "navigation"
-        },
-        {
-          "command": "redcon.refresh",
-          "when": "view == redcon.chat",
-          "group": "navigation"
+          "when": "view == redcon.control",
+          "group": "redcon@4"
         }
       ]
     },
@@ -249,10 +264,18 @@
         },
         "redcon.contextSync.targets": {
           "type": "array",
-          "default": ["claude", "cursor", "copilot"],
+          "default": [
+            "claude",
+            "cursor",
+            "copilot"
+          ],
           "items": {
             "type": "string",
-            "enum": ["claude", "cursor", "copilot"]
+            "enum": [
+              "claude",
+              "cursor",
+              "copilot"
+            ]
           },
           "description": "Which AI agents to generate context files for."
         },
@@ -260,6 +283,78 @@
           "type": "number",
           "default": 30,
           "description": "Maximum number of files to include in the context map."
+        },
+        "redcon.costPerMillionTokens": {
+          "type": "number",
+          "default": 3.0,
+          "description": "USD price per million input tokens, used to convert saved tokens into an estimated dollar amount on the dashboard (default 3.0, e.g. Claude Sonnet input pricing)."
+        },
+        "redcon.display.primaryMetric": {
+          "type": "string",
+          "enum": [
+            "tokens",
+            "dollars"
+          ],
+          "default": "tokens",
+          "description": "Which number leads on the dashboard: tokens saved (default) or the estimated dollar amount."
+        },
+        "redcon.budget.policy": {
+          "type": "string",
+          "enum": [
+            "auto-raise",
+            "strict-cap",
+            "ask-first"
+          ],
+          "default": "auto-raise",
+          "description": "Displayed budget policy: auto-raise the budget on high quality risk, keep a strict cap, or ask before raising."
+        },
+        "redcon.display.dataAccent": {
+          "type": "string",
+          "enum": [
+            "red",
+            "blue",
+            "violet",
+            "crimson",
+            "wine",
+            "gradient"
+          ],
+          "default": "red",
+          "description": "Accent used for data marks on the dashboard (charts, bars, pills). Chrome red and status colors are unaffected."
+        },
+        "redcon.views.showRecentRuns": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the recent runs list in the sidebar."
+        },
+        "redcon.views.showSetup": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the setup checklist in the sidebar while setup is incomplete."
+        },
+        "redcon.dashboard.showKpis": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the KPI cards row on the dashboard."
+        },
+        "redcon.dashboard.showDonuts": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the budget and strategy donut panels on the dashboard."
+        },
+        "redcon.dashboard.showImpact": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the token impact chart on the dashboard."
+        },
+        "redcon.dashboard.showTables": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the packed context and file rankings tables on the dashboard."
+        },
+        "redcon.views.showMiniDashboard": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show the savings card (cumulative savings, trend, last run) at the top of the sidebar."
         }
       }
     },

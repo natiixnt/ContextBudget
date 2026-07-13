@@ -79,11 +79,16 @@ class StateManager {
 
   /**
    * Scan workspace for run*.json artifacts and populate history.
+   *
+   * .redcon/runs/ is the run feed: the Python pipeline mirrors every
+   * pack report there regardless of entry point (CLI, SDK, MCP tools,
+   * middleware), which is what makes agent runs appear here without
+   * any manual step.
    */
   async loadHistory(workspaceRoot: string): Promise<void> {
     const entries: RunHistoryEntry[] = [];
     const redconDir = path.join(workspaceRoot, '.redcon');
-    const searchDirs = [workspaceRoot, redconDir];
+    const searchDirs = [workspaceRoot, redconDir, path.join(redconDir, 'runs')];
 
     for (const dir of searchDirs) {
       if (!fs.existsSync(dir)) {
@@ -110,6 +115,7 @@ class StateManager {
               path: filePath,
               task: data.task,
               tokens: data.budget.estimated_input_tokens ?? 0,
+              tokensSaved: data.budget.estimated_saved_tokens ?? 0,
               maxTokens: data.max_tokens ?? 30000,
               filesIncluded: data.files_included?.length ?? 0,
               generatedAt: data.generated_at ?? '',
@@ -123,13 +129,25 @@ class StateManager {
       }
     }
 
-    entries.sort(
+    // The CLI writes run.json at the root AND the pipeline mirrors the
+    // same run into the feed; keep one copy per (generatedAt, task).
+    const seen = new Set<string>();
+    const deduped = entries.filter((e) => {
+      const key = `${e.generatedAt}|${e.task}`;
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+
+    deduped.sort(
       (a, b) =>
         new Date(b.generatedAt).getTime() - new Date(a.generatedAt).getTime(),
     );
-    entries.splice(50);
+    deduped.splice(50);
 
-    this.setHistory(entries);
+    this.setHistory(deduped);
   }
 
   dispose(): void {

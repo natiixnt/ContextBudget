@@ -331,6 +331,7 @@ export interface RunHistoryEntry {
   path: string;
   task: string;
   tokens: number;
+  tokensSaved: number;
   maxTokens: number;
   filesIncluded: number;
   generatedAt: string;

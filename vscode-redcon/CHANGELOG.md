@@ -1,5 +1,47 @@
 # Changelog
 
+## 0.9.0 - 2026-07-11
+
+### Added
+
+- Brand new analytics dashboard implementing the Redcon Analytics
+  design handoff: brand gradient banner with the redcon lockup, a
+  cumulative savings hero with per-run trend, four KPI cards with
+  budget threshold ticks and risk states, donut panels for budget and
+  strategy share, a shared-scale token impact chart and side-by-side
+  packed context / file rankings tables.
+- New settings, all live-reactive:
+  - `redcon.display.primaryMetric` (`tokens` | `dollars`) swaps which
+    number leads in the hero and the saved-this-run KPI.
+  - `redcon.budget.policy` (`auto-raise` | `strict-cap` | `ask-first`)
+    drives the budget card footnote and the high-risk note.
+  - `redcon.display.dataAccent` (`red` default, `blue`, `violet`,
+    `crimson`, `wine`, `gradient`) recolors all data marks; chrome red
+    and status colors stay fixed.
+  - `redcon.costPerMillionTokens` converts saved tokens into dollars.
+- Status bar shows tokens saved next to budget usage after a run.
+- The chat-styled sidebar is gone. The panel now leads with a savings
+  card in the brand gradient (cumulative savings, dollar estimate,
+  per-run trend and the last run summary) that is the single
+  click-through to the full dashboard, followed by the run feed:
+  ranked rows with a savings bar, time-ago and a risk dot, each
+  opening that run in the dashboard. There is no analyze form in the
+  body; runs arrive automatically through the artifact watcher when
+  an agent uses redcon, and a manual pack sits in the view title bar
+  together with copy context, sync, doctor, config and help. The
+  setup checklist only appears while setup is incomplete. Sections
+  are toggleable via `redcon.views.*`.
+
+### Notes
+
+- Telegraf display font is referenced with a system-stack fallback but
+  NOT bundled: the Pangram Pangram license must be verified before
+  shipping the OTF files inside the extension.
+- Run history now records tokens saved per run (drives the hero and
+  trend). Dashboard HTML rendering lives in a pure module
+  (`webview/dashboardHtml.ts`) with no vscode dependency, verified by
+  rendering both themes and all accent presets in Chromium.
+
 ## 0.8.0 - 2026-04-27
 
 ### Added (delivered by the underlying Redcon CLI)

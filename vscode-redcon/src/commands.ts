@@ -1,6 +1,7 @@
 /**
  * All command handlers for the extension.
- * Routes output to the chat view when available, falls back to notifications.
+ * Reports progress to the control panel when available, falls back to
+ * window notifications.
  */
 
 import * as vscode from 'vscode';
@@ -9,13 +10,27 @@ import * as path from 'path';
 import * as redcon from './redcon';
 import { state } from './state';
 import type { RunReport } from './types';
-import type { ChatViewProvider } from './webview/chatView';
+import type { ControlViewProvider } from './webview/controlView';
 import { syncContextFiles, type SyncTarget } from './contextSync';
 
-let chatView: ChatViewProvider | null = null;
+let controlView: ControlViewProvider | null = null;
 
-export function setChatView(cv: ChatViewProvider): void {
-  chatView = cv;
+export function setControlView(view: ControlViewProvider): void {
+  controlView = view;
+}
+
+function notify(kind: 'info' | 'success' | 'error', text: string): void {
+  if (controlView) {
+    controlView.notify(kind, text);
+  } else if (kind === 'error') {
+    vscode.window.showErrorMessage(`Redcon: ${text}`);
+  } else {
+    vscode.window.showInformationMessage(`Redcon: ${text}`);
+  }
+}
+
+function errMsg(err: unknown): string {
+  return err instanceof Error ? err.message : String(err);
 }
 
 function getWorkspaceRoot(): string {
@@ -68,9 +83,7 @@ export async function cmdPack(taskFromChat?: string): Promise<void> {
     return;
   }
 
-  // Post to chat
-  chatView?.addUserMessage(task);
-  const analyzingId = chatView?.addAnalyzing('Packing context...');
+  controlView?.setBusy('Packing context...');
 
   state.setRunning(true);
   try {
@@ -81,26 +94,18 @@ export async function cmdPack(taskFromChat?: string): Promise<void> {
     // Auto-sync context files
     await autoSync(result, cwd);
 
-    if (analyzingId) {
-      chatView?.replaceWithPackResult(analyzingId, result);
-    } else {
-      // Fallback: no chat view
-      const pct = result.max_tokens > 0
-        ? Math.round((result.budget.estimated_input_tokens / result.max_tokens) * 100)
-        : 0;
-      vscode.window.showInformationMessage(
-        `Redcon: Packed ${result.files_included.length} files | ${pct}% budget | Risk: ${result.budget.quality_risk_estimate}`,
-      );
-    }
+    const pct = result.max_tokens > 0
+      ? Math.round((result.budget.estimated_input_tokens / result.max_tokens) * 100)
+      : 0;
+    notify(
+      'success',
+      `packed ${result.files_included.length} files - ${pct}% budget - risk ${result.budget.quality_risk_estimate}`,
+    );
   } catch (err: unknown) {
-    if (analyzingId) {
-      chatView?.replaceWithError(analyzingId, err);
-    } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`Redcon: ${msg}`);
-    }
+    notify('error', errMsg(err));
   } finally {
     state.setRunning(false);
+    controlView?.clearBusy();
   }
 }
 
@@ -116,30 +121,18 @@ export async function cmdPlan(): Promise<void> {
   const config = vscode.workspace.getConfiguration('redcon');
   const topFiles = config.get<number>('defaultTopFiles', 25);
 
-  chatView?.addUserMessage(`plan: ${task}`);
-  const analyzingId = chatView?.addAnalyzing('Ranking files...');
+  controlView?.setBusy('Ranking files...');
 
   state.setRunning(true);
   try {
     const result = await redcon.pack(task, { cwd, topFiles });
     state.setRun(result);
-
-    if (analyzingId) {
-      chatView?.replaceWithPackResult(analyzingId, result);
-    } else {
-      vscode.window.showInformationMessage(
-        `Redcon: Ranked ${result.ranked_files.length} files for "${task}"`,
-      );
-    }
+    notify('success', `ranked ${result.ranked_files.length} files`);
   } catch (err: unknown) {
-    if (analyzingId) {
-      chatView?.replaceWithError(analyzingId, err);
-    } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`Redcon: ${msg}`);
-    }
+    notify('error', errMsg(err));
   } finally {
     state.setRunning(false);
+    controlView?.clearBusy();
   }
 }
 
@@ -155,30 +148,18 @@ export async function cmdPlanAgent(): Promise<void> {
 
   const cwd = getWorkspaceRoot();
 
-  chatView?.addUserMessage(`plan-agent: ${task}`);
-  const analyzingId = chatView?.addAnalyzing('Planning agent workflow...');
+  controlView?.setBusy('Planning agent workflow...');
 
   state.setRunning(true);
   try {
     const result = await redcon.planAgent(task, { cwd });
     state.setPlan(result);
-
-    if (analyzingId) {
-      chatView?.replaceWithPlanAgentResult(analyzingId, result);
-    } else {
-      vscode.window.showInformationMessage(
-        `Redcon: Agent plan with ${result.steps.length} steps`,
-      );
-    }
+    notify('success', `agent plan ready - ${result.steps.length} steps`);
   } catch (err: unknown) {
-    if (analyzingId) {
-      chatView?.replaceWithError(analyzingId, err);
-    } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`Redcon: ${msg}`);
-    }
+    notify('error', errMsg(err));
   } finally {
     state.setRunning(false);
+    controlView?.clearBusy();
   }
 }
 
@@ -189,31 +170,19 @@ export async function cmdDoctor(): Promise<void> {
 
   const cwd = getWorkspaceRoot();
 
-  const analyzingId = chatView?.addAnalyzing('Running diagnostics...');
+  controlView?.setBusy('Running diagnostics...');
 
   state.setRunning(true);
   try {
     const result = await redcon.doctor({ cwd });
     state.setDoctor(result);
-
-    if (analyzingId) {
-      chatView?.replaceWithDoctorResult(analyzingId, result);
-    } else {
-      if (result.failures > 0) {
-        vscode.window.showWarningMessage(`Redcon Doctor: ${result.failures} check(s) failed`);
-      } else {
-        vscode.window.showInformationMessage('Redcon Doctor: All checks passed');
-      }
-    }
+    const kind = result.failures > 0 ? 'error' : 'success';
+    notify(kind, `doctor: ${result.passed} passed - ${result.warnings} warnings - ${result.failures} failures`);
   } catch (err: unknown) {
-    if (analyzingId) {
-      chatView?.replaceWithError(analyzingId, err);
-    } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`Redcon: ${msg}`);
-    }
+    notify('error', errMsg(err));
   } finally {
     state.setRunning(false);
+    controlView?.clearBusy();
   }
 }
 
@@ -237,7 +206,7 @@ export async function cmdInit(): Promise<void> {
   state.setRunning(true);
   try {
     await redcon.init({ cwd, force: fs.existsSync(configPath) });
-    chatView?.addInfo('Configuration initialized - redcon.toml created');
+    notify('success', 'redcon.toml created');
     const doc = await vscode.workspace.openTextDocument(configPath);
     await vscode.window.showTextDocument(doc);
   } catch (err: unknown) {
@@ -263,7 +232,7 @@ export async function cmdExport(): Promise<void> {
     .map((f) => path.join(cwd, f));
 
   if (files.length === 0) {
-    chatView?.addInfo('No run.json artifacts found');
+    notify('info', 'no run.json artifacts found');
     return;
   }
 
@@ -286,7 +255,7 @@ export async function cmdExport(): Promise<void> {
 
     if (result !== undefined) {
       await vscode.env.clipboard.writeText(result);
-      chatView?.addInfo(`Exported ${result.length} characters to clipboard`);
+      notify('success', `exported ${result.length} characters to clipboard`);
     }
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -310,30 +279,18 @@ export async function cmdBenchmark(): Promise<void> {
   const config = vscode.workspace.getConfiguration('redcon');
   const maxTokens = config.get<number>('defaultMaxTokens', 30000);
 
-  chatView?.addUserMessage(`benchmark: ${task}`);
-  const analyzingId = chatView?.addAnalyzing('Benchmarking strategies...');
+  controlView?.setBusy('Benchmarking strategies...');
 
   state.setRunning(true);
   try {
     const result = await redcon.benchmark(task, { cwd, maxTokens });
     state.setBenchmark(result);
-
-    if (analyzingId) {
-      chatView?.replaceWithBenchmarkResult(analyzingId, result);
-    } else {
-      vscode.window.showInformationMessage(
-        `Redcon: Benchmarked ${result.strategies.length} strategies`,
-      );
-    }
+    notify('success', `benchmarked ${result.strategies.length} strategies`);
   } catch (err: unknown) {
-    if (analyzingId) {
-      chatView?.replaceWithError(analyzingId, err);
-    } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`Redcon: ${msg}`);
-    }
+    notify('error', errMsg(err));
   } finally {
     state.setRunning(false);
+    controlView?.clearBusy();
   }
 }
 
@@ -364,30 +321,18 @@ export async function cmdSimulate(): Promise<void> {
     return;
   }
 
-  chatView?.addUserMessage(`simulate: ${task} (${model.label})`);
-  const analyzingId = chatView?.addAnalyzing('Simulating agent cost...');
+  controlView?.setBusy('Simulating agent cost...');
 
   state.setRunning(true);
   try {
     const result = await redcon.simulate(task, { cwd, model: model.label });
     state.setSimulation(result);
-
-    if (analyzingId) {
-      chatView?.replaceWithSimulateResult(analyzingId, result);
-    } else {
-      vscode.window.showInformationMessage(
-        `Redcon: Estimated cost $${result.cost_estimate.total_cost_usd.toFixed(4)}`,
-      );
-    }
+    notify('success', `estimated cost $${result.cost_estimate.total_cost_usd.toFixed(4)} (${model.label})`);
   } catch (err: unknown) {
-    if (analyzingId) {
-      chatView?.replaceWithError(analyzingId, err);
-    } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`Redcon: ${msg}`);
-    }
+    notify('error', errMsg(err));
   } finally {
     state.setRunning(false);
+    controlView?.clearBusy();
   }
 }
 
@@ -398,32 +343,21 @@ export async function cmdDrift(): Promise<void> {
 
   const cwd = getWorkspaceRoot();
 
-  const analyzingId = chatView?.addAnalyzing('Checking token drift...');
+  controlView?.setBusy('Checking token drift...');
 
   state.setRunning(true);
   try {
     const result = await redcon.drift({ cwd });
-
-    if (analyzingId) {
-      chatView?.replaceWithDriftResult(analyzingId, result);
+    if (result.drift_detected) {
+      notify('info', `token drift detected: +${result.drift_pct.toFixed(1)}%`);
     } else {
-      if (result.drift_detected) {
-        vscode.window.showWarningMessage(
-          `Redcon Drift: ${result.drift_pct.toFixed(1)}% growth`,
-        );
-      } else {
-        vscode.window.showInformationMessage('Redcon: No drift detected');
-      }
+      notify('success', 'no token drift detected');
     }
   } catch (err: unknown) {
-    if (analyzingId) {
-      chatView?.replaceWithError(analyzingId, err);
-    } else {
-      const msg = err instanceof Error ? err.message : String(err);
-      vscode.window.showErrorMessage(`Redcon: ${msg}`);
-    }
+    notify('error', errMsg(err));
   } finally {
     state.setRunning(false);
+    controlView?.clearBusy();
   }
 }
 
@@ -457,7 +391,7 @@ export async function cmdOpenConfig(): Promise<void> {
 export async function cmdCopyContext(): Promise<void> {
   const run = state.state.lastRun;
   if (!run?.compressed_context?.length) {
-    chatView?.addInfo('No packed context to copy. Run Pack first.');
+    notify('info', 'no packed context to copy - run Analyze first');
     return;
   }
 
@@ -467,7 +401,7 @@ export async function cmdCopyContext(): Promise<void> {
 
   await vscode.env.clipboard.writeText(text);
   vscode.window.setStatusBarMessage('Context copied to clipboard', 3000);
-  chatView?.addInfo(`Copied context for ${run.compressed_context.length} files to clipboard`);
+  notify('success', `copied context for ${run.compressed_context.length} files`);
 }
 
 // --- Load Run (from history) ---
@@ -477,7 +411,7 @@ export async function cmdLoadRun(runPath: string): Promise<void> {
     const raw = fs.readFileSync(runPath, 'utf-8');
     const data = JSON.parse(raw) as RunReport;
     state.setRun(data);
-    chatView?.addInfo(`Loaded run: "${data.task}" (${data.budget.estimated_input_tokens.toLocaleString()} tokens)`);
+    notify('info', `loaded run: "${data.task}"`);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     vscode.window.showErrorMessage(`Failed to load run: ${msg}`);
@@ -505,17 +439,17 @@ async function autoSync(result: RunReport, cwd: string): Promise<void> {
 
   if (syncResult.filesWritten.length > 0) {
     const names = syncResult.filesWritten.map((p) => path.basename(p)).join(', ');
-    chatView?.addInfo(`Context synced: ${names}`);
+    notify('success', `context synced: ${names}`);
   }
   if (syncResult.errors.length > 0) {
-    chatView?.addInfo(`Sync errors: ${syncResult.errors.join('; ')}`);
+    notify('error', `sync errors: ${syncResult.errors.join('; ')}`);
   }
 }
 
 export async function cmdSyncContext(): Promise<void> {
   const run = state.state.lastRun;
   if (!run) {
-    chatView?.addInfo('No analysis data yet. Send a task first.');
+    notify('info', 'no analysis data yet - run Analyze first');
     return;
   }
 
@@ -528,10 +462,10 @@ export async function cmdSyncContext(): Promise<void> {
 
   if (syncResult.filesWritten.length > 0) {
     const names = syncResult.filesWritten.map((p) => path.basename(p)).join(', ');
-    chatView?.addInfo(`Context synced: ${names}`);
+    notify('success', `context synced: ${names}`);
   } else if (syncResult.errors.length > 0) {
-    chatView?.addInfo(`Sync failed: ${syncResult.errors.join('; ')}`);
+    notify('error', `sync failed: ${syncResult.errors.join('; ')}`);
   } else {
-    chatView?.addInfo('No sync targets configured. Enable in Settings > Redcon > Context Sync.');
+    notify('info', 'no sync targets configured - see Settings > Redcon > Context Sync');
   }
 }

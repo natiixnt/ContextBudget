@@ -63,9 +63,11 @@ export class StatusBar {
     const max = run.max_tokens;
     const pct = max > 0 ? Math.round((used / max) * 100) : 0;
 
-    // Budget item
+    // Budget item - savings are the headline number, keep them visible.
     const icon = pct > 90 ? '$(warning)' : pct > 70 ? '$(info)' : '$(package)';
-    this.budgetItem.text = `${icon} ${formatTokens(used)}/${formatTokens(max)}`;
+    const saved = run.budget.estimated_saved_tokens;
+    const savedPart = saved > 0 ? ` $(arrow-down)${formatTokens(saved)}` : '';
+    this.budgetItem.text = `${icon} ${formatTokens(used)}/${formatTokens(max)}${savedPart}`;
     this.budgetItem.tooltip = new vscode.MarkdownString(
       [
         `**Redcon Budget**`,
