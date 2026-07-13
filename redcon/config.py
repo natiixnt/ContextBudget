@@ -1,22 +1,23 @@
-from __future__ import annotations
-
 """Configuration loading and defaults for Redcon."""
 
+from __future__ import annotations
+
 import logging
+from collections.abc import Mapping
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Mapping
-
-logger = logging.getLogger(__name__)
+from typing import Any
 
 from redcon.schemas.models import (
     BINARY_EXTENSIONS,
     CACHE_FILE,
-    DEFAULT_TOP_FILES,
     DEFAULT_IGNORE_DIRS,
     DEFAULT_MAX_TOKENS,
+    DEFAULT_TOP_FILES,
     RUN_HISTORY_FILE,
 )
+
+logger = logging.getLogger(__name__)
 
 try:
     import tomllib  # type: ignore[attr-defined]
@@ -242,7 +243,7 @@ class WorkspaceDefinition:
     path: Path
     root: Path
     repos: list[WorkspaceRepoSettings]
-    config: "RedconConfig"
+    config: RedconConfig
     name: str = ""
 
 
@@ -274,12 +275,13 @@ class RedconConfig:
             warnings.append(
                 f"[budget].max_tokens must be a positive integer, got {self.budget.max_tokens!r}"
             )
-        if self.budget.top_files is not None:
-            if not isinstance(self.budget.top_files, int) or self.budget.top_files <= 0:
-                warnings.append(
-                    f"[budget].top_files must be a positive integer or omitted, "
-                    f"got {self.budget.top_files!r}"
-                )
+        if self.budget.top_files is not None and (
+            not isinstance(self.budget.top_files, int) or self.budget.top_files <= 0
+        ):
+            warnings.append(
+                f"[budget].top_files must be a positive integer or omitted, "
+                f"got {self.budget.top_files!r}"
+            )
 
         # Compression validations
         if not (0.0 <= self.compression.snippet_score_threshold <= 100.0):
@@ -294,9 +296,7 @@ class RedconConfig:
                 f"[scan].max_file_size_bytes must be > 0, got {self.scan.max_file_size_bytes}"
             )
         if self.scan.preview_chars < 0:
-            warnings.append(
-                f"[scan].preview_chars must be >= 0, got {self.scan.preview_chars}"
-            )
+            warnings.append(f"[scan].preview_chars must be >= 0, got {self.scan.preview_chars}")
 
         # Cache backend
         valid_cache_backends = {"local_file", "redis", "sqlite", "memory"}
@@ -308,8 +308,14 @@ class RedconConfig:
 
         # Token estimation backend
         valid_token_backends = {
-            "heuristic", "simple", "model_aligned", "model-aligned",
-            "exact", "exact_tiktoken", "exact-tiktoken", "tiktoken",
+            "heuristic",
+            "simple",
+            "model_aligned",
+            "model-aligned",
+            "exact",
+            "exact_tiktoken",
+            "exact-tiktoken",
+            "tiktoken",
         }
         if self.tokens.backend not in valid_token_backends:
             warnings.append(
@@ -340,12 +346,10 @@ class RedconConfig:
         # Role multipliers
         for role, multiplier in self.score.role_multipliers.items():
             if multiplier < 0:
-                warnings.append(
-                    f"[score].role_multipliers.{role} must be >= 0, got {multiplier}"
-                )
+                warnings.append(f"[score].role_multipliers.{role} must be >= 0, got {multiplier}")
 
         # Telemetry sink
-        valid_telemetry_sinks = {"noop", "jsonl_file"}
+        valid_telemetry_sinks = {"noop", "none", "file", "jsonl", "jsonl_file", "cloud", "http"}
         if self.telemetry.enabled and self.telemetry.sink not in valid_telemetry_sinks:
             warnings.append(
                 f"[telemetry].sink must be one of {sorted(valid_telemetry_sinks)}, "
@@ -391,7 +395,9 @@ def _to_dict(value: Any) -> dict[str, Any]:
     return {str(key): raw for key, raw in value.items()}
 
 
-def _mark_explicit_fields(explicit: set[str], data: Mapping[str, Any], field_map: Mapping[str, str]) -> None:
+def _mark_explicit_fields(
+    explicit: set[str], data: Mapping[str, Any], field_map: Mapping[str, str]
+) -> None:
     for raw_key, canonical_name in field_map.items():
         if raw_key in data:
             explicit.add(canonical_name)
@@ -427,16 +433,12 @@ def _coerce_int(value: Any, field_name: str) -> int:
     try:
         return int(value)
     except (TypeError, ValueError):
-        raise ValueError(
-            f"{field_name} must be an integer, got {value!r}"
-        )
+        raise ValueError(f"{field_name} must be an integer, got {value!r}") from None
 
 
 def _apply_budget_overrides(settings: BudgetSettings, data: Mapping[str, Any]) -> None:
     if "max_tokens" in data:
-        settings.max_tokens = _coerce_int(
-            data["max_tokens"], "[budget].max_tokens"
-        )
+        settings.max_tokens = _coerce_int(data["max_tokens"], "[budget].max_tokens")
     if "top_files" in data:
         raw_top_files = int(data["top_files"])
         if raw_top_files > 0:
@@ -447,9 +449,7 @@ def _apply_budget_overrides(settings: BudgetSettings, data: Mapping[str, Any]) -
         settings.strategy = str(data["strategy"]).strip().lower() or "adaptive"
     # Backward-compatible keys
     if "default_max_tokens" in data:
-        settings.max_tokens = _coerce_int(
-            data["default_max_tokens"], "[budget].default_max_tokens"
-        )
+        settings.max_tokens = _coerce_int(data["default_max_tokens"], "[budget].default_max_tokens")
     if "default_top_files" in data:
         raw_top_files = int(data["default_top_files"])
         settings.top_files = raw_top_files if raw_top_files > 0 else None
@@ -480,7 +480,9 @@ def _apply_score_overrides(settings: ScoreSettings, data: Mapping[str, Any]) -> 
     if "critical_path_bonus" in data:
         settings.critical_path_bonus = float(data["critical_path_bonus"])
     if "critical_path_keywords" in data:
-        settings.critical_path_keywords = [item.lower() for item in _to_list(data["critical_path_keywords"])]
+        settings.critical_path_keywords = [
+            item.lower() for item in _to_list(data["critical_path_keywords"])
+        ]
     if "enable_import_graph_signals" in data:
         settings.enable_import_graph_signals = bool(data["enable_import_graph_signals"])
     if "graph_seed_score_threshold" in data:
@@ -500,7 +502,9 @@ def _apply_score_overrides(settings: ScoreSettings, data: Mapping[str, Any]) -> 
     if "history_score_cap" in data:
         settings.history_score_cap = float(data["history_score_cap"])
     if "history_task_similarity_threshold" in data:
-        settings.history_task_similarity_threshold = float(data["history_task_similarity_threshold"])
+        settings.history_task_similarity_threshold = float(
+            data["history_task_similarity_threshold"]
+        )
     if "history_entry_limit" in data:
         settings.history_entry_limit = int(data["history_entry_limit"])
     if "entrypoint_filenames" in data:
@@ -596,7 +600,9 @@ def _apply_cache_overrides(settings: CacheSettings, data: Mapping[str, Any]) -> 
         settings.summary_cache_enabled = bool(data["enabled"])
 
 
-def _apply_summarization_overrides(settings: SummarizationSettings, data: Mapping[str, Any]) -> None:
+def _apply_summarization_overrides(
+    settings: SummarizationSettings, data: Mapping[str, Any]
+) -> None:
     if "backend" in data:
         settings.backend = str(data["backend"]).strip().lower()
     if "adapter" in data:
@@ -605,7 +611,9 @@ def _apply_summarization_overrides(settings: SummarizationSettings, data: Mappin
         settings.backend = str(data["provider"]).strip().lower()
 
 
-def _apply_token_estimation_overrides(settings: TokenEstimationSettings, data: Mapping[str, Any]) -> None:
+def _apply_token_estimation_overrides(
+    settings: TokenEstimationSettings, data: Mapping[str, Any]
+) -> None:
     if "backend" in data:
         settings.backend = str(data["backend"]).strip().lower() or settings.backend
     if "model" in data:
@@ -613,7 +621,9 @@ def _apply_token_estimation_overrides(settings: TokenEstimationSettings, data: M
     if "encoding" in data:
         settings.encoding = str(data["encoding"]).strip()
     if "fallback_backend" in data:
-        settings.fallback_backend = str(data["fallback_backend"]).strip().lower() or settings.fallback_backend
+        settings.fallback_backend = (
+            str(data["fallback_backend"]).strip().lower() or settings.fallback_backend
+        )
 
 
 def _apply_model_overrides(settings: ModelProfileSettings, data: Mapping[str, Any]) -> None:
@@ -624,7 +634,9 @@ def _apply_model_overrides(settings: ModelProfileSettings, data: Mapping[str, An
     if "context_window" in data:
         settings.context_window = int(data["context_window"])
     if "recommended_compression_strategy" in data:
-        settings.recommended_compression_strategy = str(data["recommended_compression_strategy"]).strip().lower()
+        settings.recommended_compression_strategy = (
+            str(data["recommended_compression_strategy"]).strip().lower()
+        )
     if "output_reserve_tokens" in data:
         settings.output_reserve_tokens = int(data["output_reserve_tokens"])
 
@@ -663,11 +675,25 @@ def _apply_plugin_overrides(settings: PluginSettings, data: Mapping[str, Any]) -
         settings.registrations = registrations
 
 
-_KNOWN_TOP_LEVEL_KEYS = frozenset({
-    "scan", "budget", "score", "compression", "summarization", "cache",
-    "tokens", "model", "telemetry", "plugins", "pack", "output",
-    "model_profile", "repos", "name",
-})
+_KNOWN_TOP_LEVEL_KEYS = frozenset(
+    {
+        "scan",
+        "budget",
+        "score",
+        "compression",
+        "summarization",
+        "cache",
+        "tokens",
+        "model",
+        "telemetry",
+        "plugins",
+        "pack",
+        "output",
+        "model_profile",
+        "repos",
+        "name",
+    }
+)
 
 
 def _warn_unknown_keys(data: Mapping[str, Any]) -> None:
@@ -880,15 +906,18 @@ def validate_config(config: RedconConfig) -> list[str]:
             f"[budget].max_tokens must be a positive integer (> 0), got {config.budget.max_tokens!r}"
         )
 
-    if config.budget.top_files is not None:
-        if not isinstance(config.budget.top_files, int) or config.budget.top_files <= 0:
-            errors.append(
-                f"[budget].top_files must be a positive integer (> 0) or omitted, "
-                f"got {config.budget.top_files!r}"
-            )
+    if config.budget.top_files is not None and (
+        not isinstance(config.budget.top_files, int) or config.budget.top_files <= 0
+    ):
+        errors.append(
+            f"[budget].top_files must be a positive integer (> 0) or omitted, "
+            f"got {config.budget.top_files!r}"
+        )
 
     if config.scan.max_file_size_bytes <= 0:
-        errors.append(f"[scan].max_file_size_bytes must be > 0, got {config.scan.max_file_size_bytes}")
+        errors.append(
+            f"[scan].max_file_size_bytes must be > 0, got {config.scan.max_file_size_bytes}"
+        )
 
     if config.scan.preview_chars < 0:
         errors.append(f"[scan].preview_chars must be >= 0, got {config.scan.preview_chars}")
@@ -900,8 +929,14 @@ def validate_config(config: RedconConfig) -> list[str]:
         )
 
     valid_token_backends = {
-        "heuristic", "simple", "model_aligned", "model-aligned",
-        "exact", "exact_tiktoken", "exact-tiktoken", "tiktoken",
+        "heuristic",
+        "simple",
+        "model_aligned",
+        "model-aligned",
+        "exact",
+        "exact_tiktoken",
+        "exact-tiktoken",
+        "tiktoken",
     }
     if config.tokens.backend not in valid_token_backends:
         errors.append(
@@ -937,7 +972,7 @@ def validate_config(config: RedconConfig) -> list[str]:
         if multiplier < 0:
             errors.append(f"[score].role_multipliers.{role} must be >= 0, got {multiplier}")
 
-    valid_telemetry_sinks = {"noop", "jsonl_file"}
+    valid_telemetry_sinks = {"noop", "none", "file", "jsonl", "jsonl_file", "cloud", "http"}
     if config.telemetry.enabled and config.telemetry.sink not in valid_telemetry_sinks:
         errors.append(
             f"[telemetry].sink must be one of {sorted(valid_telemetry_sinks)}, got '{config.telemetry.sink}'"

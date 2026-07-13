@@ -273,6 +273,48 @@ def _check_git_available() -> CheckResult:
         )
 
 
+def _check_mcp_registration(repo: Path) -> CheckResult:
+    """Is the redcon MCP server registered for any detected agent?
+
+    A broken agent integration is the most common silent failure: the
+    package imports fine, doctor is green, yet the agent never sees the
+    redcon tools. Surface it here.
+    """
+    try:
+        from redcon.mcp.install import detect_targets, installed_path
+
+        detected = detect_targets(repo)
+        registered = [t for t in detected if installed_path(t, repo)]
+    except Exception as exc:
+        return CheckResult(
+            name="mcp_registration",
+            status="warn",
+            message=f"Could not inspect MCP registration: {exc}",
+        )
+    if not detected:
+        return CheckResult(
+            name="mcp_registration",
+            status="warn",
+            message="No agent configs detected in this project",
+            detail=(
+                "Run 'redcon mcp install' to register the redcon MCP server "
+                "for Claude Code, Cursor, Windsurf, VS Code, Codex or Gemini."
+            ),
+        )
+    if registered:
+        return CheckResult(
+            name="mcp_registration",
+            status="ok",
+            message=f"Registered for: {', '.join(sorted(registered))}",
+        )
+    return CheckResult(
+        name="mcp_registration",
+        status="warn",
+        message=f"Agents detected ({', '.join(sorted(detected))}) but redcon is not registered",
+        detail="Run 'redcon mcp install' to register the MCP server.",
+    )
+
+
 def run_doctor(repo: Path) -> DoctorReport:
     """Run all diagnostic checks and return a report."""
     try:
@@ -293,6 +335,10 @@ def run_doctor(repo: Path) -> DoctorReport:
         _check_optional_dep("redis", "redis", "redis"),
         _check_optional_dep("fastapi", "fastapi", "gateway"),
         _check_optional_dep("uvicorn", "uvicorn", "gateway"),
+        _check_optional_dep("mcp", "mcp", "mcp"),
+        _check_optional_dep("tree_sitter", "tree_sitter", "symbols"),
+        _check_optional_dep("ast_grep", "ast_grep_py", "ast_grep"),
+        _check_mcp_registration(repo),
         _check_config(repo),
         _check_redcon_toml(repo),
         _check_cache_dir(repo),

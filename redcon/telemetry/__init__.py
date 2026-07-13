@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Telemetry abstraction layer for optional analytics sinks."""
+
+from __future__ import annotations
 
 import json
 import os
@@ -168,7 +168,7 @@ def build_telemetry_sink(
     sink_name = sink.strip().lower()
     if sink_name in {"noop", "none", ""}:
         return NoOpTelemetrySink()
-    if sink_name in {"file", "jsonl"}:
+    if sink_name in {"file", "jsonl", "jsonl_file"}:
         path = Path(file_path)
         if not path.is_absolute():
             path = repo / path

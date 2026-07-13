@@ -143,12 +143,8 @@ def _summary_table(results: list[Benchmark]) -> str:
     for b in results:
         by_schema.setdefault(b.schema, []).extend(b.levels)
     lines: list[str] = ["## Per-schema averages", ""]
-    lines.append(
-        "| schema | level | avg reduction | avg cold (ms) | avg warm (ms) |"
-    )
-    lines.append(
-        "|--------|-------|---------------|---------------|---------------|"
-    )
+    lines.append("| schema | level | avg reduction | avg cold (ms) | avg warm (ms) |")
+    lines.append("|--------|-------|---------------|---------------|---------------|")
     for schema, entries in by_schema.items():
         for level_value in ("verbose", "compact", "ultra"):
             level_entries = [e for e in entries if e.level == level_value]
@@ -188,7 +184,7 @@ def _force_level(level: CompressionLevel) -> BudgetHint:
 
 def _default_cases() -> list[tuple]:
     """Reuse the M8 fixture corpus so benchmarks track quality coverage."""
-    from tests.test_cmd_quality import CASES  # type: ignore
+    from redcon.cmd.quality_cases import CASES
 
     return list(CASES)
 
@@ -210,7 +206,7 @@ def compare_to_baseline(
     """
     import json as _json
 
-    with open(baseline_path, "r", encoding="utf-8") as fh:
+    with open(baseline_path, encoding="utf-8") as fh:
         baseline_payload = _json.load(fh)
 
     baseline_index: dict[tuple[str, str, str], float] = {}

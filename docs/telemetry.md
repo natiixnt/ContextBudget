@@ -6,8 +6,8 @@ Redcon includes a telemetry abstraction so future integrations can route run met
 to different sinks without changing pipeline logic.
 
 Current behavior remains local-first:
-- telemetry is disabled by default
-- no network sinks are implemented
+- telemetry is disabled by default (`enabled = false`, sink `noop`)
+- nothing is written or sent unless you explicitly enable it
 - no hidden data collection exists
 
 ## Components
@@ -15,6 +15,10 @@ Current behavior remains local-first:
 - `TelemetrySink` interface (`redcon.telemetry`)
 - `NoOpTelemetrySink` default implementation
 - `JsonlFileTelemetrySink` local development sink
+- `HttpTelemetrySink` opt-in network sink: POSTs events to a Redcon Cloud
+  ingestion endpoint. Only active when you explicitly set `sink = "cloud"`
+  (or `"http"`); the endpoint comes from `redcon.toml` or `REDCON_CLOUD_URL`.
+  Delivery is best-effort and never interrupts the pipeline.
 - `TelemetrySession` run-scoped emitter with shared context fields
 
 ## Event Model
@@ -39,8 +43,6 @@ Events are structured JSON objects:
   }
 }
 ```
-
-Detailed event schemas are documented in [Analytics Events](analytics-events.md).
 
 ## Emitted Events
 
@@ -68,9 +70,14 @@ Defaults:
 - `sink = "noop"`
 - `file_path = ".redcon/telemetry.jsonl"`
 
+Accepted sink values: `noop` (or `none`), `file` (aliases `jsonl`,
+`jsonl_file`) for the local JSONL file, and `cloud` (alias `http`) for the
+opt-in network sink described above.
+
 ## Trust and Privacy
 
 - No telemetry events are emitted unless users explicitly enable telemetry.
-- No HTTP clients or hosted collectors are included.
+- Nothing ever leaves the machine unless you explicitly select the `cloud`
+  sink; the default and `file` sinks are purely local.
 - File sink writes only to local filesystem paths under user control.
 - Event payloads exclude raw file contents, raw repository paths, and task text.
