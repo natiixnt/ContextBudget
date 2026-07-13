@@ -1,16 +1,14 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Versioned analytics event schema definitions and builders."""
 
+from __future__ import annotations
+
+from collections.abc import Mapping
 from dataclasses import asdict, dataclass, field
 from hashlib import sha256
 from pathlib import Path
-from typing import Any, Literal, Mapping
-
+from typing import Any, Literal
 
 EventName = Literal[
     "run_started",
@@ -38,7 +36,9 @@ ANALYTICS_EVENT_NAMES: tuple[EventName, ...] = (
     "policy_violation",
 )
 ANALYTICS_SCHEMA_V1 = "v1"
-EVENT_SCHEMA_VERSIONS: dict[str, str] = {name: ANALYTICS_SCHEMA_V1 for name in ANALYTICS_EVENT_NAMES}
+EVENT_SCHEMA_VERSIONS: dict[str, str] = {
+    name: ANALYTICS_SCHEMA_V1 for name in ANALYTICS_EVENT_NAMES
+}
 
 
 @dataclass(slots=True)
@@ -253,20 +253,26 @@ def _base_payload(command: str, repo: str | Path | None) -> AnalyticsEventPayloa
     )
 
 
-def _build_run_started_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_run_started_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     payload.tokens.max_tokens = _int_or_none(data.get("max_tokens"))
     payload.files.top_files = _int_or_none(data.get("top_files"))
     return asdict(payload)
 
 
-def _build_scan_completed_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_scan_completed_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     payload.files.scanned_files = _int_or_none(data.get("scanned_files"))
     return asdict(payload)
 
 
-def _build_scoring_completed_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_scoring_completed_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     payload.files.scanned_files = _int_or_none(data.get("scanned_files"))
     payload.files.ranked_files = _int_or_none(data.get("ranked_files"))
@@ -274,7 +280,9 @@ def _build_scoring_completed_payload(command: str, repo: str | Path | None, data
     return asdict(payload)
 
 
-def _build_pack_completed_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_pack_completed_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     payload.tokens.max_tokens = _int_or_none(data.get("max_tokens"))
     payload.tokens.estimated_input_tokens = _int_or_none(data.get("estimated_input_tokens"))
@@ -290,25 +298,37 @@ def _build_pack_completed_payload(command: str, repo: str | Path | None, data: M
     return asdict(payload)
 
 
-def _build_benchmark_completed_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_benchmark_completed_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     strategies = _strategy_summaries(data.get("strategies"))
     payload.tokens.max_tokens = _int_or_none(data.get("max_tokens"))
-    payload.tokens.baseline_full_context_tokens = _int_or_none(data.get("baseline_full_context_tokens"))
-    payload.tokens.estimated_input_tokens = _min_int([item.estimated_input_tokens for item in strategies])
-    payload.tokens.estimated_saved_tokens = _max_int([item.estimated_saved_tokens for item in strategies])
+    payload.tokens.baseline_full_context_tokens = _int_or_none(
+        data.get("baseline_full_context_tokens")
+    )
+    payload.tokens.estimated_input_tokens = _min_int(
+        [item.estimated_input_tokens for item in strategies]
+    )
+    payload.tokens.estimated_saved_tokens = _max_int(
+        [item.estimated_saved_tokens for item in strategies]
+    )
     payload.files.scanned_files = _int_or_none(data.get("scanned_files"))
     payload.files.ranked_files = _int_or_none(data.get("ranked_files"))
     payload.files.top_files = _int_or_none(data.get("top_files"))
     payload.files.strategy_count = len(strategies)
     payload.cache.cache_hits = _max_int([item.cache_hits for item in strategies])
-    payload.cache.duplicate_reads_prevented = _max_int([item.duplicate_reads_prevented for item in strategies])
+    payload.cache.duplicate_reads_prevented = _max_int(
+        [item.duplicate_reads_prevented for item in strategies]
+    )
     payload.benchmark.scan_runtime_ms = _int_or_none(data.get("scan_runtime_ms"))
     payload.benchmark.strategies = strategies
     return asdict(payload)
 
 
-def _build_policy_failed_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_policy_failed_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     checks = _policy_checks(data.get("checks"))
     violations = _string_list(data.get("violations"))
@@ -330,7 +350,9 @@ def _build_policy_failed_payload(command: str, repo: str | Path | None, data: Ma
     return asdict(payload)
 
 
-def _build_cache_hit_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_cache_hit_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     payload.cache.cache_hits = _int_or_none(data.get("total_hits"))
     payload.cache.tokens_saved = _int_or_none(data.get("tokens_saved"))
@@ -340,7 +362,9 @@ def _build_cache_hit_payload(command: str, repo: str | Path | None, data: Mappin
     return asdict(payload)
 
 
-def _build_delta_applied_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_delta_applied_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     payload.delta.files_added = _int_or_none(data.get("files_added"))
     payload.delta.files_removed = _int_or_none(data.get("files_removed"))
@@ -353,12 +377,16 @@ def _build_delta_applied_payload(command: str, repo: str | Path | None, data: Ma
     return asdict(payload)
 
 
-def _build_policy_violation_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_policy_violation_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     # Identical structure to policy_failed; canonical name going forward.
     return _build_policy_failed_payload(command, repo, data)
 
 
-def _build_plan_completed_payload(command: str, repo: str | Path | None, data: Mapping[str, Any]) -> dict[str, Any]:
+def _build_plan_completed_payload(
+    command: str, repo: str | Path | None, data: Mapping[str, Any]
+) -> dict[str, Any]:
     payload = _base_payload(command, repo)
     payload.files.scanned_files = _int_or_none(data.get("scanned_files"))
     payload.files.ranked_files = _int_or_none(data.get("ranked_files"))

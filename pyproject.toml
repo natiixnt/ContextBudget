@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "redcon"
-version = "1.9.1"
+version = "1.10.0"
 description = "Deterministic context budgeting for coding-agent workflows"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -53,15 +53,15 @@ redcon-gateway = "redcon.gateway.server:run_gateway"
 include-package-data = true
 
 [tool.setuptools.packages.find]
-# "redcon*" would also match the sibling redcon-cloud/ and
-# redcon-benchmarks/ directories and ship them in the wheel.
+# "redcon*" alone would also match hyphenated sibling directories
+# and ship them in the wheel; keep the explicit include list.
 include = ["redcon", "redcon.*"]
 namespaces = false
 
 [tool.ruff]
 target-version = "py310"
 line-length = 100
-exclude = ["benchmarks", "dashboard", "examples", "redcon-cloud", "redcon-benchmarks"]
+exclude = ["benchmarks", "examples"]
 
 [tool.ruff.lint]
 select = ["E", "F", "W", "I", "UP", "B", "SIM"]

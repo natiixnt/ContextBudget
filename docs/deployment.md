@@ -19,8 +19,8 @@ Redcon has two independently deployable tiers.
 ┌──────────────────────────────────────────────────────────┐
 │                   CONTROL PLANE TIER                     │
 │                                                          │
-│  redcon-cloud  (FastAPI + asyncpg)                │
-│  PostgreSQL database                                     │
+│  Redcon Cloud  (private repo) or local            │
+│  redcon control-plane (SQLite)                           │
 │  port 8080 (default)                                     │
 └──────────────────────────────────────────────────────────┘
 ```
@@ -59,52 +59,18 @@ When `RC_GATEWAY_CLOUD_POLICY_URL` is set, the gateway fetches the active `Polic
 
 ## Control Plane Tier
 
-```bash
-cd redcon-cloud
-docker-compose up          # starts PostgreSQL + FastAPI on port 8080
-```
-
-Or run the app directly:
+The hosted multi-tenant control plane (Redcon Cloud: org and project
+management, API keys, quotas, usage metering, billing, dashboards) is
+commercial and lives in a separate private repository. This public
+repository ships the local single-node alternative:
 
 ```bash
-pip install -r requirements.txt
-export DATABASE_URL=postgresql://user:pass@localhost:5432/redcon
-uvicorn app.main:app --host 0.0.0.0 --port 8080
+redcon control-plane        # stdlib HTTP + SQLite, single team, no auth
 ```
 
-### Database setup
-
-Apply migrations in order:
-
-```bash
-psql $DATABASE_URL -f migrations/001_create_events.sql
-psql $DATABASE_URL -f migrations/002_create_control_plane.sql
-```
-
-Migrations are idempotent (`CREATE TABLE IF NOT EXISTS`).
-
-### Environment variables
-
-| Variable | Default | Description |
-|---|---|---|
-| `DATABASE_URL` | `postgresql://redcon:redcon@db:5432/redcon` | PostgreSQL DSN |
-| `HOST` | `0.0.0.0` | Bind address |
-| `PORT` | `8080` | TCP port |
-
----
-
-## Docker Compose (recommended for trials)
-
-The included `docker-compose.yml` starts both PostgreSQL and the cloud service:
-
-```bash
-cd redcon-cloud
-docker-compose up -d
-```
-
-Services:
-- `db` - PostgreSQL 15 on port 5432
-- `app` - Redcon Cloud on port 8080
+The gateway integrates with either through the same environment
+variables (`RC_GATEWAY_CLOUD_POLICY_URL`, `RC_GATEWAY_CLOUD_API_KEY`,
+`RC_GATEWAY_CLOUD_ORG_ID`).
 
 ---
 

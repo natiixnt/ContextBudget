@@ -1,20 +1,17 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Adapter abstractions for local agent-tool integrations."""
+
+from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+from redcon.agents.middleware import AgentMiddlewareResult, AgentTaskRequest, RedconMiddleware
 from redcon.core.delta import effective_pack_metrics
 from redcon.core.policy import PolicySpec
-
-from redcon.agents.middleware import AgentMiddlewareResult, AgentTaskRequest, RedconMiddleware
 
 
 @dataclass(slots=True)
@@ -107,8 +104,7 @@ class LocalDemoAgentAdapter(AgentAdapter):
             f"Estimated input tokens: {result.metadata.get('estimated_input_tokens', 0)}"
         )
         response = (
-            f"Simulated agent received {len(included)} packed files "
-            f"for task '{request.task}'."
+            f"Simulated agent received {len(included)} packed files for task '{request.task}'."
         )
 
         adapter_metadata = {
@@ -116,7 +112,9 @@ class LocalDemoAgentAdapter(AgentAdapter):
             "files_included_count": len(included),
             "selected_repos": list(result.metadata.get("selected_repos", [])),
             "policy_passed": (
-                bool(result.policy_result.get("passed", False)) if result.policy_result is not None else None
+                bool(result.policy_result.get("passed", False))
+                if result.policy_result is not None
+                else None
             ),
         }
         result.adapter_name = self.name

@@ -52,7 +52,7 @@ jobs:
         env:
           BASE_REF: ${{ github.base_ref }}
         run: |
-          changed=$(git diff --name-only --diff-filter=ACMR "origin/${BASE_REF}...HEAD" -- '*.py' | grep -v -E '^(benchmarks|dashboard|examples|redcon-cloud|redcon-benchmarks)/' || true)
+          changed=$(git diff --name-only --diff-filter=ACMR "origin/${BASE_REF}...HEAD" -- '*.py' | grep -v -E '^(benchmarks|examples)/' || true)
           if [ -n "$changed" ]; then
             echo "$changed" | xargs ruff check
             echo "$changed" | xargs ruff format --check

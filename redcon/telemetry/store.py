@@ -1,8 +1,4 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Local metrics store for agent observability run history.
 
@@ -11,10 +7,11 @@ inside the repository root (or a custom path).  The store is append-only and
 capped at *max_entries* to prevent unbounded growth.
 """
 
+from __future__ import annotations
+
 import json
 from pathlib import Path
 from typing import Any
-
 
 OBSERVE_HISTORY_FILE = ".redcon/observe-history.json"
 OBSERVE_HISTORY_FORMAT_VERSION = 1

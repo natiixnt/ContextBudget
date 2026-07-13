@@ -3,7 +3,7 @@
 Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under explicit token limits - and watch how many tokens (and dollars) redcon saves you, directly in your editor.
 
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue)
-![License](https://img.shields.io/badge/license-MIT-green)
+![License](https://img.shields.io/badge/license-FSL--1.1--MIT-blue)
 
 ![Redcon Analytics dashboard](media/dashboard-dark.png)
 

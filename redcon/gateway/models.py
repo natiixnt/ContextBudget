@@ -1,14 +1,11 @@
-# SPDX-License-Identifier: LicenseRef-Redcon-Commercial
-# Copyright (c) 2026 nai. All rights reserved.
-# See LICENSE-COMMERCIAL for terms.
-
-from __future__ import annotations
+# Copyright (c) 2026 Natalia Szczepanik. Licensed under FSL-1.1-MIT (see LICENSE).
 
 """Request and response dataclasses for the Redcon Gateway API."""
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Any
-
 
 # ── Requests ──────────────────────────────────────────────────────────────────
 
@@ -42,9 +39,7 @@ class PrepareContextRequest:
             max_tokens=int(d["max_tokens"]) if d.get("max_tokens") is not None else None,
             max_files=int(d["max_files"]) if d.get("max_files") is not None else None,
             max_context_size=(
-                int(d["max_context_size"])
-                if d.get("max_context_size") is not None
-                else None
+                int(d["max_context_size"]) if d.get("max_context_size") is not None else None
             ),
             top_files=int(d["top_files"]) if d.get("top_files") is not None else None,
             delta_from=d.get("delta_from") or None,
@@ -83,9 +78,7 @@ class RunAgentStepRequest:
             max_tokens=int(d["max_tokens"]) if d.get("max_tokens") is not None else None,
             max_files=int(d["max_files"]) if d.get("max_files") is not None else None,
             max_context_size=(
-                int(d["max_context_size"])
-                if d.get("max_context_size") is not None
-                else None
+                int(d["max_context_size"]) if d.get("max_context_size") is not None else None
             ),
             top_files=int(d["top_files"]) if d.get("top_files") is not None else None,
             metadata=dict(d.get("metadata") or {}),
@@ -113,9 +106,7 @@ class ReportRunRequest:
             session_id=str(d["session_id"]),
             run_id=str(d["run_id"]),
             status=str(d.get("status", "success")),
-            tokens_used=(
-                int(d["tokens_used"]) if d.get("tokens_used") is not None else None
-            ),
+            tokens_used=(int(d["tokens_used"]) if d.get("tokens_used") is not None else None),
             error=d.get("error") or None,
             metadata=dict(d.get("metadata") or {}),
         )
