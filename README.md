@@ -26,6 +26,12 @@ AI coding agents burn tokens on irrelevant context. You either:
 
 Redcon solves both. It ranks files by task relevance, compresses them with language-aware strategies (full, snippet, symbol extraction, summary), and packs the result under your token budget. Deterministic, local-first, no embeddings.
 
+## Punch above your plan
+
+On a flat subscription - Claude Pro/Max, Cursor, GitHub Copilot - the token bill isn't what stings, the **usage limit** is. Redcon cuts the tokens each task needs, so the same plan covers far more work before you hit the weekly wall. Same subscription, more runway.
+
+It stretches the budget you already pay for, and reports exactly how much it saved.
+
 ## Install
 
 ### Option 1: VS Code Extension (easiest)
