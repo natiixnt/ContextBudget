@@ -416,10 +416,13 @@ def run_pack(
     )
     if effective_top_files is not None:
         ranked = ranked[:effective_top_files]
-    # Build import graph once and share with compression stage to avoid
-    # rebuilding it from disk reads.
+    # Reuse the graph the scoring stage already built (memoized on the file
+    # set + entrypoints) instead of rebuilding it from disk. Pass the same
+    # entrypoint_filenames so the cache key matches the scorer's build.
     import_graph = (
-        build_import_graph(files) if prepared_cfg.score.enable_import_graph_signals else None
+        build_import_graph(files, entrypoint_filenames=prepared_cfg.score.entrypoint_filenames)
+        if prepared_cfg.score.enable_import_graph_signals
+        else None
     )
     cache = run_cache_stage(target_repo, prepared_cfg)
     pack_plugins = resolved_plugins

@@ -1,19 +1,21 @@
-from __future__ import annotations
-
 """Lightweight import/dependency graph extraction for local repository files."""
 
+from __future__ import annotations
+
+import posixpath
+import re
 from collections import defaultdict
 from dataclasses import dataclass
-import posixpath
 from pathlib import Path, PurePosixPath
-import re
 
 from redcon.schemas.models import FileRecord
 
 PY_IMPORT_RE = re.compile(r"^\s*import\s+(.+)$")
 PY_FROM_RE = re.compile(r"^\s*from\s+([\.\w]+)\s+import\s+(.+)$")
 
-JS_IMPORT_FROM_RE = re.compile(r"(?:import|export)\s+(?:type\s+)?[^\n;]*?\sfrom\s+[\"']([^\"']+)[\"']")
+JS_IMPORT_FROM_RE = re.compile(
+    r"(?:import|export)\s+(?:type\s+)?[^\n;]*?\sfrom\s+[\"']([^\"']+)[\"']"
+)
 JS_SIDE_EFFECT_IMPORT_RE = re.compile(r"\bimport\s+[\"']([^\"']+)[\"']")
 JS_REQUIRE_RE = re.compile(r"\brequire\(\s*[\"']([^\"']+)[\"']\s*\)")
 
@@ -66,7 +68,9 @@ def _build_python_module_map(files: list[FileRecord]) -> dict[str, str]:
     return module_map
 
 
-def _resolve_python_module_spec(spec: str, current_path: str, module_map: dict[str, str]) -> str | None:
+def _resolve_python_module_spec(
+    spec: str, current_path: str, module_map: dict[str, str]
+) -> str | None:
     if not spec:
         return None
 
@@ -75,10 +79,10 @@ def _resolve_python_module_spec(spec: str, current_path: str, module_map: dict[s
         level = len(spec) - len(spec.lstrip("."))
         remainder = spec.lstrip(".")
         current = list(PurePosixPath(current_path).with_suffix("").parts)
-        if current and current[-1] == "__init__":
-            package_parts = current[:-1]
-        else:
-            package_parts = current[:-1]
+        # Drop the module/__init__ name to get the containing package; both a
+        # regular module and a package __init__ resolve relative imports
+        # against their containing package.
+        package_parts = current[:-1]
 
         keep_count = max(0, len(package_parts) - (level - 1))
         resolved_parts = package_parts[:keep_count]
@@ -132,7 +136,10 @@ def _extract_python_import_edges(files: list[FileRecord]) -> dict[str, set[str]]
 
                 import_match = PY_IMPORT_RE.match(raw_line)
                 if import_match:
-                    modules = [token.strip().split(" as ")[0].strip() for token in import_match.group(1).split(",")]
+                    modules = [
+                        token.strip().split(" as ")[0].strip()
+                        for token in import_match.group(1).split(",")
+                    ]
                     for module in modules:
                         target = _resolve_python_module_spec(module, current_path, module_map)
                         if target and target != record.path:
@@ -144,7 +151,10 @@ def _extract_python_import_edges(files: list[FileRecord]) -> dict[str, set[str]]
                     continue
 
                 module_spec = from_match.group(1).strip()
-                imported_items = [token.strip().split(" as ")[0].strip() for token in from_match.group(2).split(",")]
+                imported_items = [
+                    token.strip().split(" as ")[0].strip()
+                    for token in from_match.group(2).split(",")
+                ]
                 specs = [module_spec]
                 for imported in imported_items:
                     if imported in {"", "*"}:
@@ -212,6 +222,9 @@ def _extract_js_ts_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
             for record in repo_files
             if record.extension in JS_TS_EXTENSIONS
         }
+        # Constant for the whole repo group; build the lookup set once instead
+        # of rebuilding it for every import spec of every file (was O(specs x files)).
+        existing_keys = set(existing_paths)
 
         for record in repo_files:
             if record.extension not in JS_TS_EXTENSIONS:
@@ -227,7 +240,7 @@ def _extract_js_ts_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
 
             current_path = record.relative_path or record.path
             for spec in specs:
-                target_relative_path = _resolve_js_ts_spec(current_path, spec, set(existing_paths))
+                target_relative_path = _resolve_js_ts_spec(current_path, spec, existing_keys)
                 if target_relative_path is None:
                     continue
                 target = existing_paths[target_relative_path]
@@ -318,7 +331,40 @@ def _extract_go_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
     return edges
 
 
-def build_import_graph(files: list[FileRecord], entrypoint_filenames: set[str] | None = None) -> ImportGraph:
+# Per-process memoization of the last few graphs. A single pack builds the
+# graph twice (scoring stage + compression stage) and plan-agent/simulate
+# rebuild it once per workflow step over the same file set; each build reads
+# every source file from disk, so on a monorepo that is the dominant cost.
+# Keyed on (entrypoints, (path, content_hash)...) - the content hash already
+# lives in the scan index, so the key needs no disk reads and invalidates
+# automatically when any file changes.
+_GRAPH_CACHE: dict[tuple, ImportGraph] = {}
+_GRAPH_CACHE_MAX = 4
+
+
+def _graph_cache_key(files: list[FileRecord], entrypoint_filenames: set[str] | None) -> tuple:
+    ep = tuple(sorted(entrypoint_filenames)) if entrypoint_filenames else ()
+    return (ep, tuple((f.path, f.content_hash) for f in files))
+
+
+def build_import_graph(
+    files: list[FileRecord], entrypoint_filenames: set[str] | None = None
+) -> ImportGraph:
+    """Build a deterministic, local-file import graph, memoized per file set."""
+    key = _graph_cache_key(files, entrypoint_filenames)
+    cached = _GRAPH_CACHE.get(key)
+    if cached is not None:
+        return cached
+    graph = _build_import_graph_uncached(files, entrypoint_filenames)
+    if len(_GRAPH_CACHE) >= _GRAPH_CACHE_MAX:
+        _GRAPH_CACHE.clear()
+    _GRAPH_CACHE[key] = graph
+    return graph
+
+
+def _build_import_graph_uncached(
+    files: list[FileRecord], entrypoint_filenames: set[str] | None = None
+) -> ImportGraph:
     """Build a deterministic, local-file import graph for Python, JS/TS, and Go files."""
 
     py_edges = _extract_python_import_edges(files)
