@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.1 - 2026-07-14
+
+### Changed
+
+- Marketplace icon is now the actual redcon mark: the white triple
+  chevron from the brand logo on the brand gradient, replacing the
+  older generic icon.
+
 ## 0.9.0 - 2026-07-11
 
 ### Added
