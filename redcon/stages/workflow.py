@@ -161,6 +161,43 @@ def _get_git_dirty_paths(repo: Path) -> set[str]:
     return set()
 
 
+def _get_git_recent_paths(repo: Path, commits: int) -> dict[str, float]:
+    """Return files touched in the last ``commits`` commits with a recency weight.
+
+    The most recent commit's files get weight 1.0 and older commits decay
+    linearly to 1/commits, so a freshly committed (but now clean) file still
+    gets a boost. Weights are the max across commits a file appears in.
+    """
+    if commits <= 0:
+        return {}
+    try:
+        result = subprocess.run(
+            ["git", "log", f"-n{commits}", "--name-only", "--format=%x1e"],
+            cwd=repo,
+            capture_output=True,
+            text=True,
+            timeout=5,
+            check=False,
+        )
+    except Exception:  # noqa: BLE001
+        return {}
+    if result.returncode != 0:
+        return {}
+
+    # \x1e (record separator) precedes each commit; its files follow on their
+    # own lines until the next separator.
+    chunks = [chunk for chunk in result.stdout.split("\x1e") if chunk.strip()]
+    total = len(chunks)
+    recent: dict[str, float] = {}
+    for index, chunk in enumerate(chunks):
+        weight = (total - index) / total
+        for line in chunk.splitlines():
+            path = line.strip()
+            if path:
+                recent[path] = max(recent.get(path, 0.0), weight)
+    return recent
+
+
 def run_score_stage(
     task: str,
     files: list[FileRecord],
@@ -183,6 +220,10 @@ def run_score_stage(
         dirty = _get_git_dirty_paths(repo)
         if dirty:
             scorer_options["dirty_paths"] = dirty
+    if repo is not None and config.score.git_recent_boost > 0:
+        recent = _get_git_recent_paths(repo, config.score.git_recent_commits)
+        if recent:
+            scorer_options["recent_paths"] = recent
     return resolved.scorer.score(
         task=task,
         files=files,

@@ -1,9 +1,10 @@
-from __future__ import annotations
-
 """Relevance scoring stage for repository files."""
+
+from __future__ import annotations
 
 import logging
 import re
+from collections import defaultdict
 
 from redcon.config import ScoreSettings
 from redcon.core.text import task_keywords
@@ -34,6 +35,55 @@ def _format_graph_reason(prefix: str, related: set[str]) -> str:
     return f"{prefix}: {sorted_related[0]} (+{len(sorted_related) - 1} more)"
 
 
+_PY_TEST_PREFIX_RE = re.compile(r"^test_(.+)\.py$")
+_PY_TEST_SUFFIX_RE = re.compile(r"^(.+)_test\.py$")
+_GO_TEST_RE = re.compile(r"^(.+)_test\.go$")
+_JS_TEST_RE = re.compile(r"^(.+)\.(?:test|spec)\.(?:ts|tsx|js|jsx|mjs|cjs)$")
+
+
+def _test_base_name(filename: str) -> str | None:
+    """Return the source stem a test filename refers to, or None if not a test."""
+    for pattern in (_PY_TEST_PREFIX_RE, _PY_TEST_SUFFIX_RE, _GO_TEST_RE, _JS_TEST_RE):
+        match = pattern.match(filename)
+        if match:
+            return match.group(1)
+    return None
+
+
+def _build_test_source_pairs(files: list[FileRecord]) -> dict[str, set[str]]:
+    """Map each file to its test/source counterparts by filename.
+
+    Pairs ``test_foo.py``/``foo_test.py``/``foo_test.go``/``foo.test.ts`` with a
+    same-repo source file whose stem is ``foo``. Bidirectional, so a relevant
+    source pulls in its test and vice versa.
+    """
+    tests_by_base: dict[tuple[str, str], set[str]] = defaultdict(set)
+    sources_by_base: dict[tuple[str, str], set[str]] = defaultdict(set)
+    for record in files:
+        filename = record.path.rsplit("/", 1)[-1].lower()
+        key_repo = record.repo_label or ""
+        base = _test_base_name(filename)
+        if base is not None:
+            tests_by_base[(key_repo, base)].add(record.path)
+        elif "." in filename:
+            stem = filename.rsplit(".", 1)[0]
+            if stem:
+                sources_by_base[(key_repo, stem)].add(record.path)
+
+    pairs: dict[str, set[str]] = defaultdict(set)
+    for key, test_paths in tests_by_base.items():
+        source_paths = sources_by_base.get(key)
+        if not source_paths:
+            continue
+        for test_path in test_paths:
+            for source_path in source_paths:
+                if test_path == source_path:
+                    continue
+                pairs[test_path].add(source_path)
+                pairs[source_path].add(test_path)
+    return pairs
+
+
 def score_files(
     task: str,
     files: list[FileRecord],
@@ -42,6 +92,7 @@ def score_files(
     history_entries=None,
     similarity: TaskSimilarityCallable | None = None,
     dirty_paths: set[str] | None = None,
+    recent_paths: dict[str, float] | None = None,
 ) -> list[RankedFile]:
     """Score files for a task using deterministic keyword and import-graph heuristics."""
 
@@ -68,7 +119,9 @@ def score_files(
         for critical_keyword in cfg.critical_path_keywords:
             if critical_keyword and critical_keyword in path_lower:
                 score += cfg.critical_path_bonus
-                breakdown["critical_path"] = breakdown.get("critical_path", 0) + cfg.critical_path_bonus
+                breakdown["critical_path"] = (
+                    breakdown.get("critical_path", 0) + cfg.critical_path_bonus
+                )
                 _add_reason(reasons, f"critical path keyword '{critical_keyword}'")
 
         path_tokens = _path_tokens(path_lower)
@@ -86,7 +139,9 @@ def score_files(
                 delta = cfg.path_keyword_weight * 0.6
                 score += delta
                 breakdown["path_keyword"] = breakdown.get("path_keyword", 0) + delta
-                _add_reason(reasons, f"path abbreviation '{tokens_matching[0]}' matches '{keyword}'")
+                _add_reason(
+                    reasons, f"path abbreviation '{tokens_matching[0]}' matches '{keyword}'"
+                )
             if preview_hits:
                 delta = min(cfg.content_keyword_cap, cfg.content_keyword_weight * preview_hits)
                 score += delta
@@ -123,6 +178,14 @@ def score_files(
             breakdown["git_dirty"] = cfg.git_dirty_boost
             _add_reason(reasons, "has uncommitted changes")
 
+        if recent_paths and cfg.git_recent_boost > 0:
+            recency = recent_paths.get(record.relative_path or "", 0.0)
+            if recency > 0:
+                delta = round(cfg.git_recent_boost * recency, 3)
+                score += delta
+                breakdown["git_recent"] = delta
+                _add_reason(reasons, "recently committed")
+
         heuristic_scores[record.path] = score
         reasons_by_path[record.path] = reasons
         breakdowns[record.path] = breakdown
@@ -153,6 +216,27 @@ def score_files(
                 _add_reason(reasons, f"role={role} (x{multiplier:.1f})")
                 breakdowns[record.path]["role_multiplier"] = multiplier
 
+    if cfg.test_pair_boost > 0 and files:
+        pairs = _build_test_source_pairs(files)
+        if pairs:
+            # Seed on genuine keyword/path relevance (before graph propagation)
+            # so a relevant file pulls its test/source counterpart along.
+            pair_seed = {
+                path
+                for path, score in heuristic_scores.items()
+                if score >= cfg.graph_seed_score_threshold
+            }
+            for record in files:
+                path = record.path
+                relevant_pair = pairs.get(path, set()) & pair_seed
+                if relevant_pair:
+                    heuristic_scores[path] += cfg.test_pair_boost
+                    breakdowns.setdefault(path, {})["test_pair"] = cfg.test_pair_boost
+                    _add_reason(
+                        reasons_by_path[path],
+                        _format_graph_reason("paired with relevant file", relevant_pair),
+                    )
+
     if cfg.enable_import_graph_signals and files:
         graph = build_import_graph(files, entrypoint_filenames=cfg.entrypoint_filenames)
 
@@ -160,7 +244,11 @@ def score_files(
         # 1) Find seed files from high base scores.
         # 2) Award deterministic bonuses to one-hop neighbors.
         # 3) Keep explanations tied to specific graph relationships.
-        seed_paths = {path for path, score in heuristic_scores.items() if score >= cfg.graph_seed_score_threshold}
+        seed_paths = {
+            path
+            for path, score in heuristic_scores.items()
+            if score >= cfg.graph_seed_score_threshold
+        }
         if not seed_paths:
             # Fallback seed for sparse tasks: top positive base score only.
             positive = sorted(
@@ -180,23 +268,36 @@ def score_files(
 
             inbound_from_seed = graph.incoming.get(path, set()) & seed_paths
             if inbound_from_seed:
-                bonus = min(cfg.graph_bonus_cap, cfg.graph_imported_by_relevant_bonus * len(inbound_from_seed))
+                bonus = min(
+                    cfg.graph_bonus_cap,
+                    cfg.graph_imported_by_relevant_bonus * len(inbound_from_seed),
+                )
                 score += bonus
                 graph_total += bonus
-                _add_reason(reasons, _format_graph_reason("imported by relevant file", inbound_from_seed))
+                _add_reason(
+                    reasons, _format_graph_reason("imported by relevant file", inbound_from_seed)
+                )
 
             outbound_to_seed = graph.outgoing.get(path, set()) & seed_paths
             if outbound_to_seed:
-                bonus = min(cfg.graph_bonus_cap, cfg.graph_depends_on_relevant_bonus * len(outbound_to_seed))
+                bonus = min(
+                    cfg.graph_bonus_cap, cfg.graph_depends_on_relevant_bonus * len(outbound_to_seed)
+                )
                 score += bonus
                 graph_total += bonus
-                _add_reason(reasons, _format_graph_reason("depends on relevant module", outbound_to_seed))
+                _add_reason(
+                    reasons, _format_graph_reason("depends on relevant module", outbound_to_seed)
+                )
 
-            adjacent_entrypoints = (graph.incoming.get(path, set()) | graph.outgoing.get(path, set())) & graph.entrypoints
+            adjacent_entrypoints = (
+                graph.incoming.get(path, set()) | graph.outgoing.get(path, set())
+            ) & graph.entrypoints
             if adjacent_entrypoints:
                 score += cfg.graph_entrypoint_adjacency_bonus
                 graph_total += cfg.graph_entrypoint_adjacency_bonus
-                _add_reason(reasons, _format_graph_reason("adjacent to entrypoint", adjacent_entrypoints))
+                _add_reason(
+                    reasons, _format_graph_reason("adjacent to entrypoint", adjacent_entrypoints)
+                )
 
             if graph_total > 0:
                 bd["import_graph"] = round(graph_total, 3)

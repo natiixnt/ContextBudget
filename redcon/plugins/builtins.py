@@ -1,20 +1,22 @@
-from __future__ import annotations
-
 """Built-in plugin registrations that preserve current Redcon behavior."""
 
-from typing import Any, Mapping
+from __future__ import annotations
+
+from collections.abc import Mapping
+from typing import Any
 
 from redcon.compressors.context_compressor import compress_ranked_files
 from redcon.config import TokenEstimationSettings
 from redcon.core.tokens import (
     DEFAULT_MODEL_ALIGNED_MODEL,
     describe_builtin_token_estimator,
-    estimate_tokens as builtin_estimate_tokens,
     estimate_with_builtin_backend,
 )
-from redcon.scorers.relevance import score_files
-
+from redcon.core.tokens import (
+    estimate_tokens as builtin_estimate_tokens,
+)
 from redcon.plugins.api import CompressorPlugin, ScorerPlugin, TokenEstimatorPlugin
+from redcon.scorers.relevance import score_files
 
 
 def _builtin_relevance_score(
@@ -33,6 +35,7 @@ def _builtin_relevance_score(
         history_entries=options.get("history_entries"),
         similarity=options.get("task_similarity"),
         dirty_paths=options.get("dirty_paths"),
+        recent_paths=options.get("recent_paths"),
     )
 
 
@@ -185,7 +188,9 @@ def _token_estimator_options(settings: TokenEstimationSettings | None) -> dict[s
     }
 
 
-def register_builtin_plugins(registry, *, token_settings: TokenEstimationSettings | None = None) -> None:
+def register_builtin_plugins(
+    registry, *, token_settings: TokenEstimationSettings | None = None
+) -> None:
     """Register built-in plugins on a registry instance."""
 
     registry.register_scorer(builtin_relevance_scorer)
