@@ -517,6 +517,10 @@ def run_pack(
                     "quality_risk_estimate": str(
                         report.budget.get("quality_risk_estimate", "unknown")
                     ),
+                    # Selection baseline (see RunReport) so `redcon insights` can
+                    # reason about how broadly each prompt pulled files.
+                    "context_baseline_tokens": int(report.context_baseline_tokens or 0),
+                    "files_scanned": int(report.files_scanned or 0),
                 },
                 result_artifacts={
                     "run_json": str(feed_path) if feed_path else "",

@@ -436,6 +436,57 @@ def cmd_license(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_insights(args: argparse.Namespace) -> int:
+    from redcon.cache.run_history import load_run_history
+    from redcon.core.insights import build_insights, insights_as_dict
+    from redcon.entitlements import load_entitlement
+
+    repo = Path(args.repo).resolve()
+    entries = load_run_history(repo)
+    report = build_insights(entries)
+    ent = load_entitlement(repo)
+    is_pro = ent.has("insights.prompt")
+
+    if getattr(args, "json", False):
+        data = insights_as_dict(report)
+        data["pro"] = is_pro
+        if not is_pro:
+            # Free tier gets the aggregate, not the per-prompt detail.
+            data["opportunities"] = []
+            data["locked"] = len(report.opportunities)
+        print(_json_mod.dumps(data, indent=2))
+        return 0
+
+    if report.note and not report.opportunities:
+        print(report.note)
+        return 0
+
+    count = len(report.opportunities)
+    total = report.total_potential_savings_tokens
+    headline = (
+        f"Found {count} prompt-optimization "
+        f"{'opportunity' if count == 1 else 'opportunities'} across {report.runs_analyzed} runs, "
+        f"~{total} tokens you could stop re-sending."
+    )
+    print(headline)
+
+    if not is_pro:
+        print()
+        print("Unlock the per-prompt breakdown and suggestions with Pro:")
+        print("  redcon license --activate <key>")
+        if ent.hint:
+            print(f"  ({ent.hint})")
+        return 0
+
+    for item in report.opportunities:
+        print()
+        print(f"- {item.title}")
+        print(f"  {item.detail}")
+        print(f"  ~{item.potential_savings_tokens} tokens above your typical run.")
+        print(f"  Fix: {item.suggestion}")
+    return 0
+
+
 def cmd_plan(args: argparse.Namespace) -> int:
     err = _validate_positive_int(args.top_files, "--top-files")
     if err:
@@ -2658,6 +2709,23 @@ def build_parser() -> argparse.ArgumentParser:
         help="Print the entitlement as JSON.",
     )
     license_parser.set_defaults(func=cmd_license)
+
+    insights = sub.add_parser(
+        "insights",
+        help="Find prompts that keep pulling large contexts (Pro)",
+    )
+    insights.add_argument(
+        "--repo",
+        default=".",
+        help="Repository whose run history to analyze (default: current directory).",
+    )
+    insights.add_argument(
+        "--json",
+        action="store_true",
+        default=False,
+        help="Print the insights report as JSON.",
+    )
+    insights.set_defaults(func=cmd_insights)
 
     completion = sub.add_parser(
         "completion",
