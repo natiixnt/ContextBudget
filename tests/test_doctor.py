@@ -2,12 +2,28 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from redcon.core.doctor import run_doctor, doctor_as_dict
+from redcon.core.doctor import _check_optional_dep, doctor_as_dict, run_doctor
 
 
 def _write(path: Path, content: str) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(content, encoding="utf-8")
+
+
+def test_missing_optional_dep_is_info_not_warning() -> None:
+    # A missing optional dependency is informational, not an alarming warning,
+    # so a plain `pip install redcon` doesn't look half-broken in doctor.
+    result = _check_optional_dep("nope", "definitely_not_a_real_package_xyz", "extra")
+    assert result.status == "info"
+    assert "Optional" in result.message
+
+
+def test_doctor_counts_optional_deps_as_info(tmp_path: Path) -> None:
+    report = run_doctor(tmp_path)
+    # The optional deps that aren't installed land in info, not warnings.
+    assert report.info >= 1
+    summary = doctor_as_dict(report)["summary"]
+    assert summary["info"] == report.info
 
 
 def test_doctor_passes_with_default_setup(tmp_path: Path) -> None:

@@ -353,7 +353,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
         print(_json_mod.dumps(doctor_as_dict(report), indent=2))
         return 0
 
-    _STATUS_ICONS = {"ok": "[ok]", "warn": "[!!]", "fail": "[XX]"}
+    _STATUS_ICONS = {"ok": "[ok]", "info": "[--]", "warn": "[!!]", "fail": "[XX]"}
 
     print(f"Redcon Doctor v{report.redcon_version}")
     print(f"Python {report.python_version} on {report.platform}")
@@ -368,6 +368,8 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
     print()
     parts = [f"{report.passed} passed"]
+    if report.info:
+        parts.append(f"{report.info} optional")
     if report.warnings:
         parts.append(f"{report.warnings} warnings")
     if report.failures:
@@ -716,7 +718,12 @@ def cmd_pack(args: argparse.Namespace) -> int:
         + (f", cache {cache_hits}/{cache_total} hits" if cache_total > 0 else ""),
     )
     model_profile = data.get("model_profile", {})
-    if isinstance(model_profile, dict) and model_profile:
+    # Only show the profile line when a model is actually configured; otherwise
+    # every default run prints a block of empty selected=/resolved=/context=0
+    # fields that reads as misconfigured.
+    if isinstance(model_profile, dict) and (
+        model_profile.get("selected_profile") or model_profile.get("resolved_profile")
+    ):
         _qprint(
             args,
             "Model profile: "

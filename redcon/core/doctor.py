@@ -34,6 +34,7 @@ class DoctorReport:
     passed: int = 0
     warnings: int = 0
     failures: int = 0
+    info: int = 0
 
 
 def _check_python_version() -> CheckResult:
@@ -87,8 +88,8 @@ def _check_optional_dep(name: str, package: str, extra: str) -> CheckResult:
     except ImportError:
         return CheckResult(
             name=name,
-            status="warn",
-            message=f"Not installed - install with: pip install 'redcon[{extra}]'",
+            status="info",
+            message=f"Optional - not installed. Enable with: pip install 'redcon[{extra}]'",
         )
 
 
@@ -410,6 +411,8 @@ def run_doctor(repo: Path) -> DoctorReport:
         report.checks.append(check)
         if check.status == "ok":
             report.passed += 1
+        elif check.status == "info":
+            report.info += 1
         elif check.status == "warn":
             report.warnings += 1
         else:
@@ -436,6 +439,7 @@ def doctor_as_dict(report: DoctorReport) -> dict[str, Any]:
         ],
         "summary": {
             "passed": report.passed,
+            "info": report.info,
             "warnings": report.warnings,
             "failures": report.failures,
             "total": len(report.checks),
