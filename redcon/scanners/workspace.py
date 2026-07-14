@@ -43,6 +43,7 @@ def scan_workspace(
             internal_paths=internal_paths,
             repo_label=repo.label,
             exclude_secrets=config.scan.exclude_secrets,
+            max_file_count=config.scan.max_file_count,
         )
         repo_files = refresh.records
         files.extend(repo_files)

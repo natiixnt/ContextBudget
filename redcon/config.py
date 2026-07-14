@@ -42,6 +42,10 @@ class ScanSettings:
     # scan by default so a pack can never leak secrets to an LLM. Turn off only
     # if you deliberately need to pack such a file.
     exclude_secrets: bool = True
+    # Hard cap on how many files the scan walk will visit before stopping. Large
+    # monorepos may need this raised; when the cap is hit the run reports it so
+    # the truncation is never silent.
+    max_file_count: int = 50_000
 
 
 @dataclass(slots=True)
@@ -301,6 +305,8 @@ class RedconConfig:
             )
         if self.scan.preview_chars < 0:
             warnings.append(f"[scan].preview_chars must be >= 0, got {self.scan.preview_chars}")
+        if self.scan.max_file_count <= 0:
+            warnings.append(f"[scan].max_file_count must be > 0, got {self.scan.max_file_count}")
 
         # Cache backend
         valid_cache_backends = {"local_file", "redis", "sqlite", "memory"}
@@ -427,6 +433,8 @@ def _apply_scan_overrides(settings: ScanSettings, data: Mapping[str, Any]) -> No
         settings.preview_chars = int(data["preview_chars"])
     if "exclude_secrets" in data:
         settings.exclude_secrets = bool(data["exclude_secrets"])
+    if "max_file_count" in data:
+        settings.max_file_count = int(data["max_file_count"])
     # Backward-compatible keys
     if "ignore_dirs" in data:
         settings.ignore_dirs = _to_set(data["ignore_dirs"])

@@ -58,12 +58,18 @@ def _resolve_config_path(path: str | None) -> Path | None:
 
 
 def _render_scan_summary(prefix: str, tracked_repo: Path, summary: ScanRefreshSummary) -> str:
-    return (
+    line = (
         f"{prefix}: repo={tracked_repo} "
         f"tracked={summary.tracked_files} included={summary.included_files} "
         f"reused={summary.reused_count} added={summary.added_count} "
         f"updated={summary.updated_count} removed={summary.removed_count}"
     )
+    if summary.file_count_capped:
+        line += (
+            f" [CAPPED at {summary.file_count_limit} files - scan is incomplete; "
+            f"raise [scan].max_file_count to include more]"
+        )
+    return line
 
 
 def _render_scan_change_paths(summary: ScanRefreshSummary, limit: int = 5) -> str:

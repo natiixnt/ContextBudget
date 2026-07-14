@@ -15,7 +15,7 @@ from redcon.core.agent_planning import AgentWorkflowPlan
 from redcon.core.model_profiles import normalize_model_profile_report
 from redcon.core.tokens import normalize_token_estimator_report
 from redcon.plugins import ResolvedPlugins, resolve_plugins
-from redcon.scanners.incremental import ScanRefreshResult, refresh_scan_index
+from redcon.scanners.incremental import ScanRefreshResult, ScanRefreshSummary, refresh_scan_index
 from redcon.scanners.workspace import ScannedWorkspaceRepo, scan_workspace
 from redcon.schemas.models import (
     DEFAULT_TOP_FILES,
@@ -124,6 +124,7 @@ def run_scan_refresh_stage(repo: Path, config: RedconConfig) -> ScanRefreshResul
         binary_extensions=config.scan.binary_extensions,
         internal_paths=_scan_internal_paths(config),
         exclude_secrets=config.scan.exclude_secrets,
+        max_file_count=config.scan.max_file_count,
     )
 
 
@@ -244,12 +245,20 @@ def run_render_stage(
     implementations: dict[str, str] | None = None,
     token_estimator: dict[str, object] | None = None,
     model_profile: dict[str, object] | None = None,
+    scan_summary: ScanRefreshSummary | None = None,
 ) -> RunReport:
     """Render pipeline stage data into stable run report schema."""
 
     effective_top_files = top_files if top_files is not None else config.budget.top_files
     if effective_top_files is None:
         effective_top_files = DEFAULT_TOP_FILES
+    scan_meta: dict[str, int | bool] = {}
+    if scan_summary is not None and scan_summary.file_count_capped:
+        scan_meta = {
+            "file_count_capped": True,
+            "file_count_limit": scan_summary.file_count_limit,
+            "files_seen": scan_summary.files_seen,
+        }
     return RunReport(
         command="pack",
         task=task,
@@ -294,6 +303,7 @@ def run_render_stage(
         implementations=dict(implementations or {}),
         degraded_files=compressed.degraded_files,
         degradation_savings=compressed.degradation_savings,
+        scan=scan_meta,
     )
 
 

@@ -32,6 +32,7 @@ from redcon.stages.workflow import (
     run_cache_stage,
     run_pack_stage,
     run_render_stage,
+    run_scan_refresh_stage,
     run_scan_stage,
     run_scan_workspace_stage,
     run_score_stage,
@@ -400,10 +401,13 @@ def run_pack(
         repo_count=len(workspace.repos) if workspace is not None else 1,
     )
 
+    scan_summary = None
     if workspace is not None:
         files, scanned_repos = run_scan_workspace_stage(workspace, prepared_cfg)
     else:
-        files = run_scan_stage(repo, prepared_cfg)
+        scan_result = run_scan_refresh_stage(repo, prepared_cfg)
+        files = scan_result.records
+        scan_summary = scan_result.summary
         scanned_repos = []
     telemetry.emit("scan_completed", scanned_files=len(files), scanned_repos=len(scanned_repos))
     ranked = run_score_stage(task, files, prepared_cfg, repo=target_repo, plugins=resolved_plugins)
@@ -470,6 +474,7 @@ def run_pack(
         implementations=resolved_plugins.pack_implementations(),
         token_estimator=resolved_plugins.token_estimator_report,
         model_profile=model_profile,
+        scan_summary=scan_summary,
     )
     if record_history:
         # Mirror the full report into .redcon/runs/ so editor
