@@ -37,14 +37,10 @@ def git_repo(tmp_path: Path) -> Path:
         cwd=str(tmp_path),
         check=True,
     )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"], cwd=str(tmp_path), check=True
-    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=str(tmp_path), check=True)
     (tmp_path / "foo.py").write_text("a = 1\nb = 2\nc = 3\n")
     subprocess.run(["git", "add", "."], cwd=str(tmp_path), check=True)
-    subprocess.run(
-        ["git", "commit", "-q", "-m", "initial"], cwd=str(tmp_path), check=True
-    )
+    subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(tmp_path), check=True)
     (tmp_path / "foo.py").write_text("a = 1\nb = 999\nc = 3\nd = 4\n")
     return tmp_path
 
@@ -57,9 +53,7 @@ def _run_cli(parser, argv: list[str]) -> int:
     return int(args.func(args))
 
 
-def test_run_subcommand_exits_zero_on_clean_diff(
-    git_repo: Path, capsys: pytest.CaptureFixture
-):
+def test_run_subcommand_exits_zero_on_clean_diff(git_repo: Path, capsys: pytest.CaptureFixture):
     parser = build_parser()
     rc = _run_cli(
         parser,
@@ -84,9 +78,7 @@ def test_run_subcommand_exits_zero_on_clean_diff(
     assert "git_diff" in captured.err
 
 
-def test_run_subcommand_json_output_is_parseable(
-    git_repo: Path, capsys: pytest.CaptureFixture
-):
+def test_run_subcommand_json_output_is_parseable(git_repo: Path, capsys: pytest.CaptureFixture):
     parser = build_parser()
     rc = _run_cli(
         parser,
@@ -117,9 +109,7 @@ def test_run_subcommand_rejects_invalid_quality_floor(
         parser.parse_args(["run", "git diff", "--quality-floor", "invalid"])
 
 
-def test_run_subcommand_blocks_unallowed_command(
-    git_repo: Path, capsys: pytest.CaptureFixture
-):
+def test_run_subcommand_blocks_unallowed_command(git_repo: Path, capsys: pytest.CaptureFixture):
     parser = build_parser()
     rc = _run_cli(
         parser,
@@ -311,9 +301,7 @@ def test_tool_quality_check_quality_dimensions_on_real_diff(git_repo: Path):
     """Real git diff on a small fixture: must_preserve and determinism must hold."""
     from redcon.mcp.tools import tool_quality_check
 
-    result = tool_quality_check(
-        command="git diff", cwd=str(git_repo), quality_floor="compact"
-    )
+    result = tool_quality_check(command="git diff", cwd=str(git_repo), quality_floor="compact")
     assert "error" not in result
     assert result["must_preserve_ok"] is True
     assert result["deterministic"] is True
@@ -323,9 +311,7 @@ def test_tool_quality_check_passes_prefer_compact_output(git_repo: Path):
     """The flag is plumbed through and respected on real commands."""
     from redcon.mcp.tools import tool_quality_check
 
-    result = tool_quality_check(
-        command="git diff", cwd=str(git_repo), prefer_compact_output=True
-    )
+    result = tool_quality_check(command="git diff", cwd=str(git_repo), prefer_compact_output=True)
     # Same fixture, same compressor; just verifying the flag doesn't break
     # the code path.
     assert "error" not in result

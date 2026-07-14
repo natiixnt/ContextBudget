@@ -40,14 +40,10 @@ def git_repo(tmp_path: Path) -> Path:
         cwd=str(tmp_path),
         check=True,
     )
-    subprocess.run(
-        ["git", "config", "user.name", "Test"], cwd=str(tmp_path), check=True
-    )
+    subprocess.run(["git", "config", "user.name", "Test"], cwd=str(tmp_path), check=True)
     (tmp_path / "foo.py").write_text("a = 1\nb = 2\nc = 3\n")
     subprocess.run(["git", "add", "."], cwd=str(tmp_path), check=True)
-    subprocess.run(
-        ["git", "commit", "-q", "-m", "initial"], cwd=str(tmp_path), check=True
-    )
+    subprocess.run(["git", "commit", "-q", "-m", "initial"], cwd=str(tmp_path), check=True)
     # Now produce a diff:
     (tmp_path / "foo.py").write_text("a = 1\nb = 999\nc = 3\nd = 4\n")
     return tmp_path
@@ -110,7 +106,8 @@ def test_compress_command_passthrough_when_no_compressor(git_repo: Path, monkeyp
 
     monkeypatch.setattr(pipeline, "detect_compressor", lambda _argv: None)
     report = compress_command(
-        "git status", cwd=git_repo,
+        "git status",
+        cwd=git_repo,
         hint=BudgetHint(remaining_tokens=10_000, max_output_tokens=4_000),
     )
     assert report.output.schema == "raw_passthrough"
