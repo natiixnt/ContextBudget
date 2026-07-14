@@ -1,20 +1,23 @@
-from __future__ import annotations
-
 """Local run-history persistence for deterministic score adjustments."""
 
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timedelta, timezone
+from __future__ import annotations
+
+import contextlib
 import json
 import logging
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Mapping
+from typing import Any
+
+from redcon.io_utils import atomic_write_text
+from redcon.schemas.models import RUN_HISTORY_FILE
 
 logger = logging.getLogger(__name__)
 
 # Maximum history file size to load (10 MB)
 _MAX_HISTORY_FILE_SIZE = 10 * 1024 * 1024
-
-from redcon.schemas.models import RUN_HISTORY_FILE
 
 
 HISTORY_FORMAT_VERSION = 1
@@ -129,6 +132,7 @@ def load_run_history(
     if use_sqlite:
         try:
             from redcon.cache.run_history_sqlite import load_run_history_sqlite
+
             return load_run_history_sqlite(
                 repo_path,
                 enabled=enabled,
@@ -183,6 +187,7 @@ def append_run_history_entry(
     if use_sqlite:
         try:
             from redcon.cache.run_history_sqlite import append_run_history_entry_sqlite
+
             return append_run_history_entry_sqlite(
                 repo_path,
                 entry,
@@ -201,8 +206,7 @@ def append_run_history_entry(
         entries = entries[-max_entries:]
     document["entries"] = entries
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
+        atomic_write_text(path, json.dumps(document, indent=2, sort_keys=True))
     except OSError:
         return False
     return True
@@ -226,6 +230,7 @@ def update_run_history_artifacts(
     if use_sqlite:
         try:
             from redcon.cache.run_history_sqlite import update_run_history_artifacts_sqlite
+
             return update_run_history_artifacts_sqlite(
                 repo_path,
                 generated_at=generated_at,
@@ -265,8 +270,7 @@ def update_run_history_artifacts(
     if not updated:
         return False
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
+        atomic_write_text(path, json.dumps(document, indent=2, sort_keys=True))
     except OSError:
         return False
     return True
@@ -305,8 +309,9 @@ def prune(
     # --- SQLite path ---
     if use_sqlite:
         try:
-            from redcon.cache.run_history_sqlite import _db_path, _ensure_schema
             import sqlite3
+
+            from redcon.cache.run_history_sqlite import _db_path, _ensure_schema
 
             resolved = repo_path.resolve()
             db = _db_path(resolved, history_db)
@@ -343,9 +348,6 @@ def prune(
         kept.append(item)
     if removed > 0:
         document["entries"] = kept
-        try:
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
-        except OSError:
-            pass
+        with contextlib.suppress(OSError):
+            atomic_write_text(path, json.dumps(document, indent=2, sort_keys=True))
     return removed

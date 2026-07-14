@@ -13,6 +13,8 @@ import json
 from pathlib import Path
 from typing import Any
 
+from redcon.io_utils import atomic_write_text
+
 OBSERVE_HISTORY_FILE = ".redcon/observe-history.json"
 OBSERVE_HISTORY_FORMAT_VERSION = 1
 OBSERVE_HISTORY_DEFAULT_MAX = 500
@@ -56,8 +58,7 @@ def _load_document(path: Path) -> dict[str, Any]:
 
 def _save_document(path: Path, document: dict[str, Any]) -> bool:
     try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(json.dumps(document, indent=2, sort_keys=True), encoding="utf-8")
+        atomic_write_text(path, json.dumps(document, indent=2, sort_keys=True))
         return True
     except OSError:
         return False

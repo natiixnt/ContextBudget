@@ -306,6 +306,10 @@ class RunReport:
     delta: dict[str, str | int | float] = field(default_factory=dict)
     degraded_files: list[str] = field(default_factory=list)
     degradation_savings: int = 0
+    # Scan-level facts for this run. Populated with file_count_capped /
+    # file_count_limit / files_seen when the walk hit the file cap, so a
+    # truncated monorepo scan is visible in run.json instead of silent.
+    scan: dict[str, int | bool] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.max_tokens <= 0:

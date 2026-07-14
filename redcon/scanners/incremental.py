@@ -13,6 +13,7 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any
 
+from redcon.io_utils import atomic_write_text
 from redcon.schemas.models import (
     BINARY_EXTENSIONS,
     CACHE_FILE,
@@ -86,6 +87,12 @@ class ScanRefreshSummary:
     added_paths: list[str] = field(default_factory=list)
     updated_paths: list[str] = field(default_factory=list)
     removed_paths: list[str] = field(default_factory=list)
+    # True when the walk hit the file-count cap and stopped early, so callers
+    # can tell the user the scan is incomplete instead of silently dropping the
+    # alphabetically-last files.
+    file_count_capped: bool = False
+    file_count_limit: int = 0
+    files_seen: int = 0
 
 
 @dataclass(slots=True)
@@ -465,7 +472,7 @@ def _save_scan_index(path: Path, state: ScanIndexState, settings: dict[str, Any]
         "settings": settings,
         "entries": [asdict(state.entries[key]) for key in sorted(state.entries)],
     }
-    path.write_text(json.dumps(data, indent=2, sort_keys=True), encoding="utf-8")
+    atomic_write_text(path, json.dumps(data, indent=2, sort_keys=True))
 
 
 def _build_file_record(
@@ -615,6 +622,7 @@ def refresh_scan_index(
     repo_label: str | None = None,
     use_sqlite: bool = True,
     exclude_secrets: bool = True,
+    max_file_count: int = MAX_FILE_COUNT,
 ) -> ScanRefreshResult:
     """Refresh the on-disk scan index and reuse unchanged file metadata."""
 
@@ -666,6 +674,7 @@ def refresh_scan_index(
     seen_paths: set[str] = set()
 
     total_file_count = 0
+    file_count_capped = False
     resolved_symlinks: set[str] = set()
 
     for root, dirnames, filenames in os.walk(repo_path):
@@ -701,12 +710,14 @@ def refresh_scan_index(
 
             # File count limit guard
             total_file_count += 1
-            if total_file_count > MAX_FILE_COUNT:
-                if total_file_count == MAX_FILE_COUNT + 1:
+            if total_file_count > max_file_count:
+                if total_file_count == max_file_count + 1:
                     logger.warning(
-                        "File count exceeds %d limit - capping scan results",
-                        MAX_FILE_COUNT,
+                        "File count exceeds %d limit - capping scan results. "
+                        "Raise [scan].max_file_count to include more files.",
+                        max_file_count,
                     )
+                file_count_capped = True
                 break
 
             try:
@@ -780,5 +791,8 @@ def refresh_scan_index(
         added_paths=sorted(added_paths),
         updated_paths=sorted(updated_paths),
         removed_paths=removed_paths,
+        file_count_capped=file_count_capped,
+        file_count_limit=max_file_count,
+        files_seen=total_file_count,
     )
     return ScanRefreshResult(records=records, summary=summary, index_path=str(index_path))
