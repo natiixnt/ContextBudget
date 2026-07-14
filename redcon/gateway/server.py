@@ -188,6 +188,7 @@ class GatewayServer:
         self._server = None
 
     def start(self, *, block: bool = True) -> None:
+        self._guard_bind()
         fastapi_mod, uvicorn_mod = _try_import_fastapi()
         if fastapi_mod is not None:
             self._start_fastapi(block=block)
@@ -197,6 +198,21 @@ class GatewayServer:
                 "For production use: pip install 'redcon[gateway]'"
             )
             self._start_stdlib(block=block)
+
+    def _guard_bind(self) -> None:
+        """Refuse to expose an unauthenticated gateway off loopback.
+
+        Binding a non-loopback host without an api_key would serve requests
+        whose ``repo`` field reads arbitrary paths to anyone on the network.
+        Fail closed: require RC_GATEWAY_API_KEY for any non-loopback host.
+        """
+        host = (self._config.host or "").strip()
+        loopback = {"127.0.0.1", "::1", "localhost", ""}
+        if host not in loopback and not self._config.api_key:
+            raise RuntimeError(
+                f"refusing to start: host {host!r} is not loopback and no API key is set. "
+                "Set RC_GATEWAY_API_KEY (or bind 127.0.0.1) before exposing the gateway."
+            )
 
     def stop(self) -> None:
         if self._server is not None:

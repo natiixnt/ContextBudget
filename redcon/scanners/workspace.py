@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Workspace scan helpers for multi-repo local analysis."""
+
+from __future__ import annotations
 
 from dataclasses import dataclass
 
@@ -42,6 +42,7 @@ def scan_workspace(
             binary_extensions=config.scan.binary_extensions,
             internal_paths=internal_paths,
             repo_label=repo.label,
+            exclude_secrets=config.scan.exclude_secrets,
         )
         repo_files = refresh.records
         files.extend(repo_files)

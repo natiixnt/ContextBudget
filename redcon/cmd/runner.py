@@ -15,11 +15,11 @@ huge outputs).
 
 from __future__ import annotations
 
+import contextlib
 import logging
 import os
 import select
 import shlex
-import signal
 import subprocess
 import time
 from dataclasses import dataclass, field
@@ -31,7 +31,11 @@ _READ_CHUNK_BYTES = 64 * 1024
 _KILL_GRACE_SECONDS = 1.0
 
 
-# Commands we are willing to spawn from MCP. Extend as new compressors land.
+# Known tools whose output we have a compressor for. This is a schema
+# DETECTOR, not a security boundary: many entries (python, git, find, npm,
+# pip, docker, psql...) can execute arbitrary code via a subcommand or flag.
+# The host is responsible for deciding whether to run an agent-supplied
+# command at all - see the REDCON_MCP_ENABLE_RUN gate on the MCP tool.
 DEFAULT_ALLOWLIST: frozenset[str] = frozenset(
     {
         "git",
@@ -151,19 +155,64 @@ def parse_command(command: str | list[str] | tuple[str, ...]) -> tuple[str, ...]
     return argv
 
 
+# Flags/subcommands that turn an otherwise read-only tool into arbitrary code
+# execution. This is enforced at the AGENT boundary only (the MCP tools), not
+# in run_command itself: a user running `redcon run` on their own machine is
+# trusted, but an agent that may be prompt-injected is not. Matched
+# case-sensitively so `git -C dir` / `grep -C 3` (benign) are not confused
+# with `python -c` (code execution).
+_DANGEROUS_ARG_TOKENS: frozenset[str] = frozenset(
+    {
+        "-c",  # python -c, psql -c "COPY ... TO PROGRAM", sh -c
+        "-e",  # node -e, perl -e
+        "--eval",
+        "--exec",
+        "-exec",  # find -exec
+        "-execdir",
+        "-fprintf",
+        "run",  # npm run, docker run, cargo run
+        "install",  # pip install, npm install
+        "--command",
+        "--pager",
+    }
+)
+
+
+def reject_dangerous_args(argv: tuple[str, ...]) -> None:
+    """Raise CommandNotAllowed if argv contains a known code-execution escape.
+
+    Intended for callers that run agent-supplied commands. run_command does
+    not call this; the trust decision belongs to the caller.
+    """
+    for token in argv[1:]:
+        if token in _DANGEROUS_ARG_TOKENS:
+            raise CommandNotAllowed(
+                f"argument '{token}' can execute arbitrary code and is refused. "
+                "Run such commands yourself instead of through redcon."
+            )
+        low = token.lower()
+        # git -c core.pager=... / -o ProxyCommand=... style injection.
+        if low.startswith(("core.pager", "-o", "proxycommand")):
+            raise CommandNotAllowed(f"argument '{token}' is refused for safety.")
+
+
 def run_command(
     request: RunRequest,
     *,
     allowlist: frozenset[str] = DEFAULT_ALLOWLIST,
 ) -> RunResult:
-    """Execute the command, return captured output. Raises if not allowlisted."""
+    """Execute the command, return captured output. Raises if not allowlisted.
+
+    The allowlist selects a compressor schema; it is not a sandbox. Callers
+    exposing this to untrusted input (e.g. an agent) must gate execution
+    themselves - see reject_dangerous_args.
+    """
     if not request.argv:
         raise ValueError("argv is empty")
     binary = Path(request.argv[0]).name
     if binary not in allowlist:
         raise CommandNotAllowed(
-            f"command '{binary}' is not in the allowlist. "
-            f"Allowed: {sorted(allowlist)}"
+            f"command '{binary}' is not in the allowlist. Allowed: {sorted(allowlist)}"
         )
 
     cwd = request.cwd.resolve()
@@ -186,9 +235,7 @@ def run_command(
             stderr=subprocess.PIPE,
         )
     except FileNotFoundError as e:
-        raise BinaryNotFound(
-            f"binary '{request.argv[0]}' not found on PATH"
-        ) from e
+        raise BinaryNotFound(f"binary '{request.argv[0]}' not found on PATH") from e
 
     stdout_buf = bytearray()
     stderr_buf = bytearray()
@@ -205,8 +252,7 @@ def run_command(
             if now >= deadline:
                 _terminate(proc)
                 raise CommandTimeout(
-                    f"command timed out after {request.timeout_seconds}s: "
-                    f"{request.argv[0]}"
+                    f"command timed out after {request.timeout_seconds}s: {request.argv[0]}"
                 )
 
             streams = []
@@ -244,7 +290,9 @@ def run_command(
     finally:
         _drain_remaining(proc, stdout_buf, stderr_buf, cap, truncated_stdout, truncated_stderr)
 
-    returncode = proc.wait(timeout=_KILL_GRACE_SECONDS) if proc.returncode is None else proc.returncode
+    returncode = (
+        proc.wait(timeout=_KILL_GRACE_SECONDS) if proc.returncode is None else proc.returncode
+    )
     duration = time.monotonic() - started
 
     notes: list[str] = []
@@ -279,7 +327,11 @@ def _select_ready(streams: list, timeout: float) -> set:
 
 def _read_chunk(stream) -> bytes:
     try:
-        return stream.read1(_READ_CHUNK_BYTES) if hasattr(stream, "read1") else stream.read(_READ_CHUNK_BYTES)
+        return (
+            stream.read1(_READ_CHUNK_BYTES)
+            if hasattr(stream, "read1")
+            else stream.read(_READ_CHUNK_BYTES)
+        )
     except OSError:
         return b""
 
@@ -324,10 +376,8 @@ def _drain_remaining(
             remaining = b""
         if remaining:
             _append_capped(buf, remaining, cap, flag)
-        try:
+        with contextlib.suppress(OSError):
             stream.close()
-        except OSError:
-            pass
 
 
 def _terminate(proc: subprocess.Popen) -> None:
@@ -339,10 +389,8 @@ def _terminate(proc: subprocess.Popen) -> None:
     try:
         proc.wait(timeout=_KILL_GRACE_SECONDS)
     except subprocess.TimeoutExpired:
-        try:
+        with contextlib.suppress(OSError):
             proc.kill()
-        except OSError:
-            pass
         try:
             proc.wait(timeout=_KILL_GRACE_SECONDS)
         except subprocess.TimeoutExpired:

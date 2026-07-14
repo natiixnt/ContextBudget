@@ -216,12 +216,14 @@
         "redcon.pythonPath": {
           "type": "string",
           "default": "python",
-          "description": "Path to Python interpreter (must have redcon installed)."
+          "scope": "machine",
+          "description": "Path to Python interpreter (must have redcon installed). Machine-scoped so a workspace cannot override the executable that is run."
         },
         "redcon.cliCommand": {
           "type": "string",
           "default": "redcon",
-          "description": "Redcon CLI command or path to executable."
+          "scope": "machine",
+          "description": "Redcon CLI command or path to executable. Machine-scoped so a workspace cannot override the executable that is run."
         },
         "redcon.defaultMaxTokens": {
           "type": "number",
@@ -256,7 +258,8 @@
         "redcon.configPath": {
           "type": "string",
           "default": "",
-          "description": "Path to redcon.toml (auto-detected if empty)."
+          "scope": "machine",
+          "description": "Path to redcon.toml (auto-detected if empty). Machine-scoped so a workspace cannot point the CLI at an arbitrary file."
         },
         "redcon.contextSync.enabled": {
           "type": "boolean",

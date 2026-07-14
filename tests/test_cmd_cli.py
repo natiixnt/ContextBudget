@@ -18,7 +18,11 @@ from redcon.cmd.types import CompressionLevel
 
 
 @pytest.fixture(autouse=True)
-def _reset_cache():
+def _reset_cache(monkeypatch):
+    # redcon_quality_check executes commands and is disabled by default;
+    # enable it and widen the confinement root for these direct tests.
+    monkeypatch.setenv("REDCON_MCP_ENABLE_RUN", "1")
+    monkeypatch.setenv("REDCON_MCP_ROOT", "/")
     clear_default_cache()
     yield
     clear_default_cache()
@@ -212,7 +216,6 @@ def test_history_record_and_read(tmp_path: Path):
 
 def test_history_swallows_errors_when_db_unwritable(tmp_path: Path):
     """If the DB path can't be created, record_run returns None instead of raising."""
-    bad_path = tmp_path / "no_such_dir" / "nested" / "history.db"
     # Make the parent unwritable by pointing into a file-not-dir.
     blocker = tmp_path / "blocker"
     blocker.write_text("file, not dir")

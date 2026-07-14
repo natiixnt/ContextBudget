@@ -19,7 +19,13 @@ from redcon.mcp.tools import tool_run
 
 
 @pytest.fixture(autouse=True)
-def _clear_pipeline_cache():
+def _clear_pipeline_cache(monkeypatch):
+    # redcon_run is disabled by default and confines cwd to REDCON_MCP_ROOT;
+    # these tests drive it directly on tmp git repos, so enable it and widen
+    # the root for the suite. Dedicated gating tests live in
+    # test_trust_hardening.py.
+    monkeypatch.setenv("REDCON_MCP_ENABLE_RUN", "1")
+    monkeypatch.setenv("REDCON_MCP_ROOT", "/")
     clear_default_cache()
     yield
     clear_default_cache()
