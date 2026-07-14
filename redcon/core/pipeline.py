@@ -464,6 +464,12 @@ def run_pack(
             fragment_hits=cache_snap.fragment_hits or 0,
             fragment_misses=cache_snap.fragment_misses or 0,
         )
+    # Honest selection baseline: what dumping every scanned file into context
+    # would cost (char/4 heuristic, matching the default token estimator). The
+    # pack sends only the ranked subset, so baseline minus what was actually
+    # sent is the value redcon delivered by choosing files - visible even when
+    # no in-file compression happened (estimated_saved_tokens == 0).
+    baseline_tokens = sum(f.size_bytes for f in files) // 4
     report = run_render_stage(
         task,
         target_repo,
@@ -478,6 +484,8 @@ def run_pack(
         token_estimator=resolved_plugins.token_estimator_report,
         model_profile=model_profile,
         scan_summary=scan_summary,
+        baseline_tokens=baseline_tokens,
+        files_scanned=len(files),
     )
     if record_history:
         # Mirror the full report into .redcon/runs/ so editor

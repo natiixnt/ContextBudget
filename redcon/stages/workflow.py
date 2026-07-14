@@ -297,6 +297,8 @@ def run_render_stage(
     token_estimator: dict[str, object] | None = None,
     model_profile: dict[str, object] | None = None,
     scan_summary: ScanRefreshSummary | None = None,
+    baseline_tokens: int = 0,
+    files_scanned: int = 0,
 ) -> RunReport:
     """Render pipeline stage data into stable run report schema."""
 
@@ -355,6 +357,8 @@ def run_render_stage(
         degraded_files=compressed.degraded_files,
         degradation_savings=compressed.degradation_savings,
         scan=scan_meta,
+        context_baseline_tokens=max(0, baseline_tokens),
+        files_scanned=max(0, files_scanned),
     )
 
 

@@ -713,6 +713,20 @@ def cmd_pack(args: argparse.Namespace) -> int:
         f"saved={budget['estimated_saved_tokens']} tokens, "
         f"risk={budget['quality_risk_estimate']}",
     )
+    # Selection savings: the honest "value delivered" line. saved= above only
+    # counts in-file compression, which is often 0. Redcon's real win is picking
+    # a subset of files, so show what was sent vs dumping the whole scanned repo.
+    baseline_tokens = int(data.get("context_baseline_tokens", 0) or 0)
+    files_scanned = int(data.get("files_scanned", 0) or 0)
+    sent_tokens = int(budget.get("estimated_input_tokens", 0) or 0)
+    if baseline_tokens > sent_tokens > 0 and files_scanned > files_included:
+        pct_less = round((baseline_tokens - sent_tokens) / baseline_tokens * 100)
+        _qprint(
+            args,
+            f"Context: sent {files_included} of {files_scanned} files "
+            f"(~{sent_tokens} tokens) vs ~{baseline_tokens} for the whole repo "
+            f"- {pct_less}% less",
+        )
     _qprint(
         args,
         f"Files: {files_included} included, {files_skipped} skipped"

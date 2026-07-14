@@ -530,6 +530,26 @@ def render_agent_plan_markdown(data: dict) -> str:
     return "\n".join(lines)
 
 
+def _selection_savings_md_lines(data: dict, budget: dict) -> list[str]:
+    """Budget-section lines describing selection savings, when meaningful.
+
+    Empty when the pack sent the whole scanned universe (no subset was chosen)
+    or the baseline is not larger than what was actually sent - in those cases
+    there is no honest selection saving to report.
+    """
+    baseline = int(data.get("context_baseline_tokens", 0) or 0)
+    files_scanned = int(data.get("files_scanned", 0) or 0)
+    files_included = len(data.get("files_included") or [])
+    sent = int(budget.get("estimated_input_tokens", 0) or 0)
+    if not (baseline > sent > 0 and files_scanned > files_included):
+        return []
+    pct_less = round((baseline - sent) / baseline * 100)
+    return [
+        f"- Context sent: {files_included} of {files_scanned} files "
+        f"(~{sent} tokens) vs ~{baseline} for the whole repo - {pct_less}% less",
+    ]
+
+
 def render_pack_markdown(data: dict) -> str:
     """Render pack run payload to Markdown."""
 
@@ -556,6 +576,7 @@ def render_pack_markdown(data: dict) -> str:
             "## Budget",
             f"- Estimated input tokens: {budget.get('estimated_input_tokens', 0)}",
             f"- Estimated saved tokens: {budget.get('estimated_saved_tokens', 0)}",
+            *_selection_savings_md_lines(data, budget),
             f"- Duplicate reads prevented: {budget.get('duplicate_reads_prevented', 0)}",
             f"- Quality risk estimate: {budget.get('quality_risk_estimate', 'unknown')}",
             f"- Cache backend: {cache.get('backend', 'unknown')}",

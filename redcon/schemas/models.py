@@ -310,6 +310,15 @@ class RunReport:
     # file_count_limit / files_seen when the walk hit the file cap, so a
     # truncated monorepo scan is visible in run.json instead of silent.
     scan: dict[str, int | bool] = field(default_factory=dict)
+    # Selection savings. context_baseline_tokens is what the whole scanned file
+    # universe would cost if dumped into context (char/4 heuristic);
+    # files_scanned is how many files that universe held. The pack sends only a
+    # ranked subset, so the honest saving is this baseline minus the tokens
+    # actually sent - reported so a run that does no in-file compression
+    # (estimated_saved_tokens == 0) still shows the value redcon delivered by
+    # picking the right files.
+    context_baseline_tokens: int = 0
+    files_scanned: int = 0
 
     def __post_init__(self) -> None:
         if self.max_tokens <= 0:
