@@ -39,6 +39,10 @@ export RC_GATEWAY_API_KEY=my-secret-key
 redcon gateway --host 0.0.0.0 --port 8787
 ```
 
+The gateway refuses to start on a non-loopback host (anything other than
+`127.0.0.1` / `::1`) unless `RC_GATEWAY_API_KEY` is set, so an unauthenticated
+service is never exposed to the network by accident.
+
 ### Environment variables
 
 | Variable | Default | Description |

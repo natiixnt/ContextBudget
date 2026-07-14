@@ -6,7 +6,7 @@
  */
 
 import * as vscode from 'vscode';
-import { exec } from 'child_process';
+import { execFile } from 'child_process';
 import * as path from 'path';
 import * as fs from 'fs';
 
@@ -17,9 +17,19 @@ export interface SetupResult {
   mcpConfigured?: boolean;
 }
 
-function execAsync(cmd: string, cwd: string, timeoutMs = 120_000): Promise<{ stdout: string; stderr: string }> {
+/**
+ * Run a program with an explicit argument array. No shell is spawned, so
+ * metacharacters in any argument (workspace path, python path) cannot be
+ * interpreted - this closes the shell-injection surface the old exec() had.
+ */
+function run(
+  file: string,
+  args: string[],
+  cwd: string,
+  timeoutMs = 120_000,
+): Promise<{ stdout: string; stderr: string }> {
   return new Promise((resolve, reject) => {
-    const child = exec(cmd, { cwd, timeout: timeoutMs, env: { ...process.env } }, (err, stdout, stderr) => {
+    const child = execFile(file, args, { cwd, timeout: timeoutMs, env: { ...process.env } }, (err, stdout, stderr) => {
       if (err) {
         const e = err as NodeJS.ErrnoException;
         (e as unknown as { stdout: string; stderr: string }).stdout = stdout;
@@ -29,7 +39,6 @@ function execAsync(cmd: string, cwd: string, timeoutMs = 120_000): Promise<{ std
       }
       resolve({ stdout, stderr });
     });
-    // Ensure we don't leak zombie processes
     child.on('exit', () => { /* noop */ });
   });
 }
@@ -42,7 +51,7 @@ async function detectPython(): Promise<string | null> {
   const candidates = [...new Set([configured, 'python3', 'python'].filter(Boolean))];
   for (const cmd of candidates) {
     try {
-      const { stdout } = await execAsync(`${cmd} --version`, process.cwd(), 5000);
+      const { stdout } = await run(cmd, ['--version'], process.cwd(), 5000);
       if (stdout.toLowerCase().includes('python')) {
         return cmd;
       }
@@ -55,12 +64,12 @@ async function detectPython(): Promise<string | null> {
 
 async function isRedconInstalled(pythonCmd: string): Promise<boolean> {
   try {
-    await execAsync(`${pythonCmd} -m redcon --help`, process.cwd(), 10_000);
+    await run(pythonCmd, ['-m', 'redcon', '--help'], process.cwd(), 10_000);
     return true;
   } catch {
     // Fallback: direct redcon binary on PATH
     try {
-      await execAsync('redcon --help', process.cwd(), 5_000);
+      await run('redcon', ['--help'], process.cwd(), 5_000);
       return true;
     } catch {
       return false;
@@ -101,7 +110,7 @@ export async function runSetup(workspaceRoot: string): Promise<SetupResult> {
 
       progress.report({ message: 'Installing redcon[mcp] via pip...', increment: 20 });
       try {
-        await execAsync(`${pythonCmd} -m pip install --user --upgrade "redcon[mcp]"`, workspaceRoot, 180_000);
+        await run(pythonCmd, ['-m', 'pip', 'install', '--user', '--upgrade', 'redcon[mcp]'], workspaceRoot, 180_000);
       } catch (err) {
         const e = err as NodeJS.ErrnoException & { stderr?: string };
         return {
@@ -123,8 +132,9 @@ export async function runSetup(workspaceRoot: string): Promise<SetupResult> {
 
       progress.report({ message: 'Registering MCP server...', increment: 70 });
       try {
-        await execAsync(
-          `${pythonCmd} -m redcon mcp install --target all --repo "${workspaceRoot}"`,
+        await run(
+          pythonCmd,
+          ['-m', 'redcon', 'mcp', 'install', '--target', 'all', '--repo', workspaceRoot],
           workspaceRoot,
           30_000,
         );
@@ -167,15 +177,17 @@ export async function registerMcp(workspaceRoot: string): Promise<SetupResult> {
       progress.report({ message: 'Configuring MCP...', increment: 0 });
       const pythonCmd = (await detectPython()) ?? 'python3';
       try {
-        await execAsync(
-          `${pythonCmd} -m redcon mcp install --target all --repo "${workspaceRoot}"`,
+        await run(
+          pythonCmd,
+          ['-m', 'redcon', 'mcp', 'install', '--target', 'all', '--repo', workspaceRoot],
           workspaceRoot,
           30_000,
         );
       } catch {
         try {
-          await execAsync(
-            `redcon mcp install --target all --repo "${workspaceRoot}"`,
+          await run(
+            'redcon',
+            ['mcp', 'install', '--target', 'all', '--repo', workspaceRoot],
             workspaceRoot,
             30_000,
           );

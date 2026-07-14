@@ -315,6 +315,64 @@ def _check_mcp_registration(repo: Path) -> CheckResult:
     )
 
 
+def _check_secret_exposure(repo: Path) -> CheckResult:
+    """Confirm credential files are excluded from the packable scan universe.
+
+    Reports OK with a count when secret-looking files exist and are being
+    excluded, and only warns if exclusion has been turned off while such files
+    are present (the one configuration that could leak them to an LLM).
+    """
+    try:
+        from redcon.config import load_config
+        from redcon.scanners.incremental import _matches_glob
+        from redcon.schemas.models import DEFAULT_SECRET_GLOBS
+
+        cfg = load_config(repo)
+    except Exception as exc:
+        return CheckResult(
+            name="secret_exposure",
+            status="warn",
+            message=f"Could not evaluate secret exclusion: {exc}",
+        )
+
+    matches: list[str] = []
+    ignore_dirs = set(cfg.scan.ignore_dirs)
+    for path in repo.rglob("*"):
+        if not path.is_file():
+            continue
+        rel_parts = path.relative_to(repo).parts
+        if any(part in ignore_dirs for part in rel_parts[:-1]):
+            continue
+        rel = path.relative_to(repo).as_posix()
+        if any(_matches_glob(rel, pat) for pat in DEFAULT_SECRET_GLOBS):
+            matches.append(rel)
+        if len(matches) >= 50:
+            break
+
+    if not matches:
+        return CheckResult(
+            name="secret_exposure",
+            status="ok",
+            message="No credential files detected in scan scope",
+        )
+    if cfg.scan.exclude_secrets:
+        return CheckResult(
+            name="secret_exposure",
+            status="ok",
+            message=f"{len(matches)} credential file(s) present and excluded from packing",
+        )
+    return CheckResult(
+        name="secret_exposure",
+        status="fail",
+        message=f"{len(matches)} credential file(s) can be packed - [scan].exclude_secrets is false",
+        detail=(
+            "Set [scan].exclude_secrets = true (the default) so files like "
+            + ", ".join(matches[:5])
+            + " are never sent to an LLM."
+        ),
+    )
+
+
 def run_doctor(repo: Path) -> DoctorReport:
     """Run all diagnostic checks and return a report."""
     try:
@@ -339,6 +397,7 @@ def run_doctor(repo: Path) -> DoctorReport:
         _check_optional_dep("tree_sitter", "tree_sitter", "symbols"),
         _check_optional_dep("ast_grep", "ast_grep_py", "ast_grep"),
         _check_mcp_registration(repo),
+        _check_secret_exposure(repo),
         _check_config(repo),
         _check_redcon_toml(repo),
         _check_cache_dir(repo),

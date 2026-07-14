@@ -1,6 +1,6 @@
-from __future__ import annotations
-
 """Shared schema dataclasses and legacy constants."""
+
+from __future__ import annotations
 
 import json
 from dataclasses import dataclass, field
@@ -309,9 +309,7 @@ class RunReport:
 
     def __post_init__(self) -> None:
         if self.max_tokens <= 0:
-            raise ValueError(
-                f"max_tokens must be positive, got {self.max_tokens}"
-            )
+            raise ValueError(f"max_tokens must be positive, got {self.max_tokens}")
 
     def __repr__(self) -> str:
         used = self.budget.get("estimated_input_tokens", "?")
@@ -322,10 +320,7 @@ class RunReport:
         included = len(self.files_included)
         saved = self.budget.get("estimated_saved_tokens", 0)
         used = self.budget.get("estimated_input_tokens", 0)
-        return (
-            f"[{self.repo}] {self.task!r} - "
-            f"{included} files, {used} tokens used, {saved} saved"
-        )
+        return f"[{self.repo}] {self.task!r} - {included} files, {used} tokens used, {saved} saved"
 
     @property
     def compression_ratio(self) -> float:
@@ -363,10 +358,20 @@ class RunReport:
         """
         data = json.loads(raw)
         required_keys = {
-            "command", "task", "repo", "max_tokens", "ranked_files",
-            "compressed_context", "files_included", "files_skipped",
-            "budget", "cache", "summarizer", "token_estimator",
-            "cache_hits", "generated_at",
+            "command",
+            "task",
+            "repo",
+            "max_tokens",
+            "ranked_files",
+            "compressed_context",
+            "files_included",
+            "files_skipped",
+            "budget",
+            "cache",
+            "summarizer",
+            "token_estimator",
+            "cache_hits",
+            "generated_at",
         }
         missing = required_keys - set(data)
         if missing:
@@ -419,6 +424,51 @@ DEFAULT_IGNORE_DIRS = {
     ".venv",
     "venv",
 }
+
+# Files that commonly hold credentials. These are excluded from the scan
+# universe by default so a pack can never send secrets to an LLM (or write
+# them into run.json / .redcon/runs/). The worst case is task-correlated:
+# packing "fix the database connection" would otherwise surface the .env whose
+# DATABASE_URL matches the task. Users can still force-include a path via
+# explicit include_globs. Kept as glob patterns matched against the POSIX
+# relative path, so both "*.pem" and nested ".aws/credentials" work.
+DEFAULT_SECRET_GLOBS: tuple[str, ...] = (
+    ".env",
+    ".env.*",
+    "*.env",
+    "env.*.local",
+    "*.pem",
+    "*.key",
+    "*.pfx",
+    "*.p12",
+    "*.keystore",
+    "*.jks",
+    "id_rsa",
+    "id_rsa.*",
+    "id_dsa",
+    "id_ecdsa",
+    "id_ed25519",
+    "id_ed25519.*",
+    "*.ppk",
+    "*.tfvars",
+    "*.tfvars.json",
+    "secrets.*",
+    "*secrets.y*ml",
+    "credentials",
+    "credentials.*",
+    "*credentials.json",
+    ".npmrc",
+    ".pypirc",
+    ".netrc",
+    ".htpasswd",
+    ".pgpass",
+    ".aws/credentials",
+    ".aws/config",
+    ".ssh/*",
+    "gcp-*.json",
+    "service-account*.json",
+    "serviceaccount*.json",
+)
 
 
 def normalize_repo(repo: str | Path) -> Path:

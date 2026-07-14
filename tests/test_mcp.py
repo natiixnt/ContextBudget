@@ -8,8 +8,14 @@ from redcon.mcp import tools
 
 
 @pytest.fixture(autouse=True)
-def _clear_cache():
-    """Clear the rank cache before each test."""
+def _clear_cache(monkeypatch):
+    """Clear the rank cache and allow tools to reach the test's tmp dirs.
+
+    MCP path arguments are confined to REDCON_MCP_ROOT (default: the server
+    cwd). Tests operate on pytest tmp_path directories outside cwd, so widen
+    the root to "/" for the suite; a dedicated test covers confinement itself.
+    """
+    monkeypatch.setenv("REDCON_MCP_ROOT", "/")
     tools.clear_cache()
     yield
     tools.clear_cache()
@@ -85,9 +91,7 @@ def test_search_rejects_invalid_regex():
 
 def test_search_finds_pattern_in_ranked(tmp_path):
     """search scope='ranked' should find patterns in the ranked files."""
-    (tmp_path / "auth.py").write_text(
-        "def authenticate(user, password):\n    return True\n"
-    )
+    (tmp_path / "auth.py").write_text("def authenticate(user, password):\n    return True\n")
     (tmp_path / "db.py").write_text("def connect(): pass\n")
 
     result = tools.tool_search(
@@ -140,9 +144,7 @@ def test_budget_rejects_zero_max_tokens():
 
 def test_budget_returns_plan(tmp_path):
     """budget should return a plan for fitting files within a token budget."""
-    (tmp_path / "auth.py").write_text(
-        "def login(user, password):\n    return True\n" * 5
-    )
+    (tmp_path / "auth.py").write_text("def login(user, password):\n    return True\n" * 5)
 
     result = tools.tool_budget(
         files=["auth.py"],
@@ -157,7 +159,7 @@ def test_budget_returns_plan(tmp_path):
 
 def test_server_creation():
     """The MCP server should be constructible when mcp is installed."""
-    from redcon.mcp.server import create_server, _MCP_AVAILABLE, _TOOL_SCHEMAS
+    from redcon.mcp.server import _MCP_AVAILABLE, _TOOL_SCHEMAS, create_server
 
     if not _MCP_AVAILABLE:
         pytest.skip("mcp package not installed")
@@ -192,8 +194,13 @@ def test_dispatch_rank(tmp_path):
     from redcon.mcp.server import _dispatch_tool
 
     (tmp_path / "x.py").write_text("x = 1\n")
-    result = _dispatch_tool("redcon_rank", {
-        "task": "test", "repo": str(tmp_path), "top_k": 5,
-    })
+    result = _dispatch_tool(
+        "redcon_rank",
+        {
+            "task": "test",
+            "repo": str(tmp_path),
+            "top_k": 5,
+        },
+    )
     assert "error" not in result
     assert "files" in result

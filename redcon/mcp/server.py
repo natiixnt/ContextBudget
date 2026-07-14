@@ -253,7 +253,8 @@ _TOOL_SCHEMAS = [
             "INSTEAD of a raw shell whenever output may exceed a screenful "
             "- test runs, diffs, logs. The token caps are hard guarantees, "
             "and failures keep their essential detail (failing test names, "
-            "error lines)."
+            "error lines). DISABLED by default because it executes commands; "
+            "set REDCON_MCP_ENABLE_RUN=1 on the server to enable it."
         ),
         "inputSchema": {
             "type": "object",

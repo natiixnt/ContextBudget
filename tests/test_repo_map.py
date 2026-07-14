@@ -35,13 +35,9 @@ def python_repo(tmp_path: Path) -> Path:
         "    def create_task(self, payload):\n"
         "        return None\n"
     )
-    (tmp_path / "unrelated.py").write_text(
-        "def coffee_machine():\n    return 'espresso'\n"
-    )
+    (tmp_path / "unrelated.py").write_text("def coffee_machine():\n    return 'espresso'\n")
     subprocess.run(["git", "add", "."], cwd=str(tmp_path), check=True)
-    subprocess.run(
-        ["git", "commit", "-q", "-m", "init"], cwd=str(tmp_path), check=True
-    )
+    subprocess.run(["git", "commit", "-q", "-m", "init"], cwd=str(tmp_path), check=True)
     return tmp_path
 
 
@@ -90,26 +86,22 @@ def test_repo_map_respects_budget(python_repo: Path):
     # tokens, so budget=12 fits all three fixture files. Pick a budget
     # that genuinely cannot fit every file (~5 tokens admits 1-2 of 3)
     # so the truncation contract actually fires.
-    tight = build_repo_map(
-        task="add authentication", repo=python_repo, budget=5, top_files=10
-    )
+    tight = build_repo_map(task="add authentication", repo=python_repo, budget=5, top_files=10)
     assert tight.total_tokens <= tight.budget
     assert tight.truncated is True
 
     # Roomy budget: contract still holds, no truncation when everything fits.
-    roomy = build_repo_map(
-        task="add authentication", repo=python_repo, budget=4_000, top_files=10
-    )
+    roomy = build_repo_map(task="add authentication", repo=python_repo, budget=4_000, top_files=10)
     assert roomy.total_tokens <= roomy.budget
     assert roomy.truncated is False
 
 
-def test_repo_map_mcp_tool_returns_meta(python_repo: Path):
+def test_repo_map_mcp_tool_returns_meta(python_repo: Path, monkeypatch):
     from redcon.mcp.tools import tool_repo_map
 
-    result = tool_repo_map(
-        task="add authentication", repo=str(python_repo), budget=4_000
-    )
+    # python_repo is a tmp dir outside cwd; widen the MCP confinement root.
+    monkeypatch.setenv("REDCON_MCP_ROOT", "/")
+    result = tool_repo_map(task="add authentication", repo=str(python_repo), budget=4_000)
     assert "error" not in result
     assert "_meta" in result
     assert result["_meta"]["redcon"]["tool"] == "redcon_repo_map"

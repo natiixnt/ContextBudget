@@ -123,6 +123,7 @@ def run_scan_refresh_stage(repo: Path, config: RedconConfig) -> ScanRefreshResul
         ignore_dirs=config.scan.ignore_dirs,
         binary_extensions=config.scan.binary_extensions,
         internal_paths=_scan_internal_paths(config),
+        exclude_secrets=config.scan.exclude_secrets,
     )
 
 

@@ -23,6 +23,8 @@ from redcon.cmd.runner import (
     CommandTimeout,
     RunRequest,
     RunResult,
+    parse_command,
+    reject_dangerous_args,
     run_command,
 )
 from redcon.cmd.types import (
@@ -71,7 +73,9 @@ __all__ = [
     "clear_default_cache",
     "compress_command",
     "detect_compressor",
+    "parse_command",
     "register_compressor",
+    "reject_dangerous_args",
     "run_command",
     "select_level",
 ]

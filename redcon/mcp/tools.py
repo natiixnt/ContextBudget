@@ -15,6 +15,7 @@ tool produced the response.
 from __future__ import annotations
 
 import logging
+import os
 import time
 from pathlib import Path
 from typing import Any
@@ -35,6 +36,7 @@ def _meta_block(tool: str, **extras: Any) -> dict[str, Any]:
     }
     payload.update({k: v for k, v in extras.items() if v is not None})
     return {"redcon": payload}
+
 
 # Cache ranks by (repo, task) key for 15 minutes so repeat calls are free.
 _RANK_CACHE: dict[tuple[str, str], tuple[float, dict[str, Any]]] = {}
@@ -71,7 +73,39 @@ def _make_engine(config_path: str | None = None) -> RedconEngine:
     return RedconEngine(config_path=config_path) if config_path else RedconEngine()
 
 
+class PathOutsideRoot(ValueError):
+    """Raised when an MCP path argument resolves outside the confinement root."""
+
+
+def _mcp_root() -> Path:
+    """Root that MCP path arguments are confined to.
+
+    Defaults to the server process's working directory (the project the agent
+    is operating in), so a prompt-injected agent cannot make redcon read
+    /etc/passwd or ~/.ssh. Override with REDCON_MCP_ROOT; set it to "/" to
+    disable confinement for a trusted multi-repo setup.
+    """
+    root = os.environ.get("REDCON_MCP_ROOT", "").strip()
+    return Path(root).resolve() if root else Path.cwd().resolve()
+
+
+def _confine(path_str: str, *, label: str = "path") -> str:
+    """Resolve path_str and confirm it stays within the MCP root.
+
+    Returns the resolved absolute path as a string, or raises PathOutsideRoot.
+    """
+    resolved = Path(path_str).resolve()
+    root = _mcp_root()
+    if resolved != root and root not in resolved.parents:
+        raise PathOutsideRoot(
+            f"{label} {path_str!r} resolves outside the allowed root {root}. "
+            "Set REDCON_MCP_ROOT to broaden access."
+        )
+    return str(resolved)
+
+
 # --- Tool: rank ---
+
 
 def tool_rank(
     task: str,
@@ -89,6 +123,10 @@ def tool_rank(
         return {"error": "task must be a non-empty string"}
     if top_k <= 0:
         return {"error": "top_k must be positive"}
+    try:
+        repo = _confine(repo, label="repo")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     cached = _get_cached_rank(repo, task)
     if cached is not None:
@@ -125,16 +163,19 @@ def tool_rank(
 def _format_rank_entries(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
     out = []
     for entry in entries:
-        out.append({
-            "path": entry.get("path", ""),
-            "score": round(float(entry.get("score", 0.0)), 2),
-            "reasons": entry.get("reasons", [])[:3],
-            "line_count": entry.get("line_count", 0),
-        })
+        out.append(
+            {
+                "path": entry.get("path", ""),
+                "score": round(float(entry.get("score", 0.0)), 2),
+                "reasons": entry.get("reasons", [])[:3],
+                "line_count": entry.get("line_count", 0),
+            }
+        )
     return out
 
 
 # --- Tool: overview ---
+
 
 def tool_overview(
     task: str,
@@ -147,6 +188,10 @@ def tool_overview(
     """
     if not task or not task.strip():
         return {"error": "task must be a non-empty string"}
+    try:
+        repo = _confine(repo, label="repo")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     cached = _get_cached_rank(repo, task)
     if cached is None:
@@ -166,23 +211,27 @@ def tool_overview(
         path = entry.get("path", "")
         parts = path.replace("\\", "/").split("/")
         directory = "/".join(parts[:-1]) if len(parts) > 1 else "."
-        dirs.setdefault(directory, []).append({
-            "name": parts[-1],
-            "score": round(float(entry.get("score", 0.0)), 2),
-        })
+        dirs.setdefault(directory, []).append(
+            {
+                "name": parts[-1],
+                "score": round(float(entry.get("score", 0.0)), 2),
+            }
+        )
 
     # Sort directories by max file score
     dir_summary = []
     for directory, files in dirs.items():
         files_sorted = sorted(files, key=lambda f: f["score"], reverse=True)
         top_file = files_sorted[0] if files_sorted else None
-        dir_summary.append({
-            "directory": directory,
-            "file_count": len(files_sorted),
-            "top_file": top_file["name"] if top_file else None,
-            "top_score": top_file["score"] if top_file else 0.0,
-            "files": [f["name"] for f in files_sorted[:5]],
-        })
+        dir_summary.append(
+            {
+                "directory": directory,
+                "file_count": len(files_sorted),
+                "top_file": top_file["name"] if top_file else None,
+                "top_score": top_file["score"] if top_file else 0.0,
+                "files": [f["name"] for f in files_sorted[:5]],
+            }
+        )
     dir_summary.sort(key=lambda d: d["top_score"], reverse=True)
 
     return {
@@ -195,6 +244,7 @@ def tool_overview(
 
 
 # --- Tool: compress ---
+
 
 def tool_compress(
     path: str,
@@ -215,6 +265,10 @@ def tool_compress(
         return {"error": "task must be a non-empty string"}
     if max_tokens <= 0:
         return {"error": "max_tokens must be positive"}
+    try:
+        repo = _confine(repo, label="repo")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     engine = _make_engine(config_path)
     try:
@@ -262,6 +316,7 @@ def tool_compress(
 
 # --- Tool: search ---
 
+
 def tool_search(
     pattern: str,
     task: str,
@@ -279,8 +334,13 @@ def tool_search(
         return {"error": "pattern must be a non-empty string"}
     if scope not in ("ranked", "all"):
         return {"error": "scope must be 'ranked' or 'all'"}
+    try:
+        repo = _confine(repo, label="repo")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     import re
+
     try:
         regex = re.compile(pattern)
     except re.error as e:
@@ -306,8 +366,18 @@ def tool_search(
     else:
         # Walk repo, skip common ignore directories
         paths = []
-        ignore_dirs = {".git", "node_modules", ".venv", "venv", "__pycache__",
-                       "dist", "build", ".mypy_cache", ".ruff_cache", ".pytest_cache"}
+        ignore_dirs = {
+            ".git",
+            "node_modules",
+            ".venv",
+            "venv",
+            "__pycache__",
+            "dist",
+            "build",
+            ".mypy_cache",
+            ".ruff_cache",
+            ".pytest_cache",
+        }
         for p in repo_path.rglob("*"):
             if p.is_file() and not any(part in ignore_dirs for part in p.parts):
                 paths.append(p)
@@ -328,11 +398,13 @@ def tool_search(
                             rel = str(file_path.relative_to(repo_path)).replace("\\", "/")
                         except ValueError:
                             rel = str(file_path)
-                        matches.append({
-                            "path": rel,
-                            "line": line_num,
-                            "text": line.rstrip()[:200],
-                        })
+                        matches.append(
+                            {
+                                "path": rel,
+                                "line": line_num,
+                                "text": line.rstrip()[:200],
+                            }
+                        )
                         if len(matches) >= max_results:
                             break
         except (OSError, UnicodeDecodeError):
@@ -366,6 +438,10 @@ def tool_structural_search(
     """Run an ast-grep structural search. Pattern matches the AST, not text."""
     if not pattern or not pattern.strip():
         return {"error": "pattern must be a non-empty string"}
+    try:
+        scope = _confine(scope, label="scope")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     try:
         from redcon.structural_search import (
@@ -427,6 +503,10 @@ def tool_repo_map(
     """
     if not task or not task.strip():
         return {"error": "task must be a non-empty string"}
+    try:
+        repo = _confine(repo, label="repo")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     try:
         from redcon.repo_map import build_repo_map
@@ -473,6 +553,7 @@ def tool_repo_map(
 
 # --- Tool: quality_check ---
 
+
 def tool_quality_check(
     command: str,
     cwd: str = ".",
@@ -491,9 +572,24 @@ def tool_quality_check(
     No competitor MCP server exposes a self-audit like this; agents that
     want defence-in-depth around lossy compression can call this instead
     of (or before) ``redcon_run``.
+
+    Like redcon_run this executes commands and is DISABLED unless
+    REDCON_MCP_ENABLE_RUN=1 is set on the server.
     """
+    if os.environ.get("REDCON_MCP_ENABLE_RUN", "").strip().lower() not in {"1", "true", "yes"}:
+        return {
+            "error": (
+                "redcon_quality_check is disabled. It executes shell commands. "
+                "Set REDCON_MCP_ENABLE_RUN=1 on the MCP server to enable it."
+            ),
+            "kind": "disabled",
+        }
     if not command or not command.strip():
         return {"error": "command must be a non-empty string"}
+    try:
+        cwd = _confine(cwd, label="cwd")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     try:
         from redcon.cmd import (
@@ -507,18 +603,22 @@ def tool_quality_check(
         from redcon.cmd.compressors.base import CompressorContext
         from redcon.cmd.quality import DEFAULT_THRESHOLDS
         from redcon.cmd.registry import detect_compressor
-        from redcon.cmd.runner import parse_command
+        from redcon.cmd.runner import parse_command, reject_dangerous_args
     except ImportError as e:
         return {"error": f"redcon.cmd module unavailable: {e}"}
+
+    try:
+        reject_dangerous_args(parse_command(command))
+    except CommandNotAllowed as e:
+        return {"error": str(e), "kind": "not_allowed"}
+    except ValueError as e:
+        return {"error": str(e)}
 
     try:
         floor = CompressionLevel(quality_floor.lower())
     except ValueError:
         return {
-            "error": (
-                f"quality_floor must be one of verbose, compact, ultra "
-                f"(got {quality_floor})"
-            )
+            "error": (f"quality_floor must be one of verbose, compact, ultra (got {quality_floor})")
         }
 
     hint = BudgetHint(
@@ -557,7 +657,7 @@ def tool_quality_check(
         argv = parse_command(command)
         compressor = detect_compressor(argv)
         if compressor is not None:
-            ctx = CompressorContext(
+            CompressorContext(
                 argv=argv,
                 cwd=str(report.cache_key.cwd),
                 returncode=report.returncode,
@@ -574,11 +674,7 @@ def tool_quality_check(
     except Exception:
         pass
 
-    verdict_passed = (
-        out.must_preserve_ok
-        and threshold_met
-        and deterministic
-    )
+    verdict_passed = out.must_preserve_ok and threshold_met and deterministic
 
     return {
         "command": command,
@@ -611,6 +707,7 @@ def tool_quality_check(
 
 # --- Tool: run ---
 
+
 def tool_run(
     command: str,
     cwd: str = ".",
@@ -624,12 +721,30 @@ def tool_run(
     """
     Run a shell command and return its compressed output.
 
+    DISABLED by default: this tool executes commands, which is unsafe to
+    expose to an agent that could be prompt-injected. Set the environment
+    variable REDCON_MCP_ENABLE_RUN=1 to enable it. The runner's allowlist
+    selects a compressor schema and is NOT a security sandbox.
+
     Wraps redcon.cmd.compress_command with MCP-friendly argument handling.
     Falls back to raw passthrough (still token-budgeted) for unrecognised
-    commands. Refuses commands that are not in the runner allowlist.
+    commands.
     """
+    if os.environ.get("REDCON_MCP_ENABLE_RUN", "").strip().lower() not in {"1", "true", "yes"}:
+        return {
+            "error": (
+                "redcon_run is disabled. It executes shell commands, which is "
+                "unsafe to expose to an agent. Set REDCON_MCP_ENABLE_RUN=1 on "
+                "the MCP server to enable it, or run the command yourself."
+            ),
+            "kind": "disabled",
+        }
     if not command or not command.strip():
         return {"error": "command must be a non-empty string"}
+    try:
+        cwd = _confine(cwd, label="cwd")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     try:
         from redcon.cmd import (
@@ -639,18 +754,26 @@ def tool_run(
             CommandTimeout,
             CompressionLevel,
             compress_command,
+            parse_command,
+            reject_dangerous_args,
         )
     except ImportError as e:
         return {"error": f"redcon.cmd module unavailable: {e}"}
+
+    # Refuse code-execution escapes (python -c, find -exec, npm run) at the
+    # agent boundary; the CLI path is unaffected.
+    try:
+        reject_dangerous_args(parse_command(command))
+    except CommandNotAllowed as e:
+        return {"error": str(e), "kind": "not_allowed"}
+    except ValueError as e:
+        return {"error": str(e)}
 
     try:
         floor = CompressionLevel(quality_floor.lower())
     except ValueError:
         return {
-            "error": (
-                f"quality_floor must be one of verbose, compact, ultra "
-                f"(got {quality_floor})"
-            )
+            "error": (f"quality_floor must be one of verbose, compact, ultra (got {quality_floor})")
         }
 
     hint = BudgetHint(
@@ -728,6 +851,10 @@ def tool_budget(
         return {"error": "task must be a non-empty string"}
     if max_tokens <= 0:
         return {"error": "max_tokens must be positive"}
+    try:
+        repo = _confine(repo, label="repo")
+    except PathOutsideRoot as exc:
+        return {"error": str(exc), "kind": "path_denied"}
 
     engine = _make_engine(config_path)
     # Run pack with the user's max_tokens and enough top_files to cover the request
@@ -759,12 +886,14 @@ def tool_budget(
                 break
         if matched:
             ct = int(item.get("compressed_tokens", 0))
-            plan.append({
-                "path": item.get("path", ""),
-                "strategy": item.get("strategy", "unknown"),
-                "tokens": ct,
-                "original_tokens": int(item.get("original_tokens", 0)),
-            })
+            plan.append(
+                {
+                    "path": item.get("path", ""),
+                    "strategy": item.get("strategy", "unknown"),
+                    "tokens": ct,
+                    "original_tokens": int(item.get("original_tokens", 0)),
+                }
+            )
             total_tokens += ct
 
     dropped = sorted(requested_set - matched_paths)

@@ -38,6 +38,10 @@ class ScanSettings:
     preview_chars: int = 2_000
     ignore_dirs: set[str] = field(default_factory=lambda: set(DEFAULT_IGNORE_DIRS))
     binary_extensions: set[str] = field(default_factory=lambda: set(BINARY_EXTENSIONS))
+    # Exclude credential files (.env, keys, .pem, credentials, ...) from the
+    # scan by default so a pack can never leak secrets to an LLM. Turn off only
+    # if you deliberately need to pack such a file.
+    exclude_secrets: bool = True
 
 
 @dataclass(slots=True)
@@ -421,6 +425,8 @@ def _apply_scan_overrides(settings: ScanSettings, data: Mapping[str, Any]) -> No
         settings.max_file_size_bytes = int(data["max_file_size_bytes"])
     if "preview_chars" in data:
         settings.preview_chars = int(data["preview_chars"])
+    if "exclude_secrets" in data:
+        settings.exclude_secrets = bool(data["exclude_secrets"])
     # Backward-compatible keys
     if "ignore_dirs" in data:
         settings.ignore_dirs = _to_set(data["ignore_dirs"])

@@ -17,6 +17,7 @@ from redcon.schemas.models import (
     BINARY_EXTENSIONS,
     CACHE_FILE,
     DEFAULT_IGNORE_DIRS,
+    DEFAULT_SECRET_GLOBS,
     RUN_HISTORY_FILE,
     SCAN_INDEX_FILE,
     FileRecord,
@@ -613,6 +614,7 @@ def refresh_scan_index(
     internal_paths: set[str] | None = None,
     repo_label: str | None = None,
     use_sqlite: bool = True,
+    exclude_secrets: bool = True,
 ) -> ScanRefreshResult:
     """Refresh the on-disk scan index and reuse unchanged file metadata."""
 
@@ -620,7 +622,10 @@ def refresh_scan_index(
     ignore_patterns = list(ignore_globs if ignore_globs is not None else [])
     # Always exclude redcon's own artifacts and honour the repo's .gitignore so
     # the pack never re-ingests its own output or files the user has ignored.
-    for extra in (*REDCON_ARTIFACT_GLOBS, *_gitignore_globs(repo_path)):
+    # Secret files (credentials, keys, .env) are excluded by default so a pack
+    # can never leak them to an LLM; set scan.exclude_secrets=false to override.
+    secret_globs = DEFAULT_SECRET_GLOBS if exclude_secrets else ()
+    for extra in (*REDCON_ARTIFACT_GLOBS, *secret_globs, *_gitignore_globs(repo_path)):
         if extra not in ignore_patterns:
             ignore_patterns.append(extra)
     ignored_directories = ignore_dirs if ignore_dirs is not None else set(DEFAULT_IGNORE_DIRS)
