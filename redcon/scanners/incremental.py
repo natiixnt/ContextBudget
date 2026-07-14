@@ -682,6 +682,8 @@ def refresh_scan_index(
     total_file_count = 0
     file_count_capped = False
     resolved_symlinks: set[str] = set()
+    # Real path of the repo root, used to keep symlink targets contained.
+    repo_real = repo_path.resolve()
 
     for root, dirnames, filenames in os.walk(repo_path):
         dirnames[:] = sorted(
@@ -690,13 +692,27 @@ def refresh_scan_index(
         for name in sorted(filenames):
             path = Path(root) / name
 
-            # Handle symlinks - resolve and skip circular links
+            # Handle symlinks - resolve, keep the target inside the repo, and
+            # skip broken or circular links.
             if path.is_symlink():
                 try:
-                    resolved = str(path.resolve(strict=True))
-                except OSError:
-                    logger.debug("Skipping broken symlink: %s", path)
+                    resolved_path = path.resolve(strict=True)
+                except (OSError, RuntimeError):
+                    # OSError: broken link. RuntimeError: pathlib wraps an ELOOP
+                    # (a true a->b->a cycle) as a RuntimeError, so catch both.
+                    logger.debug("Skipping unresolvable symlink: %s", path)
                     continue
+                # Default-closed containment. A repo-supplied symlink whose real
+                # target lives outside the repo (../../etc/passwd, ~/.ssh/id_rsa,
+                # a cloud-credentials file) must never be read and packed into
+                # LLM-bound context. is_relative_to is a lexical prefix check on
+                # two already-resolved absolute paths.
+                if not resolved_path.is_relative_to(repo_real):
+                    logger.debug(
+                        "Skipping symlink escaping repo root: %s -> %s", path, resolved_path
+                    )
+                    continue
+                resolved = str(resolved_path)
                 if resolved in resolved_symlinks:
                     logger.debug("Skipping circular symlink: %s -> %s", path, resolved)
                     continue
