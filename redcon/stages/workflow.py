@@ -27,6 +27,7 @@ from redcon.schemas.models import (
     RunReport,
     TokenEstimatorReport,
 )
+from redcon.telemetry.pricing import DEFAULT_MODEL, compute_run_costs
 
 
 @dataclass(slots=True)
@@ -299,12 +300,23 @@ def run_render_stage(
     scan_summary: ScanRefreshSummary | None = None,
     baseline_tokens: int = 0,
     files_scanned: int = 0,
+    pricing_model: str | None = None,
 ) -> RunReport:
     """Render pipeline stage data into stable run report schema."""
 
     effective_top_files = top_files if top_files is not None else config.budget.top_files
     if effective_top_files is None:
         effective_top_files = DEFAULT_TOP_FILES
+    # Price out the selection saving so the "if you pay per token" number is
+    # available to the CLI, the run markdown, and the editor nudge. Empty when
+    # there is no whole-repo baseline to compare against.
+    cost: dict[str, str | int | float] = {}
+    if baseline_tokens > 0:
+        cost = compute_run_costs(
+            baseline_tokens=max(0, baseline_tokens),
+            optimized_tokens=compressed.estimated_input_tokens,
+            model=pricing_model or DEFAULT_MODEL,
+        )
     scan_meta: dict[str, int | bool] = {}
     if scan_summary is not None and scan_summary.file_count_capped:
         scan_meta = {
@@ -359,6 +371,7 @@ def run_render_stage(
         scan=scan_meta,
         context_baseline_tokens=max(0, baseline_tokens),
         files_scanned=max(0, files_scanned),
+        cost=cost,
     )
 
 

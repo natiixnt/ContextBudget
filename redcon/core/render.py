@@ -550,6 +550,21 @@ def _selection_savings_md_lines(data: dict, budget: dict) -> list[str]:
     ]
 
 
+def _cost_savings_md_lines(data: dict) -> list[str]:
+    """Budget-section line pricing out the selection saving, when non-zero.
+
+    Independent of the selection line: shows whenever the run saved dollars vs
+    dumping the whole repo, even if every scanned file happened to be included.
+    """
+    cost = data.get("cost", {})
+    if not isinstance(cost, dict) or float(cost.get("savings_usd", 0) or 0) <= 0:
+        return []
+    return [
+        f"- Saved if paying per token: ~${float(cost['savings_usd']):.4f} "
+        f"({cost.get('display_name', 'default')} input rates)"
+    ]
+
+
 def render_pack_markdown(data: dict) -> str:
     """Render pack run payload to Markdown."""
 
@@ -577,6 +592,7 @@ def render_pack_markdown(data: dict) -> str:
             f"- Estimated input tokens: {budget.get('estimated_input_tokens', 0)}",
             f"- Estimated saved tokens: {budget.get('estimated_saved_tokens', 0)}",
             *_selection_savings_md_lines(data, budget),
+            *_cost_savings_md_lines(data),
             f"- Duplicate reads prevented: {budget.get('duplicate_reads_prevented', 0)}",
             f"- Quality risk estimate: {budget.get('quality_risk_estimate', 'unknown')}",
             f"- Cache backend: {cache.get('backend', 'unknown')}",

@@ -319,6 +319,13 @@ class RunReport:
     # picking the right files.
     context_baseline_tokens: int = 0
     files_scanned: int = 0
+    # Dollar translation of the selection saving, for the "if you pay per token"
+    # framing (redcon.telemetry.pricing.compute_run_costs). Empty when there is
+    # no baseline to compare against. On a flat plan the value delivered is
+    # runway (see context_baseline_tokens); this is that same saving priced out
+    # at a model's input rate, labeled with the model assumed. Read by the
+    # editor nudge and the savings dashboard.
+    cost: dict[str, str | int | float] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         if self.max_tokens <= 0:

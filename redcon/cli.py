@@ -834,6 +834,15 @@ def cmd_pack(args: argparse.Namespace) -> int:
             f"(~{sent_tokens} tokens) vs ~{baseline_tokens} for the whole repo "
             f"- {pct_less}% less",
         )
+    # Dollar translation for anyone paying per token. On a flat plan the win is
+    # runway (the Context line above); this is the same saving priced out.
+    pack_cost = data.get("cost", {})
+    if isinstance(pack_cost, dict) and float(pack_cost.get("savings_usd", 0) or 0) > 0:
+        _qprint(
+            args,
+            f"Cost: ~${float(pack_cost['savings_usd']):.4f} saved this task if you pay "
+            f"per token ({pack_cost.get('display_name', 'default')} input rates)",
+        )
     _qprint(
         args,
         f"Files: {files_included} included, {files_skipped} skipped"
