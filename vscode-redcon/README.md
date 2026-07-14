@@ -5,7 +5,7 @@ Deterministic context budgeting for AI coding agents. Rank, compress, and pack r
 ![VS Code](https://img.shields.io/badge/VS%20Code-1.85+-blue)
 ![License](https://img.shields.io/badge/license-FSL--1.1--MIT-blue)
 
-![Redcon Analytics dashboard](media/dashboard-dark.png)
+![Redcon Analytics dashboard](https://raw.githubusercontent.com/natiixnt/redcon/main/vscode-redcon/media/dashboard-dark.png)
 
 ---
 
@@ -19,7 +19,7 @@ full dashboard. Below it, a live run feed: every run shows the tokens
 that actually went to the agent against the gray would-be total, the
 cut percentage, age and a risk dot. Click any run to inspect it.
 
-<img src="media/panel-dark.png" width="330" alt="Redcon sidebar panel" />
+<img src="https://raw.githubusercontent.com/natiixnt/redcon/main/vscode-redcon/media/panel-dark.png" width="330" alt="Redcon sidebar panel" />
 
 ### Plug and play: agent runs appear by themselves
 

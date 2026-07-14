@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.2 - 2026-07-14
+
+### Fixed
+
+- README screenshots load on the Marketplace listing: image links now
+  use absolute raw URLs, since relative paths in a monorepo subfolder
+  get rewritten without the vscode-redcon/ prefix and 404.
+
 ## 0.9.1 - 2026-07-14
 
 ### Changed

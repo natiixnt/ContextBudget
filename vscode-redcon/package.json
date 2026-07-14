@@ -2,7 +2,7 @@
   "name": "redcon",
   "displayName": "Redcon - Context Budget",
   "description": "Deterministic context budgeting for AI coding agents. Rank, compress, and pack repository context under token limits.",
-  "version": "0.9.1",
+  "version": "0.9.2",
   "publisher": "redcon",
   "license": "FSL-1.1-MIT",
   "icon": "resources/icon.png",
