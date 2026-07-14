@@ -85,3 +85,25 @@ def test_run_caps_output_and_kills_subprocess(tmp_path: Path):
     assert any("output cap" in note for note in result.notes)
     # Kill grace ensures we returned in well under the 60s sleep budget.
     assert result.duration_seconds < 5
+
+
+def test_run_captures_full_output_on_both_streams(tmp_path: Path):
+    """The thread-based reader captures all bytes from stdout and stderr.
+
+    Regression guard for the portable read loop that replaced select() (which
+    was Windows-broken): a large payload on both pipes must arrive intact and
+    the call must not deadlock.
+    """
+    custom_allow = DEFAULT_ALLOWLIST | {Path(sys.executable).name}
+    program = "import sys; sys.stdout.write('O' * 200000); sys.stderr.write('E' * 200000)"
+    request = RunRequest(
+        argv=(sys.executable, "-c", program),
+        cwd=tmp_path,
+        timeout_seconds=10,
+    )
+    result = run_command(request, allowlist=custom_allow)
+    assert result.returncode == 0
+    assert result.stdout == b"O" * 200000
+    assert result.stderr == b"E" * 200000
+    assert result.truncated_stdout is False
+    assert result.truncated_stderr is False

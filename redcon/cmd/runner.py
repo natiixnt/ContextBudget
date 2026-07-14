@@ -18,9 +18,10 @@ from __future__ import annotations
 import contextlib
 import logging
 import os
-import select
+import queue
 import shlex
 import subprocess
+import threading
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -243,52 +244,47 @@ def run_command(
     truncated_stderr = False
     deadline = started + request.timeout_seconds
     cap_hit_reason: str | None = None
-    stdout_eof = proc.stdout is None
-    stderr_eof = proc.stderr is None
+
+    # Reader threads drain each pipe into a shared queue. This replaces a
+    # select.select() loop, which only accepts sockets on Windows and so
+    # broke `redcon run` there entirely; threads behave identically on every
+    # platform. Each reader emits (name, chunk) and a final (name, None) EOF.
+    chunk_queue: queue.Queue = queue.Queue()
+    active = 0
+    for stream, name in ((proc.stdout, "stdout"), (proc.stderr, "stderr")):
+        if stream is not None:
+            threading.Thread(
+                target=_pump_stream, args=(stream, name, chunk_queue), daemon=True
+            ).start()
+            active += 1
 
     try:
-        while not (stdout_eof and stderr_eof):
+        while active > 0:
             now = time.monotonic()
             if now >= deadline:
                 _terminate(proc)
                 raise CommandTimeout(
                     f"command timed out after {request.timeout_seconds}s: {request.argv[0]}"
                 )
-
-            streams = []
-            if not stdout_eof and proc.stdout is not None:
-                streams.append(proc.stdout)
-            if not stderr_eof and proc.stderr is not None:
-                streams.append(proc.stderr)
-            ready = _select_ready(streams, deadline - now)
-
-            if proc.stdout in ready and not stdout_eof:
-                chunk = _read_chunk(proc.stdout)
-                if not chunk:
-                    stdout_eof = True
-                else:
-                    truncated_stdout, capped = _append_capped(
-                        stdout_buf, chunk, cap, truncated_stdout
-                    )
-                    if capped and cap_hit_reason is None:
-                        cap_hit_reason = "stdout"
-            if proc.stderr in ready and not stderr_eof:
-                chunk = _read_chunk(proc.stderr)
-                if not chunk:
-                    stderr_eof = True
-                else:
-                    truncated_stderr, capped = _append_capped(
-                        stderr_buf, chunk, cap, truncated_stderr
-                    )
-                    if capped and cap_hit_reason is None:
-                        cap_hit_reason = "stderr"
-
+            try:
+                name, chunk = chunk_queue.get(timeout=min(0.5, max(0.0, deadline - now)))
+            except queue.Empty:
+                continue
+            if chunk is None:
+                active -= 1
+                continue
+            if name == "stdout":
+                truncated_stdout, capped = _append_capped(stdout_buf, chunk, cap, truncated_stdout)
+            else:
+                truncated_stderr, capped = _append_capped(stderr_buf, chunk, cap, truncated_stderr)
+            if capped and cap_hit_reason is None:
+                cap_hit_reason = name
             if cap_hit_reason is not None:
                 # Stop draining further bytes; kill the subprocess.
                 _terminate(proc)
                 break
     finally:
-        _drain_remaining(proc, stdout_buf, stderr_buf, cap, truncated_stdout, truncated_stderr)
+        _close_streams(proc)
 
     returncode = (
         proc.wait(timeout=_KILL_GRACE_SECONDS) if proc.returncode is None else proc.returncode
@@ -316,24 +312,27 @@ def run_command(
     )
 
 
-def _select_ready(streams: list, timeout: float) -> set:
-    """Block up to `timeout` seconds waiting for any of the pipes to be readable."""
-    if not streams:
-        return set()
-    # Cap the per-iteration wait so we still check the deadline regularly.
-    ready, _, _ = select.select(streams, [], [], min(0.5, max(0.0, timeout)))
-    return set(ready)
+def _pump_stream(stream, name: str, out: queue.Queue) -> None:
+    """Read a pipe to EOF, emitting (name, chunk) then a final (name, None).
 
-
-def _read_chunk(stream) -> bytes:
+    Runs on its own thread so the main loop can enforce the deadline and
+    byte cap without platform-specific polling.
+    """
     try:
-        return (
-            stream.read1(_READ_CHUNK_BYTES)
-            if hasattr(stream, "read1")
-            else stream.read(_READ_CHUNK_BYTES)
-        )
-    except OSError:
-        return b""
+        while True:
+            try:
+                chunk = (
+                    stream.read1(_READ_CHUNK_BYTES)
+                    if hasattr(stream, "read1")
+                    else stream.read(_READ_CHUNK_BYTES)
+                )
+            except (OSError, ValueError):
+                break
+            if not chunk:
+                break
+            out.put((name, chunk))
+    finally:
+        out.put((name, None))
 
 
 def _append_capped(
@@ -355,29 +354,12 @@ def _append_capped(
     return True, True
 
 
-def _drain_remaining(
-    proc: subprocess.Popen,
-    stdout_buf: bytearray,
-    stderr_buf: bytearray,
-    cap: int,
-    truncated_stdout: bool,
-    truncated_stderr: bool,
-) -> None:
-    """After the main loop exits, slurp any pending bytes still in pipes."""
-    for stream, buf, flag in (
-        (proc.stdout, stdout_buf, truncated_stdout),
-        (proc.stderr, stderr_buf, truncated_stderr),
-    ):
-        if stream is None:
-            continue
-        try:
-            remaining = stream.read()
-        except (OSError, ValueError):
-            remaining = b""
-        if remaining:
-            _append_capped(buf, remaining, cap, flag)
-        with contextlib.suppress(OSError):
-            stream.close()
+def _close_streams(proc: subprocess.Popen) -> None:
+    """Close the pipes; reader threads exit on the resulting EOF/error."""
+    for stream in (proc.stdout, proc.stderr):
+        if stream is not None:
+            with contextlib.suppress(OSError):
+                stream.close()
 
 
 def _terminate(proc: subprocess.Popen) -> None:
