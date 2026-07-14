@@ -77,16 +77,25 @@ class PathOutsideRoot(ValueError):
     """Raised when an MCP path argument resolves outside the confinement root."""
 
 
-def _mcp_root() -> Path:
-    """Root that MCP path arguments are confined to.
+# Explicit "no confinement" markers. "/" is spelled the same on POSIX and
+# Windows but resolves to the current drive root on Windows (not a universal
+# root spanning C:/D:/...), so it cannot be used as an actual confinement
+# root cross-platform - it only ever means "disable confinement".
+_CONFINEMENT_DISABLED = {"/", "\\"}
+
+
+def _mcp_root() -> Path | None:
+    """Root that MCP path arguments are confined to, or None if disabled.
 
     Defaults to the server process's working directory (the project the agent
     is operating in), so a prompt-injected agent cannot make redcon read
-    /etc/passwd or ~/.ssh. Override with REDCON_MCP_ROOT; set it to "/" to
-    disable confinement for a trusted multi-repo setup.
+    /etc/passwd or ~/.ssh. Set REDCON_MCP_ROOT to a path to broaden access, or
+    to "/" to disable confinement entirely for a trusted multi-repo setup.
     """
-    root = os.environ.get("REDCON_MCP_ROOT", "").strip()
-    return Path(root).resolve() if root else Path.cwd().resolve()
+    raw = os.environ.get("REDCON_MCP_ROOT", "").strip()
+    if raw in _CONFINEMENT_DISABLED:
+        return None
+    return Path(raw).resolve() if raw else Path.cwd().resolve()
 
 
 def _confine(path_str: str, *, label: str = "path") -> str:
@@ -96,6 +105,8 @@ def _confine(path_str: str, *, label: str = "path") -> str:
     """
     resolved = Path(path_str).resolve()
     root = _mcp_root()
+    if root is None:
+        return str(resolved)
     if resolved != root and root not in resolved.parents:
         raise PathOutsideRoot(
             f"{label} {path_str!r} resolves outside the allowed root {root}. "
