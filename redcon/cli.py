@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json as _json_mod
 import logging
 import sys
@@ -42,7 +43,7 @@ from redcon.core.render import (
 )
 from redcon.engine import BudgetPolicyViolationError, RedconEngine
 from redcon.scanners.incremental import ScanRefreshResult, ScanRefreshSummary
-from redcon.schemas.models import normalize_repo
+from redcon.schemas.models import DEFAULT_MAX_TOKENS, normalize_repo
 from redcon.stages.workflow import run_scan_refresh_stage
 
 
@@ -1693,7 +1694,9 @@ def cmd_init(args: argparse.Namespace) -> int:
     # ── Estimate savings ──────────────────────────────────────────────────────
     # Rough heuristic: 40-60% token savings is typical for well-structured repos
     estimated_savings_pct = 55 if total_files > 50 else (40 if total_files > 10 else 25)
-    default_max_tokens = 64000
+    # Match the code default and the README quickstart so init doesn't emit a
+    # third, different number.
+    default_max_tokens = DEFAULT_MAX_TOKENS
     estimated_baseline = total_files * 300  # ~300 tokens avg per file
     estimated_saved = int(estimated_baseline * estimated_savings_pct / 100)
 
@@ -3459,7 +3462,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     gateway_cmd = sub.add_parser(
         "gateway",
-        help="Start the Redcon Runtime Gateway (agent → Redcon → LLM middleware)",
+        help="Start the Redcon Runtime Gateway (agent -> Redcon -> LLM middleware)",
     )
     gateway_cmd.add_argument(
         "--host",
@@ -3763,7 +3766,25 @@ def _configure_logging(args: argparse.Namespace) -> None:
     )
 
 
+def _force_utf8_streams() -> None:
+    """Keep redcon from crashing on a legacy Windows console (cp1252).
+
+    Output can contain non-ASCII (file paths, arrows, box drawing); on a
+    cp1252 stdout that raises UnicodeEncodeError and takes the whole command
+    down. Reconfigure stdout/stderr to UTF-8 with a replacement fallback so
+    output degrades gracefully instead of crashing. No-op where the streams
+    don't support reconfigure (e.g. already replaced under capture).
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is None:
+            continue
+        with contextlib.suppress(ValueError, OSError):
+            reconfigure(encoding="utf-8", errors="replace")
+
+
 def main() -> int:
+    _force_utf8_streams()
     parser = build_parser()
     args = parser.parse_args()
     _configure_logging(args)
