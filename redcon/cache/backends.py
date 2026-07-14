@@ -212,6 +212,38 @@ class SummaryCacheBackend(ABC):
         """Optional persistence hook."""
 
 
+@contextlib.contextmanager
+def _cache_file_lock(lock_path: Path):
+    """Serialize the read-merge-write of the JSON cache across processes.
+
+    Uses ``fcntl.flock`` on POSIX so several agent processes packing the same
+    repo take turns writing the cache file. Where ``fcntl`` is unavailable
+    (Windows), the lock degrades to a no-op: the per-key merge in ``_save``
+    still prevents whole-file clobbering, leaving only the narrow read/write
+    interleaving window unguarded rather than losing an entire process's work.
+    """
+    try:
+        import fcntl
+    except ImportError:
+        yield
+        return
+    try:
+        lock_path.parent.mkdir(parents=True, exist_ok=True)
+        handle = open(lock_path, "w")  # noqa: SIM115 - closed in finally
+    except OSError:
+        # If the lock file itself cannot be created, proceed unlocked rather
+        # than fail the save; the merge still protects against total loss.
+        yield
+        return
+    try:
+        fcntl.flock(handle, fcntl.LOCK_EX)
+        yield
+    finally:
+        with contextlib.suppress(OSError):
+            fcntl.flock(handle, fcntl.LOCK_UN)
+        handle.close()
+
+
 class LocalFileSummaryCacheBackend(SummaryCacheBackend):
     """Persistent local summary cache backed by a JSON file."""
 
@@ -296,12 +328,49 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
     def _clear(self) -> None:
         self._data = {"summaries": {}, "fragments": {}, "slices": {}}
 
-    def _save(self) -> None:
+    def _merge_with_disk(self) -> dict[str, Any]:
+        """Fold this process's in-memory entries into whatever is on disk now.
+
+        A concurrent agent may have written entries after we loaded the file, so
+        we re-read it and overlay our own entries on top: last-writer-wins per
+        key instead of the whole file being clobbered. The stores are
+        content-addressed and append-only in practice, so a union is safe.
+        Unreadable or malformed on-disk data is treated as empty so a corrupt
+        file can never discard this process's work.
+        """
+        disk: dict[str, Any] = {}
         try:
-            atomic_write_text(
-                self.cache_path,
-                json.dumps(self._data, indent=2, sort_keys=True),
-            )
+            raw = json.loads(self.cache_path.read_text(encoding="utf-8"))
+            if isinstance(raw, dict):
+                disk = raw
+        except (OSError, json.JSONDecodeError):
+            disk = {}
+
+        merged: dict[str, Any] = {}
+        for store in ("summaries", "fragments", "slices"):
+            combined: dict[str, str] = {}
+            disk_store = disk.get(store)
+            if isinstance(disk_store, dict):
+                combined.update(disk_store)
+            mem_store = self._data.get(store)
+            if isinstance(mem_store, dict):
+                combined.update(mem_store)  # in-memory wins per key
+            merged[store] = combined
+        # Carry over any extra top-level keys this process holds (forward-compat).
+        for key, value in self._data.items():
+            merged.setdefault(key, value)
+        return merged
+
+    def _save(self) -> None:
+        lock_path = self.cache_path.with_name(self.cache_path.name + ".lock")
+        try:
+            with _cache_file_lock(lock_path):
+                merged = self._merge_with_disk()
+                atomic_write_text(
+                    self.cache_path,
+                    json.dumps(merged, indent=2, sort_keys=True),
+                )
+                self._data = merged
         except OSError:
             return
 

@@ -23,6 +23,7 @@ htmlcov/
 # Redcon artifacts
 .redcon/
 .redcon_cache.json
+.redcon_cache.json.lock
 .redcon_cache.db
 run.json
 run.md
