@@ -78,6 +78,14 @@ class ScoreSettings:
     graph_entrypoint_adjacency_bonus: float = 0.45
     graph_bonus_cap: float = 2.5
     git_dirty_boost: float = 3.0
+    # Recently committed files are likely still in play even once clean, so
+    # boost them on a recency curve over the last git_recent_commits commits
+    # (most recent commit gets the full boost, older ones decay linearly).
+    git_recent_boost: float = 1.5
+    git_recent_commits: int = 10
+    # Pull a file's test/source counterpart along when its pair scores well
+    # (foo.py <-> test_foo.py, foo.ts <-> foo.test.ts, ...).
+    test_pair_boost: float = 2.0
     history_selected_file_boost: float = 1.25
     history_ignored_file_penalty: float = 0.35
     history_score_cap: float = 3.0
@@ -483,6 +491,12 @@ def _apply_score_overrides(settings: ScoreSettings, data: Mapping[str, Any]) -> 
         settings.symbol_name_weight = float(data["symbol_name_weight"])
     if "git_dirty_boost" in data:
         settings.git_dirty_boost = float(data["git_dirty_boost"])
+    if "git_recent_boost" in data:
+        settings.git_recent_boost = float(data["git_recent_boost"])
+    if "git_recent_commits" in data:
+        settings.git_recent_commits = int(data["git_recent_commits"])
+    if "test_pair_boost" in data:
+        settings.test_pair_boost = float(data["test_pair_boost"])
     if "code_extension_bonus" in data:
         settings.code_extension_bonus = float(data["code_extension_bonus"])
     if "test_path_bonus" in data:
