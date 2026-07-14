@@ -147,9 +147,7 @@ def test_degrades_to_unverified_without_cryptography(iso: Path, monkeypatch: pyt
     # _verify_token imports resolve to None in sys.modules, so `from ... import`
     # raises ImportError just as a missing package would.
     monkeypatch.setitem(sys.modules, "cryptography.exceptions", None)
-    monkeypatch.setitem(
-        sys.modules, "cryptography.hazmat.primitives.asymmetric.ed25519", None
-    )
+    monkeypatch.setitem(sys.modules, "cryptography.hazmat.primitives.asymmetric.ed25519", None)
 
     ent = load_entitlement(iso)
     assert ent.status == "unverified"
@@ -176,9 +174,7 @@ def test_env_license_beats_file(iso: Path, monkeypatch: pytest.MonkeyPatch):
     monkeypatch.setenv("REDCON_LICENSE_PUBKEY", pub)
     redcon_dir = iso / ".redcon"
     redcon_dir.mkdir()
-    (redcon_dir / "license").write_text(
-        _sign(priv, tier="free", email="file@x"), encoding="utf-8"
-    )
+    (redcon_dir / "license").write_text(_sign(priv, tier="free", email="file@x"), encoding="utf-8")
     monkeypatch.setenv("REDCON_LICENSE_KEY", _sign(priv, tier="pro", email="env@x", exp=FUTURE))
 
     ent = load_entitlement(iso)
