@@ -74,9 +74,11 @@ jobs:
         run: twine check dist/*
 
       # Trusted publishing (OIDC): no API token or password involved.
-      # PyPA recommends tracking the release/v1 branch for this action.
+      # Pinned to an immutable commit SHA (not the movable release/v1 branch)
+      # so a compromised upstream branch cannot alter our most sensitive step;
+      # this commit is v1.14.0, which is what release/v1 currently points to.
       - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
+        uses: pypa/gh-action-pypi-publish@cef221092ed1bacb1cc03d23a2d87d1d172e277b # v1.14.0
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@153bb8e04406b158c6c84fc1615b65b24149a1fe # v2
