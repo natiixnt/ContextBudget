@@ -147,7 +147,9 @@ def _get_git_dirty_paths(repo: Path) -> set[str]:
     """Return relative paths of files with uncommitted changes (staged + unstaged)."""
     try:
         result = subprocess.run(
-            ["git", "diff", "--name-only", "HEAD"],
+            # core.quotePath=false keeps non-ASCII paths verbatim, so they match
+            # the scanned relative_path and still get the dirty boost.
+            ["git", "-c", "core.quotePath=false", "diff", "--name-only", "HEAD"],
             cwd=repo,
             capture_output=True,
             text=True,
@@ -172,7 +174,15 @@ def _get_git_recent_paths(repo: Path, commits: int) -> dict[str, float]:
         return {}
     try:
         result = subprocess.run(
-            ["git", "log", f"-n{commits}", "--name-only", "--format=%x1e"],
+            [
+                "git",
+                "-c",
+                "core.quotePath=false",
+                "log",
+                f"-n{commits}",
+                "--name-only",
+                "--format=%x1e",
+            ],
             cwd=repo,
             capture_output=True,
             text=True,

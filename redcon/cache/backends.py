@@ -13,6 +13,7 @@ from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
+from redcon.io_utils import atomic_write_text
 from redcon.schemas.models import CACHE_FILE, CacheReport
 
 logger = logging.getLogger(__name__)
@@ -297,10 +298,9 @@ class LocalFileSummaryCacheBackend(SummaryCacheBackend):
 
     def _save(self) -> None:
         try:
-            self.cache_path.parent.mkdir(parents=True, exist_ok=True)
-            self.cache_path.write_text(
+            atomic_write_text(
+                self.cache_path,
                 json.dumps(self._data, indent=2, sort_keys=True),
-                encoding="utf-8",
             )
         except OSError:
             return

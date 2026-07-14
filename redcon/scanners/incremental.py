@@ -228,6 +228,7 @@ def _fingerprint_settings(
     ignore_dirs: set[str],
     binary_extensions: set[str],
     internal_paths: set[str],
+    repo_label: str | None,
 ) -> tuple[str, dict[str, Any]]:
     payload = {
         "include_globs": list(include_globs),
@@ -237,6 +238,10 @@ def _fingerprint_settings(
         "ignore_dirs": sorted(ignore_dirs),
         "binary_extensions": sorted(binary_extensions),
         "internal_paths": sorted(internal_paths),
+        # Part of the key so a repo scanned standalone (label "") and the same
+        # repo scanned inside a workspace (a real label) never reuse each
+        # other's records, which would attribute files to the wrong repo.
+        "repo_label": repo_label or "",
     }
     encoded = json.dumps(payload, sort_keys=True).encode("utf-8")
     return hashlib.sha1(encoded).hexdigest(), payload
@@ -651,6 +656,7 @@ def refresh_scan_index(
         ignore_dirs=ignored_directories,
         binary_extensions=binaries,
         internal_paths=normalized_internal_paths,
+        repo_label=repo_label,
     )
     index_path = _resolve_index_path(repo_path, scan_index_file)
     db_path = repo_path / SCAN_INDEX_DB_FILE if use_sqlite else None
