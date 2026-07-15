@@ -23,6 +23,7 @@ from redcon.schemas.models import (
     SCAN_INDEX_FILE,
     FileRecord,
 )
+from redcon.scorers.import_graph import extract_import_specs
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +33,9 @@ _SYMBOL_DEF_RE = re.compile(r"^(?:async\s+)?(?:def|class)\s+([A-Za-z_]\w*)", re.
 
 SCAN_INDEX_DB_FILE = ".redcon/scan-index.db"
 
-INDEX_FORMAT_VERSION = 1
+# v2 added FileRecord.import_specs; bumping discards v1 indexes so they rebuild
+# with import specs populated instead of serving records that lack them.
+INDEX_FORMAT_VERSION = 2
 
 _VENV_PREFIXES = (".venv", "venv-")
 
@@ -280,6 +283,7 @@ def _load_scan_index(path: Path, *, settings_fingerprint: str) -> ScanIndexState
                     content_hash=str(record_raw.get("content_hash", "")),
                     content_preview=str(record_raw.get("content_preview", "")),
                     symbol_names=str(record_raw.get("symbol_names", "")),
+                    import_specs=str(record_raw.get("import_specs", "")),
                     relative_path=str(record_raw.get("relative_path", "")),
                     repo_label=str(record_raw.get("repo_label", "")),
                     repo_root=str(record_raw.get("repo_root", "")),
@@ -380,6 +384,7 @@ def _load_scan_index_sqlite(db_path: Path, *, settings_fingerprint: str) -> Scan
                         content_hash=str(rd.get("content_hash", "")),
                         content_preview=str(rd.get("content_preview", "")),
                         symbol_names=str(rd.get("symbol_names", "")),
+                        import_specs=str(rd.get("import_specs", "")),
                         relative_path=str(rd.get("relative_path", "")),
                         repo_label=str(rd.get("repo_label", "")),
                         repo_root=str(rd.get("repo_root", "")),
@@ -495,15 +500,21 @@ def _build_file_record(
         return None
     digest = hashlib.sha1(text.encode("utf-8", errors="ignore")).hexdigest()
     symbol_names = " ".join(m.lower() for m in _SYMBOL_DEF_RE.findall(text))
+    extension = path.suffix.lower()
+    # Extract import specs now, while the file text is already in memory, so the
+    # import graph reuses them from the scan index instead of re-reading the
+    # file in every process.
+    import_specs = json.dumps(extract_import_specs(extension, text))
     return FileRecord(
         path=_scoped_path(rel, repo_label),
         absolute_path=str(path),
-        extension=path.suffix.lower(),
+        extension=extension,
         size_bytes=file_size,
         line_count=_count_lines(text),
         content_hash=digest,
         content_preview=text[:preview_chars],
         symbol_names=symbol_names,
+        import_specs=import_specs,
         relative_path=rel,
         repo_label=repo_label or "",
         repo_root=str(repo_path),

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import posixpath
 import re
 from collections import defaultdict
@@ -109,6 +110,119 @@ def _resolve_python_module_spec(
     return None
 
 
+def _python_specs(text: str) -> list[str]:
+    """Raw import specs from Python source (module names + expanded from-imports).
+
+    Extraction only - resolution to repo paths happens later against the module
+    map. Depends solely on the file's content, so the result is cacheable by
+    content hash.
+    """
+    specs: list[str] = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#"):
+            continue
+
+        import_match = PY_IMPORT_RE.match(raw_line)
+        if import_match:
+            for token in import_match.group(1).split(","):
+                module = token.strip().split(" as ")[0].strip()
+                if module:
+                    specs.append(module)
+            continue
+
+        from_match = PY_FROM_RE.match(raw_line)
+        if not from_match:
+            continue
+
+        module_spec = from_match.group(1).strip()
+        imported_items = [
+            token.strip().split(" as ")[0].strip() for token in from_match.group(2).split(",")
+        ]
+        specs.append(module_spec)
+        for imported in imported_items:
+            if imported in {"", "*"}:
+                continue
+            if module_spec.startswith("."):
+                specs.append(f"{module_spec}{imported}")
+            else:
+                specs.append(f"{module_spec}.{imported}")
+    return specs
+
+
+def _js_ts_specs(text: str) -> list[str]:
+    """Raw module specifiers from JS/TS source (import-from, side-effect, require)."""
+    specs: set[str] = set(JS_IMPORT_FROM_RE.findall(text))
+    specs.update(JS_SIDE_EFFECT_IMPORT_RE.findall(text))
+    specs.update(JS_REQUIRE_RE.findall(text))
+    return sorted(specs)
+
+
+def _go_specs(text: str) -> list[str]:
+    """Raw import paths from Go source (single and block imports)."""
+    specs: list[str] = []
+    in_block = False
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("//"):
+            continue
+        single = GO_IMPORT_SINGLE_RE.match(line)
+        if single:
+            specs.append(single.group(1))
+            continue
+        if GO_IMPORT_BLOCK_START_RE.match(line):
+            in_block = True
+            continue
+        if in_block:
+            if line == ")":
+                in_block = False
+                continue
+            block_match = GO_IMPORT_RE.match(line)
+            if block_match:
+                specs.append(block_match.group(1))
+    return specs
+
+
+def extract_import_specs(extension: str, text: str) -> list[str]:
+    """Extract raw import specs for a file, dispatched by extension.
+
+    Content-only: the scanner calls this while it already has the file text in
+    memory, and the result is stored in the scan index so later import-graph
+    builds reuse it instead of re-reading unchanged files.
+    """
+    ext = extension.lower()
+    if ext == ".py":
+        return _python_specs(text)
+    if ext in JS_TS_EXTENSIONS:
+        return _js_ts_specs(text)
+    if ext == ".go":
+        return _go_specs(text)
+    return []
+
+
+def _record_specs(record: FileRecord, extractor) -> list[str] | None:
+    """Return a record's import specs, preferring the scan-index cache.
+
+    ``record.import_specs`` is a JSON list populated by the scanner. When it is
+    set (including an empty list for a file with no imports) it is used as-is,
+    avoiding a disk read. An empty string means "not cached" - fall back to
+    reading and extracting from disk so behaviour is never wrong, only slower.
+    Returns ``None`` only when the file was meant to be read but could not be.
+    """
+    if record.import_specs:
+        try:
+            data = json.loads(record.import_specs)
+        except (ValueError, TypeError):
+            data = None
+        if isinstance(data, list):
+            return [str(spec) for spec in data]
+    try:
+        text = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return None
+    return extractor(text)
+
+
 def _extract_python_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
     edges: dict[str, set[str]] = defaultdict(set)
     repo_groups: dict[str, list[FileRecord]] = defaultdict(list)
@@ -122,52 +236,15 @@ def _extract_python_import_edges(files: list[FileRecord]) -> dict[str, set[str]]
         for record in repo_files:
             if record.extension != ".py":
                 continue
-            try:
-                source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
-            except OSError:
+            specs = _record_specs(record, _python_specs)
+            if specs is None:
                 continue
 
             current_path = record.relative_path or record.path
-
-            for raw_line in source.splitlines():
-                line = raw_line.strip()
-                if not line or line.startswith("#"):
-                    continue
-
-                import_match = PY_IMPORT_RE.match(raw_line)
-                if import_match:
-                    modules = [
-                        token.strip().split(" as ")[0].strip()
-                        for token in import_match.group(1).split(",")
-                    ]
-                    for module in modules:
-                        target = _resolve_python_module_spec(module, current_path, module_map)
-                        if target and target != record.path:
-                            edges[record.path].add(target)
-                    continue
-
-                from_match = PY_FROM_RE.match(raw_line)
-                if not from_match:
-                    continue
-
-                module_spec = from_match.group(1).strip()
-                imported_items = [
-                    token.strip().split(" as ")[0].strip()
-                    for token in from_match.group(2).split(",")
-                ]
-                specs = [module_spec]
-                for imported in imported_items:
-                    if imported in {"", "*"}:
-                        continue
-                    if module_spec.startswith("."):
-                        specs.append(f"{module_spec}{imported}")
-                    else:
-                        specs.append(f"{module_spec}.{imported}")
-
-                for spec in specs:
-                    target = _resolve_python_module_spec(spec, current_path, module_map)
-                    if target and target != record.path:
-                        edges[record.path].add(target)
+            for spec in specs:
+                target = _resolve_python_module_spec(spec, current_path, module_map)
+                if target and target != record.path:
+                    edges[record.path].add(target)
 
     return edges
 
@@ -229,14 +306,9 @@ def _extract_js_ts_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
         for record in repo_files:
             if record.extension not in JS_TS_EXTENSIONS:
                 continue
-            try:
-                source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
-            except OSError:
+            specs = _record_specs(record, _js_ts_specs)
+            if specs is None:
                 continue
-
-            specs: set[str] = set(JS_IMPORT_FROM_RE.findall(source))
-            specs.update(JS_SIDE_EFFECT_IMPORT_RE.findall(source))
-            specs.update(JS_REQUIRE_RE.findall(source))
 
             current_path = record.relative_path or record.path
             for spec in specs:
@@ -288,33 +360,12 @@ def _extract_go_import_edges(files: list[FileRecord]) -> dict[str, set[str]]:
                         suffix_to_dir[suffix] = dir_path
 
         for record in go_files:
-            try:
-                source = Path(record.absolute_path).read_text(encoding="utf-8", errors="ignore")
-            except OSError:
+            specs = _record_specs(record, _go_specs)
+            if specs is None:
                 continue
 
-            import_specs: list[str] = []
-            in_block = False
-            for raw_line in source.splitlines():
-                line = raw_line.strip()
-                if not line or line.startswith("//"):
-                    continue
-                if GO_IMPORT_SINGLE_RE.match(line):
-                    import_specs.append(GO_IMPORT_SINGLE_RE.match(line).group(1))
-                    continue
-                if GO_IMPORT_BLOCK_START_RE.match(line):
-                    in_block = True
-                    continue
-                if in_block:
-                    if line == ")":
-                        in_block = False
-                        continue
-                    block_match = GO_IMPORT_RE.match(line)
-                    if block_match:
-                        import_specs.append(block_match.group(1))
-
             current_dir = posixpath.dirname(record.relative_path or record.path)
-            for spec in import_specs:
+            for spec in specs:
                 # Try matching suffix of the import path against repo directories.
                 parts = spec.split("/")
                 matched_dir = None

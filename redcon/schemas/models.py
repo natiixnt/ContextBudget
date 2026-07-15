@@ -19,6 +19,9 @@ class FileRecord:
     content_hash: str
     content_preview: str
     symbol_names: str = ""
+    # JSON list of raw import specifiers extracted at scan time (empty string =
+    # not extracted, so the import graph falls back to reading the file).
+    import_specs: str = ""
     relative_path: str = ""
     repo_label: str = ""
     repo_root: str = ""
