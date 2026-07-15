@@ -152,42 +152,24 @@ def _setup_no_color(args: argparse.Namespace) -> None:
     _NO_COLOR = getattr(args, "no_color", False) or os.environ.get("NO_COLOR", "") != ""
 
 
+def _completion_commands() -> list[str]:
+    """Subcommands to advertise in shell completion, read from the real parser.
+
+    Deriving the list from :func:`build_parser` keeps completion in lockstep with
+    the CLI - a hardcoded list drifts, advertising removed commands and omitting
+    new ones.
+    """
+    parser = build_parser()
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return sorted(action.choices)
+    return []
+
+
 def cmd_completion(args: argparse.Namespace) -> int:
     """Generate shell completion script."""
     shell = args.shell
-    commands = [
-        "doctor",
-        "plan",
-        "plan-agent",
-        "simulate-agent",
-        "pack",
-        "export",
-        "profile",
-        "pipeline",
-        "read-profiler",
-        "report",
-        "diff",
-        "pr-audit",
-        "benchmark",
-        "dataset",
-        "context-dataset",
-        "heatmap",
-        "watch",
-        "advise",
-        "observe",
-        "visualize",
-        "prepare-context",
-        "enforce",
-        "policy",
-        "drift",
-        "cost-analysis",
-        "gateway",
-        "control-plane",
-        "init",
-        "roi",
-        "benchmark-report",
-        "hooks",
-    ]
+    commands = _completion_commands()
     if shell == "bash":
         print(f"""# Redcon bash completion - add to ~/.bashrc or ~/.bash_completion
 _redcon_completions() {{
