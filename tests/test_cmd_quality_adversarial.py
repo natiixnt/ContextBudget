@@ -25,29 +25,30 @@ from __future__ import annotations
 
 import os
 import random
-from dataclasses import dataclass, field
-from typing import Callable
+from collections.abc import Callable
+from dataclasses import dataclass
 
 import pytest
 
 from redcon.cmd.budget import BudgetHint
 from redcon.cmd.compressors.base import Compressor, CompressorContext
+from redcon.cmd.compressors.bundle_stats_compressor import BundleStatsCompressor
 from redcon.cmd.compressors.cargo_test_compressor import CargoTestCompressor
+from redcon.cmd.compressors.coverage_compressor import CoverageCompressor
+from redcon.cmd.compressors.docker_compressor import DockerCompressor
 from redcon.cmd.compressors.git_diff import GitDiffCompressor
 from redcon.cmd.compressors.git_log import GitLogCompressor
 from redcon.cmd.compressors.git_status import GitStatusCompressor
 from redcon.cmd.compressors.go_test_compressor import GoTestCompressor
 from redcon.cmd.compressors.grep_compressor import GrepCompressor
+from redcon.cmd.compressors.json_log_compressor import JsonLogCompressor
+from redcon.cmd.compressors.kubectl_compressor import KubectlGetCompressor
+from redcon.cmd.compressors.lint_compressor import LintCompressor
 from redcon.cmd.compressors.listing_compressor import (
     FindCompressor,
     LsCompressor,
     TreeCompressor,
 )
-from redcon.cmd.compressors.coverage_compressor import CoverageCompressor
-from redcon.cmd.compressors.docker_compressor import DockerCompressor
-from redcon.cmd.compressors.json_log_compressor import JsonLogCompressor
-from redcon.cmd.compressors.kubectl_compressor import KubectlGetCompressor
-from redcon.cmd.compressors.lint_compressor import LintCompressor
 from redcon.cmd.compressors.npm_test_compressor import NpmTestCompressor
 from redcon.cmd.compressors.pkg_install_compressor import (
     PackageInstallCompressor,
@@ -56,7 +57,6 @@ from redcon.cmd.compressors.profiler_compressor import ProfilerCompressor
 from redcon.cmd.compressors.pytest_compressor import PytestCompressor
 from redcon.cmd.compressors.sql_explain_compressor import SqlExplainCompressor
 from redcon.cmd.types import CompressionLevel
-
 
 # --- knobs ---
 
@@ -109,9 +109,7 @@ def _eval_one(
       - lost-pres   -> 20 + (1 - red_pct)
       - low-red     -> max(0, floor - red_frac) * 10  (only if >= 80 raw tokens)
     """
-    ctx = CompressorContext(
-        argv=argv, cwd=".", returncode=0, hint=_force_compact_hint()
-    )
+    ctx = CompressorContext(argv=argv, cwd=".", returncode=0, hint=_force_compact_hint())
     # (a) crash check
     try:
         first = compressor.compress(raw, b"", ctx)
@@ -195,19 +193,16 @@ def _eval_one(
 
 
 def _first_diff(a: str, b: str, n: int = 60) -> str:
-    for i, (x, y) in enumerate(zip(a, b)):
+    for i, (x, y) in enumerate(zip(a, b, strict=False)):
         if x != y:
-            return f"@{i} {a[i:i+n]!r} vs {b[i:i+n]!r}"
+            return f"@{i} {a[i : i + n]!r} vs {b[i : i + n]!r}"
     return f"len {len(a)} vs {len(b)}"
 
 
 # --- mutation operators ---
 
 
-_PRINTABLE = (
-    b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ"
-    b"0123456789 \n\t/.:-_+@()=[]{}<>"
-)
+_PRINTABLE = b"abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789 \n\t/.:-_+@()=[]{}<>"
 
 
 def _mutate(seed: bytes, rng: random.Random) -> bytes:
@@ -356,9 +351,7 @@ def _seed_corpus_for(schema: str) -> tuple[bytes, ...]:
             b"========================= 1 failed, 1 passed in 0.01s ==========================\n",
         )
     if schema == "grep":
-        return (
-            b"src/a.py:1:def f():\nsrc/a.py:2:    return 1\nsrc/b.py:1:def g():\n",
-        )
+        return (b"src/a.py:1:def f():\nsrc/a.py:2:    return 1\nsrc/b.py:1:def g():\n",)
     if schema == "ls":
         return (b"./d:\nfoo.py\nbar.py\n",)
     if schema == "tree":
@@ -378,16 +371,25 @@ def _seed_corpus_for(schema: str) -> tuple[bytes, ...]:
         )
     if schema == "npm_test":
         return (
-            b"PASS src/a.test.js\nFAIL src/b.test.js\n"
-            b"Tests:       1 failed, 1 passed, 2 total\n",
+            b"PASS src/a.test.js\nFAIL src/b.test.js\nTests:       1 failed, 1 passed, 2 total\n",
         )
     return (b"hello\n",)
 
 
 _CORPUS: tuple[bytes, ...] = _TOKENS + tuple(
-    s for k in (
-        "git_diff", "git_status", "git_log", "pytest", "grep",
-        "ls", "tree", "find", "cargo_test", "go_test", "npm_test",
+    s
+    for k in (
+        "git_diff",
+        "git_status",
+        "git_log",
+        "pytest",
+        "grep",
+        "ls",
+        "tree",
+        "find",
+        "cargo_test",
+        "go_test",
+        "npm_test",
     )
     for s in _seed_corpus_for(k)
 )
@@ -482,6 +484,7 @@ COMPRESSOR_TARGETS: list[tuple[str, Callable[[], Compressor], tuple[str, ...]]] 
         SqlExplainCompressor,
         ("psql", "-c", "EXPLAIN ANALYZE SELECT 1"),
     ),
+    ("bundle_stats", BundleStatsCompressor, ("webpack", "--json")),
 ]
 
 
@@ -513,8 +516,7 @@ def test_v85_genetic_hunt(name, factory, argv, capsys):
     import hashlib
 
     rng = random.Random(
-        0x85_85
-        + int(hashlib.sha1(name.encode("utf-8")).hexdigest()[:8], 16) % 10_000
+        0x85_85 + int(hashlib.sha1(name.encode("utf-8")).hexdigest()[:8], 16) % 10_000
     )
     compressor = factory()
     findings = genetic_hunt(
@@ -537,7 +539,7 @@ def test_v85_genetic_hunt(name, factory, argv, capsys):
 # confirms the harness itself doesn't crash. Cheap to keep in CI.
 def test_v85_smoke():
     rng = random.Random(0xC0FFEE)
-    for name, factory, argv in COMPRESSOR_TARGETS[:3]:
+    for _name, factory, argv in COMPRESSOR_TARGETS[:3]:
         findings = genetic_hunt(
             factory(),
             argv,
