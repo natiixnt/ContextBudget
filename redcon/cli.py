@@ -2617,42 +2617,7 @@ def cmd_cmd_quality(args: argparse.Namespace) -> int:
     return 0
 
 
-def build_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
-        prog="redcon",
-        description=(
-            "Reduce token usage by planning and packing repository context. "
-            "Supports redcon.toml sections: [scan], [budget], [score], [compression], "
-            "[summarization], [plugins], [cache], [telemetry]."
-        ),
-    )
-    parser.add_argument(
-        "-v",
-        "--verbose",
-        action="store_true",
-        default=False,
-        help="Enable verbose (DEBUG) logging output.",
-    )
-    parser.add_argument(
-        "-q",
-        "--quiet",
-        action="store_true",
-        default=False,
-        help="Suppress all output except errors and JSON.",
-    )
-    parser.add_argument(
-        "--version",
-        action="version",
-        version=f"redcon {_redcon_version}",
-    )
-    parser.add_argument(
-        "--no-color",
-        action="store_true",
-        default=False,
-        help="Disable colored output.",
-    )
-    sub = parser.add_subparsers(dest="command", required=True)
-
+def _register_setup_commands(sub: argparse._SubParsersAction) -> None:
     doctor = sub.add_parser(
         "doctor", help="Check environment health, dependencies, and configuration"
     )
@@ -2789,6 +2754,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     hooks_parser.set_defaults(func=cmd_hooks)
 
+
+def _register_planning_commands(sub: argparse._SubParsersAction) -> None:
     plan = sub.add_parser("plan", help="Rank relevant files for a natural language task")
     plan.add_argument("task", help="Task description")
     plan.add_argument("--repo", default=".", help="Repository path")
@@ -2929,6 +2896,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     simulate_agent.set_defaults(func=cmd_simulate_agent)
 
+
+def _register_packing_commands(sub: argparse._SubParsersAction) -> None:
     pack = sub.add_parser("pack", help="Build compressed context under token budget")
     pack.add_argument("task", help="Task description")
     pack.add_argument("--repo", default=".", help="Repository path")
@@ -3044,6 +3013,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     read_profiler.set_defaults(func=cmd_read_profiler)
 
+
+def _register_reporting_commands(sub: argparse._SubParsersAction) -> None:
     report = sub.add_parser("report", help="Read a run JSON and produce a summary report")
     report.add_argument("run_json", help="Path to run JSON produced by pack")
     report.add_argument("--out", help="Path for markdown summary output")
@@ -3103,6 +3074,8 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark.add_argument("--out-prefix", help="Output file prefix for benchmark JSON/Markdown")
     benchmark.set_defaults(func=cmd_benchmark)
 
+
+def _register_datasets_commands(sub: argparse._SubParsersAction) -> None:
     dataset = sub.add_parser(
         "dataset",
         help=(
@@ -3214,6 +3187,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     heatmap.set_defaults(func=cmd_heatmap)
 
+
+def _register_analysis_commands(sub: argparse._SubParsersAction) -> None:
     enforce = sub.add_parser(
         "enforce",
         help="Enforce a budget policy against a run artifact (exit non-zero on violations)",
@@ -3550,6 +3525,8 @@ def build_parser() -> argparse.ArgumentParser:
     )
     observe.set_defaults(func=cmd_observe)
 
+
+def _register_cloud_commands(sub: argparse._SubParsersAction) -> None:
     control_plane_cmd = sub.add_parser(
         "control-plane",
         help="Start the control plane HTTP API server for multi-team analytics",
@@ -3777,6 +3754,9 @@ def build_parser() -> argparse.ArgumentParser:
     benchmark_report_cmd.set_defaults(func=cmd_benchmark_report)
 
     # --- redcon run ---
+
+
+def _register_dev_commands(sub: argparse._SubParsersAction) -> None:
     run_parser = sub.add_parser(
         "run",
         help="Run a shell command and return its output compressed for the LLM context",
@@ -3905,6 +3885,52 @@ def build_parser() -> argparse.ArgumentParser:
         help="Emit a structured JSON report instead of plain text",
     )
     repo_map_parser.set_defaults(func=cmd_repo_map)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="redcon",
+        description=(
+            "Reduce token usage by planning and packing repository context. "
+            "Supports redcon.toml sections: [scan], [budget], [score], [compression], "
+            "[summarization], [plugins], [cache], [telemetry]."
+        ),
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        default=False,
+        help="Enable verbose (DEBUG) logging output.",
+    )
+    parser.add_argument(
+        "-q",
+        "--quiet",
+        action="store_true",
+        default=False,
+        help="Suppress all output except errors and JSON.",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"redcon {_redcon_version}",
+    )
+    parser.add_argument(
+        "--no-color",
+        action="store_true",
+        default=False,
+        help="Disable colored output.",
+    )
+    sub = parser.add_subparsers(dest="command", required=True)
+
+    _register_setup_commands(sub)
+    _register_planning_commands(sub)
+    _register_packing_commands(sub)
+    _register_reporting_commands(sub)
+    _register_datasets_commands(sub)
+    _register_analysis_commands(sub)
+    _register_cloud_commands(sub)
+    _register_dev_commands(sub)
 
     return parser
 
