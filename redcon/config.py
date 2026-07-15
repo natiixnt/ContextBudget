@@ -141,6 +141,10 @@ class ScoreSettings:
 class CompressionSettings:
     """Settings for context compression behavior."""
 
+    # Named profile applied on top of these settings ("" or "default" = none;
+    # "max" = the Pro max-compression preset, resolved against the entitlement
+    # at run time - see redcon/compressors/profiles.py).
+    profile: str = ""
     full_file_threshold_tokens: int = 300
     snippet_score_threshold: float = 2.5
     symbol_extraction_enabled: bool = True
@@ -558,6 +562,8 @@ def _apply_score_overrides(settings: ScoreSettings, data: Mapping[str, Any]) -> 
 
 
 def _apply_compression_overrides(settings: CompressionSettings, data: Mapping[str, Any]) -> None:
+    if "profile" in data:
+        settings.profile = str(data["profile"]).strip().lower()
     if "full_file_threshold_tokens" in data:
         settings.full_file_threshold_tokens = int(data["full_file_threshold_tokens"])
     if "snippet_score_threshold" in data:
@@ -880,6 +886,7 @@ def _apply_overrides(config: RedconConfig, data: Mapping[str, Any]) -> RedconCon
             config.explicit.compression,
             compression_data,
             {
+                "profile": "profile",
                 "full_file_threshold_tokens": "full_file_threshold_tokens",
                 "snippet_score_threshold": "snippet_score_threshold",
                 "symbol_extraction_enabled": "symbol_extraction_enabled",

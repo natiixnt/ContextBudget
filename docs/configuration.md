@@ -48,6 +48,8 @@ critical_path_keywords = ["auth", "permissions", "billing"]
 
 [compression]
 summary_preview_lines = 10
+# profile = "max"  # Pro: tighter tier thresholds, ~20% fewer input tokens;
+#                    falls back to the default profile without a license
 
 [summarization]
 backend = "deterministic"

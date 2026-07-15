@@ -318,6 +318,7 @@ class RedconEngine:
         delta_from: RunArtifactInput | None = None,
         config_path: str | Path | None = None,
         timeout: int = 120,
+        compression_profile: str | None = None,
     ) -> dict[str, Any]:
         """Build compressed context under token and file budgets.
 
@@ -327,6 +328,10 @@ class RedconEngine:
             Maximum wall-clock seconds for the pack pipeline (default: 120).
             The value is stored in result metadata; actual enforcement depends
             on the underlying pipeline implementation.
+        compression_profile:
+            Optional named compression profile ("default" or "max"); overrides
+            the ``[compression] profile`` config key. "max" requires a Pro
+            license and otherwise falls back to the default profile.
         """
 
         logger.info("pack: start - task=%r repo=%r timeout=%d", task, repo, timeout)
@@ -353,6 +358,7 @@ class RedconEngine:
                     config=workspace_definition.config,
                     telemetry_sink=self._telemetry_sink,
                     workspace=workspace_definition,
+                    compression_profile=compression_profile,
                 )
                 result = as_json_dict(report)
             else:
@@ -365,6 +371,7 @@ class RedconEngine:
                     delta_from=delta_from,
                     config=cfg,
                     telemetry_sink=self._telemetry_sink,
+                    compression_profile=compression_profile,
                 )
                 result = as_json_dict(report)
 

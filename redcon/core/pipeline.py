@@ -2,11 +2,13 @@
 
 from __future__ import annotations
 
+import logging
 from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
 from redcon.cache import RunHistoryEntry, append_run_history_entry, normalize_cache_report
+from redcon.compressors.profiles import PROFILE_DEFAULT, resolve_compression_profile
 from redcon.compressors.summarizers import normalize_summarizer_report
 from redcon.config import RedconConfig, WorkspaceDefinition, load_config
 from redcon.core.agent_planning import build_agent_workflow_plan
@@ -22,6 +24,7 @@ from redcon.core.pr_audit import analyze_pull_request, pr_audit_as_dict
 from redcon.core.render import read_json, render_pr_comment_markdown
 from redcon.core.run_feed import write_run_feed_artifact
 from redcon.core.tokens import normalize_token_estimator_report
+from redcon.entitlements import load_entitlement
 from redcon.plugins import ResolvedPlugins, resolve_plugins
 from redcon.schemas.models import DEFAULT_TOP_FILES, RunReport
 from redcon.scorers.import_graph import build_import_graph
@@ -38,6 +41,8 @@ from redcon.stages.workflow import (
     run_score_stage,
 )
 from redcon.telemetry import TelemetrySession, TelemetrySink, build_telemetry_sink
+
+logger = logging.getLogger(__name__)
 
 
 def _resolve_config(
@@ -373,6 +378,7 @@ def run_pack(
     workspace: WorkspaceDefinition | None = None,
     plugins: ResolvedPlugins | None = None,
     record_history: bool = True,
+    compression_profile: str | None = None,
 ) -> RunReport:
     """Run pack command pipeline and return typed run report."""
 
@@ -384,6 +390,18 @@ def run_pack(
     effective_max_tokens = prepared_cfg.budget.max_tokens
     effective_top_files = top_files if top_files is not None else prepared_cfg.budget.top_files
     target_repo = workspace.root if workspace is not None else repo
+    # Resolve the compression profile (CLI/SDK override wins over config).
+    # Entitlement is only consulted when a profile was actually requested, and
+    # prepared_cfg is a deep copy, so reassigning its compression is safe.
+    if compression_profile is not None:
+        prepared_cfg.compression.profile = compression_profile
+    applied_compression_profile = PROFILE_DEFAULT
+    if (prepared_cfg.compression.profile or "").strip():
+        prepared_cfg.compression, applied_compression_profile, profile_note = (
+            resolve_compression_profile(prepared_cfg.compression, load_entitlement(target_repo))
+        )
+        if profile_note:
+            logger.warning(profile_note)
     telemetry = _build_telemetry_session(
         repo=target_repo,
         config=prepared_cfg,
@@ -487,6 +505,7 @@ def run_pack(
         baseline_tokens=baseline_tokens,
         files_scanned=len(files),
     )
+    report.compression_profile = applied_compression_profile
     if record_history:
         # Mirror the full report into .redcon/runs/ so editor
         # integrations see this run no matter which entry point made it
@@ -521,6 +540,7 @@ def run_pack(
                     # reason about how broadly each prompt pulled files.
                     "context_baseline_tokens": int(report.context_baseline_tokens or 0),
                     "files_scanned": int(report.files_scanned or 0),
+                    "compression_profile": applied_compression_profile,
                 },
                 result_artifacts={
                     "run_json": str(feed_path) if feed_path else "",

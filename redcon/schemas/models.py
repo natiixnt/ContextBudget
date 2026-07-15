@@ -322,6 +322,10 @@ class RunReport:
     # picking the right files.
     context_baseline_tokens: int = 0
     files_scanned: int = 0
+    # Which compression profile shaped this run's tier thresholds: "default",
+    # or "max" when the Pro max-compression preset was active. A run that
+    # requested "max" without a license reports "default" - what actually ran.
+    compression_profile: str = "default"
     # Dollar translation of the selection saving, for the "if you pay per token"
     # framing (redcon.telemetry.pricing.compute_run_costs). Empty when there is
     # no baseline to compare against. On a flat plan the value delivered is

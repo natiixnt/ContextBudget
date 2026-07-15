@@ -708,6 +708,7 @@ def cmd_pack(args: argparse.Namespace) -> int:
         max_tokens=args.max_tokens,
         top_files=args.top_files,
         delta_from=args.delta,
+        compression_profile=getattr(args, "compression_profile", None),
     )
 
     files_included = len(data.get("files_included") or [])
@@ -825,6 +826,8 @@ def cmd_pack(args: argparse.Namespace) -> int:
             f"Cost: ~${float(pack_cost['savings_usd']):.4f} saved this task if you pay "
             f"per token ({pack_cost.get('display_name', 'default')} input rates)",
         )
+    if str(data.get("compression_profile", "")) == "max":
+        _qprint(args, "Profile: max compression (Pro)")
     _qprint(
         args,
         f"Files: {files_included} included, {files_skipped} skipped"
@@ -2963,6 +2966,15 @@ def _register_packing_commands(sub: argparse._SubParsersAction) -> None:
         action="store_true",
         default=False,
         help="Show what would be packed without writing any output files.",
+    )
+    pack.add_argument(
+        "--compression-profile",
+        choices=["default", "max"],
+        default=None,
+        help=(
+            "Compression profile: 'max' packs tighter representations (Pro; "
+            "falls back to default without a license). Overrides [compression] profile."
+        ),
     )
     pack.set_defaults(func=cmd_pack)
 
