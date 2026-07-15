@@ -32,6 +32,26 @@ def _guard_output_size(output: str) -> str:
     return truncated + "\n\n[WARNING] Output truncated - exceeded 10 MB render limit.\n"
 
 
+def md_table(headers: list[str], rows: list[list[str]], *, align: str = "") -> list[str]:
+    """Build a Markdown table (header, separator, rows) as a list of lines.
+
+    ``align`` is a per-column code string of ``l`` (left, the default), ``r``
+    (right), or ``c`` (centre) selecting the separator marker. Cells and headers
+    are emitted verbatim, so callers pre-format them (numbers, bold, etc.).
+    """
+
+    def _marker(index: int) -> str:
+        code = align[index] if index < len(align) else "l"
+        return {"r": "---:", "c": ":-:"}.get(code, "---")
+
+    lines = [
+        "| " + " | ".join(headers) + " |",
+        "| " + " | ".join(_marker(i) for i in range(len(headers))) + " |",
+    ]
+    lines.extend("| " + " | ".join(str(cell) for cell in row) + " |" for row in rows)
+    return lines
+
+
 def write_json(path: Path, data: dict) -> None:
     """Write JSON file with stable formatting."""
 
@@ -1169,28 +1189,35 @@ def render_benchmark_markdown(data: dict) -> str:
         _append_model_profile_lines(lines, data)
     lines.extend(["", "## Token Estimator"])
     _append_token_estimator_lines(lines, data)
+    lines.extend(["", "## Strategy Comparison", ""])
     lines.extend(
-        [
-            "",
-            "## Strategy Comparison",
-            "",
-            "| Strategy | Input Tokens | Saved Tokens | Files Included | Duplicate Reads Prevented | Quality Risk | Cache Hits | Runtime (ms) |",
-            "| --- | ---: | ---: | ---: | ---: | --- | ---: | ---: |",
-        ]
-    )
-
-    for strategy in strategies:
-        lines.append(
-            "| "
-            f"{strategy.get('strategy', '')} | "
-            f"{strategy.get('estimated_input_tokens', 0)} | "
-            f"{strategy.get('estimated_saved_tokens', 0)} | "
-            f"{len(strategy.get('files_included', []))} | "
-            f"{strategy.get('duplicate_reads_prevented', 0)} | "
-            f"{strategy.get('quality_risk_estimate', 'unknown')} | "
-            f"{strategy.get('cache_hits', 0)} | "
-            f"{strategy.get('runtime_ms', 0)} |"
+        md_table(
+            [
+                "Strategy",
+                "Input Tokens",
+                "Saved Tokens",
+                "Files Included",
+                "Duplicate Reads Prevented",
+                "Quality Risk",
+                "Cache Hits",
+                "Runtime (ms)",
+            ],
+            [
+                [
+                    strategy.get("strategy", ""),
+                    strategy.get("estimated_input_tokens", 0),
+                    strategy.get("estimated_saved_tokens", 0),
+                    len(strategy.get("files_included", [])),
+                    strategy.get("duplicate_reads_prevented", 0),
+                    strategy.get("quality_risk_estimate", "unknown"),
+                    strategy.get("cache_hits", 0),
+                    strategy.get("runtime_ms", 0),
+                ]
+                for strategy in strategies
+            ],
+            align="lrrrrlrr",
         )
+    )
 
     lines.extend(["", "## Strategy Details"])
     for strategy in strategies:
@@ -1468,27 +1495,29 @@ def render_pipeline_markdown(data: dict) -> str:
         "",
         "## Summary",
         "",
-        "| Metric | Value |",
-        "| --- | --- |",
-        f"| Scanned files | {data.get('scanned_files', 0):,} |",
-        f"| Tokens at scan (ranked pool) | {tokens_at_scan:,} |",
-        f"| Tokens after ranking | {int(data.get('tokens_after_ranking') or 0):,} |",
-        f"| Tokens before pack | {int(data.get('tokens_before_pack') or 0):,} |",
-        f"| Tokens after pack | {int(data.get('tokens_after_pack') or 0):,} |",
-        f"| **Final context tokens** | **{final_tokens:,}** |",
-        f"| Total tokens saved | {total_saved:,} |",
-        f"| **Total reduction** | **{total_pct:.1f}%** |",
-        f"| Cache active | {'yes' if data.get('has_cache') else 'no'} |",
-        f"| Delta active | {'yes' if data.get('has_delta') else 'no'} |",
+        *md_table(
+            ["Metric", "Value"],
+            [
+                ["Scanned files", f"{data.get('scanned_files', 0):,}"],
+                ["Tokens at scan (ranked pool)", f"{tokens_at_scan:,}"],
+                ["Tokens after ranking", f"{int(data.get('tokens_after_ranking') or 0):,}"],
+                ["Tokens before pack", f"{int(data.get('tokens_before_pack') or 0):,}"],
+                ["Tokens after pack", f"{int(data.get('tokens_after_pack') or 0):,}"],
+                ["**Final context tokens**", f"**{final_tokens:,}**"],
+                ["Total tokens saved", f"{total_saved:,}"],
+                ["**Total reduction**", f"**{total_pct:.1f}%**"],
+                ["Cache active", "yes" if data.get("has_cache") else "no"],
+                ["Delta active", "yes" if data.get("has_delta") else "no"],
+            ],
+        ),
         "",
         "## Stage Breakdown",
         "",
-        "| Stage | Files | Tokens In | Tokens Out | Saved | Reduction |",
-        "| --- | ---: | ---: | ---: | ---: | ---: |",
     ]
 
     OPT_INDENT = "\u00a0\u00a0\u00a0\u00bb "
 
+    stage_rows: list[list[str]] = []
     for stage in stages:
         if not isinstance(stage, dict):
             continue
@@ -1502,9 +1531,16 @@ def render_pipeline_markdown(data: dict) -> str:
         pct = float(stage.get("reduction_pct") or 0.0)
         pct_cell = f"{pct:.1f}%" if pct > 0 else "-"
         saved_cell = f"{t_saved:,}" if t_saved > 0 else "-"
-        lines.append(
-            f"| {display_label} | {files:,} | {t_in:,} | {t_out:,} | {saved_cell} | {pct_cell} |"
+        stage_rows.append(
+            [display_label, f"{files:,}", f"{t_in:,}", f"{t_out:,}", saved_cell, pct_cell]
         )
+    lines.extend(
+        md_table(
+            ["Stage", "Files", "Tokens In", "Tokens Out", "Saved", "Reduction"],
+            stage_rows,
+            align="lrrrrr",
+        )
+    )
 
     notes_rows = [s for s in stages if isinstance(s, dict) and s.get("notes")]
     if notes_rows:
