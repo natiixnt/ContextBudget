@@ -4,9 +4,20 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "redcon"
-version = "1.10.0"
+version = "1.11.0"
 description = "Deterministic context budgeting for coding-agent workflows"
 readme = "README.md"
+keywords = [
+    "ai-agents",
+    "claude-code",
+    "context-compression",
+    "context-engineering",
+    "cursor",
+    "developer-tools",
+    "llm",
+    "mcp",
+    "token-optimization",
+]
 requires-python = ">=3.10"
 license = { file = "LICENSE" }
 authors = [{ name = "Natalia Szczepanik" }]

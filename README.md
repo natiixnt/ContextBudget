@@ -24,7 +24,7 @@ AI coding agents burn tokens on irrelevant context. You either:
 - Dump the whole repo and pay for 200k input tokens per request, or
 - Let the agent grep blindly and waste tool calls figuring out where to look
 
-Redcon solves both. It ranks files by task relevance, compresses them with language-aware strategies (full, snippet, symbol extraction, summary), and packs the result under your token budget. Deterministic, local-first, no embeddings.
+Redcon solves both. It ranks files by task relevance, compresses them with language-aware strategies (full, snippet, symbol extraction, summary), and packs the result under your token budget. Deterministic, local-first, no embeddings. One MCP server covers Claude Code, Cursor, Windsurf, Cline and Zed; a plain CLI covers CI. Measured on this repository it cuts input tokens by more than 83% at the same task coverage ([methodology](docs/methodology.md)).
 
 ## Punch above your plan
 

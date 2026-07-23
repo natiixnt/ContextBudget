@@ -7,7 +7,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.0] - 2026-07-23
+
 ### Added
+
+- Compression profiles: `redcon pack --compression-profile max` (Pro) applies
+  tighter tier thresholds end to end and reports `Profile: max compression
+  (Pro)` in the output; without a license the run falls back to the default
+  profile with a warning. Configurable via `profile` in `redcon.toml`.
+- `redcon license` command: `--activate KEY` stores the license, plain
+  invocation shows plan, status and expiry, `--deactivate` removes it.
+- `docs/methodology.md`: reproducible measurement procedure behind the
+  published savings numbers.
 
 - Five new cmd-side compressors: `kubectl_events` (specialised inside
   KubectlGetCompressor for event-shape headers, 91.5% reduction),
@@ -59,6 +70,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- FastAPI gateway resolves the Authorization header reliably under
+  `from __future__ import annotations` and returns a consistent JSON error
+  contract (400 with `{"error": ...}` for malformed bodies).
+- Concurrent summary-cache writers merge per key under a file lock instead of
+  last-writer-wins.
+- `last_run_artifact` survives session serialization in the gateway store.
 - ANSI sequences and CR-overwrite progress bars no longer bleed into
   compressed output (V38).
 - `git_status`, `json_log`, `bundle_stats` fall through to raw
