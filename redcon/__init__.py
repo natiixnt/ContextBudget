@@ -15,7 +15,15 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING
 
-__version__ = "1.10.0"
+# Single-sourced from package metadata so the CLI can never lag behind the
+# released version again (1.11.0 shipped reporting 1.10.0).
+try:
+    from importlib.metadata import PackageNotFoundError
+    from importlib.metadata import version as _pkg_version
+
+    __version__ = _pkg_version("redcon")
+except PackageNotFoundError:  # source tree without an installed distribution
+    __version__ = "0.0.0+source"
 
 # Mapping from public symbol name to the submodule it lives in. The first
 # attribute access triggers an import of that module and caches the symbol

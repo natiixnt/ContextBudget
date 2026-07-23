@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.11.1] - 2026-07-23
+
+### Fixed
+
+- `redcon --version` (and `redcon.__version__`) now reads the installed
+  package metadata instead of a hardcoded string, which had lagged behind
+  the released version.
+
 ## [1.11.0] - 2026-07-23
 
 ### Added
